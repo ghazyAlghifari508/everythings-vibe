@@ -77,7 +77,7 @@ describe("FIX02 prompt credential follows the active session", () => {
 			},
 			onRequestNewToken: () => {},
 		});
-		expect(container?.textContent).toContain("Sesi telah berakhir");
+		expect(container?.textContent).toContain("Sesi sinkronisasi berakhir");
 		expect(container?.textContent).toContain("Buat sesi baru");
 	});
 
@@ -94,5 +94,83 @@ describe("FIX02 prompt credential follows the active session", () => {
 			onRequestNewToken: () => {},
 		});
 		expect(container?.textContent).toContain("Sesi segera berakhir");
+	});
+
+	it("never hides a live prompt behind a stale credit lock", () => {
+		const future = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+		renderStep({
+			payload: payload("sess_live", future),
+			status: {
+				projectId: "cb_p2",
+				sessionId: "sess_live",
+				status: "waiting_for_cli",
+			},
+			lockedPrompt: {
+				variant: "insufficient",
+				title: "Kredit tidak mencukupi",
+				description: "Tambahkan kredit untuk melanjutkan.",
+			},
+			onRequestNewToken: () => {},
+		});
+		expect(
+			container?.querySelector('[data-testid="locked-prompt-region"]'),
+		).toBeNull();
+		expect(container?.textContent).toContain("token-sess_live");
+		expect(container?.textContent).not.toContain("Kredit tidak mencukupi");
+	});
+
+	it("still locks an expired prompt for a genuinely blocked account", () => {
+		const past = new Date(Date.now() - 60_000).toISOString();
+		renderStep({
+			payload: payload("sess_dead", past),
+			status: {
+				projectId: "cb_p2",
+				sessionId: "sess_dead",
+				status: "expired",
+			},
+			lockedPrompt: {
+				variant: "insufficient",
+				title: "Kredit tidak mencukupi",
+				description: "Tambahkan kredit untuk melanjutkan.",
+			},
+			onRequestNewToken: () => {},
+		});
+		expect(
+			container?.querySelector('[data-testid="locked-prompt-region"]'),
+		).not.toBeNull();
+		// An expired credential is never echoed back at the user.
+		expect(container?.textContent).not.toContain("token-sess_dead");
+	});
+
+	it("copies the instructions of the active session only", async () => {
+		const writeText = vi.fn().mockResolvedValue(undefined);
+		Object.defineProperty(navigator, "clipboard", {
+			configurable: true,
+			value: { writeText },
+		});
+		const future = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+		renderStep({
+			payload: payload("sess_active", future),
+			status: {
+				projectId: "cb_p2",
+				sessionId: "sess_active",
+				status: "waiting_for_cli",
+			},
+			onRequestNewToken: () => {},
+		});
+
+		const copyButton = [...(container?.querySelectorAll("button") ?? [])].find(
+			(button) => /^Salin/.test(button.textContent?.trim() ?? ""),
+		);
+		expect(copyButton).not.toBeUndefined();
+		await act(async () => {
+			copyButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+
+		expect(writeText).toHaveBeenCalledTimes(1);
+		const copied = String(writeText.mock.calls[0]?.[0] ?? "");
+		expect(copied).toContain("token-sess_active");
+		expect(copied).toContain("repo-a");
+		expect(copied).not.toContain("sess_old");
 	});
 });

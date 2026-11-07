@@ -6,8 +6,8 @@
 export function HistorySelectionBar({
 	noun,
 	count,
-	filteredTotal,
-	truncated,
+	filteredTotal = 0,
+	truncated = false,
 	notice,
 	deleting,
 	cancelLabel = "Batal",
@@ -17,8 +17,9 @@ export function HistorySelectionBar({
 }: {
 	noun: string;
 	count: number;
-	filteredTotal: number;
-	truncated: boolean;
+	/** Only meaningful for surfaces that also offer a filtered-scope selection. */
+	filteredTotal?: number;
+	truncated?: boolean;
 	notice: string | null;
 	deleting: boolean;
 	cancelLabel?: string;

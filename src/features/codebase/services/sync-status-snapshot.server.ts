@@ -48,7 +48,11 @@ export async function readSyncStatusSnapshot(input: {
 	const { userId, codebaseId } = input;
 
 	const [codebase] = await db
-		.select({ id: codebases.id, name: codebases.name })
+		.select({
+			id: codebases.id,
+			name: codebases.name,
+			onboardingProjectId: codebases.onboardingProjectId,
+		})
 		.from(codebases)
 		.where(and(eq(codebases.id, codebaseId), eq(codebases.userId, userId)))
 		.limit(1);
@@ -60,13 +64,14 @@ export async function readSyncStatusSnapshot(input: {
 		};
 
 	let analysisProjectId: string | null = null;
-	if (input.projectId) {
+	const requestedProject = input.projectId ?? codebase.onboardingProjectId;
+	if (requestedProject) {
 		const [project] = await db
 			.select({ id: projects.id })
 			.from(projects)
 			.where(
 				and(
-					eq(projects.id, input.projectId),
+					eq(projects.id, requestedProject),
 					eq(projects.codebaseId, codebaseId),
 					eq(projects.userId, userId),
 					isNull(projects.deletedAt),
@@ -92,6 +97,7 @@ export async function readSyncStatusSnapshot(input: {
 				and(
 					eq(codebaseSyncSessions.id, input.sessionId),
 					eq(codebases.id, codebaseId),
+					eq(codebaseSyncSessions.userId, userId),
 					eq(codebases.userId, userId),
 				),
 			)
@@ -128,13 +134,18 @@ export async function readSyncStatusSnapshot(input: {
 	let status = session.status as CodebaseSyncStatus;
 	let sessionUpdatedAt = session.updatedAt;
 	const usability = getSessionUsability({ ...session, projectId: codebaseId });
-	if (!usability.usable && usability.code === "SYNC_SESSION_EXPIRED") {
+	if (
+		!usability.usable &&
+		usability.code === "SYNC_SESSION_EXPIRED" &&
+		!["uploaded", "analyzing", "ready", "failed", "expired"].includes(status)
+	) {
 		const [expired] = await db
 			.update(codebaseSyncSessions)
 			.set({ status: "expired", updatedAt: new Date() })
 			.where(
 				and(
 					eq(codebaseSyncSessions.id, session.id),
+					eq(codebaseSyncSessions.userId, userId),
 					isNull(codebaseSyncSessions.consumedAt),
 					notInArray(codebaseSyncSessions.status, [
 						"ready",
@@ -150,38 +161,30 @@ export async function readSyncStatusSnapshot(input: {
 		}
 	}
 
-	// Artifacts are only attached for usable or successfully-ready sessions. A
-	// failed session must not serve a stale snapshot that polling could mistake
-	// for the current sync's success. Deliberate exception: an expired session
-	// still serves the latest stored codebase snapshot (not the session's own)
-	// so the frontend can open the workspace directly instead of blocking the
-	// user on an expired session.
-	const showArtifacts = status !== "failed" && status !== "expired";
-	const [snapshot] = showArtifacts
-		? await db
-				.select({
-					id: codebaseSnapshots.id,
-					fileCount: codebaseSnapshots.fileCount,
-					excludedCount: codebaseSnapshots.excludedCount,
-					createdAt: codebaseSnapshots.createdAt,
-				})
-				.from(codebaseSnapshots)
-				.where(eq(codebaseSnapshots.syncSessionId, session.id))
-				.orderBy(desc(codebaseSnapshots.createdAt))
-				.limit(1)
-		: status === "expired"
-			? await db
-					.select({
-						id: codebaseSnapshots.id,
-						fileCount: codebaseSnapshots.fileCount,
-						excludedCount: codebaseSnapshots.excludedCount,
-						createdAt: codebaseSnapshots.createdAt,
-					})
-					.from(codebaseSnapshots)
-					.where(eq(codebaseSnapshots.codebaseId, codebaseId))
-					.orderBy(desc(codebaseSnapshots.createdAt))
-					.limit(1)
-			: [];
+	// A snapshot belongs to this session, never to a sibling upload. An expired
+	// token after a completed upload still owns its snapshot: the credential is
+	// gone, the analysis lifecycle is not.
+	const [storedSnapshot] = await db
+		.select({
+			id: codebaseSnapshots.id,
+			fileCount: codebaseSnapshots.fileCount,
+			excludedCount: codebaseSnapshots.excludedCount,
+			createdAt: codebaseSnapshots.createdAt,
+		})
+		.from(codebaseSnapshots)
+		.where(
+			and(
+				eq(codebaseSnapshots.syncSessionId, session.id),
+				eq(codebaseSnapshots.codebaseId, codebaseId),
+				eq(codebaseSnapshots.status, "uploaded"),
+			),
+		)
+		.orderBy(desc(codebaseSnapshots.createdAt))
+		.limit(1);
+	if (storedSnapshot && status === "expired") status = "uploaded";
+	// A failed transport attempt still must not serve artifacts: polling would
+	// read them as the current sync's success.
+	const snapshot = status === "failed" ? null : storedSnapshot;
 
 	// Determinate progress exists only while transport is genuinely running; the
 	// group-by is skipped for every other state.
@@ -222,6 +225,7 @@ export async function readSyncStatusSnapshot(input: {
 		// replaced the creation placeholder, so an open onboarding page learns
 		// the real repository name from status rather than holding a stale one.
 		codebaseName: codebase.name,
+		analysisProjectId: analysisProjectId ?? undefined,
 		cliConnectedAt: cliConnectedAt ?? undefined,
 		snapshotId: snapshot?.id ?? null,
 		snapshotCreatedAt: toIsoOrUndefined(snapshot?.createdAt),

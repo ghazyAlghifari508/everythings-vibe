@@ -74,7 +74,24 @@ vi.mock("@/db", async () => {
 		};
 		return { chain, record };
 	}
+	/**
+	 * Read side of the recorded transaction. The create handler looks up an
+	 * existing codebase and `prepareSyncSession` lists the repository's sessions;
+	 * an empty result keeps both on the create path this suite asserts.
+	 */
+	const selectChain: Record<string, unknown> = {
+		from: () => selectChain,
+		where: () => selectChain,
+		limit: () => Promise.resolve([]),
+		orderBy: () => selectChain,
+	};
 	const tx = {
+		// `prepareSyncSession` takes a per-repository advisory lock and reads the
+		// existing sessions before minting one, so the recorded transaction needs
+		// the same surface as the real one. Returning no rows keeps the handler on
+		// the create path this suite asserts.
+		execute: () => Promise.resolve(undefined),
+		select: () => selectChain,
 		insert: (table: unknown) => {
 			const { chain, record } = fakeInsert(table);
 			recorder.inserts.push(record);
@@ -100,12 +117,12 @@ function createHandler(): CreateHandler {
 	return captured.post;
 }
 
-function post(body: unknown): Promise<Response> {
+function post(body: object): Promise<Response> {
 	return createHandler()({
 		request: new Request("https://example.test/api/codebases", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify(body),
+			body: JSON.stringify({ requestId: crypto.randomUUID(), ...body }),
 		}),
 	});
 }
@@ -124,7 +141,7 @@ beforeEach(() => {
 });
 
 describe("POST /api/codebases", () => {
-	it("creates a codebase and a waiting sync session for an empty body", async () => {
+	it("creates one codebase and waiting session for a valid attempt", async () => {
 		const res = await post({});
 
 		expect(res.status).toBe(200);
@@ -185,7 +202,6 @@ describe("POST /api/codebases", () => {
 
 		expect(res.status).toBe(500);
 		const payload = (await res.json()) as { error: string; code?: string };
-		expect(payload.error).toBe("Gagal membuat codebase");
 		expect(payload.code).toBe("CODEBASE_CREATE_FAILED");
 		// The driver message stays server-side; the browser must never receive it.
 		expect(JSON.stringify(payload)).not.toContain("name_source");

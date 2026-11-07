@@ -8,6 +8,7 @@
  * only name the branches the caller already handled inline.
  */
 
+import { z } from "zod";
 import {
 	type AnalysisResponse,
 	analysisResponseSchema,
@@ -18,6 +19,7 @@ import {
 	syncPromptPayloadSchema,
 	syncStatusResponseSchema,
 } from "@/features/codebase/services/sync";
+import { readOnboardingRequestId } from "./onboarding-request-identity";
 
 export type CreatedCodebase = {
 	id: string;
@@ -44,59 +46,64 @@ export type CreateCodebaseOutcome =
 			codebase: CreatedCodebase;
 			payload: SyncPromptPayload;
 	  }
+	| { kind: "recovered"; codebase: CreatedCodebase; sessionId: string }
+	| { kind: "unknown"; message: string }
 	| { kind: "unauthorized" }
 	| { kind: "rejected"; message: string };
 
-/** Approval payload for a start request; empty while the account already holds one. */
-type StartApproval = {
-	creditConsent?: { maximumCredits: number; pricingVersion: string };
-};
-
 export async function requestCreateCodebase(
-	acceptance: StartApproval,
+	requestId = readOnboardingRequestId(),
 ): Promise<CreateCodebaseOutcome> {
-	const response = await fetch("/api/codebases", {
-		method: "POST",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify(acceptance),
-	});
-	if (response.status === 401) {
-		redirectToLogin();
-		return { kind: "unauthorized" };
-	}
-	const body: unknown = await response.json().catch(() => null);
-	if (
-		typeof body !== "object" ||
-		body === null ||
-		!("id" in body) ||
-		typeof body.id !== "string"
-	) {
+	let response: Response;
+	try {
+		response = await fetch("/api/codebases", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ requestId }),
+		});
+	} catch {
 		return {
-			kind: "rejected",
-			message: readServerError(body) ?? "Codebase gagal dibuat. Coba lagi.",
+			kind: "unknown",
+			message:
+				"Hasil permintaan belum diketahui. Coba lagi untuk memulihkan repository yang sama.",
 		};
 	}
-	const sync =
-		"sync" in body ? syncPromptPayloadSchema.safeParse(body.sync) : null;
-	if (!sync?.success) {
+	if (response.status === 401) return { kind: "unauthorized" };
+	const body: unknown = await response.json().catch(() => null);
+	if (!response.ok)
 		return {
 			kind: "rejected",
+			message:
+				readServerError(body) ?? "Repository belum dapat disiapkan. Coba lagi.",
+		};
+	const identity = z
+		.object({ id: z.string().min(1), name: z.string().min(1) })
+		.safeParse(body);
+	if (!identity.success)
+		return {
+			kind: "unknown",
+			message:
+				"Respons repository tidak valid. Coba lagi untuk memulihkan percobaan yang sama.",
+		};
+	const recovered = z
+		.object({
+			code: z.literal("CODEBASE_SESSION_RECOVERY_REQUIRED"),
+			sessionId: z.string().min(1),
+		})
+		.safeParse(body);
+	if (recovered.success)
+		return {
+			kind: "recovered",
+			codebase: identity.data,
+			sessionId: recovered.data.sessionId,
+		};
+	const sync = z.object({ sync: syncPromptPayloadSchema }).safeParse(body);
+	if (!sync.success || sync.data.sync.projectId !== identity.data.id)
+		return {
+			kind: "unknown",
 			message: "Codebase dibuat, tetapi instruksi sync tidak valid.",
 		};
-	}
-	const codebaseName =
-		"name" in body && typeof body.name === "string" ? body.name : null;
-	if (!codebaseName) {
-		return {
-			kind: "rejected",
-			message: "Codebase dibuat, tetapi nama tidak diterima. Coba lagi.",
-		};
-	}
-	return {
-		kind: "created",
-		codebase: { id: body.id, name: codebaseName },
-		payload: sync.data,
-	};
+	return { kind: "created", codebase: identity.data, payload: sync.data.sync };
 }
 
 export type RecoverStatusOutcome =
@@ -114,34 +121,58 @@ export async function requestCodebaseStatus(
 		redirectToLogin();
 		return { kind: "unauthorized" };
 	}
+	if (response.status === 404) return { kind: "stale" };
 	const parsed = syncStatusResponseSchema.safeParse(
 		await response.json().catch(() => null),
 	);
-	if (!response.ok || !parsed.success) return { kind: "stale" };
+	if (!response.ok || !parsed.success || parsed.data.projectId !== codebaseId)
+		throw new Error("Status repository belum dapat dibaca. Coba lagi.");
 	return { kind: "recovered", status: parsed.data };
 }
 
 export type RetrySessionOutcome =
 	| { kind: "minted"; payload: SyncPromptPayload }
 	| { kind: "cancelled" }
-	| { kind: "failed" };
+	| { kind: "failed" }
+	| { kind: "recovery"; code: string; sessionId: string; message: string };
 
 export async function requestRetrySession(
 	codebaseId: string,
-	acceptance: StartApproval,
+	sessionId?: string,
 ): Promise<RetrySessionOutcome> {
 	const response = await fetch(
 		`/api/codebases/${encodeURIComponent(codebaseId)}/session`,
 		{
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ action: "retry", ...acceptance }),
+			body: JSON.stringify(
+				sessionId ? { action: "retry", sessionId } : { action: "recover" },
+			),
 		},
 	);
-	const parsed = syncPromptPayloadSchema.safeParse(
-		await response.json().catch(() => null),
-	);
-	if (!response.ok || !parsed.success) return { kind: "failed" };
+	const body: unknown = await response.json().catch(() => null);
+	const recovery = z
+		.object({
+			code: z.enum([
+				"SYNC_SESSION_EXPIRED",
+				"CODEBASE_SESSION_RECOVERY_REQUIRED",
+				"SYNC_SESSION_ACTIVE",
+				"SYNC_SNAPSHOT_UPLOADED",
+			]),
+			sessionId: z.string().min(1),
+			error: z.string(),
+		})
+		.safeParse(body);
+	if (response.status === 409 && recovery.success)
+		return {
+			kind: "recovery",
+			code: recovery.data.code,
+			sessionId: recovery.data.sessionId,
+			message: recovery.data.error,
+		};
+	const parsed = syncPromptPayloadSchema.safeParse(body);
+	if (!response.ok || !parsed.success || parsed.data.projectId !== codebaseId)
+		return { kind: "failed" };
 	return { kind: "minted", payload: parsed.data };
 }
 
@@ -187,6 +218,7 @@ export async function requestFeatureProject(
 export type AnalysisTriggerOutcome =
 	| { kind: "ready"; analysis: AnalysisResponse }
 	| { kind: "unauthorized" }
+	| { kind: "pending" }
 	| {
 			kind: "credit";
 			message: string;
@@ -199,31 +231,25 @@ export async function requestOnboardingAnalysis({
 	projectId,
 	snapshotId,
 	refreshStarterSuggestionsForAnalysisId,
-	creditConsent,
 }: {
 	projectId: string;
 	snapshotId: string;
 	refreshStarterSuggestionsForAnalysisId?: string;
-	creditConsent?: { maximumCredits: number; pricingVersion: string };
 }): Promise<AnalysisTriggerOutcome> {
 	const bodyPayload: {
 		snapshotId: string;
 		refreshStarterSuggestionsForAnalysisId?: string;
-		creditConsent?: { maximumCredits: number; pricingVersion: string };
 	} = { snapshotId };
 	if (refreshStarterSuggestionsForAnalysisId) {
 		bodyPayload.refreshStarterSuggestionsForAnalysisId =
 			refreshStarterSuggestionsForAnalysisId;
 	}
-	const confirmedPayload: unknown = creditConsent
-		? { ...bodyPayload, creditConsent }
-		: bodyPayload;
 	const response = await fetch(
 		`/api/v1/projects/${encodeURIComponent(projectId)}/codebase/analysis`,
 		{
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify(confirmedPayload),
+			body: JSON.stringify(bodyPayload),
 		},
 	);
 	// The caller owns the redirect here: the analysis trigger discards a
@@ -231,6 +257,14 @@ export async function requestOnboardingAnalysis({
 	// to stay in front of the navigation.
 	if (response.status === 401) return { kind: "unauthorized" };
 	const body: unknown = await response.json().catch(() => null);
+	if (
+		response.status === 409 &&
+		typeof body === "object" &&
+		body !== null &&
+		"code" in body &&
+		body.code === "ANALYSIS_IN_PROGRESS"
+	)
+		return { kind: "pending" };
 	const serverError = readServerError(body);
 	const { analysisCreditStatusSchema } = await import(
 		"./analysis-credit-policy"

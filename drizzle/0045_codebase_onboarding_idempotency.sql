@@ -1,0 +1,1 @@
+ALTER TABLE "codebases" ADD COLUMN IF NOT EXISTS "onboarding_request_hash" text;

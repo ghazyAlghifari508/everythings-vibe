@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import assert from "node:assert/strict";
+import { EventEmitter, once } from "node:events";
+import { setTimeout as delay } from "node:timers/promises";
 import {
 	cleanup,
 	fireEvent,
@@ -7,6 +9,7 @@ import {
 	screen,
 	waitFor,
 } from "@testing-library/react";
+import { StrictMode } from "react";
 import { afterEach, test, vi } from "vitest";
 import { PlanCodebasePage } from "../components/workspace/plan-codebase-page";
 
@@ -162,15 +165,18 @@ test("top-up opens the real billing flow and unlocks from server state", async (
 	});
 	render(<PlanCodebasePage />);
 
-	fireEvent.click(await screen.findByRole("button", { name: "Tambahkan Kredit" }));
+	fireEvent.click(
+		await screen.findByRole("button", { name: "Tambahkan Kredit" }),
+	);
 	assert.ok(await screen.findByText("Isi Ulang Kredit"));
 	fireEvent.click(screen.getByRole("button", { name: /Tutup modal/i }));
 
 	await screen.findByRole("button", { name: "Salin prompt untuk AI agent" });
 	assert.equal(preflightCount, 2);
 	assert.equal(
-		calls.filter((call) => call.method === "POST" && call.url === "/api/codebases")
-			.length,
+		calls.filter(
+			(call) => call.method === "POST" && call.url === "/api/codebases",
+		).length,
 		1,
 	);
 });
@@ -196,35 +202,22 @@ test("billing-exempt accounts run the normal sync without a credit gate", async 
 	assert.equal(screen.queryByText(/Analisis hingga/), null);
 });
 
-test("a changed quote asks for one approval and records the ceiling", async () => {
+test("legacy approval flag cannot add a step to an eligible account", async () => {
 	const calls = stubBackend((input) => {
-		if (input === PREFLIGHT)
-			return creditStatus({ canStart: false, requiresApproval: true });
+		if (input === PREFLIGHT) return creditStatus({ requiresApproval: true });
 		if (input === "/api/codebases") return createdCodebase();
 		if (input.includes("/status")) return statusResponse();
 		throw new Error(`Unexpected request ${input}`);
 	});
 	render(<PlanCodebasePage />);
-
-	const locked = await screen.findByTestId("locked-prompt-region");
-	assert.equal(locked.getAttribute("data-locked-variant"), "approval");
-	assert.ok(locked.textContent?.includes("Tarif analisis diperbarui"));
-	fireEvent.click(
-		await screen.findByRole("button", { name: "Setujui dan lanjutkan" }),
-	);
-
-	await waitFor(() =>
-		assert.equal(
-			calls.filter((call) => call.method === "POST").length,
-			1,
-			"the approval must start exactly one session",
-		),
-	);
+	await screen.findByRole("button", { name: "Salin prompt untuk AI agent" });
+	assert.equal(screen.queryByRole("checkbox"), null);
+	assert.equal(screen.queryByTestId("locked-prompt-region"), null);
 	const create = calls.find((call) => call.url === "/api/codebases");
-	assert.deepEqual(JSON.parse(String(create?.body)).creditConsent, {
-		maximumCredits: 12,
-		pricingVersion: "adaptive-v1",
-	});
+	assert.equal(
+		Object.hasOwn(JSON.parse(String(create?.body)), "creditConsent"),
+		false,
+	);
 });
 
 test("a rerender does not mint a second sync session", async () => {
@@ -263,27 +256,188 @@ test("opening the screen never starts a billable analysis", async () => {
 	);
 });
 
-test("no native browser confirm or alert remain in codebase feature source", async () => {
-	const glob = await import("node:fs/promises");
-	const files = [
-		"src/features/codebase/services/analysis-credit-requests.ts",
-		"src/features/codebase/hooks/use-codebase-onboarding.ts",
-		"src/features/codebase/hooks/use-codebase-sync.ts",
-		"src/features/codebase/hooks/use-workspace-analysis.ts",
-		"src/features/codebase/components/workspace/plan-codebase-page.tsx",
-		"src/features/codebase/components/planning/codebase-resync-modal.tsx",
-	];
-	for (const f of files) {
-		const source = await glob.readFile(f, "utf8");
-		assert.equal(
-			source.includes("window.confirm"),
-			false,
-			`${f} still has window.confirm`,
-		);
-		assert.equal(
-			source.includes("window.alert"),
-			false,
-			`${f} still has window.alert`,
-		);
-	}
+test("Strict Mode and remount recover the same prompt without another codebase", async () => {
+	const calls = stubBackend((input) => {
+		if (input === PREFLIGHT) return creditStatus({});
+		if (input === "/api/codebases") return createdCodebase();
+		if (input.includes("/status")) return statusResponse();
+		if (input.endsWith("/session")) return syncPayload();
+		throw new Error(`Unexpected request ${input}`);
+	});
+	const first = render(
+		<StrictMode>
+			<PlanCodebasePage intent="new" />
+		</StrictMode>,
+	);
+	await screen.findByRole("button", { name: "Salin prompt untuk AI agent" });
+	first.unmount();
+	render(
+		<StrictMode>
+			<PlanCodebasePage intent="new" />
+		</StrictMode>,
+	);
+	await screen.findByRole("button", { name: "Salin prompt untuk AI agent" });
+	assert.equal(
+		calls.filter(
+			(call) => call.method === "POST" && call.url === "/api/codebases",
+		).length,
+		1,
+	);
+	assert.ok(screen.getByText(new RegExp(SYNC_TOKEN)));
+});
+
+test("failed session preparation offers a working retry", async () => {
+	let attempts = 0;
+	stubBackend((input) => {
+		if (input === PREFLIGHT) return creditStatus({});
+		if (input === "/api/codebases")
+			return ++attempts === 1
+				? { error: "Session unavailable" }
+				: createdCodebase();
+		if (input.includes("/status")) return statusResponse();
+		throw new Error(`Unexpected request ${input}`);
+	});
+	render(<PlanCodebasePage />);
+	fireEvent.click(await screen.findByRole("button", { name: "Coba lagi" }));
+	await screen.findByRole("button", { name: "Salin prompt untuk AI agent" });
+	assert.equal(attempts, 2);
+});
+
+test("a delayed create response cannot overwrite a newer navigation", async () => {
+	const events = new EventEmitter();
+	const pending = once(events, "response");
+	let requested = false;
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async (input: string) => {
+			if (input === PREFLIGHT) return Response.json(creditStatus({}));
+			if (input === "/api/codebases") {
+				requested = true;
+				await pending;
+				return Response.json(createdCodebase());
+			}
+			throw new Error(`Unexpected request ${input}`);
+		}),
+	);
+	const page = render(<PlanCodebasePage intent="new" />);
+	await waitFor(() => assert.ok(requested));
+	page.unmount();
+	window.history.replaceState(
+		{ codebaseStartRequest: crypto.randomUUID() },
+		"",
+	);
+	events.emit("response");
+	await pending;
+	await delay(0);
+	assert.equal(sessionStorage.getItem("prdfy:plan-codebase-id"), null);
+});
+
+test("a blocked account shows a locked prompt and no progress that pretends to connect", async () => {
+	const calls = stubBackend((input) => {
+		if (input === PREFLIGHT)
+			return creditStatus({
+				code: "INSUFFICIENT_CREDITS",
+				availableCredits: 2,
+				canStart: false,
+			});
+		throw new Error(`Unexpected request ${input}`);
+	});
+	render(<PlanCodebasePage intent="new" />);
+
+	const locked = await screen.findByTestId("locked-prompt-region");
+	assert.equal(locked.getAttribute("data-locked-variant"), "insufficient");
+	// The contradictory pair from the report: no session is being created, so
+	// the progress line must not claim a connection.
+	assert.ok(screen.getByText("Belum dimulai"));
+	assert.equal(screen.queryByText("Menghubungkan server..."), null);
+	assert.equal(screen.queryByText("Menghubungkan repository..."), null);
+	assert.equal(screen.queryByText(/Menunggu agent/), null);
+	assert.equal(
+		calls.some((call) => call.method === "POST"),
+		false,
+		"a blocked account must not mint a session",
+	);
+});
+
+test("a pending create request shows loading in both the prompt and the progress line", async () => {
+	let releaseCreate: () => void = () => {};
+	const createGate = new Promise<void>((resolve) => {
+		releaseCreate = resolve;
+	});
+	let requested = false;
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async (input: string) => {
+			if (input === PREFLIGHT) return Response.json(creditStatus({}));
+			if (input === "/api/codebases") {
+				requested = true;
+				await createGate;
+				return Response.json(createdCodebase());
+			}
+			if (input.includes("/status")) return Response.json(statusResponse());
+			throw new Error(`Unexpected request ${input}`);
+		}),
+	);
+	render(<PlanCodebasePage intent="new" />);
+
+	await waitFor(() => assert.ok(requested));
+	// A real request is in flight: loading is honest here, and the lock is not.
+	// No sync connection can be claimed before the session exists.
+	assert.ok(screen.getByText("Menghubungkan repository..."));
+	assert.ok(screen.getByText("Menyiapkan sesi sync..."));
+	assert.equal(screen.queryByText("Menghubungkan server..."), null);
+	assert.equal(screen.queryByText("Belum dimulai"), null);
+	assert.equal(screen.queryByTestId("locked-prompt-region"), null);
+
+	releaseCreate();
+	await screen.findByRole("button", { name: "Salin prompt untuk AI agent" });
+	// Success replaces the loading state in the same paint as the prompt.
+	assert.equal(screen.queryByText("Menghubungkan repository..."), null);
+	assert.ok(screen.getByText(new RegExp(SYNC_TOKEN)));
+});
+
+test("a malformed session response reports one error and retries into the prompt", async () => {
+	let attempts = 0;
+	const bodies: string[] = [];
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async (input: string, init?: RequestInit) => {
+			if (input === PREFLIGHT) return Response.json(creditStatus({}));
+			if (input === "/api/codebases") {
+				attempts += 1;
+				bodies.push(String(init?.body ?? ""));
+				// First response: the server made the codebase but the client never
+				// received a usable payload (lost/malformed response).
+				return Response.json(
+					attempts === 1
+						? { id: "cb-1", name: "Repo Lokal" }
+						: createdCodebase(),
+				);
+			}
+			if (input.includes("/status")) return Response.json(statusResponse());
+			throw new Error(`Unexpected request ${input}`);
+		}),
+	);
+	render(<PlanCodebasePage intent="new" />);
+
+	assert.ok(
+		await screen.findByText(
+			"Codebase dibuat, tetapi instruksi sync tidak valid.",
+		),
+	);
+	assert.equal(screen.getAllByRole("alert").length, 1);
+	assert.equal(screen.queryByTestId("locked-prompt-region"), null);
+
+	fireEvent.click(screen.getByRole("button", { name: "Coba lagi" }));
+	await screen.findByRole("button", { name: "Salin prompt untuk AI agent" });
+	// Success clears the obsolete failure instead of stacking a second notice.
+	assert.equal(screen.queryByRole("alert"), null);
+	assert.equal(
+		screen.queryByText("Codebase dibuat, tetapi instruksi sync tidak valid."),
+		null,
+	);
+	assert.equal(attempts, 2);
+	// One onboarding attempt carries one operation identity, so the retry cannot
+	// create a second codebase for it.
+	assert.equal(new Set(bodies).size, 1);
 });

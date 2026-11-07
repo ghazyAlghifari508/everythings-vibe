@@ -2,6 +2,7 @@
 
 import { Copy01Icon, Tick01Icon } from "@hugeicons/core-free-icons";
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Spinner } from "@/components/ui/spinner";
 import { useCopyFeedback } from "@/features/codebase/hooks/use-copy-feedback";
@@ -39,6 +40,7 @@ interface ScreenConnectPromptStepProps {
 	lockedPrompt?: LockedPromptState | null;
 	/** Non-secret rate/saldo disclosure rendered outside the prompt box. */
 	creditNote?: string | null;
+	error?: string | null;
 }
 
 export function ScreenConnectPromptStep({
@@ -50,10 +52,17 @@ export function ScreenConnectPromptStep({
 	onRequestNewToken,
 	lockedPrompt = null,
 	creditNote = null,
+	error = null,
 }: ScreenConnectPromptStepProps) {
 	const { copied, copyError, copy } = useCopyFeedback();
 	const promptText = payload ? buildAgentPrompt(payload, { projectName }) : "";
 	const sessionStatus = status?.status ?? null;
+	const cliActive = [
+		"connected",
+		"scanning",
+		"filtering",
+		"uploading",
+	].includes(sessionStatus ?? "");
 	const expiryMs = resolveExpiryMs(payload?.expiresAt ?? status?.expiresAt);
 	const expiryState =
 		sessionStatus === "expired" || expiryMs === null || expiryMs <= 0
@@ -75,6 +84,18 @@ export function ScreenConnectPromptStep({
 	const showRenewal =
 		expiryState === "expired" || expiryState === "soon" || !payload;
 
+	// A schema-validated payload is the only proof that this session exists, so
+	// it always wins. A credit read taken before (or after) it landed is stale by
+	// definition and must never replace a live prompt with the lock that caused
+	// the reported "locked prompt stays visible" blocker.
+	const promptUsable =
+		payload !== null &&
+		expiryState !== "expired" &&
+		!transportComplete &&
+		!cliActive;
+	const activeLock =
+		promptUsable || transportComplete || cliActive ? null : lockedPrompt;
+
 	return (
 		<div className="flex items-start gap-3.5">
 			<span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-iron font-mono text-xs text-mist">
@@ -85,12 +106,13 @@ export function ScreenConnectPromptStep({
 					<div className="text-xs font-semibold text-mist">
 						Salin instruksi untuk AI agent
 					</div>
-					{payload && !lockedPrompt && (
-						<button
+					{promptUsable && !activeLock && (
+						<Button
 							type="button"
 							onClick={handleCopy}
 							aria-label="Salin prompt untuk AI agent"
-							className="inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-md border border-iron bg-charcoal px-3 py-1 font-sans text-xs font-semibold text-snow transition hover:bg-steel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+							variant="secondary"
+							className="min-h-11 shrink-0 gap-1.5 px-3 text-xs"
 						>
 							{copied ? (
 								<>
@@ -107,13 +129,13 @@ export function ScreenConnectPromptStep({
 									<span>Salin</span>
 								</>
 							)}
-						</button>
+						</Button>
 					)}
 				</div>
 				<div className="relative rounded-lg border border-graphite bg-onyx p-3.5 font-mono text-xs leading-relaxed text-mist sm:p-4">
-					{lockedPrompt ? (
-						<LockedPromptStateView {...lockedPrompt} />
-					) : payload ? (
+					{activeLock ? (
+						<LockedPromptStateView {...activeLock} />
+					) : promptUsable ? (
 						<>
 							<div className="hide-scrollbar max-h-56 select-all overflow-x-auto overflow-y-auto whitespace-pre-wrap text-snow">
 								{promptText}
@@ -129,11 +151,6 @@ export function ScreenConnectPromptStep({
 									perbarui sesi.
 								</p>
 							)}
-							{expiryState === "expired" && (
-								<p className="mt-2 font-sans text-[11px] text-crimson">
-									Sesi telah berakhir. Buat sesi baru untuk melanjutkan.
-								</p>
-							)}
 						</>
 					) : transportComplete ? (
 						<div
@@ -146,36 +163,44 @@ export function ScreenConnectPromptStep({
 								instruksi baru yang perlu dijalankan.
 							</p>
 						</div>
+					) : cliActive ? (
+						<output className="block py-6 font-sans text-xs text-fog">
+							Agent terhubung. Sinkronisasi sedang berlangsung.
+						</output>
 					) : isStarting ? (
 						<div className="flex min-h-[190px] items-center justify-center gap-2 py-6 font-sans text-xs text-fog">
 							<Spinner size={14} className="text-blue-400" />
-							<span>Menyiapkan token sesi...</span>
+							<span>Menghubungkan repository...</span>
 						</div>
 					) : (
 						<div className="flex min-h-[190px] flex-col items-center justify-center gap-3 py-6 text-center font-sans">
 							<p className="max-w-[38ch] text-xs text-fog">
-								{sessionStatus === "expired" || expiryState === "expired"
-									? "Sesi telah berakhir."
-									: "Token sync hanya berlaku sekali dan tidak disimpan di browser."}
+								{error ??
+									(sessionStatus === "expired" || expiryState === "expired"
+										? "Sesi sinkronisasi berakhir."
+										: "Token sync hanya berlaku sekali dan tidak disimpan di browser.")}
 							</p>
 							{showRenewal && onRequestNewToken && (
-								<button
+								<Button
 									type="button"
 									onClick={onRequestNewToken}
 									disabled={isStarting}
-									className="inline-flex min-h-9 items-center rounded-md border border-iron bg-obsidian px-3.5 font-sans text-[11px] font-medium text-mist transition hover:bg-steel hover:text-snow disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+									variant="secondary"
+									className="min-h-11 px-3.5 text-xs"
 								>
 									{expiryState === "expired" || !payload
-										? "Buat sesi baru"
+										? error
+											? "Coba lagi"
+											: "Buat sesi baru"
 										: expiryState === "soon"
 											? "Perbarui sesi"
 											: "Dapatkan token baru"}
-								</button>
+								</Button>
 							)}
 						</div>
 					)}
 				</div>
-				{creditNote && !lockedPrompt && (
+				{creditNote && !activeLock && (
 					<p className="text-[11px] leading-relaxed text-fog">{creditNote}</p>
 				)}
 			</div>

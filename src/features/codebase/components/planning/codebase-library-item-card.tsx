@@ -12,6 +12,7 @@ import {
 	resolveLibraryItemAction,
 	resolveLibraryItemStatus,
 } from "@/features/codebase/services/library";
+import { RESUME_REPOSITORY_SEARCH } from "@/features/codebase/services/onboarding-intent";
 import {
 	clearPlanCodebaseProjectPointer,
 	storePlanCodebasePointer,
@@ -141,6 +142,7 @@ export function CodebaseLibraryItemCard({
 			) : action.recovery ? (
 				<Link
 					to={NEW_REPOSITORY_HREF}
+					search={RESUME_REPOSITORY_SEARCH}
 					onClick={() => beginRecoveryNavigation(item)}
 					className={cardClassName}
 				>

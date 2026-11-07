@@ -292,6 +292,5 @@ export async function triggerCodebaseAnalysis(
 		snapshot,
 		refreshRequest,
 		preflightOnly: parsedRequest.data.preflight ?? false,
-		creditConsent: parsedRequest.data.creditConsent,
 	});
 }

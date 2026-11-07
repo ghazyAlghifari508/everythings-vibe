@@ -227,9 +227,7 @@ describe("Internal Admin/Developer Billing Exemption", () => {
 		expect(preflight.maximumCredits).toBe(0);
 		expect(preflight.billingExempt).toBe(true);
 
-		const preSync = await checkPreSyncCredit(userId, {
-			acceptAnalysisPolicy: true,
-		});
+		const preSync = await checkPreSyncCredit(userId);
 		expect(preSync.response).toBeNull();
 		expect(preSync.status.canStart).toBe(true);
 	});
@@ -389,24 +387,6 @@ describe("Internal Admin/Developer Billing Exemption", () => {
 		const entitlement = await getUserBillingEntitlement(userId);
 		expect(entitlement.billingExempt).toBe(false);
 		expect(entitlement.reason).toBeNull();
-	});
-
-	it("8. Client-provided billingExempt is ignored", async () => {
-		const { userId } = await createTestUser({
-			billingExempt: false,
-			plan: "free",
-			credits: 0,
-			initialAnalysisUsed: true,
-		});
-
-		// Calling preflight with spoofed consent or body
-		const preflight = await getAnalysisCreditPreflight(userId, {
-			isInitial: false,
-			consent: { maximumCredits: 0, billingExempt: true },
-		});
-		expect(preflight.canStart).toBe(false);
-		expect(preflight.code).toBe("INSUFFICIENT_CREDITS");
-		expect(preflight.billingExempt).toBeUndefined();
 	});
 
 	it("9. Entitlement cannot be self-granted by normal account", async () => {

@@ -72,6 +72,9 @@ function uploadedStatus() {
 		snapshotId: "snap-retry-1",
 		fileCount: 24,
 		excludedCount: 3,
+		// The server persists the codebase's analysis anchor, so a refresh after a
+		// failed attempt still knows which project owns the retry.
+		analysisProjectId: "proj-retry-1",
 	};
 }
 
@@ -149,18 +152,20 @@ describe("PlanCodebasePage conclusion step recovery and retry", () => {
 
 		// The gate is reconstructed from the server row, not from React memory and
 		// not from a copy click. The one-time sync token is deliberately not
-		// restorable, so the prompt area offers a fresh one instead.
+		// restorable, but an attempt the CLI is already running must not be
+		// replaced: no renewal action is offered while it is in flight.
 		await waitFor(
 			() => {
 				expect(screen.getByText("Agent terhubung")).toBeDefined();
 			},
 			{ timeout: 15000, interval: 100 },
 		);
+		expect(screen.getByText("Mengunggah repository...")).toBeDefined();
 		expect(
-			screen.getByRole("button", {
+			screen.queryByRole("button", {
 				name: /coba lagi|buat sesi baru|token baru/i,
 			}),
-		).toBeDefined();
+		).toBeNull();
 		// Handshake evidence alone is not a finished transport: no snapshot exists
 		// yet, so the conclusion step stays shut.
 		expect(
@@ -250,7 +255,11 @@ describe("PlanCodebasePage conclusion step recovery and retry", () => {
 					json: async () => ({
 						...uploadedStatus(),
 						...(analysisFailed
-							? { analysisStatus: "failed" }
+							? {
+									analysisStatus: "failed",
+									analysisAttemptId: "ana-attempt-failed",
+									analysisAttemptStatus: "failed",
+								}
 							: {
 									analysisStatus: "ready",
 									analysisId: "ana-retry-1",
@@ -267,16 +276,9 @@ describe("PlanCodebasePage conclusion step recovery and retry", () => {
 			}
 			if (url.endsWith("/codebase/analysis") && method === "POST") {
 				analysisPosts += 1;
-				if (analysisPosts === 1) {
-					return {
-						ok: false,
-						status: 502,
-						json: async () => ({
-							error: "Analisis codebase gagal. Coba analisis ulang.",
-							code: "ANALYSIS_FAILED",
-						}),
-					};
-				}
+				// The failed attempt is already persisted, so the mount paints it and
+				// only the explicit retry posts again. That retry targets the same
+				// snapshot and resolves.
 				analysisFailed = false;
 				return {
 					ok: true,
@@ -354,7 +356,8 @@ describe("PlanCodebasePage conclusion step recovery and retry", () => {
 			},
 			{ timeout: 15000, interval: 100 },
 		);
-		expect(analysisPosts).toBe(2);
+		// One explicit retry, no automatic re-billing on mount, no re-upload.
+		expect(analysisPosts).toBe(1);
 		expect(screen.getByText("Next.js")).toBeDefined();
 	}, 25000);
 });

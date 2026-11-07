@@ -48,16 +48,9 @@ test("real PostgreSQL allowance, concurrency, release, isolation, and paid accou
 		},
 	]);
 	// The free initial allowance needs no approval: it is priced at zero.
-	assert.equal((await checkPreSyncCredit(otherUser, {})).response, null);
-	assert.equal(
-		(await checkPreSyncCredit(otherUser, {
-			creditConsent: { maximumCredits: 0, pricingVersion: "adaptive-v1" },
-		})).response,
-		null,
-	);
+	assert.equal((await checkPreSyncCredit(otherUser)).response, null);
 
-	// A standing authorization recorded by an earlier sync covers later starts;
-	// only a changed pricing version asks again, and one explicit approval fixes it.
+	// Session metadata is not account billing authorization.
 	const authorizedUser = crypto.randomUUID();
 	const authorizedCodebase = crypto.randomUUID();
 	await db.insert(schema.users).values({
@@ -95,7 +88,7 @@ test("real PostgreSQL allowance, concurrency, release, isolation, and paid accou
 			},
 		})
 		.returning({ id: schema.codebaseSyncSessions.id });
-	const standing = await checkPreSyncCredit(authorizedUser, {});
+	const standing = await checkPreSyncCredit(authorizedUser);
 	assert.equal(standing.response, null);
 	assert.equal(standing.status.requiresApproval, false);
 	await db
@@ -109,20 +102,10 @@ test("real PostgreSQL allowance, concurrency, release, isolation, and paid accou
 			},
 		})
 		.where(eq(schema.codebaseSyncSessions.id, authorizedSession.id));
-	const stale = await checkPreSyncCredit(authorizedUser, {});
-	assert.equal(stale.response?.status, 403);
-	assert.equal(stale.status.requiresApproval, true);
-	assert.equal(
-		(
-			await checkPreSyncCredit(authorizedUser, {
-				creditConsent: {
-					maximumCredits: stale.status.maximumCredits,
-					pricingVersion: "adaptive-v1",
-				},
-			})
-		).response,
-		null,
-	);
+	const stale = await checkPreSyncCredit(authorizedUser);
+	assert.equal(stale.response, null);
+	assert.equal(stale.status.canStart, true);
+	assert.equal(stale.status.requiresApproval, false);
 	const metrics = credits.buildCodebaseMetrics({
 		fileCount: 100,
 		contentSize: 250000,
@@ -214,26 +197,7 @@ test("real PostgreSQL allowance, concurrency, release, isolation, and paid accou
 			idempotencyKey: "rename-bypass",
 		}),
 	);
-	assert.equal((await getAnalysisCreditPreflight(userId)).canStart, false);
-	assert.equal(
-		(
-			await getAnalysisCreditPreflight(userId, {
-				consent: { maximumCredits: 1, pricingVersion: quote.pricingVersion },
-			})
-		).canStart,
-		false,
-	);
-	assert.equal(
-		(
-			await getAnalysisCreditPreflight(userId, {
-				consent: {
-					maximumCredits: quote.maximumCredits,
-					pricingVersion: quote.pricingVersion,
-				},
-			})
-		).canStart,
-		true,
-	);
+	assert.equal((await getAnalysisCreditPreflight(userId)).canStart, true);
 	const paid = await Promise.all([
 		credits.reserveCreditOperation({
 			...input,

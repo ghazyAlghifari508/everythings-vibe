@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import {
 	type AnalysisResponse,
 	canContinueToCodebaseConclusion,
@@ -14,7 +14,13 @@ import {
 	SNAPSHOT_CONTEXT_STATUSES,
 	type SyncStatusResponse,
 } from "@/features/codebase/services/sync";
-import { requestCodebaseStatus } from "../services/onboarding-requests";
+import type { AnalysisCreditStatus } from "../services/analysis-credit-policy";
+import { requestAnalysisCreditPreflight } from "../services/analysis-credit-requests";
+import {
+	requestCodebaseStatus,
+	requestRetrySession,
+} from "../services/onboarding-requests";
+import type { SyncPromptPayload } from "../services/sync";
 import type { OnboardingAnalysisState } from "./use-onboarding-analysis-state";
 
 /**
@@ -66,9 +72,8 @@ function resolveRecoveredStep(
  * Refresh recovery for `/plan/codebase`.
  *
  * The stored id is only a pointer. Authoritative sync state comes from GET
- * status. A missing token after refresh is never restored from storage; waiting
- * sessions mint a fresh credential via retry, while in-flight/uploaded sessions
- * resume polling without disturbing the active attempt.
+ * status. A missing token is never restored from storage. Recovery retains the
+ * original session; explicit replacement revokes its waiting credential.
  *
  * Kept apart from the create/retry session machine because it is the one branch
  * that has to read persisted analysis output before it can decide which step to
@@ -82,6 +87,8 @@ export function useOnboardingRecovery({
 	setRecoveredStatus,
 	setActiveSessionId,
 	setStep,
+	setPayload,
+	setCreditStatus,
 }: {
 	analysisState: OnboardingAnalysisState;
 	setError: (error: string | null) => void;
@@ -90,6 +97,8 @@ export function useOnboardingRecovery({
 	setRecoveredStatus: (status: SyncStatusResponse | null) => void;
 	setActiveSessionId: (sessionId: string | null) => void;
 	setStep: (step: PlanCodebaseStep) => void;
+	setPayload: (payload: SyncPromptPayload | null) => void;
+	setCreditStatus: (status: AnalysisCreditStatus | null) => void;
 }) {
 	const {
 		analysisAttemptedFor,
@@ -98,18 +107,29 @@ export function useOnboardingRecovery({
 		setFeatureProjectId,
 		fetchAnalysisOutput,
 	} = analysisState;
+	const mounted = useRef(false);
+	useEffect(() => {
+		mounted.current = true;
+		return () => {
+			mounted.current = false;
+		};
+	}, []);
 
 	return useCallback(async (): Promise<boolean> => {
 		const stored = readPlanCodebasePointer();
+		const isCurrent = () =>
+			mounted.current && readPlanCodebasePointer()?.id === stored?.id;
 		if (!stored) return false;
 		setError(null);
 		setIsStarting(true);
 		try {
 			const statusOutcome = await requestCodebaseStatus(stored.id);
+			if (!isCurrent()) return true;
 			if (statusOutcome.kind === "unauthorized") return true;
 			if (statusOutcome.kind === "stale") {
 				// Stale pointer: clear all onboarding state so a subsequent fresh
 				// start cannot inherit the previous attempt's analysis or error.
+				setIsStarting(false);
 				clearPlanOnboardingPointers();
 				setRecoveredStatus(null);
 				setActiveSessionId(null);
@@ -121,6 +141,7 @@ export function useOnboardingRecovery({
 			const recovered = statusOutcome.status;
 			const recoveredName = recovered.codebaseName ?? stored.name;
 			if (!recoveredName) {
+				setIsStarting(false);
 				clearPlanOnboardingPointers();
 				return false;
 			}
@@ -137,7 +158,8 @@ export function useOnboardingRecovery({
 				// onboarding analysis context is restored only here. Which of the two
 				// steps the user lands on is then decided by `resolveRecoveredStep`,
 				// which keeps the stored intent from overriding this evidence.
-				const storedProject = readPlanCodebaseProjectPointer();
+				const storedProject =
+					recovered.analysisProjectId ?? readPlanCodebaseProjectPointer();
 				let existingAnalysis: AnalysisResponse | null = null;
 				if (storedProject) {
 					setFeatureProjectId(storedProject);
@@ -145,6 +167,7 @@ export function useOnboardingRecovery({
 						storedProject,
 						recoveredSnapshotId,
 					);
+					if (!isCurrent()) return true;
 					if (
 						(existingAnalysis?.output &&
 							existingAnalysis.snapshotId === recoveredSnapshotId &&
@@ -163,16 +186,29 @@ export function useOnboardingRecovery({
 					analysisProjectId: storedProject,
 				});
 				setActiveSessionId(recovered.sessionId);
-				setRecoveredStatus(null);
+				setRecoveredStatus(recovered);
 				setCodebase({ id: stored.id, name: recoveredName });
 				setStep(resolveRecoveredStep(recovered, storedStep, isAnalysisReady));
 				return true;
 			}
-			if (
-				recovered.status === "waiting_for_cli" ||
-				recovered.status === "failed" ||
-				recovered.status === "expired"
-			) {
+			if (recovered.status === "waiting_for_cli") {
+				setRecoveredStatus(recovered);
+				setActiveSessionId(recovered.sessionId);
+				const credit = await requestAnalysisCreditPreflight();
+				if (!isCurrent()) return true;
+				setCreditStatus(credit);
+				if (credit.canStart) {
+					const result = await requestRetrySession(stored.id);
+					if (!isCurrent()) return true;
+					if (result.kind === "minted") {
+						setPayload(result.payload);
+						setActiveSessionId(result.payload.sessionId ?? null);
+						setRecoveredStatus(null);
+					} else if (result.kind === "recovery") {
+						setActiveSessionId(result.sessionId);
+						setError(result.message);
+					} else setError("Sesi sync gagal dibuat. Coba lagi.");
+				}
 				setStep("sync");
 				return true;
 			}
@@ -185,19 +221,16 @@ export function useOnboardingRecovery({
 			setStep(resolveRecoveredStep(recovered, storedStep));
 			return true;
 		} catch {
-			// Recovery failure: clear all stale state so a fresh start is clean.
-			clearPlanOnboardingPointers();
-			setRecoveredStatus(null);
-			setActiveSessionId(null);
-			setAnalysis(null);
-			setAnalysisError(null);
-			analysisAttemptedFor.current = null;
-			return false;
+			if (!isCurrent()) return true;
+			setError("Status repository belum dapat dibaca. Coba lagi.");
+			return true;
 		} finally {
-			setIsStarting(false);
+			if (isCurrent()) setIsStarting(false);
 		}
 	}, [
 		setActiveSessionId,
+		setPayload,
+		setCreditStatus,
 		setStep,
 		setError,
 		setIsStarting,

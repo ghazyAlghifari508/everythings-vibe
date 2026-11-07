@@ -114,7 +114,12 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 		expect(
 			screen.getByText("Sync codebase dengan everythings-vibe"),
 		).toBeDefined();
-		expect(screen.getByText("Menyiapkan token sesi...")).toBeDefined();
+		expect(screen.getByText("Menghubungkan repository...")).toBeDefined();
+		// The progress line describes the request that is genuinely in flight, and
+		// does not claim a sync connection before a session exists.
+		expect(screen.getByText("Menyiapkan sesi sync...")).toBeDefined();
+		expect(screen.queryByText("Menghubungkan server...")).toBeNull();
+		expect(screen.queryByText("Belum dimulai")).toBeNull();
 		expect(
 			screen.queryByRole("button", { name: "Siapkan instruksi" }),
 		).toBeNull();
@@ -421,63 +426,5 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 		expect(cta.disabled).toBe(true);
 		expect(screen.queryByTestId("codebase-analysis-pending")).toBeNull();
 		expect(screen.queryByText(/Sync gagal/i)).toBeNull();
-	});
-
-	it("lands on the sync screen when recovering a waiting session without a payload", async () => {
-		try {
-			sessionStorage.setItem("prdfy:plan-codebase-id", "cb-wait-1");
-			sessionStorage.setItem("prdfy:plan-codebase-name", "Waiting Repo");
-		} catch {
-			// Best-effort only.
-		}
-		const freshPayload = {
-			projectId: "cb-wait-1",
-			apiBaseUrl: "http://localhost:3000",
-			syncToken: "fresh-token-xyz",
-			syncCommand:
-				"everythings-vibe codebase sync --project-id cb-wait-1 --sync-token <token>",
-			expiresAt: new Date(Date.now() + 3600000).toISOString(),
-		};
-		vi.stubGlobal(
-			"fetch",
-			vi.fn(async (input: unknown, init?: { method?: string }) => {
-				const url = String(input);
-				if (url.includes("/status")) {
-					return {
-						ok: true,
-						status: 200,
-						json: async () => ({
-							projectId: "cb-wait-1",
-							sessionId: "sess-wait-1",
-							status: "waiting_for_cli",
-							snapshotId: null,
-						}),
-					};
-				}
-				if (url.endsWith("/session") && init?.method === "POST") {
-					return {
-						ok: true,
-						status: 200,
-						json: async () => freshPayload,
-					};
-				}
-				throw new Error(`unexpected fetch ${url}`);
-			}),
-		);
-
-		await renderConnectedOnboarding();
-
-		await waitFor(
-			() => {
-				expect(
-					screen.getByText("Sync codebase dengan everythings-vibe"),
-				).toBeDefined();
-			},
-			{ timeout: 15000 },
-		);
-		expect(screen.queryByText(/fresh-token-xyz/)).toBeNull();
-		expect(
-			screen.queryByRole("button", { name: /Siapkan|Buat sesi|token baru/i }),
-		).not.toBeNull();
 	});
 });

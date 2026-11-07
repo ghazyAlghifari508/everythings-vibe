@@ -6,7 +6,6 @@ import {
 	shouldDiscardWorkspaceAnalysis,
 } from "@/features/codebase/services/analysis-selection";
 import {
-	getPendingSyncPayloadKey,
 	type SyncPromptPayload,
 	type SyncStatusResponse,
 	syncPromptPayloadSchema,
@@ -15,6 +14,7 @@ import {
 import { shouldFetchWorkspaceAnalysis } from "@/features/codebase/services/workspace-analysis";
 import { CODEBASE_SYNC_POLL_INTERVAL_MS } from "@/features/codebase/types/codebase-constants";
 import type { AnalysisCreditStatus } from "../services/analysis-credit-policy";
+import { requestAnalysisCreditPreflight } from "../services/analysis-credit-requests";
 import {
 	type CodebaseSessionStartAction,
 	getCodebaseSessionRequestBody,
@@ -45,6 +45,7 @@ export function useCodebaseSync({
 	const [creditPreflight, setCreditPreflight] =
 		useState<AnalysisCreditStatus | null>(null);
 	const inFlight = useRef(false);
+	const sessionInFlight = useRef(false);
 	const analysisState = useWorkspaceAnalysis({
 		projectId,
 		currentSnapshotId,
@@ -133,23 +134,6 @@ export function useCodebaseSync({
 		setAnalysis,
 	]);
 	useEffect(() => {
-		try {
-			const raw = sessionStorage.getItem(getPendingSyncPayloadKey(codebaseId));
-			if (!raw) return;
-			const parsed = syncPromptPayloadSchema.safeParse(JSON.parse(raw));
-			if (parsed.success && parsed.data.projectId === codebaseId) {
-				setPayload(parsed.data);
-				if (parsed.data.sessionId) {
-					setActiveSessionId(parsed.data.sessionId);
-				}
-				setIsResyncModalOpen(true);
-			}
-			sessionStorage.removeItem(getPendingSyncPayloadKey(codebaseId));
-		} catch {
-			setError("Instruksi sync tidak dapat dibaca dari browser.");
-		}
-	}, [codebaseId]);
-	useEffect(() => {
 		void readStatus();
 		const interval = setInterval(
 			() => void readStatus(),
@@ -181,12 +165,12 @@ export function useCodebaseSync({
 	const startSession = async (
 		action: CodebaseSessionStartAction = "initial",
 	) => {
+		if (sessionInFlight.current) return;
+		sessionInFlight.current = true;
 		setIsStarting(true);
 		setIsResyncModalOpen(true);
 		setError(null);
 		try {
-			const { requestAnalysisCreditPreflight, preSyncAcceptance } =
-				await import("../services/analysis-credit-requests");
 			const status = await requestAnalysisCreditPreflight().catch(
 				(error: unknown) => {
 					setError(
@@ -199,11 +183,10 @@ export function useCodebaseSync({
 			);
 			if (!status) return;
 			setCreditPreflight(status);
-			// Mirrors the onboarding flow: an ineligible account gets a locked
-			// prompt with a top-up action, and no credential is ever minted for it.
-			// `requiresApproval` is the explicit approval action itself.
-			if (!status.canStart && !status.requiresApproval) return;
-			const acceptance = preSyncAcceptance(status);
+			if (!status.canStart) {
+				setPayload(null);
+				return;
+			}
 			const response = await fetch(
 				`/api/codebases/${encodeURIComponent(codebaseId)}/session`,
 				{
@@ -211,7 +194,7 @@ export function useCodebaseSync({
 					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify({
 						...getCodebaseSessionRequestBody(action),
-						...acceptance,
+						sessionId: activeSessionId,
 					}),
 				},
 			);
@@ -236,6 +219,7 @@ export function useCodebaseSync({
 					: "Server tidak dapat dihubungi.",
 			);
 		} finally {
+			sessionInFlight.current = false;
 			setIsStarting(false);
 		}
 	};

@@ -49,7 +49,6 @@ type AnalysisAttemptInput = {
 		syncSessionId: string;
 	};
 	preflightOnly?: boolean;
-	creditConsent?: unknown;
 	refreshRequest: AnalysisRefreshRequest | null;
 };
 
@@ -73,7 +72,6 @@ export async function runCodebaseAnalysisAttempt(
 
 	const creditStatus = await getAnalysisCreditPreflight(userId, {
 		isInitial: !refreshRequest,
-		consent: input.creditConsent,
 	});
 	if (input.preflightOnly)
 		return Response.json({

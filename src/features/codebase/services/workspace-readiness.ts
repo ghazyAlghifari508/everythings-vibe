@@ -20,7 +20,7 @@ import {
 	type AnalysisRecoveryCode,
 	isAnalysisRecoveryCode,
 } from "./analysis-diagnostics";
-import { SNAPSHOT_CONTEXT_STATUSES } from "./sync";
+import { CODEBASE_SYNC_COMPLETE_STATUSES } from "./sync";
 
 export type CodebaseReadiness =
 	/** No verified snapshot yet: the CLI has to finish. */
@@ -80,7 +80,7 @@ export function hasUsableSnapshot(
 	return Boolean(
 		status?.snapshotId &&
 			status.status &&
-			SNAPSHOT_CONTEXT_STATUSES.includes(status.status),
+			CODEBASE_SYNC_COMPLETE_STATUSES.some((value) => value === status.status),
 	);
 }
 
@@ -131,7 +131,9 @@ export function resolveCodebaseReadiness(input: {
 		Boolean(hasStoredSnapshot) ||
 		(Boolean(snapshotId) &&
 			Boolean(snapshotStatus) &&
-			SNAPSHOT_CONTEXT_STATUSES.includes(snapshotStatus as string));
+			CODEBASE_SYNC_COMPLETE_STATUSES.some(
+				(value) => value === snapshotStatus,
+			));
 	if (!hasSnapshot) return "onboarding";
 	if (hasReadyAnalysisForSnapshot(analysis, snapshotId))
 		return "planning_ready";

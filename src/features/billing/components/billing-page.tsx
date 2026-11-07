@@ -15,6 +15,7 @@ import type {
 	BillingPaymentItem,
 	BillingSubscription,
 } from "../services/billing-settings.functions";
+import { ADAPTIVE_CREDIT_PRICING } from "../types/billing-constants";
 import { getPaymentStatusInfo } from "../utils/payment-status";
 import { CreditUsageSection } from "./credit-usage";
 import { PaymentHistoryDialog } from "./payment-history-dialog";
@@ -153,6 +154,16 @@ export function BillingPage({
 								: remaining > 0
 									? `Sisa ${remaining} kredit periode ini.${creditsReserved > 0 ? ` (${creditsReserved} sedang direservasi).` : ""} Kredit reset setiap 30 hari.`
 									: "Kredit periode ini habis. Perpanjang atau tunggu reset berikutnya."}
+						</p>
+						<p className="mt-2 text-xs text-(--text-secondary)">
+							Analisis awal gratis sekali per akun. Analisis berikutnya memakai
+							hingga{" "}
+							{
+								ADAPTIVE_CREDIT_PRICING.operations.codebase_analysis
+									.maximumCredits
+							}{" "}
+							kredit sesuai ukuran repository. Sesi sync gratis; hanya analisis
+							berhasil yang ditagih.
 						</p>
 						{!isPaused &&
 							remaining === 0 &&
