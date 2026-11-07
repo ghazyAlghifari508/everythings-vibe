@@ -213,11 +213,13 @@ export const scrapes = pgTable(
 );
 
 export interface CrawlHeading {
+	id?: string;
 	level: number;
 	text: string;
 }
 
 export interface CrawlSection {
+	id?: string;
 	title: string | null;
 	level: number | null;
 	text: string;
