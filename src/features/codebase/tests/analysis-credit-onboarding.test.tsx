@@ -331,3 +331,111 @@ test("a delayed create response cannot overwrite a newer navigation", async () =
 	await delay(0);
 	assert.equal(sessionStorage.getItem("prdfy:plan-codebase-id"), null);
 });
+
+test("a blocked account shows a locked prompt and no progress that pretends to connect", async () => {
+	const calls = stubBackend((input) => {
+		if (input === PREFLIGHT)
+			return creditStatus({
+				code: "INSUFFICIENT_CREDITS",
+				availableCredits: 2,
+				canStart: false,
+			});
+		throw new Error(`Unexpected request ${input}`);
+	});
+	render(<PlanCodebasePage intent="new" />);
+
+	const locked = await screen.findByTestId("locked-prompt-region");
+	assert.equal(locked.getAttribute("data-locked-variant"), "insufficient");
+	// The contradictory pair from the report: no session is being created, so
+	// the progress line must not claim a connection.
+	assert.ok(screen.getByText("Belum dimulai"));
+	assert.equal(screen.queryByText("Menghubungkan server..."), null);
+	assert.equal(screen.queryByText("Menghubungkan repository..."), null);
+	assert.equal(screen.queryByText(/Menunggu agent/), null);
+	assert.equal(
+		calls.some((call) => call.method === "POST"),
+		false,
+		"a blocked account must not mint a session",
+	);
+});
+
+test("a pending create request shows loading in both the prompt and the progress line", async () => {
+	let releaseCreate: () => void = () => {};
+	const createGate = new Promise<void>((resolve) => {
+		releaseCreate = resolve;
+	});
+	let requested = false;
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async (input: string) => {
+			if (input === PREFLIGHT) return Response.json(creditStatus({}));
+			if (input === "/api/codebases") {
+				requested = true;
+				await createGate;
+				return Response.json(createdCodebase());
+			}
+			if (input.includes("/status")) return Response.json(statusResponse());
+			throw new Error(`Unexpected request ${input}`);
+		}),
+	);
+	render(<PlanCodebasePage intent="new" />);
+
+	await waitFor(() => assert.ok(requested));
+	// A real request is in flight: loading is honest here, and the lock is not.
+	assert.ok(screen.getByText("Menghubungkan repository..."));
+	assert.ok(screen.getByText("Menghubungkan server..."));
+	assert.equal(screen.queryByText("Belum dimulai"), null);
+	assert.equal(screen.queryByTestId("locked-prompt-region"), null);
+
+	releaseCreate();
+	await screen.findByRole("button", { name: "Salin prompt untuk AI agent" });
+	// Success replaces the loading state in the same paint as the prompt.
+	assert.equal(screen.queryByText("Menghubungkan repository..."), null);
+	assert.ok(screen.getByText(new RegExp(SYNC_TOKEN)));
+});
+
+test("a malformed session response reports one error and retries into the prompt", async () => {
+	let attempts = 0;
+	const bodies: string[] = [];
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async (input: string, init?: RequestInit) => {
+			if (input === PREFLIGHT) return Response.json(creditStatus({}));
+			if (input === "/api/codebases") {
+				attempts += 1;
+				bodies.push(String(init?.body ?? ""));
+				// First response: the server made the codebase but the client never
+				// received a usable payload (lost/malformed response).
+				return Response.json(
+					attempts === 1
+						? { id: "cb-1", name: "Repo Lokal" }
+						: createdCodebase(),
+				);
+			}
+			if (input.includes("/status")) return Response.json(statusResponse());
+			throw new Error(`Unexpected request ${input}`);
+		}),
+	);
+	render(<PlanCodebasePage intent="new" />);
+
+	assert.ok(
+		await screen.findByText(
+			"Codebase dibuat, tetapi instruksi sync tidak valid.",
+		),
+	);
+	assert.equal(screen.getAllByRole("alert").length, 1);
+	assert.equal(screen.queryByTestId("locked-prompt-region"), null);
+
+	fireEvent.click(screen.getByRole("button", { name: "Coba lagi" }));
+	await screen.findByRole("button", { name: "Salin prompt untuk AI agent" });
+	// Success clears the obsolete failure instead of stacking a second notice.
+	assert.equal(screen.queryByRole("alert"), null);
+	assert.equal(
+		screen.queryByText("Codebase dibuat, tetapi instruksi sync tidak valid."),
+		null,
+	);
+	assert.equal(attempts, 2);
+	// One onboarding attempt carries one operation identity, so the retry cannot
+	// create a second codebase for it.
+	assert.equal(new Set(bodies).size, 1);
+});

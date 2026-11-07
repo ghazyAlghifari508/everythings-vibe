@@ -114,7 +114,10 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 		expect(
 			screen.getByText("Sync codebase dengan everythings-vibe"),
 		).toBeDefined();
-		expect(screen.getByText("Menyiapkan token sesi...")).toBeDefined();
+		expect(screen.getByText("Menghubungkan repository...")).toBeDefined();
+		// The progress line describes the request that is genuinely in flight.
+		expect(screen.getByText("Menghubungkan server...")).toBeDefined();
+		expect(screen.queryByText("Belum dimulai")).toBeNull();
 		expect(
 			screen.queryByRole("button", { name: "Siapkan instruksi" }),
 		).toBeNull();
