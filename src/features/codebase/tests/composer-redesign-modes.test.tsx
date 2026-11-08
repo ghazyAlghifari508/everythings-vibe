@@ -17,6 +17,13 @@ afterEach(() => {
 	vi.unstubAllGlobals();
 });
 
+// Radix Popper measures its anchor; jsdom ships no ResizeObserver.
+globalThis.ResizeObserver ??= class {
+	observe() {}
+	unobserve() {}
+	disconnect() {}
+} as unknown as typeof ResizeObserver;
+
 const prdArtifact = {
 	id: "prd-proj-1",
 	title: "PRD · Pencarian Artikel",
@@ -233,9 +240,7 @@ describe("Phase 07 Composer Redesign — Plan/Revise Modes & Workflow Separation
 		expect(submitBtn.disabled).toBe(false);
 
 		fireEvent.click(screen.getByTestId("composer-mention-trigger"));
-		fireEvent.click(
-			screen.getByTestId("composer-mention-file-src/pages/Content.jsx"),
-		);
+		fireEvent.click(screen.getByTestId("composer-mention-doc-prd"));
 		expect(composer.value).toBe("Tambahkan indeks pencarian penuh");
 
 		fireEvent.click(screen.getByTestId("composer-mode-trigger"));
