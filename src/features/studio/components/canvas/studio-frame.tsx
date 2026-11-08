@@ -1,7 +1,6 @@
 import {
 	AlertCircleIcon,
 	ComputerIcon,
-	Loading03Icon,
 	SmartPhone01Icon,
 } from "@hugeicons/core-free-icons";
 import { memo, useRef } from "react";
@@ -50,12 +49,11 @@ function frameStatusMessage(status: string, retryError?: string): string {
 }
 
 /**
- * The frame header carries the screen name, a small platform icon and at most
- * one restrained status affordance: a spinner while the frame is actively
- * generating, a quiet static dot while it waits in the queue, and a small
- * error affordance when generation failed. Queued and generating stay
- * distinguishable for assistive technology through their text alternatives.
- *
+ * The frame header carries the screen name, a small platform icon, and an
+ * error affordance when generation failed. Actively generating frames rely on
+ * the single artboard shimmer below without redundant header spinners. Queued
+ * and generating stay distinguishable for assistive technology through their
+ * sr-only text alternatives.
  * Recovery lives inside the failed artboard instead of the header, so the frame
  * keeps exactly one retry control. A frame that already has HTML keeps that
  * preview while a new version is built or after it failed.
@@ -137,13 +135,7 @@ export const StudioFrame = memo(function StudioFrame({
 					</button>
 
 					{status === "generating" ? (
-						<Icon
-							icon={Loading03Icon}
-							size={13}
-							role="status"
-							aria-label="Sedang digenerate"
-							className="shrink-0 text-fog motion-safe:animate-spin"
-						/>
+						<output aria-label="Sedang digenerate" className="sr-only" />
 					) : null}
 					{status === "queued" ? (
 						<output aria-label="Menunggu antrean" className="sr-only" />
