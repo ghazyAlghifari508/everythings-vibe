@@ -271,7 +271,10 @@ describe("Phase 07 Composer Redesign — Plan/Revise Modes & Workflow Separation
 			/>,
 		);
 		expect(submitBtn.disabled).toBe(true);
-		expect(submitBtn.querySelector("[data-testid='spinner']")).toBeTruthy();
+		// One operation, one animation: the Thinking indicator owns the progress
+		// animation, so the submit control closes without spinning a second time.
+		expect(submitBtn.getAttribute("aria-busy")).toBe("true");
+		expect(submitBtn.querySelector("[data-testid='spinner']")).toBeNull();
 		fireEvent.keyDown(composer, { key: "Enter", code: "Enter" });
 		expect(onSubmitComposer).toHaveBeenCalledTimes(1);
 

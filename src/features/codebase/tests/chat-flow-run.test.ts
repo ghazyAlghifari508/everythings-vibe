@@ -1,15 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
-	appendRunThinking,
-	CODEBASE_STAGE_ACTIVITY,
+	anchorRunStart,
 	CODEBASE_STAGE_DONE_LABEL,
 	isRunWorking,
+	operationStartEpoch,
 	reconcilePipelineStage,
-	resetRunThinking,
 	resolvePersistedStage,
 	resolveResumeStage,
 	runDurationSeconds,
 	settleRun,
+	settleRunIfCurrent,
 	shouldAutoRevealArtifact,
 	startRun,
 } from "@/features/codebase/services/chat-flow";
@@ -21,30 +21,71 @@ describe("codebase run state (real request facts only)", () => {
 		expect(run.startedAt).toBe(1_000);
 		expect(run.finishedAt).toBeNull();
 		expect(run.status).toBe("running");
-		expect(run.thinkingText).toBe("");
+		expect(run.error).toBeNull();
 		expect(isRunWorking(run)).toBe(true);
 	});
 
-	it("exposes one honest activity line per stage and never a rotating list", () => {
-		const stages = ["questions", "feature", "prd", "ac", "task"] as const;
-		for (const stage of stages) {
-			const activity = CODEBASE_STAGE_ACTIVITY[stage];
-			expect(typeof activity).toBe("string");
-			expect(activity.length).toBeGreaterThan(0);
-			// Every line names the real request; none claims an internal phase.
-			expect(activity).not.toMatch(
-				/membaca file|reading database|analyzing repository/i,
-			);
-		}
-		expect(new Set(stages.map((s) => CODEBASE_STAGE_ACTIVITY[s])).size).toBe(
-			stages.length,
-		);
+	it("carries no phase, activity log or reasoning field to render", () => {
+		const run = startRun("questions", 1_000);
+		expect(Object.keys(run).sort()).toEqual([
+			"error",
+			"finishedAt",
+			"requestId",
+			"stage",
+			"startedAt",
+			"status",
+		]);
 	});
 
-	it("gives every stage a distinct settled label", () => {
-		const labels = Object.values(CODEBASE_STAGE_DONE_LABEL);
-		expect(labels.every((label) => label.length > 0)).toBe(true);
-		expect(new Set(labels).size).toBe(labels.length);
+	it("publishes exactly the approved settled label per stage", () => {
+		expect(CODEBASE_STAGE_DONE_LABEL).toEqual({
+			questions: "Pertanyaan siap",
+			feature: "Spesifikasi fitur siap",
+			prd: "PRD siap",
+			ac: "Acceptance criteria siap",
+			task: "Task siap",
+		});
+	});
+
+	it("re-anchors a running request on the server's acceptance time", () => {
+		const run = startRun("prd", 1_000);
+		const accepted = new Date(1_600).toISOString();
+
+		const anchored = anchorRunStart(run, accepted, run.requestId);
+		expect(anchored?.startedAt).toBe(1_600);
+		// Re-anchoring does not restart the run or move its identity.
+		expect(anchored?.requestId).toBe(run.requestId);
+		expect(anchored?.status).toBe("running");
+	});
+
+	it("never moves the clock for a settled run, a foreign request, or junk input", () => {
+		const settled = settleRun(startRun("prd", 1_000), "done", 5_000);
+		const accepted = new Date(1_600).toISOString();
+		expect(anchorRunStart(settled, accepted, settled?.requestId)).toBe(settled);
+
+		const run = startRun("prd", 1_000);
+		expect(anchorRunStart(run, accepted, "run-other-1")).toBe(run);
+		expect(anchorRunStart(run, "not-a-date", run.requestId)).toBe(run);
+		expect(anchorRunStart(run, null, run.requestId)).toBe(run);
+	});
+
+	it("prefers the acceptance timestamp and falls back to the worker start", () => {
+		vi.spyOn(Date, "now").mockReturnValue(9_000_000);
+		expect(
+			operationStartEpoch({
+				createdAt: new Date(2_000).toISOString(),
+				startedAt: new Date(3_000).toISOString(),
+			}),
+		).toBe(2_000);
+		expect(
+			operationStartEpoch({
+				createdAt: null,
+				startedAt: new Date(3_000).toISOString(),
+			}),
+		).toBe(3_000);
+		expect(operationStartEpoch({ createdAt: "junk", startedAt: null })).toBe(
+			9_000_000,
+		);
 	});
 
 	it("records the real measured duration only after settling", () => {
@@ -68,18 +109,22 @@ describe("codebase run state (real request facts only)", () => {
 		expect(runDurationSeconds(null)).toBeNull();
 	});
 
-	it("appends real streamed reasoning and clears it on a provider reset", () => {
-		const run = startRun("prd", 0);
-		const first = appendRunThinking(run, "menimbang");
-		const second = appendRunThinking(first, " struktur");
-		expect(second?.thinkingText).toBe("menimbang struktur");
-		expect(resetRunThinking(second)?.thinkingText).toBe("");
-	});
+	it("keeps a late settle from a previous request away from the current run", () => {
+		const current = startRun("prd", 2_000);
+		const earlier = startRun("questions", 1_000);
 
-	it("refuses to mutate reasoning once the run settled", () => {
-		const settled = settleRun(startRun("prd", 0), "done", 10);
-		expect(appendRunThinking(settled, "late")).toBe(settled);
-		expect(resetRunThinking(settled)).toBe(settled);
+		expect(
+			settleRunIfCurrent(
+				current,
+				earlier.requestId,
+				"failed",
+				3_000,
+				"late failure from the previous request",
+			),
+		).toBe(current);
+		expect(
+			settleRunIfCurrent(current, current.requestId, "done", 4_000)?.status,
+		).toBe("done");
 	});
 });
 

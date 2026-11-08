@@ -3,11 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CodebaseStarterSuggestion } from "@/features/codebase/services/analysis";
-import {
-	CODEBASE_STAGE_ACTIVITY,
-	settleRun,
-	startRun,
-} from "@/features/codebase/services/chat-flow";
+import { settleRun, startRun } from "@/features/codebase/services/chat-flow";
 import {
 	type AdaptiveQuestion,
 	CodebaseChatWorkspace,
@@ -614,9 +610,13 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 			container.querySelector("[data-testid='codebase-questions-loading']"),
 		).toBeNull();
 		expect(container.querySelectorAll(".animate-pulse")).toHaveLength(0);
-		// The real activity line for this stage, plus a real elapsed timer.
-		expect(thinking?.textContent).toContain("Menyusun pertanyaan klarifikasi");
-		expect(thinking?.textContent).toContain(CODEBASE_STAGE_ACTIVITY.questions);
+		// Exactly one status line and one real elapsed timer.
+		expect(thinking?.textContent).toContain(
+			"Menyusun pertanyaan klarifikasi...",
+		);
+		expect(thinking?.querySelectorAll("[data-orb]")).toHaveLength(1);
+		// No transport log is exposed to the user.
+		expect(thinking?.textContent).not.toContain("Permintaan diterima server");
 		const timer = thinking?.querySelector("[role='timer']");
 		expect(timer).not.toBeNull();
 		expect(timer?.textContent).toMatch(/^\d+\.\d+s$/);
@@ -664,7 +664,7 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 		const thinking = container.querySelector(
 			"[data-testid='codebase-run-thinking']",
 		);
-		expect(thinking?.textContent).toContain("PRD selesai");
+		expect(thinking?.textContent).toContain("PRD siap");
 		expect(thinking?.textContent).toContain("18.4s");
 	});
 
