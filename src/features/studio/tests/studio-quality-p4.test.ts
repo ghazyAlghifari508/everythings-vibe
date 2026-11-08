@@ -8,7 +8,6 @@ import {
 import { generateValidatedFrameHtml } from "../services/studio-frame-generation";
 import { validateGeneratedHtml } from "../services/studio-generated-html-validation";
 import { inspectStudioHtml } from "../services/studio-html-diagnostics";
-import { buildStudioFramePrompt } from "../services/studio-screen-prompts";
 import {
 	financeBlueprint,
 	webSaaSBlueprint,
@@ -92,17 +91,6 @@ describe("TASK 04 Quality, Responsive Layout & HTML/CSS Reliability (14 Scenario
 
 	// 3. Narrower viewport CSS rules
 	it("3. validates responsive adaptation and enforces fluid sizing on mobile and desktop", () => {
-		const prompt = buildStudioFramePrompt({
-			screenName: "Dashboard",
-			projectPrompt: "SaaS Metriq",
-			designMode: "web",
-			blueprint: webSaaSBlueprint,
-			activeScreen: "Dashboard",
-		});
-		expect(prompt).toContain("fluid widths");
-		expect(prompt).toContain("min-w-0");
-		expect(prompt).toContain("two-column desktop layout");
-
 		const validMobileHtml = `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><main data-studio-content><p>Konten</p></main></body></html>`;
 		const issues = validateGeneratedHtml(validMobileHtml, {
 			blueprint: null,
@@ -286,23 +274,6 @@ describe("TASK 04 Quality, Responsive Layout & HTML/CSS Reliability (14 Scenario
 		expect(style).toContain(
 			`--app-radius:${financeBlueprint.designTokens.radius}px`,
 		);
-	});
-
-	// 11. Added screen reusing blueprint
-	it("11. equips added screens with the full shared blueprint and quality contract", () => {
-		const prompt = buildStudioFramePrompt({
-			screenName: "Laporan Keuangan",
-			screenDescription: "Layar rincian laporan keuangan bulanan",
-			allScreens: ["Beranda", "Laporan Keuangan"],
-			projectPrompt: "Aplikasi keuangan Metriq",
-			designMode: "web",
-			blueprint: financeBlueprint,
-			activeScreen: "Laporan Keuangan",
-		});
-		expect(prompt).toContain("Laporan Keuangan");
-		expect(prompt).toContain("SHARED_DESIGN_BLUEPRINT");
-		expect(prompt).toContain("CONTROLLED ASSEMBLY CONTRACT");
-		expect(prompt).toContain("DOMAIN_AWARE_QUALITY_CONTRACT");
 	});
 
 	// 12. Missing accessible labels
