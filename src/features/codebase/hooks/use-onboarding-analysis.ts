@@ -49,6 +49,9 @@ export function useOnboardingAnalysis({
 		fetchAnalysisOutput,
 	} = state;
 	const analysisRequestGeneration = useRef(0);
+	// The analysis identity this client already asked the read endpoint for, so
+	// one persisted row is read once per attempt instead of once per frame.
+	const analysisReconciledFor = useRef<string | null>(null);
 	// The working flag lives in shared state, but the retry guard runs inside
 	// a callback: a ref mirror keeps the guard synchronous so a double click
 	// in the same tick still resolves to one attempt.
@@ -60,6 +63,7 @@ export function useOnboardingAnalysis({
 		identityRef.current = identity;
 		analysisRequestGeneration.current += 1;
 		analysisWorkingRef.current = false;
+		analysisReconciledFor.current = null;
 	}
 	useEffect(
 		() => () => {
@@ -270,33 +274,46 @@ export function useOnboardingAnalysis({
 		analysisAttemptedFor,
 	]);
 
-	// Pull validated analysis output once status reports it. The status
-	// endpoint only attaches analysisStatus when the analysis project query
-	// is present (wired via the SyncStatus analysisProjectId passed by the
-	// onboarding session hook), so this effect only ever renders
-	// server-persisted output, never a fabrication.
+	// Reconcile the exact analysis the server names as ready.
+	//
+	// Status is the only authority for that identity, so the read is driven by
+	// it: fetch until the client holds THAT row (id, snapshot, and project), and
+	// never let local facts veto server truth. Two local facts used to: a
+	// trigger request still in flight, and a newer pending attempt. Either one
+	// could keep the browser from ever reading a persisted ready output while
+	// the screen already painted the analysis as finished — the exact
+	// "conclusion stays disabled until refresh" defect. The read endpoint serves
+	// the newest readable analysis for this snapshot by design, so it is safe to
+	// ask while another attempt is pending.
+	const serverReadyAnalysisId =
+		lastStatus?.analysisStatus === "ready"
+			? (lastStatus.analysisId ?? null)
+			: null;
 	useEffect(() => {
 		const snapshotId = lastStatus?.snapshotId;
-		if (!featureProjectId || !snapshotId) return;
-		if (state.analysisWorking || lastStatus.analysisAttemptStatus === "pending")
-			return;
+		if (!featureProjectId || !snapshotId || !serverReadyAnalysisId) return;
 		if (
-			lastStatus.analysisStatus !== "ready" &&
-			lastStatus.analysisStatus !== "failed"
+			analysis?.id === serverReadyAnalysisId &&
+			analysis.snapshotId === snapshotId &&
+			analysis.projectId === featureProjectId
 		)
 			return;
-		if (
-			analysis?.snapshotId === snapshotId &&
-			analysis.status === lastStatus.analysisStatus
-		)
-			return;
-		void fetchAnalysisOutput(featureProjectId, snapshotId);
+		// One read per (project, snapshot, analysis) identity: a miss stays open
+		// for the next real frame instead of looping, and a newer identity always
+		// re-reads.
+		const key = `${featureProjectId}:${snapshotId}:${serverReadyAnalysisId}`;
+		if (analysisReconciledFor.current === key) return;
+		analysisReconciledFor.current = key;
+		void fetchAnalysisOutput(featureProjectId, snapshotId).then((result) => {
+			if (!result && analysisReconciledFor.current === key)
+				analysisReconciledFor.current = null;
+		});
 	}, [
 		featureProjectId,
 		lastStatus,
 		analysis,
 		fetchAnalysisOutput,
-		state.analysisWorking,
+		serverReadyAnalysisId,
 	]);
 
 	return { retryAnalysis, refreshLegacySuggestions };
