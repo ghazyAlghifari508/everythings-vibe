@@ -43,6 +43,11 @@ export function viewportKeyForWidth(width: number): string {
 	return "mobile";
 }
 
+export function viewportLabelForWidth(width: number): string {
+	const key = viewportKeyForWidth(width);
+	return VIEWPORT_LABELS[key] ?? key;
+}
+
 export function designCaptureScopes(
 	model: DesignTokenModel | null,
 ): DesignCaptureScope[] {
@@ -106,6 +111,136 @@ export function designThemeOptions(
 	}
 	const options = THEME_ORDER.filter((theme) => observed.has(theme));
 	return options.length === THEME_ORDER.length ? options : [];
+}
+
+export interface DesignThemeNote {
+	/** The appearance the run asked the capture to measure. */
+	requested: DesignThemeKey;
+	/** Reader-facing reason the appearance is not offered for the context. */
+	detail: string;
+}
+
+export interface DesignThemeReport {
+	/** Requested appearances the capture verified for the selected viewport. */
+	verified: DesignThemeKey[];
+	/** Requested appearances the capture could not verify, with the reason. */
+	unverified: DesignThemeNote[];
+	/** The result carries no capture at all, so nothing can be verified. */
+	captureMissing: boolean;
+}
+
+export interface DesignThemeNotice {
+	title: string;
+	detail: string;
+}
+
+const THEME_WORDS: Record<DesignThemeKey, string> = {
+	light: "terang",
+	dark: "gelap",
+};
+
+interface CaptureThemeFact {
+	viewport: string;
+	requested: DesignThemeKey | "auto";
+	observed: DesignThemeKey | "unknown";
+}
+
+// The appearances the run asked the capture to measure. "auto" asks for nothing
+// in particular, so it never produces an availability note.
+export function requestedThemes(
+	model: DesignTokenModel | null,
+): DesignThemeKey[] {
+	const requested = model?.settings?.theme;
+	if (requested === "light") return ["light"];
+	if (requested === "dark") return ["dark"];
+	if (requested === "both") return ["light", "dark"];
+	if (requested === "auto") return [];
+	const asked = new Set<DesignThemeKey>();
+	for (const capture of model?.capturedViews ?? []) {
+		if (capture.colorScheme === "light" || capture.colorScheme === "dark")
+			asked.add(capture.colorScheme);
+	}
+	return THEME_ORDER.filter((theme) => asked.has(theme));
+}
+
+// One row per captured view, in capture order. The observed appearance of a
+// multi-capture run lives on `views`; a single capture reports it as the model
+// theme. A requested preference is never treated as an observation.
+function captureThemeFacts(model: DesignTokenModel | null): CaptureThemeFact[] {
+	const captures = model?.capturedViews ?? [];
+	return captures.map((capture, index) => ({
+		viewport: viewportKeyForWidth(capture.width),
+		requested:
+			capture.colorScheme === "light" || capture.colorScheme === "dark"
+				? capture.colorScheme
+				: "auto",
+		observed:
+			model?.views?.[index]?.observedTheme ??
+			(captures.length === 1 ? (model?.theme ?? "unknown") : "unknown"),
+	}));
+}
+
+function unverifiedThemeDetail(
+	theme: DesignThemeKey,
+	facts: CaptureThemeFact[],
+): string {
+	const other: DesignThemeKey = theme === "dark" ? "light" : "dark";
+	const asked = facts.filter((fact) => fact.requested === theme);
+	if (!asked.length)
+		return `Preferensi ${THEME_WORDS[theme]} diminta, tetapi capture dengan preferensi itu tidak ada pada hasil ini.`;
+	if (asked.some((fact) => fact.observed === other))
+		return `Capture dengan preferensi ${THEME_WORDS[theme]} masih menampilkan tampilan ${THEME_WORDS[other]}.`;
+	return `Capture dengan preferensi ${THEME_WORDS[theme]} tidak menentukan tampilan yang dirender, sehingga tema ${THEME_WORDS[theme]} tidak dapat diverifikasi.`;
+}
+
+// Availability is reported, never invented: a requested appearance the capture
+// could not verify is explained rather than offered as a theme option. Requested
+// and observed stay separate so an unverified theme is never shown as verified.
+export function designThemeReport(
+	model: DesignTokenModel | null,
+	viewport: string | null,
+): DesignThemeReport {
+	const all = captureThemeFacts(model);
+	if (!all.length)
+		return { verified: [], unverified: [], captureMissing: true };
+	const scoped = viewport
+		? all.filter((fact) => fact.viewport === viewport)
+		: all;
+	const facts = scoped.length ? scoped : all;
+	const observed = new Set(facts.map((fact) => fact.observed));
+	const requested = requestedThemes(model);
+	return {
+		verified: requested.filter((theme) => observed.has(theme)),
+		unverified: requested
+			.filter((theme) => !observed.has(theme))
+			.map((theme) => ({
+				requested: theme,
+				detail: unverifiedThemeDetail(theme, facts),
+			})),
+		captureMissing: false,
+	};
+}
+
+// One concise, contextual notice for the theme controls. A verified theme, or a
+// run that never asked for the missing one, needs no explanation at all.
+export function designThemeNotice(
+	model: DesignTokenModel | null,
+	viewport: string | null,
+): DesignThemeNotice | null {
+	const report = designThemeReport(model, viewport);
+	if (report.captureMissing)
+		return {
+			title: "Status tema belum dapat diverifikasi pada hasil ini.",
+			detail:
+				"Hasil ini belum menyertakan data pengukuran, sehingga pilihan tema belum tersedia.",
+		};
+	if (!report.unverified.length) return null;
+	return {
+		title: `Tema ${report.unverified
+			.map((note) => THEME_WORDS[note.requested])
+			.join(" dan ")} belum terverifikasi pada hasil ini.`,
+		detail: report.unverified.map((note) => note.detail).join(" "),
+	};
 }
 
 export function selectedViewIds(

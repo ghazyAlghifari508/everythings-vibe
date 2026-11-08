@@ -11,6 +11,7 @@ import {
 import {
 	type DesignThemeKey,
 	designCaptureScopes,
+	designThemeNotice,
 	designThemeOptions,
 	designViewportOptions,
 	scopedDesignMd,
@@ -110,6 +111,12 @@ export function DesignResult({
 		: (viewports[0]?.key ?? null);
 	const themes = useMemo(
 		() => designThemeOptions(designModel, activeViewport),
+		[designModel, activeViewport],
+	);
+	// Requested appearances the capture could not verify are explained next to
+	// the context controls; a verified or unrequested theme explains nothing.
+	const themeNotice = useMemo(
+		() => designThemeNotice(designModel, activeViewport),
 		[designModel, activeViewport],
 	);
 	const activeTheme =
@@ -290,6 +297,7 @@ export function DesignResult({
 						themes={themes}
 						theme={activeTheme}
 						onThemeChange={setThemeKey}
+						themeNotice={themeNotice}
 						inspectorSource={source}
 						enrichment={enrichment}
 						enrichmentDetail={enrichmentDetail}

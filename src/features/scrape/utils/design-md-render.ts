@@ -16,6 +16,11 @@ import {
 	renderComponentSections,
 	renderMergedComponentSections,
 } from "./design-md-render-components";
+import { renderImplementationGuide } from "./design-md-render-guide";
+import {
+	renderIdentitySection,
+	renderOverviewSection,
+} from "./design-md-render-overview";
 import { renderTokenSections } from "./design-md-render-tokens";
 
 // Renders the canonical DESIGN.md from the validated structured model. Both the
@@ -99,9 +104,12 @@ export function renderDesignMd(
 			model.essence?.trim() ||
 			options.identityNarrative?.trim();
 		if (essence) lines.push("", `> ${essence}`);
+		renderOverviewSection(lines, model, options);
+		renderIdentitySection(lines, options);
+		renderImplementationGuide(lines, model, options);
 		renderTokenSections(lines, model, options);
 		renderComponentSections(lines, model, options);
-		renderCodeSections(lines, model, options);
+		renderCodeSections(lines, model);
 	}
 
 	// --- Coverage & Important Limitations -----------------------------------
@@ -115,14 +123,8 @@ export function renderDesignMd(
 			"",
 			`This document combines ${model.views.length} captures. A value is shared only when every capture measured it; everything else stays scoped to the capture that produced it.`,
 		);
-	if (options.enrichmentUnavailable) {
-		lines.push(
-			"",
-			"The AI synthesis step did not produce a narrative for this capture. AI synthesis is unavailable or did not run. Available measurements remain usable within the capture scope, not a complete website specification.",
-		);
-		if (options.enrichmentDetail?.trim())
-			lines.push(`- ${escapeCell(options.enrichmentDetail.trim())}`);
-	}
+	// The AI synthesis status is stated once in the overview, next to the
+	// requested scope, so it is never repeated as a second, softer disclaimer.
 	for (const limitation of documentLimitations(model, options))
 		lines.push(`- ${escapeCell(limitation)}`);
 
@@ -165,6 +167,11 @@ function renderCombinedDocument(
 	const sections = new Map<string, SectionEntry[]>();
 
 	const sharedLines: string[] = [];
+	// Overview, identity and the implementation brief describe the document, not
+	// one capture, so they are stated once for the shared block.
+	renderOverviewSection(sharedLines, model, options);
+	renderIdentitySection(sharedLines, options);
+	renderImplementationGuide(sharedLines, model, options);
 	renderTokenSections(sharedLines, shared, {
 		...options,
 		captureScopeLabel: "all captures",
@@ -203,7 +210,6 @@ function renderCombinedDocument(
 		specific.map((view) =>
 			scopedDeclarations(baseView.model, view.model, view.label),
 		),
-		options,
 	);
 	collectSections(sections, codeLines, "Shared", true);
 

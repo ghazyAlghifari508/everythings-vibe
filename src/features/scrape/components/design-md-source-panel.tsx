@@ -17,10 +17,15 @@ import { Icon } from "@/components/ui/icon";
 import { assessDocumentUsability } from "../utils/design-md-usability";
 import type {
 	DesignThemeKey,
+	DesignThemeNotice,
 	DesignViewportOption,
 } from "../utils/design-view-contexts";
 import { markdownComponents } from "./design-md-markdown-components";
-import { CONTROL_CLASS, DesignMdViewControls } from "./design-md-view-controls";
+import {
+	CONTROL_CLASS,
+	DesignMdThemeNotice,
+	DesignMdViewControls,
+} from "./design-md-view-controls";
 import { copyText, downloadFile } from "./scrape-file-actions";
 
 export interface DesignMdSourcePanelProps {
@@ -37,6 +42,8 @@ export interface DesignMdSourcePanelProps {
 	themes?: DesignThemeKey[];
 	theme?: DesignThemeKey | null;
 	onThemeChange?: (theme: DesignThemeKey) => void;
+	/** Why a requested appearance has no verified option, for the selected context. */
+	themeNotice?: DesignThemeNotice | null;
 	// Mirrors the inspector: an archived document is still available, but it is
 	// labelled as an archive instead of capture-verified output.
 	inspectorSource?: "observed" | "unverified";
@@ -72,6 +79,7 @@ export function DesignMdSourcePanel({
 	themes,
 	theme,
 	onThemeChange,
+	themeNotice,
 	inspectorSource = "observed",
 	enrichment,
 	enrichmentDetail: _enrichmentDetail,
@@ -272,6 +280,10 @@ export function DesignMdSourcePanel({
 					onThemeChange={onThemeChange}
 				/>
 			</div>
+			{/* The theme controls can only offer verified appearances, so a requested
+			    appearance the capture did not confirm is explained beside them
+			    instead of being buried in the document limitations. */}
+			<DesignMdThemeNotice notice={themeNotice} />
 			{previewMd && contextSummary ? (
 				<p className="border-b border-graphite px-3 py-1.5 text-xs text-fog">
 					Pratinjau terfilter ke {contextSummary}. Salin dan Download tetap

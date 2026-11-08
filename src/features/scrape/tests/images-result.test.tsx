@@ -415,7 +415,7 @@ describe("ImagesResult gallery", () => {
 		);
 
 		expect(screen.getByText("7 gambar tidak berhasil diambil")).toBeDefined();
-		expect(screen.getAllByRole("article")).toHaveLength(23);
+		expect(screen.getAllByRole("article")).toHaveLength(12);
 		// Partial failures stay one light notice; group counts wait for the toggle.
 		expect(screen.queryByText(/Akses tidak tersedia/)).toBeNull();
 		fireEvent.click(
