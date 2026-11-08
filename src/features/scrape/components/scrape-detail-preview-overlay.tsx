@@ -57,23 +57,7 @@ export function PreviewCanvasOverlay({
 	onRetry?: () => void;
 }) {
 	const { label, detail } = READINESS_MESSAGE[report];
-	if (report === "ready") return null;
-	if (report === "degraded") {
-		return (
-			<div className="pointer-events-none absolute top-3 left-3 z-10 flex max-w-[calc(100%-1.5rem)] items-center gap-2 rounded-md border border-graphite bg-obsidian/95 px-2.5 py-1.5 text-xs">
-				<Icon
-					icon={Alert02Icon}
-					size={14}
-					aria-hidden
-					className="shrink-0 text-amber-400"
-				/>
-				<output className="truncate font-semibold text-snow">
-					{label}
-					<span className="font-normal text-fog"> {detail}</span>
-				</output>
-			</div>
-		);
-	}
+	if (report === "ready" || report === "degraded") return null;
 	if (report === "preparing") {
 		return (
 			<div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-onyx px-6 py-12 text-center">
@@ -105,6 +89,44 @@ export function PreviewCanvasOverlay({
 					className="inline-flex items-center gap-1.5 rounded-md border border-graphite px-3 py-2 text-sm text-snow transition-colors hover:border-steel hover:bg-charcoal focus-visible:ring-2 focus-visible:ring-indigo"
 				>
 					<Icon icon={RefreshIcon} size={15} aria-hidden />
+					Coba lagi
+				</button>
+			) : null}
+		</div>
+	);
+}
+
+/**
+ * Footer notice for a rendered preview whose external resources partially failed.
+ * Sits below the preview viewport instead of obscuring page content.
+ */
+export function PreviewDegradedNotice({ onRetry }: { onRetry?: () => void }) {
+	const { label, detail } = READINESS_MESSAGE.degraded;
+	return (
+		<div
+			data-testid="scrape-preview-degraded-warning"
+			className="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-2 border-t border-graphite bg-obsidian/95 px-3 py-2 text-xs backdrop-blur-sm"
+		>
+			<div className="flex min-w-0 flex-1 items-center gap-2">
+				<Icon
+					icon={Alert02Icon}
+					size={14}
+					aria-hidden
+					className="shrink-0 text-amber-400"
+				/>
+				<output className="min-w-0 flex-1 truncate font-semibold text-snow">
+					{label}
+					<span className="font-normal text-fog"> · {detail}</span>
+				</output>
+			</div>
+			{onRetry ? (
+				<button
+					type="button"
+					onClick={onRetry}
+					aria-label="Coba lagi memuat preview interaktif"
+					className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-graphite px-2.5 py-1 font-semibold text-snow transition-colors hover:border-steel hover:bg-charcoal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+				>
+					<Icon icon={RefreshIcon} size={13} aria-hidden />
 					Coba lagi
 				</button>
 			) : null}
