@@ -48,7 +48,7 @@ describe("P9 Polish — Studio Theme Chip, Queued Dot, and Landing Copywriting",
 	});
 
 	describe("Part 1: Theme Chip Swatches and Reference Palette", () => {
-		it("renders actual token colors as swatches for built-in themes", () => {
+		it("renders actual token colors on a single circular multicolor disk for built-in themes", () => {
 			render(
 				<StudioComposer
 					onSubmit={vi.fn()}
@@ -61,28 +61,27 @@ describe("P9 Polish — Studio Theme Chip, Queued Dot, and Landing Copywriting",
 			expect(chip).toBeDefined();
 			expect(screen.getByText("Orchid")).toBeDefined();
 
-			const swatches = screen.getByTestId("studio-palette-swatches");
-			expect(swatches).toBeDefined();
+			const disk = screen.getByTestId("studio-palette-disk");
+			expect(disk).toBeDefined();
 
-			const dots = swatches.querySelectorAll("[data-color]");
-			expect(dots.length).toBe(3);
+			const tokens = disk.querySelectorAll("[data-color]");
+			expect(tokens.length).toBe(3);
 
 			const orchidPreset = STUDIO_DESIGN_PRESETS.find((p) => p.id === "orchid");
 			expect(orchidPreset).toBeDefined();
-			expect(dots[0]?.getAttribute("data-color")).toBe(
+			expect(tokens[0]?.getAttribute("data-color")).toBe(
 				orchidPreset?.tokens.canvas,
 			);
-			expect(dots[1]?.getAttribute("data-color")).toBe(
+			expect(tokens[1]?.getAttribute("data-color")).toBe(
 				orchidPreset?.tokens.primary,
 			);
-			expect(dots[2]?.getAttribute("data-color")).toBe(
+			expect(tokens[2]?.getAttribute("data-color")).toBe(
 				orchidPreset?.tokens.ink,
 			);
 
 			// Generic file icon must not be rendered for built-in theme
 			expect(chip.querySelector("svg")).toBeNull();
 		});
-
 		it("supports all 9 built-in themes with their authentic tokens", () => {
 			for (const preset of STUDIO_DESIGN_PRESETS) {
 				const { unmount } = render(
@@ -94,13 +93,17 @@ describe("P9 Polish — Studio Theme Chip, Queued Dot, and Landing Copywriting",
 				);
 
 				expect(screen.getByText(preset.name)).toBeDefined();
-				const swatches = screen.getByTestId("studio-palette-swatches");
-				const dots = swatches.querySelectorAll("[data-color]");
-				expect(dots.length).toBe(3);
+				const disk = screen.getByTestId("studio-palette-disk");
+				const tokens = disk.querySelectorAll("[data-color]");
+				expect(tokens.length).toBe(3);
 
-				expect(dots[0]?.getAttribute("data-color")).toBe(preset.tokens.canvas);
-				expect(dots[1]?.getAttribute("data-color")).toBe(preset.tokens.primary);
-				expect(dots[2]?.getAttribute("data-color")).toBe(preset.tokens.ink);
+				expect(tokens[0]?.getAttribute("data-color")).toBe(
+					preset.tokens.canvas,
+				);
+				expect(tokens[1]?.getAttribute("data-color")).toBe(
+					preset.tokens.primary,
+				);
+				expect(tokens[2]?.getAttribute("data-color")).toBe(preset.tokens.ink);
 
 				unmount();
 			}
@@ -118,13 +121,12 @@ describe("P9 Polish — Studio Theme Chip, Queued Dot, and Landing Copywriting",
 			const workspacePreset = STUDIO_DESIGN_PRESETS.find(
 				(p) => p.id === "workspace",
 			);
-			const initialDots = screen
-				.getByTestId("studio-palette-swatches")
+			const initialTokens = screen
+				.getByTestId("studio-palette-disk")
 				.querySelectorAll("[data-color]");
-			expect(initialDots[0]?.getAttribute("data-color")).toBe(
+			expect(initialTokens[0]?.getAttribute("data-color")).toBe(
 				workspacePreset?.tokens.canvas,
 			);
-
 			rerender(
 				<StudioComposer
 					onSubmit={vi.fn()}
@@ -134,16 +136,16 @@ describe("P9 Polish — Studio Theme Chip, Queued Dot, and Landing Copywriting",
 			);
 
 			const jadePreset = STUDIO_DESIGN_PRESETS.find((p) => p.id === "jade");
-			const updatedDots = screen
-				.getByTestId("studio-palette-swatches")
+			const updatedTokens = screen
+				.getByTestId("studio-palette-disk")
 				.querySelectorAll("[data-color]");
-			expect(updatedDots[0]?.getAttribute("data-color")).toBe(
+			expect(updatedTokens[0]?.getAttribute("data-color")).toBe(
 				jadePreset?.tokens.canvas,
 			);
-			expect(updatedDots[1]?.getAttribute("data-color")).toBe(
+			expect(updatedTokens[1]?.getAttribute("data-color")).toBe(
 				jadePreset?.tokens.primary,
 			);
-			expect(updatedDots[2]?.getAttribute("data-color")).toBe(
+			expect(updatedTokens[2]?.getAttribute("data-color")).toBe(
 				jadePreset?.tokens.ink,
 			);
 		});
@@ -160,9 +162,8 @@ describe("P9 Polish — Studio Theme Chip, Queued Dot, and Landing Copywriting",
 
 			const chip = screen.getByTestId("studio-reference-chip");
 			expect(screen.getByText("custom-reference.md")).toBeDefined();
-			// No swatches rendered
-			expect(screen.queryByTestId("studio-palette-swatches")).toBeNull();
-
+			// No palette disk rendered
+			expect(screen.queryByTestId("studio-palette-disk")).toBeNull();
 			// Fallback icon rendered instead of FileCodeIcon
 			const svg = chip.querySelector("svg");
 			expect(svg).not.toBeNull();
@@ -180,12 +181,12 @@ describe("P9 Polish — Studio Theme Chip, Queued Dot, and Landing Copywriting",
 			);
 
 			expect(screen.getByText("extracted-theme.md")).toBeDefined();
-			const swatches = screen.getByTestId("studio-palette-swatches");
-			const dots = swatches.querySelectorAll("[data-color]");
-			expect(dots.length).toBe(3);
-			expect(dots[0]?.getAttribute("data-color")).toBe("#101010");
-			expect(dots[1]?.getAttribute("data-color")).toBe("#202020");
-			expect(dots[2]?.getAttribute("data-color")).toBe("#303030");
+			const disk = screen.getByTestId("studio-palette-disk");
+			const tokens = disk.querySelectorAll("[data-color]");
+			expect(tokens.length).toBe(3);
+			expect(tokens[0]?.getAttribute("data-color")).toBe("#101010");
+			expect(tokens[1]?.getAttribute("data-color")).toBe("#202020");
+			expect(tokens[2]?.getAttribute("data-color")).toBe("#303030");
 		});
 
 		it("maintains compact composer layout without expanding height", () => {
@@ -202,11 +203,12 @@ describe("P9 Polish — Studio Theme Chip, Queued Dot, and Landing Copywriting",
 			expect(chip.className).toContain("px-1.5");
 			expect(chip.className).toContain("py-1");
 
-			const dots = chip.querySelectorAll("[data-color]");
-			for (const dot of dots) {
-				expect(dot.className).toContain("size-2");
-				expect(dot.className).toContain("rounded-full");
-			}
+			const disk = screen.getByTestId("studio-palette-disk");
+			expect(disk.className).toContain("size-3.5");
+			expect(disk.className).toContain("rounded-full");
+
+			// No separate three-dot layout remains
+			expect(chip.querySelector(".size-2")).toBeNull();
 		});
 	});
 

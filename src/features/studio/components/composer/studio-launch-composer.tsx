@@ -5,7 +5,6 @@ import {
 	AttachmentIcon,
 	Cancel01Icon,
 	ComputerIcon,
-	Loading01Icon,
 	PaintBoardIcon,
 	SmartPhone01Icon,
 } from "@hugeicons/core-free-icons";
@@ -17,6 +16,7 @@ import {
 	useState,
 } from "react";
 import { Icon } from "@/components/ui/icon";
+import { Spinner } from "@/components/ui/spinner";
 import { useTypewriterPlaceholder } from "@/features/studio/hooks/use-typewriter-placeholder";
 import type { StudioDesignSkillId } from "@/features/studio/services/studio-generation-options";
 import {
@@ -89,6 +89,7 @@ export function StudioLaunchComposer({
 
 	function handleSubmit(event: FormEvent) {
 		event.preventDefault();
+		if (!canSubmit) return;
 		onSubmit();
 	}
 
@@ -355,15 +356,12 @@ export function StudioLaunchComposer({
 						type="submit"
 						disabled={!canSubmit}
 						aria-label="Kirim prompt"
+						aria-busy={loading ? "true" : undefined}
 						title="Kirim prompt (Enter)"
 						className="flex size-9 items-center justify-center rounded-lg bg-snow text-onyx transition-opacity hover:opacity-85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-40"
 					>
 						{loading ? (
-							<Icon
-								icon={Loading01Icon}
-								size={16}
-								className="motion-safe:animate-spin"
-							/>
+							<Spinner size={16} className="text-current" />
 						) : (
 							<Icon icon={ArrowUp01Icon} size={16} />
 						)}

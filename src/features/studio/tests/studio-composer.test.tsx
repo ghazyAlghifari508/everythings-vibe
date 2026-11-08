@@ -236,4 +236,54 @@ describe("StudioComposer", () => {
 			),
 		);
 	});
+
+	it("renders circular spinner with accessible busy state during submission and restores idle state", async () => {
+		const { promise, resolve: resolveSubmit } = Promise.withResolvers<{
+			accepted: boolean;
+		}>();
+		const onSubmit = vi.fn(() => promise);
+		render(<StudioComposer onSubmit={onSubmit} />);
+		const input = screen.getByRole("textbox");
+		fireEvent.change(input, {
+			target: { value: "Perbarui layout kartu metrik" },
+		});
+
+		const submitBtn = screen.getByRole("button", { name: /Kirim prompt/i });
+		expect(submitBtn).toHaveProperty("disabled", false);
+		expect(submitBtn.querySelector('[data-testid="spinner"]')).toBeNull();
+		expect(submitBtn.getAttribute("aria-busy")).toBeNull();
+
+		fireEvent.click(submitBtn);
+
+		expect(submitBtn).toHaveProperty("disabled", true);
+		expect(submitBtn.getAttribute("aria-busy")).toBe("true");
+		const spinner = submitBtn.querySelector('[data-testid="spinner"]');
+		expect(spinner).not.toBeNull();
+		expect(spinner?.getAttribute("class")).toContain(
+			"motion-safe:animate-spin",
+		);
+
+		// Double submit prevention: click and enter do not trigger duplicate calls while pending
+		fireEvent.click(submitBtn);
+		fireEvent.keyDown(input, { key: "Enter" });
+		expect(onSubmit).toHaveBeenCalledTimes(1);
+
+		// Settle with failure/rejection
+		resolveSubmit({ accepted: false });
+		await waitFor(() => {
+			expect(submitBtn).toHaveProperty("disabled", false);
+		});
+		expect(submitBtn.querySelector('[data-testid="spinner"]')).toBeNull();
+		expect(submitBtn.getAttribute("aria-busy")).toBeNull();
+		expect(input).toHaveProperty("value", "Perbarui layout kartu metrik");
+	});
+
+	it("renders circular spinner when loading prop is true from canvas parent", () => {
+		render(<StudioComposer onSubmit={vi.fn()} loading={true} />);
+		const submitBtn = screen.getByRole("button", { name: /Kirim prompt/i });
+		expect(submitBtn).toHaveProperty("disabled", true);
+		expect(submitBtn.getAttribute("aria-busy")).toBe("true");
+		const spinner = submitBtn.querySelector('[data-testid="spinner"]');
+		expect(spinner).not.toBeNull();
+	});
 });

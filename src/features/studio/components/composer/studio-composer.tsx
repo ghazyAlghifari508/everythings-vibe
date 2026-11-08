@@ -1,11 +1,11 @@
 import {
 	ArrowUp01Icon,
 	Cancel01Icon,
-	Loading01Icon,
 	PaintBoardIcon,
 } from "@hugeicons/core-free-icons";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
+import { Spinner } from "@/components/ui/spinner";
 import type { StudioDesignSkillId } from "@/features/studio/services/studio-generation-options";
 import { STUDIO_DESIGN_PRESETS } from "@/features/studio/services/studio-presets";
 import { STUDIO_MIN_PROMPT_CHARS } from "@/features/studio/services/studio-prompt-validation";
@@ -15,10 +15,9 @@ import {
 	canvasComposerBottomCss,
 	canvasComposerWidthCss,
 } from "@/features/studio/utils/studio-canvas-layout";
+import { filterValidHexColors, StudioPaletteDisk } from "./studio-palette-disk";
 import { StudioSkillSelect } from "./studio-skill-select";
 import { StudioSuggestionRow } from "./studio-suggestion-row";
-
-const SWATCH_ROLES = ["canvas", "primary", "ink"] as const;
 
 /**
  * The server resolves the operation, so the composer only reports whether the
@@ -42,7 +41,7 @@ export interface StudioComposerProps {
 	onDesignSkillChange?: (skillId: StudioDesignSkillId) => void;
 	referenceLabel?: string | null;
 	referenceColors?: readonly string[] | null;
-	/** Next-screen bubbles derived from the project's own structure. */
+	/** Next-screen cards derived from the project's own structure. */
 	suggestions?: readonly StudioScreenSuggestion[];
 }
 
@@ -68,7 +67,9 @@ export function StudioComposer({
 
 	const resolvedColors = useMemo(() => {
 		if (referenceColors && referenceColors.length > 0) {
-			return referenceColors;
+			const valid = filterValidHexColors(referenceColors);
+			if (valid.length > 0) return valid;
+			return null;
 		}
 		if (!referenceLabel) return null;
 		const preset = STUDIO_DESIGN_PRESETS.find(
@@ -127,7 +128,7 @@ export function StudioComposer({
 	}
 
 	// A suggestion only fills the composer: the user still reviews and submits,
-	// so clicking a bubble never spends a generation credit on its own.
+	// so clicking a card never spends a generation credit on its own.
 	function insertSuggestion(suggestion: StudioScreenSuggestion) {
 		setPrompt(suggestion.prompt);
 		setClarify("");
@@ -200,23 +201,10 @@ export function StudioComposer({
 								className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-iron px-1.5 py-1 text-xs text-mist"
 							>
 								{resolvedColors && resolvedColors.length > 0 ? (
-									<span
-										data-testid="studio-palette-swatches"
-										className="flex items-center gap-1 shrink-0"
-										aria-hidden="true"
-									>
-										{resolvedColors.slice(0, 3).map((color, index) => {
-											const role = SWATCH_ROLES[index] ?? color;
-											return (
-												<span
-													key={role}
-													className="size-2 rounded-full border border-white/20 shrink-0"
-													style={{ backgroundColor: color }}
-													data-color={color}
-												/>
-											);
-										})}
-									</span>
+									<StudioPaletteDisk
+										colors={resolvedColors}
+										label={referenceLabel}
+									/>
 								) : (
 									<Icon
 										icon={PaintBoardIcon}
@@ -258,16 +246,13 @@ export function StudioComposer({
 						type="submit"
 						disabled={!canSubmit}
 						aria-label="Kirim prompt"
+						aria-busy={loading || sending ? "true" : undefined}
 						title="Kirim prompt (Enter)"
 						style={{ background: "var(--btn-bg)", color: "var(--btn-text)" }}
 						className="flex size-10 shrink-0 items-center justify-center rounded-lg hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-snow disabled:cursor-not-allowed disabled:opacity-40"
 					>
 						{loading || sending ? (
-							<Icon
-								icon={Loading01Icon}
-								size={18}
-								className="motion-safe:animate-spin"
-							/>
+							<Spinner size={18} className="text-current" />
 						) : (
 							<Icon icon={ArrowUp01Icon} size={18} />
 						)}
