@@ -285,13 +285,13 @@ export function useStudioWorkspaceActions({
 		if (frames.length === 0 || exportingZip) return;
 		setExportingZip(true);
 		try {
-			await exportProjectAsZip(project.title, frames);
+			await exportProjectAsZip(project.title, project.id, frames);
 		} catch {
 			setError("Gagal menyiapkan bundel ZIP unduhan.");
 		} finally {
 			setExportingZip(false);
 		}
-	}, [exportingZip, frames, project.title, setError]);
+	}, [exportingZip, frames, project.id, project.title, setError]);
 
 	return {
 		composerLoading,
