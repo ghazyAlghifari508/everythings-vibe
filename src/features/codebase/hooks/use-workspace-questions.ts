@@ -8,11 +8,10 @@ import {
 } from "react";
 import {
 	type AdaptiveQuestion,
+	anchorRunStart,
 	type CodebaseRunState,
 	mapAskQuestionsToAdaptive,
 	operationSettleEpoch,
-	recordOperationActivities,
-	recordRunActivity,
 	settleRunIfCurrent,
 	startRun,
 } from "@/features/codebase/services/chat-flow";
@@ -97,16 +96,12 @@ export function useWorkspaceQuestions(
 				}
 
 				let op = submitRes.operation;
-				setRun((current) => recordOperationActivities(current, op, requestId));
+				setRun((current) => anchorRunStart(current, op.createdAt, requestId));
 				if (op.status === "queued" || op.status === "running") {
 					const settled = await pollOperationUntilSettled({
 						projectId,
 						stage: "questions",
 						operationId: op.id,
-						onTick: (tick) =>
-							setRun((current) =>
-								recordOperationActivities(current, tick, requestId),
-							),
 					});
 					if (
 						requestEpoch.current !== epoch ||
@@ -138,18 +133,12 @@ export function useWorkspaceQuestions(
 					}
 					setAiQuestions(mapAskQuestionsToAdaptive(parsed));
 					setChatAnswers({});
-					const settledAt = operationSettleEpoch(op);
 					setRun((current) =>
 						settleRunIfCurrent(
-							recordRunActivity(
-								current,
-								"result.persisted",
-								settledAt,
-								requestId,
-							),
+							current,
 							requestId,
 							"done",
-							settledAt,
+							operationSettleEpoch(op),
 						),
 					);
 				} else {

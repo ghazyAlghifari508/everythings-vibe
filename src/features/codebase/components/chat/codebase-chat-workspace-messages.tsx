@@ -2,7 +2,6 @@
 
 import { AgentThinking } from "@/components/ui/agent-thinking";
 import {
-	CODEBASE_RUN_ACTIVITY_LABEL,
 	CODEBASE_STAGE_DONE_LABEL,
 	type CodebaseRunState,
 } from "@/features/codebase/services/chat-flow";
@@ -18,7 +17,7 @@ const STAGE_LABEL: Record<CodebaseRunState["stage"], string> = {
 	questions: "pertanyaan klarifikasi",
 	feature: "spesifikasi fitur",
 	prd: "PRD",
-	ac: "Acceptance Criteria",
+	ac: "acceptance criteria",
 	task: "task",
 };
 
@@ -74,19 +73,9 @@ export function CodebaseChatWorkspaceMessages({
 				<div data-testid="codebase-run-thinking">
 					<AgentThinking
 						status={run.status}
-						phase={run.phase}
 						thinkingLabel={`Menyusun ${STAGE_LABEL[run.stage]}`}
-						/* Once real document bytes arrive the phase is no longer "thinking",
-						   so the two lines must not read as the same sentence. */
-						generatingLabel={`Menulis ${STAGE_LABEL[run.stage]}`}
 						doneLabel={CODEBASE_STAGE_DONE_LABEL[run.stage]}
 						failedLabel={`Gagal menyusun ${STAGE_LABEL[run.stage]}`}
-						activity={run.activity}
-						activities={run.activities.map((entry) => ({
-							id: entry.id,
-							label: CODEBASE_RUN_ACTIVITY_LABEL[entry.id],
-						}))}
-						thinkingText={run.thinkingText}
 						startedAt={run.startedAt}
 						finishedAt={run.finishedAt}
 					/>

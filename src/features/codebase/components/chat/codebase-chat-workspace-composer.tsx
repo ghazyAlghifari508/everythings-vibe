@@ -129,6 +129,8 @@ export function CodebaseChatWorkspaceComposer({
 					data-testid="composer-mention-anchor"
 					className="pointer-events-none absolute inset-x-0 top-0 h-0"
 				/>
+				{/* The Thinking indicator already animates this request, so the submit
+				    control stays closed while busy without spinning a second time. */}
 				<PromptBar
 					id="codebase-chat-composer"
 					value={draft}
@@ -136,6 +138,7 @@ export function CodebaseChatWorkspaceComposer({
 					onSend={onSend}
 					onKeyDown={onKeyDown}
 					isSending={isSending}
+					showBusyGlyph={false}
 					sendDisabled={sendDisabled}
 					minCharsToSend={3}
 					minRows={minRows}

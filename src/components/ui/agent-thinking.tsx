@@ -11,13 +11,6 @@ import { cn } from "@/lib/utils";
 import { Icon } from "./icon";
 
 export type AgentOperationStatus = "idle" | "running" | "done" | "failed";
-export type AgentOperationPhase = "thinking" | "generating";
-
-/** One confirmed backend event, rendered as a line in the activity history. */
-export interface AgentThinkingActivity {
-	id: string;
-	label: string;
-}
 
 export interface AgentThinkingProps {
 	/** Current status of the operation */
@@ -26,21 +19,18 @@ export interface AgentThinkingProps {
 	working?: boolean;
 	/** Whether the operation failed */
 	failed?: boolean;
-	/** Active stage phase: "thinking" vs "generating" */
-	phase?: AgentOperationPhase | null;
-	/** Label while in thinking phase */
+	/** Label while the operation is in flight */
 	thinkingLabel?: string;
-	/** Label while in generating phase */
-	generatingLabel?: string;
 	/** Settled label upon success */
 	doneLabel?: string;
 	/** Settled label upon failure */
 	failedLabel?: string;
-	/** Single honest activity description, used until real events exist */
-	activity?: string | null;
-	/** Confirmed backend events in observation order; the last one is current while running */
-	activities?: readonly AgentThinkingActivity[] | null;
-	/** Model reasoning streamed from SSE */
+	/**
+	 * Reasoning the provider explicitly streamed to the client. This is the only
+	 * expandable detail the component ever renders: transport milestones and
+	 * backend housekeeping are diagnostics, not reasoning, so they are never
+	 * accepted here. Empty means "no disclosure", not "empty disclosure".
+	 */
 	thinkingText?: string | null;
 	/** Server-reported failure message */
 	error?: string | null;
@@ -71,17 +61,18 @@ function resolveEpoch(
 	return Number.isFinite(epoch) ? epoch : fallback;
 }
 
+/**
+ * One operation, one indicator. The single Orb in the headline is the whole
+ * progress animation: the disclosure never repeats it, and no detail line is
+ * invented from elapsed time. Details come only from real streamed reasoning.
+ */
 export function AgentThinking({
 	status,
 	working: legacyWorking,
 	failed: legacyFailed = false,
-	phase = null,
 	thinkingLabel = "Thinking",
-	generatingLabel,
 	doneLabel = "Selesai",
 	failedLabel = "Gagal",
-	activity,
-	activities,
 	thinkingText,
 	error,
 	onRetry,
@@ -160,117 +151,65 @@ export function AgentThinking({
 	}, [isWorking, isDone, isFailed]);
 
 	const hasThinking = Boolean(thinkingText && thinkingText.trim().length > 0);
-	const hasActivity = Boolean(activity && activity.trim().length > 0);
-	const visibleActivities = activities ?? [];
-	const hasActivities = visibleActivities.length > 0;
-	const hasExpandableContent = hasThinking || hasActivity || hasActivities;
 
 	// If idle and not working, nothing to display
 	if (status === "idle" && !isWorking) {
 		return null;
 	}
 
-	const isGeneratingPhase = isWorking && phase === "generating";
-
 	return (
 		<div
 			data-testid="agent-thinking"
 			className={cn("flex flex-col gap-1.5 py-1 text-sm text-snow", className)}
 		>
-			{/* Case 1: Verified Generating Phase — shows finished Thinking line above active Generating line */}
-			{isGeneratingPhase ? (
-				<div className="flex flex-col gap-1.5">
-					<div className="flex items-center justify-between gap-3 text-xs text-fog">
-						<span className="flex items-center gap-2">
-							<Icon
-								icon={Tick01Icon}
-								size={14}
-								className="shrink-0 text-emerald"
-								aria-hidden="true"
-							/>
-							<span>{thinkingLabel}</span>
-						</span>
-						{showTimer ? (
-							<span
-								role="timer"
-								aria-label="Waktu proses thinking"
-								className="font-mono text-[11px] tabular-nums text-fog/80"
-							>
-								{finalElapsed.toFixed(1)}s
-							</span>
-						) : null}
-					</div>
-					<div className="flex items-center justify-between gap-3">
-						<span className="flex items-center gap-2 font-medium text-snow">
-							<Orb state="working" size={16} />
-							<span>
-								{generatingLabel ?? activity ?? "Menyusun respons..."}
-							</span>
-						</span>
-						{showTimer ? (
-							<span
-								role="timer"
-								aria-label="Waktu proses"
-								className="font-mono text-xs tabular-nums text-fog"
-							>
-								{finalElapsed.toFixed(1)}s
-							</span>
-						) : null}
-					</div>
-				</div>
-			) : (
-				/* Case 2: Standard Active Running, Done, or Failed */
-				<div className="flex items-center justify-between gap-3">
-					<span className="flex items-center gap-2">
-						{isWorking ? (
+			<div className="flex items-center justify-between gap-3">
+				<span className="flex min-w-0 items-center gap-2">
+					{isWorking ? (
+						<span className="shrink-0" data-testid="agent-thinking-indicator">
 							<Orb state="reasoning" size={16} />
-						) : isFailed ? (
-							<Icon
-								icon={AlertCircleIcon}
-								size={16}
-								className="shrink-0 text-crimson"
-								aria-hidden="true"
-							/>
-						) : (
-							<Icon
-								icon={Tick01Icon}
-								size={16}
-								className="shrink-0 text-emerald"
-								aria-hidden="true"
-							/>
-						)}
-						<output
-							aria-live="polite"
-							className={cn(
-								"font-medium",
-								isWorking
-									? "text-snow"
-									: isFailed
-										? "text-crimson"
-										: "text-snow",
-							)}
-						>
-							{isWorking
-								? `${thinkingLabel}...`
-								: isFailed
-									? failedLabel
-									: doneLabel}
-						</output>
-					</span>
-					{showTimer ? (
-						<span
-							role="timer"
-							aria-label="Waktu proses"
-							className="font-mono text-xs tabular-nums text-fog"
-						>
-							{finalElapsed.toFixed(1)}s
 						</span>
-					) : null}
-				</div>
-			)}
+					) : isFailed ? (
+						<Icon
+							icon={AlertCircleIcon}
+							size={16}
+							className="shrink-0 text-crimson"
+							aria-hidden="true"
+						/>
+					) : (
+						<Icon
+							icon={Tick01Icon}
+							size={16}
+							className="shrink-0 text-emerald"
+							aria-hidden="true"
+						/>
+					)}
+					<output
+						aria-live="polite"
+						className={cn(
+							"truncate font-medium",
+							isFailed ? "text-crimson" : "text-snow",
+						)}
+					>
+						{isWorking
+							? `${thinkingLabel}...`
+							: isFailed
+								? failedLabel
+								: doneLabel}
+					</output>
+				</span>
+				{showTimer ? (
+					<span
+						role="timer"
+						aria-label="Waktu proses"
+						className="font-mono text-xs tabular-nums text-fog"
+					>
+						{finalElapsed.toFixed(1)}s
+					</span>
+				) : null}
+			</div>
 
-			{/* Expandable Activity / Reasoning Details: inline disclosure, no nested card */}
-			{hasExpandableContent ? (
+			{/* Disclosure: only real provider-streamed reasoning, never transport logs */}
+			{hasThinking ? (
 				<div className="flex flex-col pl-6">
 					<button
 						type="button"
@@ -296,48 +235,9 @@ export function AgentThinking({
 							id={detailsId}
 							className="mb-1 flex flex-col gap-1.5 border-l border-graphite/50 pl-3 text-xs text-fog"
 						>
-							{hasActivities ? (
-								<ul className="flex flex-col gap-1.5">
-									{visibleActivities.map((entry, index) => {
-										const isCurrent =
-											isWorking && index === visibleActivities.length - 1;
-										return (
-											<li
-												key={entry.id}
-												className="flex items-start gap-2 leading-relaxed"
-											>
-												<span
-													className="mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center"
-													aria-hidden="true"
-												>
-													{isCurrent ? (
-														<Orb state="reasoning" size={14} />
-													) : (
-														<Icon
-															icon={Tick01Icon}
-															size={12}
-															strokeWidth={2}
-															className="text-emerald"
-														/>
-													)}
-												</span>
-												<span
-													className={isCurrent ? "text-snow/90" : "text-mist"}
-												>
-													{entry.label}
-												</span>
-											</li>
-										);
-									})}
-								</ul>
-							) : hasActivity ? (
-								<p className="leading-relaxed text-snow/90">{activity}</p>
-							) : null}
-							{hasThinking ? (
-								<pre className="max-h-48 overflow-y-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-mist">
-									{thinkingText}
-								</pre>
-							) : null}
+							<pre className="max-h-48 overflow-y-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-mist">
+								{thinkingText}
+							</pre>
 						</div>
 					) : null}
 				</div>
