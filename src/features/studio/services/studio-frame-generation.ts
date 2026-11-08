@@ -68,7 +68,10 @@ export async function generateValidatedFrameHtml(
 				input.designSkillId,
 				input.signal,
 				input.timing,
-				{ stage: round === 0 ? "frame" : "correction", focus: correctionFocus },
+				{
+					stage: round === 0 ? (input.stage ?? "frame") : "correction",
+					focus: correctionFocus,
+				},
 			);
 		} catch (error) {
 			input.signal?.throwIfAborted();
@@ -127,6 +130,11 @@ export async function generateValidatedFrameHtml(
 				attempt: round + 1,
 			});
 		const validationStartedAt = Date.now();
+		const sourceIssues: string[] = [];
+		if (!/<html[\s>]/i.test(rawHtml) || !/<\/html\s*>/i.test(rawHtml))
+			sourceIssues.push("HTML tidak lengkap.");
+		if (!/<body[\s>]/i.test(rawHtml) || !/<\/body\s*>/i.test(rawHtml))
+			sourceIssues.push("Body HTML tidak lengkap.");
 		const preAssemblyHtml = enforceDesignSystemOnHtml(
 			rawHtml,
 			input.dsTokens,
@@ -135,6 +143,7 @@ export async function generateValidatedFrameHtml(
 		);
 		let htmlCode = preAssemblyHtml;
 		const assemblyIssues: string[] = [];
+		let assemblyFailed = false;
 		let assembledContentNodes = 0;
 		const ownsShell = Boolean(input.blueprint && input.activeScreen);
 		if (ownsShell || input.viewport === "mobile") {
@@ -155,6 +164,7 @@ export async function generateValidatedFrameHtml(
 						code: "CANONICAL_CHROME_FLOW",
 					});
 			} catch (error) {
+				assemblyFailed = true;
 				assemblyIssues.push(
 					error instanceof Error
 						? error.message
@@ -166,6 +176,8 @@ export async function generateValidatedFrameHtml(
 			assembledContentNodes = studioContentNodeCount(htmlCode);
 			if (assembledContentNodes === 0) {
 				const sourceContentNodes = studioContentNodeCount(preAssemblyHtml);
+				// Chrome-only model output is repairable; losing real content is an assembly defect.
+				assemblyFailed = studioContentNodeCount(preAssemblyHtml, true) > 0;
 				assemblyIssues.push(
 					"Konten layar kosong setelah perakitan shell kanonik.",
 				);
@@ -177,28 +189,40 @@ export async function generateValidatedFrameHtml(
 						code: "INVALID_OUTPUT",
 						sourceContentNodes,
 						assembledContentNodes,
-						correctionRequired: round < STUDIO_FRAME_CORRECTION_MAX,
+						correctionRequired:
+							!assemblyFailed && round < STUDIO_FRAME_CORRECTION_MAX,
 					});
 			}
-			assemblyIssues.push(
-				...validateCanonicalShell(
-					htmlCode,
-					input.blueprint,
-					input.activeScreen,
-					input.dsTokens,
-					input.logoUrl,
-				),
+			const shellIssues = validateCanonicalShell(
+				htmlCode,
+				input.blueprint,
+				input.activeScreen,
+				input.dsTokens,
+				input.logoUrl,
 			);
+			if (shellIssues.length) assemblyFailed = true;
+			assemblyIssues.push(...shellIssues);
 		}
 		if (input.activeScreen) htmlCode = repairStudioAccessibleLabels(htmlCode);
+		// Assembly failures belong to Studio, not the model. Do not spend a repair request on them.
+		if (assemblyFailed)
+			throw new StudioFrameError(
+				"STUDIO_CONTRACT_VIOLATION",
+				assemblyIssues.join(" "),
+			);
 		const diagnostics = inspectStudioHtml(htmlCode);
 		const issues: StudioOutputIssue[] = [
+			...sourceIssues.map((message) => ({ stage: "model-source", message })),
 			...assemblyIssues.map((message) => ({
 				stage: "canonical-assembly",
 				message,
 			})),
 			...diagnostics.hard.map((message) => ({
 				stage: "html-diagnostics",
+				message,
+			})),
+			...diagnostics.repairable.map((message) => ({
+				stage: "quality-repair",
 				message,
 			})),
 			...validateGeneratedHtml(htmlCode, {
@@ -214,6 +238,9 @@ export async function generateValidatedFrameHtml(
 				attempt: round + 1,
 				code: issues.length ? "INVALID_OUTPUT" : "VALID",
 				issueCount: issues.length,
+				hardCount: diagnostics.hard.length,
+				repairableCount: diagnostics.repairable.length,
+				advisoryCount: diagnostics.warnings.length,
 				issueCodes,
 				issueStages: [...new Set(issues.map((issue) => issue.stage))],
 				assembledContentNodes,

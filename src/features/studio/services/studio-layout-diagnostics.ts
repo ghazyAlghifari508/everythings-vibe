@@ -68,7 +68,7 @@ export function inspectStudioLayout(document: Document) {
 	}
 	const statuses = new Map<Element, Set<string>>();
 	for (const status of document.querySelectorAll(
-		'[role="status"],[data-badge],.badge',
+		'[role="status"],[data-badge],[data-ui="badge"],.badge',
 	)) {
 		const parent = status.parentElement;
 		const text = status.textContent?.replace(/\s+/g, " ").trim();
@@ -78,10 +78,6 @@ export function inspectStudioLayout(document: Document) {
 			warnings.push("Repeated status label in the same component.");
 		seen.add(text);
 		statuses.set(parent, seen);
-		if (/\s/.test(text))
-			warnings.push(
-				"Badge text wraps to more than one line; give the label room or shorten it.",
-			);
 	}
 	// Atomic value integrity: a currency prefix and its amount share one flow,
 	// so the browser wraps them together. A price whose prefix is glued inside
