@@ -45,6 +45,9 @@ Product requirements define domain, product name, audience, features, entities, 
 Infer the product domain, audience, main task and intended mood from the brief and PRD before choosing a palette. In productIdentity.visualDirection explain the mood, composition, typography, radius/density and why they fit this specific product. Do not treat industry as a fixed palette template, choose a built-in theme at random, or default to a familiar accent. Different briefs in the same industry can require different identities. Explicit user colors (including green) remain authoritative.
 Choose one coherent project-wide designTokens set: primary accent, secondary accent, background, surface, ink, muted, onPrimary, fontFamily, radius, border and elevation. Secondary is an accent, NOT muted text. Use opaque hex colors and ensure ink/muted contrast >= 4.5:1 on both background and surface, and onPrimary >= 4.5:1 on primary. Keep accent usage restrained. canonicalShell.density must fit the audience and task. All screens and later additions reuse this approved identity; do not reselect per frame.`);
 	}
+	sections.push(
+		"Plan one shared layout contract (gutter, contentMaxWidth, ascending spacing and typography scales), appropriate density and existing shared component geometry. In each screenPlan.role specify the task hierarchy, component roles, media presentation and responsive intent concisely. Discovery may use a horizontal promo track, customization readable vertical option rows, checkout separate quantity/price/action tracks, tracking ordered real states; these are examples, not a forced template. Distinct screen compositions reuse the same tokens and navigation.",
+	);
 
 	sections.push(
 		`Follow the system JSON schema. Keep descriptions, roles and shared-component values short; no HTML, CSS or repeated rules. Preserve the user's product name, domain and requirements, shared tokens/navigation, viewport and exact screen count.`,

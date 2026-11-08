@@ -40,6 +40,7 @@ import {
 	STUDIO_PLAN_SYSTEM_PROMPT,
 	STUDIO_SYSTEM_PROMPT,
 } from "./studio-prompt-contracts";
+import { STUDIO_BASE_QUALITY_PROMPT } from "./studio-quality-rules";
 import {
 	buildStudioSkillContext,
 	type StudioSkillStage,
@@ -419,8 +420,12 @@ export function resolveStudioFrameSystemPrompt(
 		focus?: string[];
 	} = {},
 ): string {
-	return buildStudioSkillSystemPrompt(STUDIO_SYSTEM_PROMPT, id, {
-		stage: options.stage ?? "frame",
-		focus: options.focus,
-	});
+	return buildStudioSkillSystemPrompt(
+		`${STUDIO_SYSTEM_PROMPT}\n${STUDIO_BASE_QUALITY_PROMPT}`,
+		id,
+		{
+			stage: options.stage ?? "frame",
+			focus: options.focus,
+		},
+	);
 }

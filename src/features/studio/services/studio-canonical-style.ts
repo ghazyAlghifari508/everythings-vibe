@@ -35,7 +35,10 @@ export interface CanonicalPalette {
 
 /** Outer gutter: density is the project's own spacing decision. */
 export function canonicalGutter(blueprint: StudioDesignBlueprint): number {
-	return blueprint.canonicalShell?.density === "compact" ? 16 : 24;
+	return (
+		blueprint.layout?.gutter ??
+		(blueprint.canonicalShell?.density === "compact" ? 16 : 24)
+	);
 }
 
 /**
@@ -159,10 +162,15 @@ export function canonicalShellStyle(
 	const buttonRadius =
 		tokens?.shapes.borderRadius.buttons ?? "var(--app-radius)";
 	const cardRadius = tokens?.shapes.borderRadius.cards ?? "var(--app-radius)";
+	const layout = blueprint.layout;
+	const layoutTokens = layout
+		? `--app-content-width:${layout.contentMaxWidth}px;${layout.spacing.map((value, index) => `--app-space-${index}:${value}px;`).join("")}${layout.typography.map((value, index) => `--app-type-${index}:${value}px;`).join("")}`
+		: "";
 	return `<style id="studio-canonical-style">
 html{box-sizing:border-box}*,*::before,*::after{box-sizing:inherit}
 :where(body){margin:0}
 [data-studio-shell]{--app-primary:${palette.primary};--app-secondary:${blueprint.designTokens.secondary};--app-on-primary:${palette.onPrimary};--app-canvas:${palette.canvas};--app-surface:${palette.surface};--app-ink:${palette.ink};--app-muted:${palette.muted};--app-border:${palette.border};--app-font:${palette.font};--app-gutter:${gutter}px;--app-radius:${blueprint.designTokens.radius}px;min-width:0;width:100%;background:var(--app-canvas);color:var(--app-ink);font-family:var(--app-font);overflow-wrap:break-word}
+${layout ? `[data-studio-shell]{${layoutTokens}}:where([data-studio-content]){width:100%;max-width:var(--app-content-width);margin-inline:auto}` : ""}
 ${controlRules(buttonRadius)}
 :where([data-studio-shell] .card, [data-studio-shell] [data-card]){border:var(--app-border);border-radius:${cardRadius};background:var(--app-surface);min-width:0}
 :where([data-studio-shell] table){width:100%;border-collapse:collapse;text-align:left;font-size:14px}
