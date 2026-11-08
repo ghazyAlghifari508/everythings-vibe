@@ -55,7 +55,7 @@ describe("StudioDesignPickerDialog", () => {
 		expect(screen.getByLabelText("Terpilih")).toBeDefined();
 		expect(screen.queryByText("Dipilih:")).toBeNull();
 		expect(screen.queryByText(/Referensi terpilih:/)).toBeNull();
-		fireEvent.click(screen.getByRole("button", { name: "Gunakan Tema" }));
+		fireEvent.click(screen.getByRole("button", { name: "Terapkan Tema" }));
 		expect(onSelectTheme).toHaveBeenCalledWith("editorial");
 		expect(onOpenChange).toHaveBeenCalledWith(false);
 	});
@@ -148,7 +148,7 @@ describe("StudioDesignPickerDialog", () => {
 		const scroller = dialog.querySelector(".overflow-y-auto");
 		expect(scroller).not.toBeNull();
 		const header = screen.getByText("Pilih tampilan").closest("div");
-		const footer = screen.getByRole("button", { name: "Batal" }).closest("div");
+		const footer = screen.getByRole("button", { name: "Tutup" }).closest("div");
 		expect(header?.contains(scroller)).toBe(false);
 		expect(footer?.contains(scroller)).toBe(false);
 	});

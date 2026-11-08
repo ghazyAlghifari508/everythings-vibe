@@ -6,6 +6,7 @@ import {
 	studioFrames,
 } from "@/db/schema";
 import { ScrapeError } from "@/lib/design-errors";
+import { finalizeStudioFrameDetail } from "./studio-frame-document";
 import { studioJobTiming } from "./studio-job-runtime";
 import { buildStudioAssetUrl } from "./studio-logo-service";
 import { getStudioProjectDetail } from "./studio-project-detail";
@@ -20,10 +21,17 @@ export async function getStudioFrameVisual(
 	const frame = detail.frames.find((entry) => entry.id === frameId);
 	if (!frame?.htmlCode)
 		throw new ScrapeError("WEBSITE_BLOCKED", "Output frame belum tersedia.");
+	// The capture reads the same final document the export ships, so a screen
+	// generated before a canonical CSS fix renders the fixed shell too.
+	const frameDocument = finalizeStudioFrameDetail(
+		detail.project,
+		frame,
+		detail.logoUrl,
+	);
 	const { captureStudioVisual, studioVisualHash } = await import(
 		"./studio-visual"
 	);
-	const hash = studioVisualHash(frame.htmlCode, frame.viewport);
+	const hash = studioVisualHash(frameDocument.html, frame.viewport);
 	if (frame.visualHash !== hash) {
 		await db
 			.update(studioFrames)
@@ -79,7 +87,7 @@ export async function getStudioFrameVisual(
 	const captureStartedAt = Date.now();
 	const startedAt = performance.now();
 	const visual = await captureStudioVisual(
-		frame.htmlCode,
+		frameDocument.html,
 		frame.viewport,
 		detail.project.designMd,
 		assets,

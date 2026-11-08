@@ -94,14 +94,16 @@ describe("studio-export", () => {
 				return el;
 			});
 
-			await exportProjectAsZip("Finance Mobile App", mockFrames);
+			await exportProjectAsZip("Finance Mobile App", "p-1", mockFrames);
 
 			expect(global.URL.createObjectURL).toHaveBeenCalled();
 			expect(clickSpy).toHaveBeenCalled();
 		});
 
 		it("rejects empty output rather than acknowledging a nonexistent download", async () => {
-			await expect(exportProjectAsZip("Empty App", [])).rejects.toThrow();
+			await expect(
+				exportProjectAsZip("Empty App", "p-1", []),
+			).rejects.toThrow();
 			expect(global.URL.createObjectURL).not.toHaveBeenCalled();
 		});
 		it("rejects unavailable required assets rather than exporting broken private references", async () => {
@@ -110,7 +112,7 @@ describe("studio-export", () => {
 				vi.fn(async () => new Response(null, { status: 404 })),
 			);
 			await expect(
-				exportProjectAsZip("Sample", [
+				exportProjectAsZip("Sample", "p-1", [
 					{
 						...mockFrames[0],
 						htmlCode:

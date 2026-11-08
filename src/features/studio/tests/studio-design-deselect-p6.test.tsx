@@ -61,7 +61,9 @@ describe("TASK 06 — Theme Toggle Selection, Explicit Deselect, and No Redundan
 
 		expect(editorialBtn.getAttribute("aria-pressed")).toBe("true");
 		expect(screen.getByLabelText("Terpilih")).toBeDefined();
-		expect(screen.getByRole("button", { name: "Gunakan Tema" })).not.toBeNull();
+		expect(
+			screen.getByRole("button", { name: "Terapkan Tema" }),
+		).not.toBeNull();
 
 		// Other themes remain unselected
 		const workspaceBtn = screen.getByRole("button", { name: /Workspace/i });
@@ -81,10 +83,11 @@ describe("TASK 06 — Theme Toggle Selection, Explicit Deselect, and No Redundan
 
 		expect(editorialBtn.getAttribute("aria-pressed")).toBe("false");
 		expect(screen.queryByLabelText("Terpilih")).toBeNull();
-		// Apply button now allows applying the deselect (labeled "Gunakan tanpa tema")
+		// Footer reverts to Tutup without forcing "Gunakan tanpa tema" CTA
+		expect(screen.getByRole("button", { name: "Tutup" })).not.toBeNull();
 		expect(
-			screen.getByRole("button", { name: "Gunakan tanpa tema" }),
-		).not.toBeNull();
+			screen.queryByRole("button", { name: "Gunakan tanpa tema" }),
+		).toBeNull();
 	});
 
 	// 3. Select another theme
@@ -121,8 +124,11 @@ describe("TASK 06 — Theme Toggle Selection, Explicit Deselect, and No Redundan
 		expect(midnightBtn.getAttribute("aria-pressed")).toBe("false");
 		expect(screen.queryByLabelText("Terpilih")).toBeNull();
 		expect(
-			screen.getByRole("button", { name: "Gunakan tanpa tema" }),
+			screen.getByRole("button", { name: "Hapus Pilihan" }),
 		).not.toBeNull();
+		expect(
+			screen.queryByRole("button", { name: "Gunakan tanpa tema" }),
+		).toBeNull();
 	});
 
 	// 5. Cancel after deselect
@@ -154,8 +160,8 @@ describe("TASK 06 — Theme Toggle Selection, Explicit Deselect, and No Redundan
 		fireEvent.click(midnightBtn);
 		expect(midnightBtn.getAttribute("aria-pressed")).toBe("false");
 
-		// Click Apply (Gunakan tanpa tema)
-		const applyBtn = screen.getByRole("button", { name: "Gunakan tanpa tema" });
+		// Click Hapus Pilihan
+		const applyBtn = screen.getByRole("button", { name: "Hapus Pilihan" });
 		fireEvent.click(applyBtn);
 
 		expect(onClear).toHaveBeenCalledTimes(1);
@@ -221,7 +227,7 @@ describe("TASK 06 — Theme Toggle Selection, Explicit Deselect, and No Redundan
 		// Now Deselect and Apply
 		fireEvent.click(reopenedMidnight);
 		expect(reopenedMidnight.getAttribute("aria-pressed")).toBe("false");
-		fireEvent.click(screen.getByRole("button", { name: "Gunakan tanpa tema" }));
+		fireEvent.click(screen.getByRole("button", { name: "Hapus Pilihan" }));
 
 		// Confirmed theme is now cleared ("none")
 		expect(screen.getByTestId("confirmed-theme").textContent).toBe("none");
@@ -340,25 +346,28 @@ describe("TASK 06 — Theme Toggle Selection, Explicit Deselect, and No Redundan
 		).toBeNull();
 	});
 
-	// 3b. Apply with no selection at all
-	it("3b. Apply with no selection clears the reference and stays enabled", () => {
+	// 3b. Closing with no selection leaves composer unchanged without forcing apply
+	it("3b. Closing with no selection leaves composer unchanged without forcing apply", () => {
 		const { onClear, onSelectTheme, onOpenChange } = renderDialog();
 
-		const applyBtn = screen.getByRole("button", { name: "Gunakan tanpa tema" });
-		expect(applyBtn).toHaveProperty("disabled", false);
+		expect(
+			screen.queryByRole("button", { name: "Gunakan tanpa tema" }),
+		).toBeNull();
+		const closeBtn = screen.getByRole("button", { name: "Tutup" });
+		expect(closeBtn).toHaveProperty("disabled", false);
 
-		fireEvent.click(applyBtn);
+		fireEvent.click(closeBtn);
 
-		expect(onClear).toHaveBeenCalledTimes(1);
+		expect(onClear).not.toHaveBeenCalled();
 		expect(onSelectTheme).not.toHaveBeenCalled();
 		expect(onOpenChange).toHaveBeenCalledWith(false);
 	});
 
 	// 4b. Cancel with an empty selection
-	it("4b. Cancel with an empty selection mutates nothing", () => {
+	it("4b. Close with an empty selection mutates nothing", () => {
 		const { onSelectTheme, onClear, onOpenChange } = renderDialog();
 
-		fireEvent.click(screen.getByRole("button", { name: "Batal" }));
+		fireEvent.click(screen.getByRole("button", { name: "Tutup" }));
 
 		expect(onSelectTheme).not.toHaveBeenCalled();
 		expect(onClear).not.toHaveBeenCalled();
@@ -378,7 +387,7 @@ describe("TASK 06 — Theme Toggle Selection, Explicit Deselect, and No Redundan
 			fireEvent.click(themeBtn);
 			expect(themeBtn.getAttribute("aria-pressed")).toBe("true");
 
-			fireEvent.click(screen.getByRole("button", { name: "Gunakan Tema" }));
+			fireEvent.click(screen.getByRole("button", { name: "Terapkan Tema" }));
 			expect(onSelectTheme).toHaveBeenCalledWith(preset.id);
 			expect(onOpenChange).toHaveBeenCalledWith(false);
 
@@ -423,7 +432,7 @@ describe("TASK 06 — Theme Toggle Selection, Explicit Deselect, and No Redundan
 
 		const midnightBtn = screen.getByRole("button", { name: /Midnight/i });
 		fireEvent.click(midnightBtn);
-		fireEvent.click(screen.getByRole("button", { name: "Gunakan tanpa tema" }));
+		fireEvent.click(screen.getByRole("button", { name: "Hapus Pilihan" }));
 
 		expect(screen.getByTestId("theme-state").textContent).toBe("none");
 		expect(screen.getByTestId("prd-state").textContent).toBe("brief.md");

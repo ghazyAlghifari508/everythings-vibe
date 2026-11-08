@@ -1,6 +1,7 @@
 import { getRequestHeaders } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { requireUser } from "@/lib/session";
+import { readStudioFrameDocument } from "./studio-frame-document";
 import {
 	STUDIO_FRAME_ERRORS,
 	studioFrameErrorReport,
@@ -47,6 +48,21 @@ export async function GET({
 		// A user-initiated visual retry must bypass the cached render so a
 		// capture that could not be decoded is genuinely re-rendered.
 		const attempt = Number(url.searchParams.get("attempt") ?? "0");
+		// The ZIP export asks for the frame's final standalone document. It is
+		// built by the same transformation the canvas capture renders, so an
+		// exported screen and its preview cannot disagree.
+		if (url.searchParams.get("document") === "1") {
+			const frameDocument = await readStudioFrameDocument(
+				projectId,
+				frameId,
+				user.id,
+			);
+			status = 200;
+			return Response.json(
+				{ html: frameDocument.html, viewport: frameDocument.viewport },
+				{ headers: { "Cache-Control": "private, no-store" } },
+			);
+		}
 		const visual = await getStudioFrameVisual(projectId, frameId, user.id, {
 			forceRecapture: Number.isFinite(attempt) && attempt > 0,
 		});

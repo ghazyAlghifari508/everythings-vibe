@@ -13,12 +13,12 @@ import type {
 	StudioDesignMode,
 	StudioScreenPlan,
 } from "../types/studio-prompts";
+import { isTemporarySlot } from "../utils/studio-lifecycle";
 import type { StudioDesignBlueprint } from "./studio-design-blueprint";
 import {
 	resolveStudioPlanningSystemPrompt,
 	resolveStudioSkillContext,
 } from "./studio-design-skill-registry.server";
-import { isTemporarySlot } from "./studio-frame-generation";
 import {
 	type StudioJobClaim,
 	type StudioJobTransaction,

@@ -22,6 +22,7 @@ import {
 	STUDIO_CANVAS_MIN_ZOOM,
 } from "@/features/studio/types/studio-constants";
 import { isCanvasControlTarget } from "@/features/studio/utils/studio-canvas-gesture";
+import { deriveStudioLifecycle } from "@/features/studio/utils/studio-lifecycle";
 import { useCanvasZoom } from "@/hooks/use-canvas-zoom";
 
 export type {
@@ -45,6 +46,8 @@ export interface StudioCanvasProps {
 	onSelectFrames?: (frameIds: string[]) => void;
 	onRetryFrame?: (frameId: string) => void;
 	onRetryPlanning?: () => void;
+	retryingPlanning?: boolean;
+	onRefreshStatus?: () => void;
 	retryingFrameIds?: string[];
 	frameRetryErrors?: Record<string, string>;
 	className?: string;
@@ -60,18 +63,15 @@ export const StudioCanvas = memo(function StudioCanvas({
 	onSelectFrames,
 	onRetryFrame,
 	onRetryPlanning,
+	retryingPlanning = false,
+	onRefreshStatus,
 	retryingFrameIds = [],
 	frameRetryErrors,
 	className = "",
 }: StudioCanvasProps) {
 	const canvasRef = useRef<HTMLElement>(null);
 	const priorityFrameId = frames.find((frame) => frame.htmlCode)?.id;
-	// No blueprint and no saved screen means planning never completed: the frames
-	// are the provisional slots, so the only honest recovery is the whole plan.
-	const sharedPlanningFailed =
-		!project.designBlueprint &&
-		frames.length > 0 &&
-		frames.every((frame) => !frame.htmlCode);
+	const lifecycle = deriveStudioLifecycle({ project, frames, activeJob });
 	const marqueeRef = useRef<HTMLDivElement>(null);
 	const preferredZoom =
 		STUDIO_CANVAS_INITIAL_ZOOM[
@@ -231,11 +231,12 @@ export const StudioCanvas = memo(function StudioCanvas({
 					transformOrigin: "0 0",
 				}}
 			>
-				{frames.length > 0 && !sharedPlanningFailed ? (
+				{frames.length > 0 && !lifecycle.planningFailed ? (
 					frames.map((frame) => (
 						<StudioFrame
 							key={frame.id}
 							frame={frame}
+							job={activeJob}
 							priorityPreview={frame.id === priorityFrameId}
 							initialJobTiming={
 								activeJob?.jobType === "initial" ? activeJob : undefined
@@ -253,13 +254,29 @@ export const StudioCanvas = memo(function StudioCanvas({
 							isCanvasPanning={panMode}
 						/>
 					))
-				) : activeJob?.status === "failed" || sharedPlanningFailed ? (
+				) : lifecycle.planningFailed ? (
 					<StudioCanvasPlanningFailure
-						error={activeJob?.error}
-						onRetryPlanning={onRetryPlanning}
+						onRetryPlanning={
+							lifecycle.canRetryPlanning ? onRetryPlanning : undefined
+						}
+						retryingPlanning={retryingPlanning}
 					/>
 				) : null}
 			</div>
+			{lifecycle.inconsistent && (
+				<output className="absolute left-3 top-20 z-20 max-w-md rounded-xl border border-graphite bg-obsidian p-4 text-sm text-fog">
+					<p>Proses selesai, tetapi sebagian data desain belum tersedia.</p>
+					{onRefreshStatus && (
+						<button
+							type="button"
+							onClick={onRefreshStatus}
+							className="mt-2 rounded px-2 py-1 text-snow focus-visible:outline-2 focus-visible:outline-snow"
+						>
+							Muat ulang status
+						</button>
+					)}
+				</output>
+			)}
 
 			{activeJob && (
 				<StudioCanvasQueueReadout

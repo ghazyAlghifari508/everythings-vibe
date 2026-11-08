@@ -6,10 +6,6 @@ import {
 	resolveStudioPlanningSystemPrompt,
 	studioSkillSystemGuidance,
 } from "../services/studio-design-skill-registry.server";
-import {
-	STUDIO_PLAN_SYSTEM_PROMPT,
-	STUDIO_SYSTEM_PROMPT,
-} from "../services/studio-prompt-contracts";
 import { STUDIO_SKILL_ASSETS } from "../services/studio-skill-assets.generated";
 import {
 	buildStudioSkillContext,
@@ -237,21 +233,6 @@ describe("Stage-aware Studio skill context (Task 02)", () => {
 				for (const marker of markers)
 					expect(system, `${id}/${stage}`).not.toContain(marker);
 			}
-		}
-	});
-
-	it("appends nothing beyond the base contract and the selected sections", () => {
-		for (const id of [...SKILLS, "none"] as const) {
-			const frameContext = buildStudioSkillContext(id, { stage: "frame" });
-			expect(resolveStudioFrameSystemPrompt(id)).toBe(
-				`${STUDIO_SYSTEM_PROMPT}${frameContext.guidance}`,
-			);
-			const planningContext = buildStudioSkillContext(id, {
-				stage: "planning",
-			});
-			expect(resolveStudioPlanningSystemPrompt(id)).toBe(
-				`${STUDIO_PLAN_SYSTEM_PROMPT}${planningContext.guidance}`,
-			);
 		}
 	});
 

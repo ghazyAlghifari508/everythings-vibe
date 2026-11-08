@@ -3,10 +3,10 @@ import {
 	studioCanonicalHeader,
 	studioCanonicalNavigation,
 } from "./studio-canonical-chrome";
+import { canonicalShellStyle } from "./studio-canonical-style";
 import { STUDIO_COMPONENT_STYLE } from "./studio-component-patterns";
 import {
 	type StudioDesignBlueprint,
-	studioColorContrast,
 	validateBlueprint,
 } from "./studio-design-blueprint";
 import type { CanonicalDesignSystem } from "./studio-design-tokens";
@@ -15,88 +15,6 @@ function normalized(blueprint: StudioDesignBlueprint) {
 	const result = validateBlueprint(blueprint);
 	if (!result.ok) throw new Error(result.error);
 	return result.blueprint;
-}
-
-function shellStyle(
-	blueprint: StudioDesignBlueprint,
-	tokens: CanonicalDesignSystem | null,
-): string {
-	const bp = blueprint.designTokens;
-	const shell = blueprint.canonicalShell;
-	const overrides = blueprint.explicitColorOverrides ?? [];
-	const primary = overrides.includes("primary")
-		? bp.primary
-		: (tokens?.colors.primary ?? bp.primary);
-	const canvas = overrides.includes("background")
-		? bp.background
-		: (tokens?.colors.canvas ?? bp.background);
-	const surface = overrides.includes("surface")
-		? bp.surface
-		: (tokens?.colors.surface ?? bp.surface);
-	const ink =
-		(overrides.includes("ink") ? bp.ink : (tokens?.colors.ink ?? bp.ink)) ??
-		"#171717";
-	const muted =
-		(overrides.includes("muted")
-			? bp.muted
-			: (tokens?.colors.muted ?? bp.muted)) ?? bp.secondary;
-	const onPrimary =
-		bp.onPrimary && studioColorContrast(bp.onPrimary, primary) >= 4.5
-			? bp.onPrimary
-			: studioColorContrast("#ffffff", primary) >=
-					studioColorContrast("#000000", primary)
-				? "#ffffff"
-				: "#000000";
-	const border =
-		!overrides.includes("border") && tokens?.colors.border
-			? `1px solid ${tokens.colors.border}`
-			: bp.border;
-	const font = tokens?.typography.fontFamily ?? bp.fontFamily;
-	const gutter = shell?.density === "compact" ? 16 : 24;
-	return `<style id="studio-canonical-style">
-html{box-sizing:border-box}*,*::before,*::after{box-sizing:inherit}
-body{margin:0}
-[data-studio-shell]{--app-primary:${primary};--app-secondary:${bp.secondary};--app-on-primary:${onPrimary};--app-canvas:${canvas};--app-surface:${surface};--app-ink:${ink};--app-muted:${muted};--app-border:${border};--app-font:${font};--app-gutter:${gutter}px;--app-radius:${bp.radius}px;min-width:0;width:100%;background:var(--app-canvas);color:var(--app-ink);font:400 16px/1.5 var(--app-font);overflow-wrap:break-word}
-:where([data-studio-shell] button,[data-studio-shell] input,[data-studio-shell] select,[data-studio-shell] textarea){font:inherit;min-height:44px;max-width:100%;border:var(--app-border);border-radius:${tokens?.shapes.borderRadius.buttons ?? "var(--app-radius)"};padding:10px 14px}
-[data-studio-shell] :where(button[type=submit],[data-primary]){background:var(--app-primary);color:var(--app-on-primary)}
-[data-studio-shell] :where(.card,[data-card]){border:var(--app-border);border-radius:${tokens?.shapes.borderRadius.cards ?? "var(--app-radius)"};background:var(--app-surface);min-width:0;max-width:100%;overflow-wrap:break-word}
-[data-studio-shell] :where(table){width:100%;border-collapse:collapse;text-align:left;font-size:14px}
-[data-studio-shell] :where(th){padding:10px 12px;font-weight:600;border-bottom:var(--app-border);white-space:nowrap}
-[data-studio-shell] :where(td){padding:10px 12px;border-bottom:var(--app-border)}
-[data-studio-shell] :where([data-table-container],.table-container,.overflow-x-auto){overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%;min-width:0}
-[data-studio-shell] :where(.grid,[class*="grid-cols"]){min-width:0;max-width:100%}
-[data-studio-shell] :where(.grid>*,[class*="grid-cols"]>*){min-width:0}
-[data-studio-shell] :where(.flex>*,[class*="flex-"]>*){min-width:0}
-[data-studio-shell] :where(img,svg,video){max-width:100%}
-[data-studio-shell] :where(img,video){height:auto}
-[data-studio-shell] :where([data-media],figure img,img[src*="unsplash"]){aspect-ratio:16/9;width:100%;object-fit:cover}
-@supports not (aspect-ratio:16/9){[data-studio-shell] :where([data-media],figure img){min-height:200px;object-fit:cover;width:100%}}
-[data-studio-shell] :where(h1){font-size:28px;line-height:1.2}
-[data-studio-shell] :where(h2){font-size:22px;line-height:1.3}
-[data-studio-shell] :where(h3){font-size:18px;line-height:1.4}
-[data-studio-shell] :where(input,textarea,select):focus-visible{outline:2px solid var(--app-primary);outline-offset:2px}
-[data-studio-content]{min-width:0;padding:var(--app-gutter)}
-[data-studio-header]{display:flex;align-items:center;gap:12px;min-width:0;padding:12px var(--app-gutter);border-bottom:var(--app-border);background:var(--app-surface)}
-[data-studio-appbar=web]{justify-content:space-between;min-height:64px;padding-top:calc(12px + env(safe-area-inset-top))}
-[data-studio-brand]{display:flex;align-items:center;gap:10px;min-width:0}
-[data-studio-brand] strong{font-size:16px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-[data-studio-brand] img{width:32px;height:32px;flex-shrink:0;object-fit:contain;border-radius:calc(var(--app-radius)/2)}
-[data-studio-user]{display:flex;align-items:center;justify-content:center;flex:0 0 36px;width:36px;height:36px;border:var(--app-border);border-radius:50%;background:var(--app-canvas);color:var(--app-muted)}
-[data-studio-user] svg{width:18px;height:18px}
-[data-studio-appbar=mobile]{min-height:56px;padding-top:calc(10px + env(safe-area-inset-top))}
-[data-studio-appbar=mobile] h1{margin:0;flex:1;min-width:0;font-size:17px;line-height:1.3;font-weight:600}
-[data-studio-back]{display:flex;align-items:center;justify-content:center;flex:0 0 44px;width:44px;min-height:44px;margin-left:-10px;color:var(--app-ink);text-decoration:none}
-[data-studio-back] svg{width:20px;height:20px}
-[data-studio-page-header]{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px;min-width:0;margin-bottom:16px}
-[data-studio-page-header] h1{margin:0;font-size:28px;line-height:1.2}
-[data-studio-navigation]{display:flex;gap:4px;padding:8px;border-top:var(--app-border);background:var(--app-surface)}
-[data-studio-navigation]>[data-destination]{display:flex;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-width:0;min-height:56px;padding:8px 4px;color:var(--app-muted);font-size:12px;line-height:1.3;text-align:center;text-decoration:none}
-[data-studio-navigation]>[aria-current=page]{color:var(--app-primary);font-weight:700;box-shadow:inset 0 -2px var(--app-primary)}
-[data-studio-navigation] svg{width:20px;height:20px;flex-shrink:0}
-${shell?.navigation === "sidebar" ? `[data-studio-shell]{display:grid;grid-template-columns:minmax(160px,220px) minmax(0,1fr)}[data-studio-header]{grid-column:1/-1}[data-studio-navigation]{grid-column:1;grid-row:2;flex-direction:column;justify-content:flex-start;border-top:0;border-right:var(--app-border)}[data-studio-navigation]>[data-destination]{flex:0;flex-direction:row;justify-content:flex-start;gap:12px;padding:12px;font-size:14px;text-align:left}[data-studio-content]{grid-column:2;grid-row:2}@media(max-width:640px){[data-studio-shell]{display:block}[data-studio-navigation]{flex-direction:row;flex-wrap:wrap}[data-studio-navigation]>[data-destination]{flex:1}}` : ""}
-${shell?.navigation === "top" ? `[data-studio-navigation]{border-top:0;border-bottom:var(--app-border);flex-wrap:wrap}[data-studio-navigation]>[data-destination]{flex-direction:row;gap:8px;font-size:14px}` : ""}
-${shell?.navigation === "bottom" ? `[data-studio-navigation]{padding-bottom:max(8px,env(safe-area-inset-bottom))}` : ""}
-</style>`;
 }
 
 export function assembleCanonicalShell(
@@ -289,7 +207,7 @@ export function assembleCanonicalShell(
 
 	document.head.insertAdjacentHTML(
 		"beforeend",
-		shellStyle(blueprint, tokens) + STUDIO_COMPONENT_STYLE,
+		canonicalShellStyle(blueprint, tokens) + STUDIO_COMPONENT_STYLE,
 	);
 	return `<!DOCTYPE html>${document.documentElement.outerHTML}`;
 }
@@ -337,7 +255,7 @@ export function validateCanonicalShell(
 	)
 		issues.push("System status bar is not part of the application artboard.");
 	const expectedStyle = document.createElement("div");
-	expectedStyle.innerHTML = shellStyle(blueprint, tokens);
+	expectedStyle.innerHTML = canonicalShellStyle(blueprint, tokens);
 	if (
 		document.querySelector("#studio-canonical-style")?.outerHTML !==
 		expectedStyle.firstElementChild?.outerHTML

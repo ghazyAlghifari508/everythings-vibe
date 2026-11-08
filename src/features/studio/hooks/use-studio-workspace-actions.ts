@@ -281,39 +281,17 @@ export function useStudioWorkspaceActions({
 		[clearFrameRetryError, project.id, setError, showToast, syncProjectStatus],
 	);
 
-	const handleRetryPlanning = useCallback(async () => {
-		try {
-			const res = await fetch("/api/studio/frame", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					action: "retry-planning",
-					projectId: project.id,
-				}),
-			});
-			if (!res.ok) {
-				setError(
-					await readStudioApiError(res, "Gagal mencoba lagi perencanaan."),
-				);
-				return;
-			}
-			await syncProjectStatus();
-		} catch {
-			setError("Jaringan bermasalah. Coba lagi.");
-		}
-	}, [project.id, setError, syncProjectStatus]);
-
 	const handleDownloadAllZip = useCallback(async () => {
 		if (frames.length === 0 || exportingZip) return;
 		setExportingZip(true);
 		try {
-			await exportProjectAsZip(project.title, frames);
+			await exportProjectAsZip(project.title, project.id, frames);
 		} catch {
 			setError("Gagal menyiapkan bundel ZIP unduhan.");
 		} finally {
 			setExportingZip(false);
 		}
-	}, [exportingZip, frames, project.title, setError]);
+	}, [exportingZip, frames, project.id, project.title, setError]);
 
 	return {
 		composerLoading,
@@ -328,7 +306,6 @@ export function useStudioWorkspaceActions({
 		handleComposerSubmit,
 		handleSkillChange,
 		handleRetryFrame,
-		handleRetryPlanning,
 		handleDownloadAllZip,
 	};
 }

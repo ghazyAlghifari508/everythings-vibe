@@ -63,6 +63,15 @@ export const studioNavigationContractSchema = z.object({
 	activeItemRule: z.string().min(1).max(300),
 });
 
+const orderedScale = (minimum: number, maximum: number) =>
+	z
+		.array(z.number().min(minimum).max(maximum))
+		.min(2)
+		.max(8)
+		.refine((values) =>
+			values.every((value, index) => index === 0 || value > values[index - 1]),
+		);
+
 export const studioDesignBlueprintSchema = z.object({
 	explicitColorOverrides: z
 		.array(
@@ -117,6 +126,15 @@ export const studioDesignBlueprintSchema = z.object({
 	}),
 	navigationContract: studioNavigationContractSchema,
 	canonicalShell: studioCanonicalShellSchema.optional(),
+	// Persisted blueprints without layout keep FIX 02 defaults.
+	layout: z
+		.object({
+			gutter: z.number().min(0).max(64),
+			contentMaxWidth: z.number().min(240).max(1920),
+			spacing: orderedScale(0, 128),
+			typography: orderedScale(12, 96),
+		})
+		.optional(),
 	// ponytail: max 12 screens covers Studio canvas add-screen growth; upgrade when canvas pagination is introduced.
 	screenPlan: z
 		.array(

@@ -5,16 +5,32 @@ import { STUDIO_DESIGN_PRESETS } from "@/features/studio/services/studio-presets
 
 interface StudioDesignThemePanelProps {
 	activeThemeId: string | null;
+	appliedThemeId?: string | null;
 	onToggleTheme: (presetId: string) => void;
 }
 
 /** Curated theme grid; clicking the selected card again toggles it off. */
 export function StudioDesignThemePanel({
 	activeThemeId,
+	appliedThemeId = null,
 	onToggleTheme,
 }: StudioDesignThemePanelProps) {
+	const appliedPreset = appliedThemeId
+		? (STUDIO_DESIGN_PRESETS.find((preset) => preset.id === appliedThemeId) ??
+			null)
+		: null;
+	const activePreset = activeThemeId
+		? (STUDIO_DESIGN_PRESETS.find((preset) => preset.id === activeThemeId) ??
+			null)
+		: null;
+
 	return (
 		<div role="tabpanel" aria-label="Tema" className="flex flex-col gap-3">
+			{appliedPreset ? (
+				<div className="flex items-center justify-between text-xs text-fog">
+					<span>Tema aktif: {appliedPreset.name}</span>
+				</div>
+			) : null}
 			<div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
 				{STUDIO_DESIGN_PRESETS.map((preset) => {
 					const selected = activeThemeId === preset.id;
@@ -60,6 +76,13 @@ export function StudioDesignThemePanel({
 					);
 				})}
 			</div>
+			<p className="text-xs text-fog">
+				{activePreset
+					? activePreset.id !== appliedPreset?.id
+						? `${activePreset.name} dipilih`
+						: null
+					: "Tidak ada tema terpilih."}
+			</p>
 		</div>
 	);
 }

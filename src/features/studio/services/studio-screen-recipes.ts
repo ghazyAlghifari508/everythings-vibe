@@ -11,6 +11,8 @@ export interface StudioScreenConcept {
 	name: string;
 	/** Action label for the row; `Buat halaman <name>` when omitted. */
 	title?: string;
+	/** Short label displayed on compact bubbles/pills, e.g. "Kelola Stok", "Beranda". */
+	label?: string;
 	/**
 	 * Other names that mean this same screen. Without them a canvas holding
 	 * "Checkout" would still be offered "Pembayaran".
@@ -135,6 +137,7 @@ export const SCREEN_RECIPES: readonly StudioScreenRecipe[] = [
 	{
 		name: "Stok",
 		title: "Kelola stok barang",
+		label: "Kelola Stok",
 		aliases: ["inventori", "inventory", "persediaan", "stok barang"],
 		triggers: /\b(stok|inventori|inventory|persediaan)\b/i,
 		description: "Level minimum dan peringatan menipis.",

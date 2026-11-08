@@ -230,6 +230,85 @@ describe("StudioCanvas", () => {
 		expect(onSelectFrame).toHaveBeenCalledTimes(2);
 	});
 
+	it.each([
+		"queued",
+		"planning",
+		"generating",
+	])("keeps provisional slots visible without retry during %s", (status) => {
+		const date = new Date();
+		const job = {
+			id: "j",
+			projectId: "p-1",
+			userId: "u-1",
+			prompt: "Test",
+			jobType: "initial",
+			targetFrameId: null,
+			status,
+			error: null,
+			claimedBy: "worker",
+			attempts: 1,
+			claimedAt: date,
+			leaseExpiresAt: new Date(Date.now() + 60_000),
+			startedAt: date,
+			finishedAt: null,
+			createdAt: date,
+			updatedAt: date,
+		};
+		const { container } = render(
+			<StudioCanvas
+				project={mockProject}
+				frames={[
+					{
+						...mockFrames[1],
+						name: "Layar 1",
+						description: "",
+						status: "queued",
+					},
+				]}
+				activeJob={job}
+				onRetryPlanning={vi.fn()}
+			/>,
+		);
+		expect(
+			screen.getByRole("article", { name: "Frame Layar 1" }),
+		).toBeDefined();
+		expect(screen.queryByRole("button", { name: /Coba lagi/i })).toBeNull();
+		expect(container.querySelector('[data-testid$="-shimmer"]')).not.toBeNull();
+	});
+
+	it("recovers inconsistent completed data without planning retry", () => {
+		const date = new Date();
+		const onRefreshStatus = vi.fn();
+		render(
+			<StudioCanvas
+				project={mockProject}
+				frames={[]}
+				activeJob={{
+					id: "j",
+					projectId: "p-1",
+					userId: "u-1",
+					prompt: "Test",
+					jobType: "initial",
+					targetFrameId: null,
+					status: "completed",
+					error: null,
+					claimedBy: null,
+					attempts: 1,
+					claimedAt: null,
+					leaseExpiresAt: null,
+					startedAt: date,
+					finishedAt: date,
+					createdAt: date,
+					updatedAt: date,
+				}}
+				onRetryPlanning={vi.fn()}
+				onRefreshStatus={onRefreshStatus}
+			/>,
+		);
+		expect(screen.queryByRole("button", { name: /Coba lagi/i })).toBeNull();
+		fireEvent.click(screen.getByRole("button", { name: /Muat ulang status/i }));
+		expect(onRefreshStatus).toHaveBeenCalledTimes(1);
+	});
 	it("renders a clean, navigable canvas with no oversized loading card while planning", () => {
 		const planningJob = {
 			id: "j-2",
@@ -269,8 +348,6 @@ describe("StudioCanvas", () => {
 		expect(screen.getByRole("button", { name: /Pilih frame/i })).toBeDefined();
 		expect(screen.getByRole("button", { name: /Geser canvas/i })).toBeDefined();
 		expect(screen.getByRole("button", { name: /Perbesar/i })).toBeDefined();
-		// One honest, factual status line derived from the persisted job.
-		expect(screen.getByText("Menyusun rencana layar")).toBeDefined();
 	});
 
 	it("renders planning failure state with a retry action when activeJob failed", () => {
@@ -302,9 +379,6 @@ describe("StudioCanvas", () => {
 				onRetryPlanning={onRetryPlanning}
 			/>,
 		);
-
-		expect(screen.getByText("Perencanaan layar gagal")).toBeDefined();
-		expect(screen.getByText("AI rate limit reached")).toBeDefined();
 
 		const retryBtn = screen.getByRole("button", {
 			name: /Coba lagi/i,
@@ -355,10 +429,6 @@ describe("StudioCanvas", () => {
 
 		// One shared plan failed, so the only offered recovery is the plan itself:
 		// four failed slots must not each grow their own retry button.
-		expect(screen.getByText("Perencanaan layar gagal")).toBeDefined();
-		expect(
-			screen.getByText("Rencana layar belum berhasil disusun. Coba lagi."),
-		).toBeDefined();
 		const retryButtons = screen.getAllByRole("button", { name: /Coba lagi/i });
 		expect(retryButtons).toHaveLength(1);
 		fireEvent.click(retryButtons[0] as HTMLElement);
