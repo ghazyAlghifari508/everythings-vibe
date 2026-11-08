@@ -10,13 +10,11 @@ import { enqueueStudioOperation } from "./studio-operation-enqueue";
 import { retryStudioFrame, retryStudioPlanning } from "./studio-retry-service";
 
 function studioErrorResponse(error: unknown): Response {
-	// Public copy and HTTP status come from the taxonomy; the raw message stays
-	// in this server-side diagnostic line.
 	const report = studioFrameErrorReport(error);
 	console.error("[studio.frame]", {
 		code: report.code,
 		status: report.status,
-		diagnostic: report.diagnostic,
+		category: report.category,
 	});
 	return Response.json(
 		{ error: report.message, code: report.code },

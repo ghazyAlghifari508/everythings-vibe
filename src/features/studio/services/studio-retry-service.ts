@@ -9,6 +9,7 @@ import {
 } from "@/db/schema";
 import type { StudioFrameRetryOutcome } from "../types/studio";
 import { StudioFrameError } from "./studio-frame-errors";
+import { isTemporarySlot } from "./studio-frame-generation";
 
 export interface StudioFrameRetryResult {
 	frame: StudioFrameRow;
@@ -73,6 +74,24 @@ export async function retryStudioFrame(
 			)
 			.limit(1);
 		if (active) return { frame, retry: "already-running" };
+		// Every screen shares one blueprint. When the project still holds only the
+		// provisional planning slots, retrying one slot alone would rebuild it with
+		// no shared navigation contract, and repeating that per slot is the failure
+		// loop this guard exists to stop: the plan is the unit of recovery.
+		const slots = await tx
+			.select({
+				name: studioFrames.name,
+				description: studioFrames.description,
+				htmlCode: studioFrames.htmlCode,
+			})
+			.from(studioFrames)
+			.where(eq(studioFrames.projectId, projectId));
+		if (
+			!project.designBlueprint &&
+			slots.length > 0 &&
+			slots.every(isTemporarySlot)
+		)
+			throw new StudioFrameError("STUDIO_PLANNING_REQUIRED");
 		const [operation] = await tx
 			.select()
 			.from(studioJobs)

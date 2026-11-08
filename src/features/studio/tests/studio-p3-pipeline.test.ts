@@ -7,13 +7,13 @@ import { repairStudioAccessibleLabels } from "../services/studio-accessible-repa
 import type { StudioDesignBlueprint } from "../services/studio-design-blueprint";
 import { resolveStudioSkillContext } from "../services/studio-design-skill-registry.server";
 import {
-	generateInitialFrame,
 	generateValidatedFrameHtml,
 	runWithConcurrency,
 } from "../services/studio-frame-generation";
 import { isRetryableProviderError } from "../services/studio-frame-runtime";
 import { validateGeneratedHtml } from "../services/studio-generated-html-validation";
 import { inspectStudioHtml } from "../services/studio-html-diagnostics";
+import { generateInitialFrame } from "../services/studio-initial-frame";
 import { sanitizeStudioPrd } from "../services/studio-prd-helpers";
 import { sanitizeStudioDesignMd } from "../services/studio-prompt-validation";
 import { buildStudioFramePrompt } from "../services/studio-screen-prompts";
@@ -257,19 +257,20 @@ describe("P3 Mandatory Pipeline & Benchmark Requirements", () => {
 				outputTokens: 15000,
 				textTokens: 3000,
 				reasoningTokens: 12000,
-				maxTokens: 12000,
-				tokenLimitExceeded: false,
+				accountingAboveRequested: true,
+				ceilingReached: false,
 			},
 		]
 			.map((e) => JSON.stringify(e))
 			.join("\n");
 		const summary = summarizeStudioTimings(events);
 		expect(summary.meanMeasuredOutputTokensPerFrame).toBe(15000);
-		expect(summary.tokenLimitExceededCount).toBe(0);
+		expect(summary.accountingAboveRequestedCount).toBe(1);
+		expect(summary.ceilingReachedCount).toBe(0);
 	});
 
 	// Requirement 11: Output-limit enforcement or truthful limitation reporting
-	it("11. reports token limit exceeded truthfully when visible text exceeds ceiling or finish is length", () => {
+	it("11. keeps normal stop accounting separate from the provider ceiling signal", () => {
 		const events = [
 			{
 				scope: "studio",
@@ -279,8 +280,8 @@ describe("P3 Mandatory Pipeline & Benchmark Requirements", () => {
 				outputTokens: 13000,
 				textTokens: 13000,
 				reasoningTokens: 0,
-				maxTokens: 12000,
-				tokenLimitExceeded: true,
+				accountingAboveRequested: true,
+				ceilingReached: true,
 			},
 			{
 				scope: "studio",
@@ -290,14 +291,15 @@ describe("P3 Mandatory Pipeline & Benchmark Requirements", () => {
 				outputTokens: 18000,
 				textTokens: 2500,
 				reasoningTokens: 15500,
-				maxTokens: 12000,
-				tokenLimitExceeded: false,
+				accountingAboveRequested: true,
+				ceilingReached: false,
 			},
 		]
 			.map((e) => JSON.stringify(e))
 			.join("\n");
 		const summary = summarizeStudioTimings(events);
-		expect(summary.tokenLimitExceededCount).toBe(1);
+		expect(summary.accountingAboveRequestedCount).toBe(2);
+		expect(summary.ceilingReachedCount).toBe(1);
 	});
 
 	// Requirement 12: First-ready-frame persistence

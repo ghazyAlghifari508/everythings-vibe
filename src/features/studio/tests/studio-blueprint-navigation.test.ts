@@ -193,8 +193,8 @@ describe("TASK 05 — Shared Navigation Consistency When Adding Screens", () => 
 	});
 
 	// 2. Add one new primary destination
-	it("adds one new primary destination and updates shared navigation across all screens", async () => {
-		const { userId, project } = await seedThreeScreenProject();
+	it("adds a primary destination while preserving completed sibling documents", async () => {
+		const { userId, project, frames } = await seedThreeScreenProject();
 		const enqueued = await enqueueStudioOperation(project.id, userId, {
 			prompt: "Tambahkan halaman baru untuk Catat Transaksi",
 			requestId: crypto.randomUUID(),
@@ -221,8 +221,14 @@ describe("TASK 05 — Shared Navigation Consistency When Adding Screens", () => 
 			.orderBy(asc(studioFrames.order));
 		expect(storedFrames).toHaveLength(4);
 
-		// Every existing frame now has 4 navigation items
-		for (const frame of storedFrames) {
+		for (const existing of frames) {
+			expect(storedFrames.find((frame) => frame.id === existing.id)).toEqual(
+				existing,
+			);
+		}
+		for (const frame of storedFrames.filter(
+			(entry) => !frames.some((existing) => existing.id === entry.id),
+		)) {
 			const dom = new JSDOM(safeHtml(frame.htmlCode));
 			const navLinks = Array.from(
 				dom.window.document.querySelectorAll(
@@ -403,7 +409,7 @@ describe("TASK 05 — Shared Navigation Consistency When Adding Screens", () => 
 			.where(eq(studioFrames.projectId, project.id))
 			.orderBy(asc(studioFrames.order));
 
-		// All 4 frames have consistent navigation in their stored HTML
+		// A new screen gets the extended contract; completed screens retain their approved documents.
 		for (const frame of storedFrames) {
 			const dom = new JSDOM(safeHtml(frame.htmlCode));
 			const links = Array.from(
@@ -411,12 +417,12 @@ describe("TASK 05 — Shared Navigation Consistency When Adding Screens", () => 
 					"[data-studio-navigation] a[data-destination]",
 				),
 			);
-			expect(links).toHaveLength(4);
+			expect(links).toHaveLength(frame.name === "Catat Transaksi" ? 4 : 3);
 		}
 	});
 
 	// 11. Preview cache correctly invalidated only when needed
-	it("updates visual hash for primary additions while keeping contextual additions stable", async () => {
+	it("preserves completed preview hashes across primary and contextual additions", async () => {
 		const { userId, project, frames } = await seedThreeScreenProject();
 		const originalHash0 = studioVisualHash(
 			safeHtml(frames[0].htmlCode),
@@ -439,8 +445,7 @@ describe("TASK 05 — Shared Navigation Consistency When Adding Screens", () => 
 			safeHtml(afterPrimary[0].htmlCode),
 			afterPrimary[0].viewport,
 		);
-		// Primary addition changed navigation, so hash changed
-		expect(newHash0).not.toBe(originalHash0);
+		expect(newHash0).toBe(originalHash0);
 
 		// Add contextual screen
 		const addContextual = await enqueueStudioOperation(project.id, userId, {
@@ -513,8 +518,8 @@ describe("TASK 05 — Shared Navigation Consistency When Adding Screens", () => 
 	});
 
 	// 14. Reopening project retains consistent navigation
-	it("returns fully synchronized project detail on reopen", async () => {
-		const { userId, project } = await seedThreeScreenProject();
+	it("reopens with completed documents unchanged and the added screen available", async () => {
+		const { userId, project, frames } = await seedThreeScreenProject();
 		const add = await enqueueStudioOperation(project.id, userId, {
 			prompt: "Tambahkan halaman Catat Transaksi",
 			requestId: crypto.randomUUID(),
@@ -524,14 +529,14 @@ describe("TASK 05 — Shared Navigation Consistency When Adding Screens", () => 
 
 		const detail = await getStudioProjectDetail(project.id, userId);
 		expect(detail.frames).toHaveLength(4);
-		for (const frame of detail.frames) {
-			const dom = new JSDOM(safeHtml(frame.htmlCode));
-			expect(
-				dom.window.document.querySelectorAll(
-					"[data-studio-navigation] a[data-destination]",
-				),
-			).toHaveLength(4);
+		for (const original of frames) {
+			expect(detail.frames.find((frame) => frame.id === original.id)).toEqual(
+				original,
+			);
 		}
+		expect(
+			detail.frames.find((frame) => frame.name === "Catat Transaksi")?.status,
+		).toBe("ready");
 	});
 
 	// 15. No duplicate AI jobs for existing frames

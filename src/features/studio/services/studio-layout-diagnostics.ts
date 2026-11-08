@@ -78,6 +78,23 @@ export function inspectStudioLayout(document: Document) {
 			warnings.push("Repeated status label in the same component.");
 		seen.add(text);
 		statuses.set(parent, seen);
+		if (/\s/.test(text))
+			warnings.push(
+				"Badge text wraps to more than one line; give the label room or shorten it.",
+			);
 	}
+	// Atomic value integrity: a currency prefix and its amount share one flow,
+	// so the browser wraps them together. A price whose prefix is glued inside
+	// the previous word ("dariRp") or separated by a line break from its digits
+	// ("Rp\n3.900.000") renders as a broken row, not a style preference: report
+	// it instead of silently shipping the defect.
+	const rawBody = document.body?.textContent ?? "";
+	if (
+		/[a-zA-Z]Rp(?=(?:\s{2,}|\n)\d)/.test(rawBody) ||
+		/(?<![A-Za-z0-9])Rp {2,}\d/.test(rawBody)
+	)
+		warnings.push(
+			"Inspect price row: the currency prefix is separated from the amount; keep 'Rp' and the nominal in one line.",
+		);
 	return { hard, warnings };
 }

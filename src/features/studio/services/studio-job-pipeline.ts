@@ -12,12 +12,9 @@ import {
 	studioFrameErrorCodeFor,
 	studioFrameFailureCategory,
 } from "./studio-frame-errors";
-import {
-	generateInitialFrame,
-	isTemporarySlot,
-	runWithConcurrency,
-} from "./studio-frame-generation";
+import { isTemporarySlot, runWithConcurrency } from "./studio-frame-generation";
 import { runStudioFrameOperation } from "./studio-frame-operation";
+import { generateInitialFrame } from "./studio-initial-frame";
 import {
 	claimStudioJob,
 	refreshStudioJobLease,
@@ -47,6 +44,9 @@ export async function runStudioJobPipeline(
 	if (!job || job.projectId !== projectId || !job.leaseExpiresAt) return;
 	const claim: StudioJobClaim = { jobId, projectId, userId, workerId };
 	const startedAt = Date.now();
+	// A failure before the shared blueprint exists is a planning failure, not a
+	// screen failure: the recovery the user needs is the whole plan, not one frame.
+	let sharedPlanningCompleted = false;
 	studioJobTiming("queue-wait", job.createdAt.getTime(), {
 		jobId,
 		projectId,
@@ -141,6 +141,7 @@ export async function runStudioJobPipeline(
 					});
 					studioJobTiming("planning", planningStartedAt, { jobId, projectId });
 				}
+				sharedPlanningCompleted = true;
 				await withStudioJobWrite(claim, async (tx) => {
 					await tx
 						.update(studioJobs)
@@ -247,13 +248,16 @@ export async function runStudioJobPipeline(
 			!(failure instanceof StudioLeaseLostError) ||
 			failure.reason === "JOB_TIMEOUT";
 		if (finalizable) {
+			const failureMessage = sharedPlanningCompleted
+				? "Gagal memproses desain. Silakan coba lagi."
+				: "Rencana layar belum berhasil disusun. Coba lagi.";
 			try {
 				await withStudioJobWrite(claim, async (tx) => {
 					await tx
 						.update(studioFrames)
 						.set({
 							status: "failed",
-							error: "Pemrosesan terhenti. Silakan coba lagi.",
+							error: failureMessage,
 							updatedAt: new Date(),
 						})
 						.where(
@@ -269,7 +273,7 @@ export async function runStudioJobPipeline(
 						.update(studioJobs)
 						.set({
 							status: "failed",
-							error: "Gagal memproses desain. Silakan coba lagi.",
+							error: failureMessage,
 							claimedBy: null,
 							claimedAt: null,
 							leaseExpiresAt: null,

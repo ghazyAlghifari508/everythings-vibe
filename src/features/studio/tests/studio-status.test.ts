@@ -132,7 +132,7 @@ describe("Studio queue health", () => {
 		).toBeNull();
 	});
 
-	it("stays silent until the worker poll is overdue, then names the stall", () => {
+	it("distinguishes overdue queue from expired lease without diagnosing worker death", () => {
 		expect(
 			resolveStudioQueueHealth(
 				job({
@@ -157,7 +157,7 @@ describe("Studio queue health", () => {
 			job({ leaseExpiresAt: new Date("2026-01-01T23:59:00Z") }),
 			now,
 		);
-		expect(unclaimed).not.toBeNull();
+		expect(unclaimed).toBe("Menunggu giliran diproses.");
 		expect(deadHeartbeat).not.toBeNull();
 		expect(unclaimed).not.toBe(deadHeartbeat);
 	});

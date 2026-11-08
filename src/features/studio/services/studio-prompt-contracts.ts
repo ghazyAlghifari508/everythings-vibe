@@ -23,6 +23,8 @@ export const MOBILE_PLATFORM_CONTRACT = `Target platform: Mobile Application Exp
 - Keep body text at 14px-16px with comfortable line height so it stays readable at the captured ${STUDIO_VISUAL_WIDTH.mobile}px width.
 - Size sections with padding, gaps, and min-height instead of fixed pixel heights, so the page never looks stretched or squashed when captured.
 - Preserve true document height: images keep aspect ratio with max-width: 100% and height auto.
+- Anchor cards and thumbnails to bounded media geometry: give destination/product photos an explicit aspect-ratio (16/9 for travel/hero, 4/3 or 1/1 for product) via aspect-ratio + object-fit: cover; never stretch or phone-crop them, and never depend on a single external image for the card to make sense (image loads are best-effort in preview).
+- A badge conveys real status or a category label; never stack decorative pills, never let a two-word badge such as "Private Trip" wrap onto two lines (give the label room or shorten it), and prefer a status row over a badge when the status is just normal text.
 - Use the same navigation structure, icon family, and design tokens on every screen of this application.
 - Keep exactly one bottom tab <nav> containing every destination label in blueprint order; do not duplicate the full tab set in a second <nav>.
 - Put every screen body inside one content region; the first visible block establishes the screen's own hierarchy (list, search, hero, cards), not a repeated title row.`;
@@ -50,6 +52,8 @@ export const WEB_PLATFORM_CONTRACT = `Target platform: Responsive Web Applicatio
   * Format large currency values with digit separators (e.g. Rp 125.500.000) using font-mono and whitespace-nowrap.
   * Give long Indonesian labels adequate line-height and width so they never overlap controls.
   * Truncate or wrap long customer names and descriptions gracefully (truncate with title attribute or break-words).
+  * Keep atomic values together: a currency prefix and amount ("Rp 125.500.000") and short badges such as "Private Trip" never break across lines; give them one non-wrapping group or enough room, then let paragraphs wrap normally.
+  * Anchor photos to bounded media geometry: aspect-ratio + object-fit: cover (16/9 for travel/hero, 4/3 or 1/1 for product), never stretched, never layout-dependent on a single external image.
   * Provide a dedicated empty state box when tables or lists have no records.
 - Shared Shell Integration:
   * Studio deterministically injects the global topbar (product branding) and primary navigation; generate only screen-specific content inside <main data-studio-content>. Do not emit a second global sidebar, topbar, or header.
