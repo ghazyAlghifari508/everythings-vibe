@@ -24,7 +24,7 @@ describe("Tailwind output availability", () => {
 		const fixture = buildFixtureModel();
 		const render = (model: typeof fixture) => {
 			const lines: string[] = [];
-			renderCodeSections(lines, model, {});
+			renderCodeSections(lines, model);
 			return lines.join("\n");
 		};
 		const base = {

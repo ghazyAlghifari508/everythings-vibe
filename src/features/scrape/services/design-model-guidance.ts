@@ -117,10 +117,13 @@ export function deriveModelGuidelines(
 			values.length === 1 &&
 			supported
 		)
+			// The measured scope is evidence, not part of the rule or its evidence:
+			// the renderer attributes a rule to the captures that measured it, so the
+			// same rule found in four captures is one instruction, not four copies.
 			addRule(
 				dos,
-				`Use ${value} only for matching action buttons${scope ? ` in ${scope}` : ""}; do not extend it to unseen variants or other capture scopes.`,
-				`All ${actions.length} measured CTA elements${scope ? ` in ${scope}` : ""} agree on this radius. Primary/secondary hierarchy and interaction states are not established.`,
+				`Use ${value} only for matching action buttons; do not extend it to unseen variants.`,
+				`All ${actions.length} measured CTA elements agree on this radius. Primary/secondary hierarchy and interaction states are not established.`,
 			);
 		else if (!supported && values.length === 1)
 			noteCtaLimitation(
