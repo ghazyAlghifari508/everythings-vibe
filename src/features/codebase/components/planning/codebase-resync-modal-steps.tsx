@@ -99,7 +99,9 @@ export function ResyncStep1Prompt({
 	onRequestNewToken?: () => void;
 	onCopy: () => void;
 	/** Replaces the prompt when the account cannot start a billed sync. */
-	lockedPrompt?: import("../workspace/locked-prompt-state").LockedPromptState | null;
+	lockedPrompt?:
+		| import("../workspace/locked-prompt-state").LockedPromptState
+		| null;
 }) {
 	return (
 		<div
@@ -256,21 +258,7 @@ export function ResyncStep3Progress({
 						{statusError}
 					</p>
 				)}
-				{stageView.hasStarted ? (
-					<SyncStageList
-						status={status}
-						showAnalysisFailure={
-							(Boolean(analysisError) ||
-								status?.analysisAttemptStatus === "failed" ||
-								status?.analysisStatus === "failed" ||
-								analysis?.status === "failed") &&
-							Boolean(onRetryAnalysis)
-						}
-						analysisError={analysisError}
-						onRetryAnalysis={onRetryAnalysis}
-						isAnalyzing={isAnalyzing}
-					/>
-				) : stageView.failed ? (
+				{stageView.failed ? (
 					<div
 						role="alert"
 						className="rounded-md border border-crimson/30 bg-crimson/10 p-3 text-[11px]"
@@ -307,6 +295,23 @@ export function ResyncStep3Progress({
 							</div>
 						</div>
 					</div>
+				) : stageView.hasStatus ? (
+					// The same stage list the onboarding step renders, including the idle
+					// rows a session waiting on the user shows. One mapping, one visual
+					// language, no bespoke copy that could drift.
+					<SyncStageList
+						status={status}
+						showAnalysisFailure={
+							(Boolean(analysisError) ||
+								status?.analysisAttemptStatus === "failed" ||
+								status?.analysisStatus === "failed" ||
+								analysis?.status === "failed") &&
+							Boolean(onRetryAnalysis)
+						}
+						analysisError={analysisError}
+						onRetryAnalysis={onRetryAnalysis}
+						isAnalyzing={isAnalyzing}
+					/>
 				) : (
 					<p className="text-[11px] leading-relaxed text-fog">
 						Menunggu agent terhubung dari terminal repository...

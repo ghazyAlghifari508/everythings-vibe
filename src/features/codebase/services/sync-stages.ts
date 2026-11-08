@@ -27,7 +27,9 @@ import {
 /**
  * How far the real sync lifecycle has actually progressed, in product terms.
  *
- * - `waiting`  the agent has not contacted the server yet
+ * - `waiting`   the attempt exists and no CLI has contacted the server yet; the
+ *               user still has to run the prompt. Waiting for a human action is
+ *               NOT system activity, so every row in this stage renders idle
  * - `preparing` the agent is linked and the CLI is preparing source code
  * - `syncing`   files are on the wire
  * - `done`      the server holds a verified snapshot
@@ -205,11 +207,12 @@ export function resolveSyncStageView(
 	}
 
 	if (status.status === "waiting_for_cli") {
-		// Standby is still a live attempt: the session exists and the CLI has not
-		// reported in yet. Rendering the real stage list from the first paint — with
-		// the agent row actively waiting — is what makes the later `Agent terhubung`
-		// state a visible transition instead of an already-checked row that appeared
-		// out of nowhere. Nothing is claimed as done and no timestamp is invented.
+		// Standby is a live attempt whose only real state is "the user has not run
+		// the prompt yet". The stage list is rendered from the first paint for that
+		// reason — the three rows are real, in-order steps — but every one of them
+		// stays idle: no spinner and no timer, because the server is observing
+		// nothing but its own polling. `hasStarted` stays false, and the rows only
+		// gain motion once the handshake (or a later upload) is actually persisted.
 		return {
 			hasStatus: true,
 			hasStarted: false,

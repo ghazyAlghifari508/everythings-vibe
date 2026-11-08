@@ -104,13 +104,15 @@ export function CodebaseResyncModal({
 				? "done"
 				: "failed";
 
+	// Step 2 is the user's own action ("run it in your agent"), so it is never
+	// *active* while the CLI has not reported in: a spinning indicator there would
+	// claim the system is working when it is only waiting for the user. Motion is
+	// reserved for the steps the server actually observed.
 	const step2State: StepState = stageView.hasStarted
 		? "done"
 		: stageView.failed
 			? "failed"
-			: payload
-				? "active"
-				: "pending";
+			: "pending";
 
 	const step3State: StepState = isVerified
 		? "done"

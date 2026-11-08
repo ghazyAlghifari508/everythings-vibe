@@ -48,10 +48,13 @@ function renderState(overrides: {
 
 test("A waiting for CLI is the only claim, with no analysis or new session offer", () => {
 	const { container } = renderState({ status: base });
-	expect(container.textContent).toContain("Menunggu agent terhubung...");
+	expect(container.textContent).toContain("Menunggu agent");
 	expect(container.textContent).not.toContain("Menganalisis repository");
 	expect(container.textContent).not.toContain("Buat sesi baru");
 	expect(container.textContent).not.toContain("Analisis belum berhasil");
+	// The wait for the user is passive: no spinner and no elapsed timer.
+	expect(container.querySelectorAll('[data-testid="spinner"]')).toHaveLength(0);
+	expect(container.querySelector("[role='timer']")).toBeNull();
 });
 
 test("B CLI syncing shows the upload without claiming an analysis started", () => {

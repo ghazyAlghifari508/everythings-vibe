@@ -13,6 +13,14 @@ type SyncTransitionMap = Record<
 	readonly CodebaseSyncStatus[]
 >;
 
+// There is deliberately no `connecting` status between `waiting_for_cli` and
+// `connected`. The handshake is the CLI's FIRST contact with the server and it
+// commits `waiting_for_cli -> connected` in one transaction, so a "connection in
+// progress" window is not observable: persisting one would mean recording a
+// state the browser could not honestly last long enough to display, and a
+// handshake that failed afterwards would strand the session in it. A handshake
+// fast enough to skip the transition is rendered as already connected — accuracy
+// beats a spinner that only appears because it was fabricated.
 const SYNC_TRANSITIONS: SyncTransitionMap = {
 	waiting_for_cli: ["connected", "failed", "expired"],
 	connected: ["scanning", "failed", "expired"],
