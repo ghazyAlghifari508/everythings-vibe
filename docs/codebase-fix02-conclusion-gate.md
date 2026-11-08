@@ -99,6 +99,13 @@ No status value, API shape, credit path, retry path, or gating predicate
 changed. No `window.location.reload()`, no added timeout, no extra poll loop, no
 refresh button, no fabricated output, no forced-enabled button.
 
+Cache revalidation: this flow owns no TanStack Router loader/query cache for the
+status or analysis read — both are plain `fetch` calls reconciled by the one
+status loop (`useCodebaseSyncStatus` polling plus `useCodebaseSyncStream`), so
+there is nothing to invalidate. The revalidation is the read effect itself: it
+re-reads the named analysis id on the next real frame, and the id in the status
+payload is what makes that revalidation possible.
+
 ## 4. Files changed
 
 | File | Change |
