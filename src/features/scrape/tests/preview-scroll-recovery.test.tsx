@@ -133,6 +133,12 @@ describe("scrape preview recovery", () => {
 		reportFrame("degraded");
 
 		expect(frame()).toBeDefined();
+		const warning = screen.getByTestId("scrape-preview-degraded-warning");
+		expect(warning).toBeDefined();
+		expect(
+			frame().compareDocumentPosition(warning) &
+				Node.DOCUMENT_POSITION_FOLLOWING,
+		).toBeTruthy();
 		expect(screen.getByText(/sebagian tampilan belum termuat/i)).toBeDefined();
 		expect(screen.queryByTestId("scrape-visual-screenshot")).toBeNull();
 	});
