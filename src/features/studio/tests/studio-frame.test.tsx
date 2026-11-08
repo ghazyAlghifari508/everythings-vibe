@@ -262,7 +262,8 @@ describe("StudioFrame", () => {
 		);
 
 		expect(screen.getAllByText("Dashboard").length).toBeGreaterThanOrEqual(1);
-		// Active generation is a small spinner next to the title, not a badge.
+		// Active generation relies on the artboard shimmer; no redundant spinner in header.
+		expect(container.querySelector(".animate-spin")).toBeNull();
 		expect(screen.getByLabelText("Sedang digenerate")).toBeDefined();
 		expect(screen.queryByText(/Menggenerate/i)).toBeNull();
 		// The artboard itself is one shimmer surface, not skeleton content.
@@ -271,6 +272,29 @@ describe("StudioFrame", () => {
 		).not.toBeNull();
 		expect(screen.queryByText(/Membuat desain layar/i)).toBeNull();
 		expect(screen.queryByText(/Menunggu giliran/i)).toBeNull();
+	});
+
+	it("does not render a visual spinner in the frame header while generating", () => {
+		const { container } = render(
+			<StudioFrame
+				frame={frame({ status: "generating" })}
+				isSelected={false}
+				onSelect={vi.fn()}
+				isCanvasPanning={false}
+			/>,
+		);
+
+		// Header contains title and device icon only; no spinner icon or spinning class
+		expect(container.querySelector(".animate-spin")).toBeNull();
+		expect(
+			container.querySelector("svg[aria-label='Sedang digenerate']"),
+		).toBeNull();
+		// Screen reader accessibility is preserved via sr-only output
+		expect(screen.getByLabelText("Sedang digenerate")).toBeDefined();
+		// Artboard still has the single shimmer
+		expect(
+			container.querySelector('[data-testid="mobile-shimmer"]'),
+		).not.toBeNull();
 	});
 
 	it("distinguishes queued from generating for assistive technology", () => {
