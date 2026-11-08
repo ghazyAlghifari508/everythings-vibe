@@ -19,6 +19,7 @@ beforeAll(async () => {
 		"subscriptions",
 		"codebases",
 		"codebase_sync_sessions",
+		"codebase_sync_idempotency_keys",
 		"codebase_snapshots",
 		"codebase_snapshot_files",
 		"codebase_ask_handoffs",

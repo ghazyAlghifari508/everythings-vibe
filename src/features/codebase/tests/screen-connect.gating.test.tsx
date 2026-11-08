@@ -641,7 +641,14 @@ describe("Step 1 recovery affordances", () => {
 			),
 		);
 		expect(renewal).toBeUndefined();
-		expect(container.textContent).toContain("Source code berhasil diterima.");
+		// FIX 01: the prompt box never carries a progress sentence — step 3 owns
+		// the outcome. Without a credential it states prompt availability only.
+		expect(container.textContent).not.toContain(
+			"Source code berhasil diterima.",
+		);
+		expect(
+			container.querySelector('[data-testid="prompt-unavailable"]'),
+		).not.toBeNull();
 		expect(onRequestNewToken).not.toHaveBeenCalled();
 		// The absent one-time token must not block analysis recovery: the failed
 		// attempt is still retryable against the snapshot that already uploaded.
