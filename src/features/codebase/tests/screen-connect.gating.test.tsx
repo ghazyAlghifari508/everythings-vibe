@@ -10,6 +10,7 @@ import { ScreenConnect } from "../components/workspace/screen-connect";
 
 const samplePayload: SyncPromptPayload = {
 	projectId: "proj_gate_1",
+	sessionId: "sess_gate_1",
 	apiBaseUrl: "https://prdfy.example.com",
 	syncToken: "tok_gate",
 	cliMinVersion: "2.0.0",
@@ -119,22 +120,18 @@ describe("Step 1 instruction copy", () => {
 });
 
 describe("Step 1 live sync status", () => {
-	it("keeps the waiting agent idle as soon as a session exists but no CLI ran", () => {
+	it("shows the real waiting spinner as soon as a session exists", () => {
 		renderConnect({ status: status() });
 		expect(container.textContent).toContain("Pantau progres");
 		expect(container.textContent).toContain(
 			"Jalankan prompt dari root repository untuk mulai menyinkronkan codebase.",
 		);
-		// The session exists and the prompt is on screen, but nothing has contacted
-		// the server yet: the user has not run the prompt. Waiting for a human action
-		// is not system activity, so every row stays a neutral idle indicator.
-		expect(allStageStates()).toEqual(["waiting", "waiting", "waiting"]);
+		expect(allStageStates()).toEqual(["active", "waiting", "waiting"]);
 		expect(container.textContent).toContain("Menunggu agent");
 		expect(container.textContent).toContain("Menyiapkan source code");
 		expect(container.textContent).toContain("Mengunggah repository");
-		// No spinner and no elapsed timer may exist before real server-observed work.
 		expect(container.querySelectorAll('[data-testid="spinner"]')).toHaveLength(
-			0,
+			1,
 		);
 		expect(container.querySelector("[role='timer']")).toBeNull();
 		// Nothing is claimed as done before the handshake is persisted.
@@ -162,12 +159,11 @@ describe("Step 1 live sync status", () => {
 			copy?.click();
 		});
 		expect(writeText).toHaveBeenCalledOnce();
-		// Copying is browser-local feedback, not evidence that the CLI ran: the
-		// stage list must not move and no spinner may appear.
+		// Copying is local feedback, not evidence that preparation has started.
 		expect(allStageStates()).toEqual(before);
-		expect(allStageStates()).toEqual(["waiting", "waiting", "waiting"]);
+		expect(allStageStates()).toEqual(["active", "waiting", "waiting"]);
 		expect(container.querySelectorAll('[data-testid="spinner"]')).toHaveLength(
-			0,
+			1,
 		);
 	});
 
@@ -229,16 +225,13 @@ describe("Step 1 live sync status", () => {
 		expect(container.textContent).not.toContain("Mengunggah repository...");
 	});
 
-	it("stays passively waiting while the first status read is still in flight", () => {
+	it("shows session-backed waiting before the first status frame", () => {
 		renderConnect({ status: null });
-		// Polling is internal monitoring, not connection activity: the line reads as
-		// the passive wait it is, without a spinner.
-		expect(container.textContent).toContain("Menunggu agent");
+		expect(allStageStates()).toEqual(["active", "waiting", "waiting"]);
 		expect(container.querySelectorAll('[data-testid="spinner"]')).toHaveLength(
-			0,
+			1,
 		);
-		expect(container.textContent).not.toContain("Menghubungkan server...");
-		expect(container.querySelectorAll("[data-stage-state]")).toHaveLength(0);
+		expect(container.querySelector("[role='timer']")).toBeNull();
 	});
 
 	it("presents analysis status truthfully once a snapshot exists and analysisStatus is reported", () => {

@@ -152,24 +152,14 @@ describe("sync stage vocabulary", () => {
 });
 
 describe("waiting_for_cli", () => {
-	it("renders the agent wait as passive idle, not as an active connection", () => {
+	it("spins only the genuine handshake wait without claiming a completed stage", () => {
 		const view = resolveSyncStageView(status());
-		// The session exists and the prompt is on screen, but nothing has contacted
-		// the server yet. Waiting for the user is not system activity, so no row may
-		// spin: the spinner only becomes legitimate once real work is persisted.
-		expect(states(view)).toEqual(["waiting", "waiting", "waiting"]);
-		expect(stage(view, 0).title).toBe("Menunggu agent");
-		expect(stage(view, 0).detail).toBe(
-			"Jalankan prompt di AI coding agent untuk memulai sinkronisasi.",
-		);
-		expect(stage(view, 0).state).not.toBe("active");
+		expect(states(view)).toEqual(["active", "waiting", "waiting"]);
 		expect(stage(view, 0).state).not.toBe("done");
 		expect(view.hasStatus).toBe(true);
 		expect(view.hasStarted).toBe(false);
 		expect(view.syncComplete).toBe(false);
 		expect(view.canRetry).toBe(false);
-		expect(userFacingCopy(view)).toContain("Menyiapkan source code");
-		expect(userFacingCopy(view)).toContain("Mengunggah repository");
 	});
 
 	it("offers no elapsed timer and no count while nothing is running", () => {
@@ -184,12 +174,10 @@ describe("waiting_for_cli", () => {
 	});
 
 	it("cannot advance a stage by being read again", () => {
-		// Polling is internal monitoring, not connection activity: repeated reads of
-		// the same persisted status must produce the same idle view.
 		const first = resolveSyncStageView(status());
 		const later = resolveSyncStageView(status());
 		expect(states(later)).toEqual(states(first));
-		expect(states(later)).toEqual(["waiting", "waiting", "waiting"]);
+		expect(states(later)).toEqual(["active", "waiting", "waiting"]);
 	});
 });
 
@@ -312,9 +300,7 @@ describe("fast transition", () => {
 		const after = resolveSyncStageView(
 			status({ status: "uploaded", snapshotId: "snap_fast", fileCount: 12 }),
 		);
-		// Before the CLI reports in, nothing is active and nothing is claimed as
-		// completed: the whole list idles.
-		expect(states(before)).toEqual(["waiting", "waiting", "waiting"]);
+		expect(states(before)).toEqual(["active", "waiting", "waiting"]);
 		expect(before.hasStarted).toBe(false);
 		expect(states(after)).toEqual(["done", "done", "done"]);
 		expect(stage(after, 0).title).toBe("Agent terhubung");

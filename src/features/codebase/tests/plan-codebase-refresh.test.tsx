@@ -420,8 +420,7 @@ describe("PlanCodebasePage refresh recovery matrix", () => {
 			},
 			{ timeout: 15000, interval: 100 },
 		);
-		// The stage list is live from the first paint, with the agent actively
-		// waiting — and nothing claimed as completed without server evidence.
+		// Only the real handshake wait spins; completed work still requires evidence.
 		expect(
 			document
 				.querySelector('[data-testid="sync-stage-agent"]')

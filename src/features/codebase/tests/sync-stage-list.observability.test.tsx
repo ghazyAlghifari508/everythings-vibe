@@ -151,20 +151,17 @@ describe("SyncStageList fast-sync reporting", () => {
 		expect(analysis?.textContent).toContain("Analisis selesai");
 	});
 
-	it("repaints a persisted standby session as idle instead of starting motion", () => {
-		// Refresh and stream reconnect both replay the current persisted state. A
-		// waiting session must stay waiting — no spinner, no timer — rather than
-		// appearing to begin a connection the server never observed.
+	it("restores the genuine waiting spinner on refresh without inventing a start time", () => {
 		render(status());
-		expect(states()).toEqual(["waiting", "waiting", "waiting"]);
+		expect(states()).toEqual(["active", "waiting", "waiting"]);
 		expect(container.querySelectorAll('[data-testid="spinner"]')).toHaveLength(
-			0,
+			1,
 		);
 		expect(container.querySelector("[role='timer']")).toBeNull();
 		render(status({ updatedAt: "2026-02-01T10:05:00.000Z" }));
-		expect(states()).toEqual(["waiting", "waiting", "waiting"]);
+		expect(states()).toEqual(["active", "waiting", "waiting"]);
 		expect(container.querySelectorAll('[data-testid="spinner"]')).toHaveLength(
-			0,
+			1,
 		);
 	});
 

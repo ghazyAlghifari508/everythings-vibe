@@ -25,12 +25,7 @@ interface ScreenConnectSyncStepProps {
 	 */
 	streamNotice?: string | null;
 	isStarting: boolean;
-	/**
-	 * A validated session payload exists, so a status request is genuinely in
-	 * flight even before the first frame lands. Without it (and without a
-	 * request being started) the progress line must read "Belum dimulai"
-	 * instead of claiming a connection that nobody is making.
-	 */
+	/** Validated session evidence; no waiting activity is shown without it. */
 	hasSession: boolean;
 	onRetrySync?: () => void;
 	/**
@@ -82,23 +77,11 @@ export function ScreenConnectSyncStep({
 					codebase.
 				</p>
 
-				{/* The browser has not heard from the server yet, so no stage can
-				honestly be claimed. Loading is rendered for one thing only: the
-				server request that is genuinely in flight while this frame's session
-				and prompt are being prepared. A validated session that is merely
-				being polled reads as the passive wait it is — the user has not run
-				the prompt — and with nothing in flight (blocked credits) the line
-				says the sync has not started. Polling is not connection activity, so
-				it never spins. */}
-				{!stageView.hasStatus && !stageView.failed && (
+				{!hasSession && !stageView.hasStatus && !stageView.failed && (
 					<p className="flex items-center gap-2 text-[11px] leading-relaxed text-fog">
 						{isStarting && <Spinner size={12} className="text-blue-400" />}
 						<span>
-							{isStarting
-								? "Menyiapkan sesi sync..."
-								: hasSession
-									? "Menunggu agent"
-									: "Belum dimulai"}
+							{isStarting ? "Menyiapkan sesi sync..." : "Belum dimulai"}
 						</span>
 					</p>
 				)}

@@ -232,8 +232,7 @@ describe("PlanCodebasePage conclusion step recovery and retry", () => {
 			},
 			{ timeout: 15000, interval: 100 },
 		);
-		// The agent row is the real current state: actively waiting for the CLI, with
-		// no completed claim before the handshake is persisted.
+		// The waiting spinner does not claim the CLI has connected.
 		expect(
 			document
 				.querySelector('[data-testid="sync-stage-agent"]')
