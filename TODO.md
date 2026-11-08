@@ -9,12 +9,12 @@ Dokumen ini merupakan **backlog aktif tunggal (Single Source of Truth)** untuk p
 ## 📌 Daftar Isi Backlog Aktif
 
 - [1. Active Work](#1-active-work)
+  - [Inisiatif 1: Architectural Backlog — Greenfield Workspace Routing Architecture Refactor](#inisiatif-1-architectural-backlog-greenfield-workspace-routing-architecture-refactor)
   - [Inisiatif 2: UI/UX Standarisasi — WAJIB Mobile & Tablet Responsive Seluruh Halaman](#inisiatif-2-uiux-standarisasi-wajib-mobile-tablet-responsive-seluruh-halaman)
   - [Inisiatif 3: Refactoring & Clean Code — Dekonstruksi Sisa Modul Melebihi Batas 400 Baris](#inisiatif-3-refactoring-clean-code-dekonstruksi-sisa-modul-melebihi-batas-400-baris)
   - [Inisiatif 11: Infra & Scraping Optimization — Hybrid Remote Browser (Cloudflare Browser Run & Browserless.io Fallback)](#inisiatif-11-infra-scraping-optimization-hybrid-remote-browser-cloudflare-browser-run-browserlessio-fallback)
   - [Inisiatif 12: Infra & Deployment Overhaul — Migrasi Total dari Vercel ke Self-Hosted VPS (Docker, Caddy & Zero Vercel)](#inisiatif-12-infra-deployment-overhaul-migrasi-total-dari-vercel-ke-self-hosted-vps-docker-caddy-zero-vercel)
 - [2. Deferred Work](#2-deferred-work)
-  - [Inisiatif 1: Architectural Backlog — Greenfield Workspace Routing Architecture Refactor](#inisiatif-1-architectural-backlog-greenfield-workspace-routing-architecture-refactor)
   - [Inisiatif 6: Runtime & Performance Optimization — Migrasi Node.js ke Bun](#inisiatif-6-runtime-performance-optimization-migrasi-nodejs-ke-bun)
 - [3. Verification Notes & Known Blockers](#3-verification-notes-known-blockers)
   - [Blocker Rilis NPM Package CLI (@ghazynabiel/everythings-vibe)](#blocker-rilis-npm-package-cli-ghazynabieleverythings-vibe)
@@ -24,6 +24,45 @@ Dokumen ini merupakan **backlog aktif tunggal (Single Source of Truth)** untuk p
 
 ## 1. Active Work
 
+### Inisiatif 1: Architectural Backlog — Greenfield Workspace Routing Architecture Refactor
+
+- **Status:** `Implemented — final verification has repository-wide blockers` — Active Work, Opsi 2 (Nested Layout Routes) dipilih.
+- **Prioritas:** `P3`
+- **Kompleksitas:** `Tinggi`
+- **Inisiator:** Product & UX Alignment
+- **Deskripsi:** Menyatukan alur Greenfield yang saat ini berpindah-pindah rute (`/ask/:id`, `/fitur/:id`, `/prd/:id`, `/ac/:id`, `/task/:id`, `/kanban/:id`) ke dalam satu shell workspace yang konsisten (`/vibeplan/:id`) tanpa kesan "pindah-pindah website".
+
+#### Opsi Solusi yang Dievaluasi
+
+##### Opsi 1: Search-Param-Driven State Routing (Wizard Single-Route)
+- **Format URL:** `/vibeplan/:id?step=question` $\rightarrow$ `?step=fitur` $\rightarrow$ `?step=prd` $\rightarrow$ `?step=ac` $\rightarrow$ `?step=task` $\rightarrow$ `?step=kanban`
+- **Kelebihan:** Persistent shell layout (Navbar, SSE stream, project header) tidak pernah re-mount; sharing state lokal antar step lebih mulus.
+- **Tantangan:** Membutuhkan dynamic code-splitting `lazy()` granular agar tidak mendownload seluruh view sekaligus.
+
+##### Opsi 2: Nested Layout Routes (Pola Standar Industri / Sub-Routes)
+- **Format URL:** `/vibeplan/:id/ask`, `/vibeplan/:id/fitur`, `/vibeplan/:id/prd`, `/vibeplan/:id/ac`, `/vibeplan/:id/task`, `/vibeplan/:id/kanban`
+- **Kelebihan:** Granular loader bawaan TanStack Start per child route, URL sangat deskriptif dan mudah di-bookmark.
+
+#### Lingkup Perubahan & Dampak (Impact Assessment)
+1. Penataan ulang file di `src/routes/`.
+2. Penyesuaian `stepToRoute` & `stepToRouteTarget` di `src/features/greenfield/utils/flow-step.ts`.
+3. Link resume riwayat di `src/components/history/history-page.tsx` dan `src/components/layout/history-drawer.tsx`.
+4. Callback login / onboarding redirect targets.
+5. Pembaruan assertions rute di test suite.
+
+#### Milestone Eksekusi (Ketika Dijadwalkan)
+- [x] **Fase 1 — Desain Spesifikasi:** Opsi 2; dependency map routing, artifact availability, History dan SSE berdasarkan source aktual.
+- [x] **Fase 2 — Persistent Layout Shell:** Parent `/vibeplan/$id`, metadata terotorisasi, shared project header, artifact-backed step indicator; stabilitas shell dan isolasi proyek dibuktikan Router integration.
+- [x] **Fase 3 — Migrasi View Anak:** Ask, Fitur, PRD, AC, Task, Kanban menggunakan nested child routes dan loader/component existing; route generator dan production build lulus.
+- [x] **Fase 4 — Router Redirects:** Enam legacy routes melakukan replace redirect ke tahap canonical yang sama; search payment di-whitelist; HTTP SSR smoke membuktikan enam redirect 307.
+- [ ] **Fase 5 — Verifikasi & Test Suite:** Pemeriksaan telah dijalankan; project-wide belum green (rincian blocker di bawah).
+- [x] **Fase 6 — Input PRD:** Entry proyek baru canonical; setup/pending prompt terikat project ID; draft PRD per proyek di-flush saat departure; targeted regression lulus.
+- [x] **Fase 7 — Skill Compliance:** Dokumentasi TanStack dan skills engineering/domain/routing diterapkan; tidak menambah queue, schema, dependency, atau browser QA tanpa izin.
+
+**Evidence dan blocker:** Detail di `docs/greenfield-workspace-routing.md`. Final routing/state regression: 10 files, 130 tests passed. Extended lifecycle/persistence: 24 files passed; final Kanban consumers: 3 files, 36 tests passed. Read-only DB smoke: owned access berhasil; foreign/deleted/missing project ditolak. `pnpm generate-routes`, Biome 66 touched source files, dan `pnpm build` lulus. `pnpm check`: 1 existing Admin export-order error, 10 CSS warnings. Typecheck: 1 error Studio `studio-composer.test.tsx:241` (`Promise.withResolvers`, ES2022). Full `pnpm test --maxWorkers 2`: timeout 600 detik, dua kegagalan Codebase analysis/retry tercatat, total suite tidak tersedia. Browser QA, live AI generation dan valid public-share success: **Not Verified**; invalid share token mengembalikan HTTP 500 tanpa auth redirect pada route existing yang tidak diubah. Fase 5 tetap terbuka; tidak mengklaim seluruh repo lulus.
+
+
+---
 ### Inisiatif 2: UI/UX Standarisasi — WAJIB Mobile & Tablet Responsive Seluruh Halaman
 
 - **Status:** `Not Started`
@@ -315,42 +354,6 @@ Persiapan lokal pada Inisiatif 12 dikerjakan melalui `docs/prompt-random/p4.md`;
 
 ## 2. Deferred Work
 
-### Inisiatif 1: Architectural Backlog — Greenfield Workspace Routing Architecture Refactor
-
-- **Status:** `Proposed / Deferred`
-- **Prioritas:** `P3`
-- **Kompleksitas:** `Tinggi`
-- **Inisiator:** Product & UX Alignment
-- **Deskripsi:** Menyatukan alur Greenfield yang saat ini berpindah-pindah rute (`/ask/:id`, `/fitur/:id`, `/prd/:id`, `/ac/:id`, `/task/:id`, `/kanban/:id`) ke dalam satu shell workspace yang konsisten (`/vibeplan/:id`) tanpa kesan "pindah-pindah website".
-
-#### Opsi Solusi yang Dievaluasi
-
-##### Opsi 1: Search-Param-Driven State Routing (Wizard Single-Route)
-- **Format URL:** `/vibeplan/:id?step=question` $\rightarrow$ `?step=fitur` $\rightarrow$ `?step=prd` $\rightarrow$ `?step=ac` $\rightarrow$ `?step=task` $\rightarrow$ `?step=kanban`
-- **Kelebihan:** Persistent shell layout (Navbar, SSE stream, project header) tidak pernah re-mount; sharing state lokal antar step lebih mulus.
-- **Tantangan:** Membutuhkan dynamic code-splitting `lazy()` granular agar tidak mendownload seluruh view sekaligus.
-
-##### Opsi 2: Nested Layout Routes (Pola Standar Industri / Sub-Routes)
-- **Format URL:** `/vibeplan/:id/ask`, `/vibeplan/:id/fitur`, `/vibeplan/:id/prd`, `/vibeplan/:id/ac`, `/vibeplan/:id/task`, `/vibeplan/:id/kanban`
-- **Kelebihan:** Granular loader bawaan TanStack Start per child route, URL sangat deskriptif dan mudah di-bookmark.
-
-#### Lingkup Perubahan & Dampak (Impact Assessment)
-1. Penataan ulang file di `src/routes/`.
-2. Penyesuaian `stepToRoute` & `stepToRouteTarget` di `src/features/greenfield/utils/flow-step.ts`.
-3. Link resume riwayat di `src/components/history/history-page.tsx` dan `src/components/layout/history-drawer.tsx`.
-4. Callback login / onboarding redirect targets.
-5. Pembaruan assertions rute di test suite.
-
-#### Milestone Eksekusi (Ketika Dijadwalkan)
-- [ ] **Fase 1 — Desain Spesifikasi:** Putuskan Opsi 1 vs Opsi 2.
-- [ ] **Fase 2 — Layout Shell Prototype:** Buat parent layout `/vibeplan/$id` dengan shared header & step indicator.
-- [ ] **Fase 3 — Migrasi View Anak:** Pindahkan implementasi Ask, Fitur, PRD, AC, Task, dan Kanban ke dalam outlet/switcher baru.
-- [ ] **Fase 4 — Router Redirects:** Tambahkan backward-compatibility redirect dari `/ask/:id`, `/prd/:id`, dll. ke rute baru.
-- [ ] **Fase 5 — Verifikasi & Test Suite:** Update dan jalankan seluruh suite `pnpm check` dan `pnpm test`.
-- [ ] **Fase 6 — Input PRD:** Pastikan alur input PRD ikut migrasi tanpa kehilangan state.
-- [ ] **Fase 7 — Skill Compliance:** Pastikan skills relevan diterapkan saat eksekusi.
-
----
 
 ### Inisiatif 6: Runtime & Performance Optimization — Migrasi Node.js ke Bun
 

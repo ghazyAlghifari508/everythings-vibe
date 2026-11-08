@@ -7,6 +7,7 @@ import {
 	getOnboardingState,
 	getPrdDraft,
 	getSetupPrompt,
+	savePendingPrdPrompt,
 	savePrdDraft,
 	saveSetupPrompt,
 } from "./prompt-handoff";
@@ -54,6 +55,24 @@ describe("prompt-handoff storage trust boundary", () => {
 		expect(getSetupPrompt()).toBe("E-commerce lokal");
 		clearSetupPrompt();
 		expect(getSetupPrompt()).toBe("");
+	});
+
+	it("never consumes another project's pending generation", () => {
+		savePendingPrdPrompt("project A", "auto", "A", "a");
+		expect(consumePendingPrdPrompt("b")).toBeNull();
+		expect(consumePendingPrdPrompt("a")).toMatchObject({
+			prompt: "project A",
+			projectId: "a",
+		});
+		expect(consumePendingPrdPrompt("a")).toBeNull();
+	});
+
+	it("rejects unowned legacy setup prompts for workspace consumers", () => {
+		saveSetupPrompt("unowned");
+		expect(getSetupPrompt("a")).toBe("");
+		saveSetupPrompt("project A", "a");
+		expect(getSetupPrompt("b")).toBe("");
+		expect(getSetupPrompt("a")).toBe("project A");
 	});
 
 	it("never writes __proto__ draft keys", () => {

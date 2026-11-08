@@ -127,7 +127,7 @@ describe("CodebaseKanbanBoard full board action", () => {
 		);
 		expect(link).not.toBeNull();
 		expect(link?.getAttribute("aria-label")).toBe("Buka Kanban Penuh");
-		expect(link?.getAttribute("href")).toBe("/kanban/proj-1");
+		expect(link?.getAttribute("href")).toBe("/vibeplan/proj-1/kanban");
 		expect(link?.getAttribute("target")).toBe("_blank");
 		expect(link?.getAttribute("rel")).toBe("noopener noreferrer");
 	});

@@ -7,6 +7,7 @@ import { ChatPanel } from "@/features/greenfield/components/chat/chat-panel";
 
 // Mock router hooks
 vi.mock("@tanstack/react-router", () => ({
+	useBlocker: () => {},
 	useNavigate: () => vi.fn(),
 	useLocation: () => ({ pathname: "/prd/test-id", searchStr: "" }),
 	useRouter: () => ({ invalidate: vi.fn() }),

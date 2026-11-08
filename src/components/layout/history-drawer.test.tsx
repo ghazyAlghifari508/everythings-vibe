@@ -476,7 +476,7 @@ describe("HistoryDrawer item navigation", () => {
 		fireEvent.click(screen.getByText("E-Commerce SIMRS"));
 
 		expect(navigateSpy).toHaveBeenCalledWith({
-			to: "/prd/$id",
+			to: "/vibeplan/$id/prd",
 			params: { id: SIMRS_ID },
 		});
 	});
@@ -568,10 +568,10 @@ describe("toDrawerItems", () => {
 
 		expect(items).toHaveLength(2);
 		expect(items[0].type).toBe("plan");
-		expect(items[0].url).toBe(`/ac/${SIMRS_ID}`);
+		expect(items[0].url).toBe(`/vibeplan/${SIMRS_ID}`);
 		expect(items[0].updatedAt).toBeInstanceOf(Date);
 		// A serialized timestamp must survive the server-function boundary as a Date.
 		expect(items[1].updatedAt).toBeInstanceOf(Date);
-		expect(items[1].url).toBe(`/task/${AIRBNB_ID}`);
+		expect(items[1].url).toBe(`/vibeplan/${AIRBNB_ID}/task`);
 	});
 });
