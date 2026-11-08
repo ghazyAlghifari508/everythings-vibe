@@ -92,11 +92,13 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 	}, [artifact.artifactHydration, hasTasksInDb]);
 	const hasExistingPlan = data.plans.some((entry) => entry.hasArtifacts);
 	const readiness = resolveCodebaseReadiness({
-		snapshotId: sync.status?.snapshotId ?? data.currentSnapshotId,
-		snapshotStatus:
-			sync.status?.status ?? (data.hasStoredSnapshot ? "uploaded" : null),
+		snapshotId: sync.activeWorkspaceSnapshotId,
+		snapshotStatus: sync.activeWorkspaceSnapshotId ? "uploaded" : null,
 		analysis: sync.analysis,
-		analysisAttemptStatus: sync.status?.analysisAttemptStatus ?? null,
+		analysisAttemptStatus:
+			sync.activeWorkspaceSnapshotId === sync.status?.snapshotId
+				? sync.status.analysisAttemptStatus
+				: null,
 		hasExistingPlan,
 		hasStoredSnapshot: data.hasStoredSnapshot,
 	});
@@ -139,7 +141,7 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 	const source = useWorkspaceSource({
 		codebaseId: codebase.id,
 		snapshotReady: sync.snapshotReady,
-		polledSnapshotId: sync.status?.snapshotId,
+		polledSnapshotId: sync.activeWorkspaceSnapshotId,
 		analysisOutput,
 		setActiveArtifactId,
 		setCanvasOpen,
@@ -183,7 +185,7 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 	const revision = useWorkspaceRevision({
 		codebaseId: codebase.id,
 		effectiveFeatureId,
-		currentSnapshotId: sync.status?.snapshotId ?? data.currentSnapshotId,
+		currentSnapshotId: sync.activeWorkspaceSnapshotId,
 		stageBusy,
 		featureName: resolvedFeature?.name ?? codebase.name,
 		resolvedFeatureName: resolvedFeature?.name,

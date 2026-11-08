@@ -6,21 +6,14 @@ import {
 	shouldDiscardWorkspaceAnalysis,
 } from "@/features/codebase/services/analysis-selection";
 import {
-	type SyncPromptPayload,
 	type SyncStatusResponse,
-	syncPromptPayloadSchema,
 	syncStatusResponseSchema,
 } from "@/features/codebase/services/sync";
 import { shouldFetchWorkspaceAnalysis } from "@/features/codebase/services/workspace-analysis";
 import { CODEBASE_SYNC_POLL_INTERVAL_MS } from "@/features/codebase/types/codebase-constants";
-import type { AnalysisCreditStatus } from "../services/analysis-credit-policy";
-import { requestAnalysisCreditPreflight } from "../services/analysis-credit-requests";
-import {
-	type CodebaseSessionStartAction,
-	getCodebaseSessionRequestBody,
-	resolveWorkspaceSnapshotReady,
-} from "../utils/workspace-contracts";
+import { resolveWorkspaceSnapshotReady } from "../utils/workspace-contracts";
 import { useWorkspaceAnalysis } from "./use-workspace-analysis";
+import { useWorkspaceSyncSession } from "./use-workspace-sync-session";
 
 export function useCodebaseSync({
 	codebaseId,
@@ -35,21 +28,21 @@ export function useCodebaseSync({
 	initialAnalysis: AnalysisResponse | null;
 	hasStoredSnapshot: boolean;
 }) {
-	const [payload, setPayload] = useState<SyncPromptPayload | null>(null);
-	const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-	const [isResyncModalOpen, setIsResyncModalOpen] = useState(false);
 	const [status, setStatus] = useState<SyncStatusResponse | null>(null);
 	const [error, setError] = useState<string | null>(null);
-	const [isStarting, setIsStarting] = useState(false);
 	const [isWorking, setIsWorking] = useState(false);
-	const [creditPreflight, setCreditPreflight] =
-		useState<AnalysisCreditStatus | null>(null);
 	const inFlight = useRef(false);
-	const sessionInFlight = useRef(false);
+	const session = useWorkspaceSyncSession({
+		codebaseId,
+		status,
+		setStatus,
+		setError,
+	});
+	const { activeSessionId, setActiveSessionId } = session;
 	const analysisState = useWorkspaceAnalysis({
 		projectId,
 		currentSnapshotId,
-		polledSnapshotId: status?.snapshotId ?? null,
+		polledSnapshotId: status?.workspaceSnapshotId ?? currentSnapshotId,
 		initialAnalysis,
 		setError,
 		setIsWorking,
@@ -57,7 +50,7 @@ export function useCodebaseSync({
 	const {
 		analysis,
 		setAnalysis,
-		analysisAttemptedFor,
+		triggerAnalysis,
 		analysisIdentityRef,
 		readWorkspaceAnalysis,
 	} = analysisState;
@@ -86,7 +79,7 @@ export function useCodebaseSync({
 			}
 			const activeSnapshotId = resolveWorkspaceSnapshotIdentity({
 				persistedSnapshotId: currentSnapshotId,
-				polledSnapshotId: parsed.data.snapshotId ?? null,
+				polledSnapshotId: parsed.data.workspaceSnapshotId ?? currentSnapshotId,
 			});
 			analysisIdentityRef.current = `${projectId ?? ""}:${activeSnapshotId ?? ""}`;
 			setStatus(parsed.data);
@@ -109,7 +102,10 @@ export function useCodebaseSync({
 				shouldFetchWorkspaceAnalysis({
 					projectId,
 					snapshotId,
-					analysisStatus: parsed.data.analysisStatus,
+					analysisStatus:
+						snapshotId === parsed.data.snapshotId
+							? parsed.data.analysisStatus
+							: "ready",
 					analysis: retained,
 				})
 			) {
@@ -132,6 +128,7 @@ export function useCodebaseSync({
 		status?.sessionId,
 		analysisIdentityRef,
 		setAnalysis,
+		setActiveSessionId,
 	]);
 	useEffect(() => {
 		void readStatus();
@@ -162,88 +159,31 @@ export function useCodebaseSync({
 		lastLiveFrameRef.current = fingerprint;
 		void readStatusRef.current();
 	}, [liveStatus.status]);
-	const startSession = async (
-		action: CodebaseSessionStartAction = "initial",
-	) => {
-		if (sessionInFlight.current) return;
-		sessionInFlight.current = true;
-		setIsStarting(true);
-		setIsResyncModalOpen(true);
-		setError(null);
-		try {
-			const status = await requestAnalysisCreditPreflight().catch(
-				(error: unknown) => {
-					setError(
-						error instanceof Error
-							? error.message
-							: "Kebutuhan kredit belum dapat diperiksa.",
-					);
-					return null;
-				},
-			);
-			if (!status) return;
-			setCreditPreflight(status);
-			if (!status.canStart) {
-				setPayload(null);
-				return;
-			}
-			const response = await fetch(
-				`/api/codebases/${encodeURIComponent(codebaseId)}/session`,
-				{
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({
-						...getCodebaseSessionRequestBody(action),
-						sessionId: activeSessionId,
-					}),
-				},
-			);
-			const parsed = syncPromptPayloadSchema.safeParse(
-				await response.json().catch(() => null),
-			);
-			if (!response.ok || !parsed.success) {
-				setError("Sesi sync gagal dibuat. Coba lagi.");
-				return;
-			}
-			setPayload(parsed.data);
-			if (parsed.data.sessionId) {
-				setActiveSessionId(parsed.data.sessionId);
-			}
-			setStatus(null);
-			setAnalysis(null);
-			analysisAttemptedFor.current = null;
-		} catch (error) {
-			setError(
-				error instanceof Error
-					? error.message
-					: "Server tidak dapat dihubungi.",
-			);
-		} finally {
-			sessionInFlight.current = false;
-			setIsStarting(false);
-		}
-	};
+	useEffect(() => {
+		if (
+			status?.status === "uploaded" &&
+			status.snapshotId &&
+			status.snapshotId !== currentSnapshotId &&
+			!status.analysisStatus &&
+			!status.analysisAttemptStatus
+		)
+			void triggerAnalysis(status.snapshotId);
+	}, [status, currentSnapshotId, triggerAnalysis]);
 	const snapshotReady = resolveWorkspaceSnapshotReady({
 		status,
 		hasStoredSnapshot,
 	});
 	return {
 		...analysisState,
-		payload,
-		activeSessionId,
-		isResyncModalOpen,
-		setIsResyncModalOpen,
-		isResyncDrawerOpen: isResyncModalOpen,
-		setIsResyncDrawerOpen: setIsResyncModalOpen,
+		...session,
+		isResyncDrawerOpen: session.isResyncModalOpen,
+		setIsResyncDrawerOpen: session.setIsResyncModalOpen,
 		status,
 		error,
 		setError,
-		isStarting,
 		isWorking,
 		setIsWorking,
 		readStatus,
-		startSession,
-		creditPreflight,
 		snapshotReady,
 	};
 }

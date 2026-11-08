@@ -89,6 +89,7 @@ export function ResyncStep1Prompt({
 	onRequestNewToken,
 	onCopy,
 	lockedPrompt = null,
+	promptUnavailable = false,
 }: {
 	stepState: StepState;
 	payload: SyncPromptPayload | null;
@@ -98,6 +99,7 @@ export function ResyncStep1Prompt({
 	copied: boolean;
 	onRequestNewToken?: () => void;
 	onCopy: () => void;
+	promptUnavailable?: boolean;
 	/** Replaces the prompt when the account cannot start a billed sync. */
 	lockedPrompt?:
 		| import("../workspace/locked-prompt-state").LockedPromptState
@@ -139,7 +141,7 @@ export function ResyncStep1Prompt({
 							<Spinner size={14} className="text-blue-400" />
 							<span>Menyiapkan sesi sync...</span>
 						</div>
-					) : (
+					) : promptUnavailable ? null : (
 						<div className="flex flex-col items-center justify-center gap-3 py-6 text-center font-sans">
 							<p className="text-xs text-fog">
 								Token sync sudah kedaluwarsa atau belum tersedia.

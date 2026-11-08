@@ -50,9 +50,6 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 		isStarting,
 		status,
 		manifestFileCount,
-		setIsResyncDrawerOpen,
-		payload,
-		startSession,
 		error,
 		readStatus,
 		analysis,
@@ -156,10 +153,7 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 					name={codebase.name}
 					isStarting={isStarting}
 					fileCount={status?.fileCount ?? manifestFileCount}
-					onResync={() => {
-						setIsResyncDrawerOpen(true);
-						if (!payload) void startSession("retry");
-					}}
+					onResync={ws.openResync}
 				/>
 				{error && (
 					<div

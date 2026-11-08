@@ -82,10 +82,28 @@ export function CodebaseResyncModal({
 		};
 	}, []);
 
+	const [, tick] = useState(0);
+	useEffect(() => {
+		if (!isOpen || !payload) return;
+		const remaining = Date.parse(payload.expiresAt) - Date.now();
+		if (remaining <= 0) return;
+		const timer = setInterval(() => tick((value) => value + 1), 15000);
+		return () => clearInterval(timer);
+	}, [isOpen, payload]);
+	const usablePayload =
+		payload &&
+		Date.parse(payload.expiresAt) > Date.now() &&
+		(!activeSessionId ||
+			!payload.sessionId ||
+			payload.sessionId === activeSessionId) &&
+		status?.status !== "failed" &&
+		status?.status !== "expired"
+			? payload
+			: null;
 	const resolvedRepositoryName =
 		resolveCodebaseDisplayName(projectName) ?? "Repository belum terdeteksi";
-	const promptText = payload
-		? buildResyncPrompt(payload, { projectName: resolvedRepositoryName })
+	const promptText = usablePayload
+		? buildResyncPrompt(usablePayload, { projectName: resolvedRepositoryName })
 		: "";
 	const stageView = resolveSyncStageView(status);
 
@@ -165,14 +183,33 @@ export function CodebaseResyncModal({
 				<div className="flex flex-1 flex-col gap-6 overflow-y-auto p-5 sm:p-6">
 					<ResyncStep1Prompt
 						stepState={step1State}
-						payload={payload}
+						payload={usablePayload}
 						isStarting={isStarting}
 						promptText={promptText}
 						copyError={copyError}
 						copied={copied}
 						onRequestNewToken={onRequestNewToken}
 						onCopy={() => void handleCopy()}
-						lockedPrompt={lockedPrompt}
+						lockedPrompt={
+							usablePayload ||
+							(status &&
+								[
+									"connected",
+									"scanning",
+									"filtering",
+									"uploading",
+									"uploaded",
+								].includes(status.status))
+								? null
+								: lockedPrompt
+						}
+						promptUnavailable={Boolean(
+							status?.snapshotId ||
+								(status &&
+									["connected", "scanning", "filtering", "uploading"].includes(
+										status.status,
+									)),
+						)}
 					/>
 
 					<ResyncStep2Agent stepState={step2State} />

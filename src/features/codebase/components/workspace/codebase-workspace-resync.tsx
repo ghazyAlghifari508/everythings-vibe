@@ -15,7 +15,7 @@ export function CodebaseWorkspaceResync({
 	const lockedPrompt = useMemo(
 		() =>
 			buildLockedPrompt(ws.creditPreflight, {
-				onTopUpClose: () => void ws.startSession("retry"),
+				onTopUpClose: () => void ws.startSession("resync"),
 			}),
 		[ws.creditPreflight, ws.startSession],
 	);
@@ -32,16 +32,26 @@ export function CodebaseWorkspaceResync({
 			lockedPrompt={lockedPrompt}
 			status={ws.status}
 			statusError={ws.error}
-			onRequestNewToken={() => void ws.startSession("retry")}
-			onRetrySync={() => void ws.startSession("retry")}
+			onRequestNewToken={
+				!ws.status ||
+				["waiting_for_cli", "expired", "failed"].includes(ws.status.status)
+					? () => void ws.startSession(ws.status ? "retry" : "resync")
+					: undefined
+			}
+			onRetrySync={
+				ws.status && ["expired", "failed"].includes(ws.status.status)
+					? () => void ws.startSession("retry")
+					: () => void ws.startSession("resync")
+			}
 			analysis={ws.analysis}
 			isAnalyzing={ws.isWorking}
 			activeSessionId={ws.activeSessionId}
 			onRetryAnalysis={
-				ws.activeWorkspaceSnapshotId
+				ws.status?.snapshotId
 					? () => {
-							if (ws.activeWorkspaceSnapshotId) {
-								void ws.triggerAnalysis(ws.activeWorkspaceSnapshotId);
+							if (ws.status?.snapshotId) {
+								ws.analysisAttemptedFor.current = null;
+								void ws.triggerAnalysis(ws.status.snapshotId);
 							}
 						}
 					: undefined
