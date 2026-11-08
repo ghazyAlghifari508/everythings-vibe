@@ -121,7 +121,7 @@ OUTPUT CONTRACT (NON-NEGOTIABLE):
       "version": 1,
       "navigation": "bottom for mobile; sidebar or top for web",
       "statusBar": "none",
-      "density": "compact or comfortable, appropriate to the product",
+      "density": "compact (16px outer gutter) or comfortable (24px outer gutter), appropriate to the product",
       "activeDestinations": { "Screen Name": "matching destination id, or null for a contextual screen" }
     },
     "navigationContract": {
@@ -138,7 +138,7 @@ OUTPUT CONTRACT (NON-NEGOTIABLE):
 }
 - The screens array and blueprint.screenPlan must each contain exactly the requested count, ordered 0..N, using the requested viewport platform.
 - The navigation contract (destinations, labels, ordering, icons) is shared by every screen; only the active item changes per screen.
-- canonicalShell uses literal enum values: navigation bottom on mobile, sidebar or top on web; density compact or comfortable; statusBar none. Map EVERY screen name to its active destination id (or null only for contextual screens). Icon ids: home, plus, search, user, wallet, chart, analytics, calendar, location, plane, settings, circle. Studio renders these components deterministically.
+- canonicalShell uses literal enum values: navigation bottom on mobile, sidebar or top on web; density compact or comfortable; statusBar none. Density is the project's outer gutter: compact is 16px, comfortable is 24px, and every screen's content sits in that one gutter. Map EVERY screen name to its active destination id (or null only for contextual screens). Icon ids: home, plus, search, user, wallet, chart, analytics, calendar, location, plane, settings, circle. Studio renders these components deterministically.
 - Names must be standard, clean UI titles matching the user domain.
 - projectTitle is a product name, not the brief. Keep it 2-4 words and under 60 characters. Never return a sentence, a paragraph, a copy of the user's request, or a description of the work to be done.
 - Use the brand or product name the user wrote, spelled exactly as they wrote it. If the user named no brand, name the product after its domain, audience, and main purpose, for example "Analytics Dashboard" or "Inventory Console". Never invent a brand that contradicts the user.

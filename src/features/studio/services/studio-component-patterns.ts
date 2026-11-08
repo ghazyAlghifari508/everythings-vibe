@@ -1,4 +1,9 @@
 // Static HTML adaptation of input-group composition; no React runtime in artboards.
+//
+// Every rule here is written as `:where(...)`, i.e. zero specificity. A pattern
+// is a starting point the screen may restyle; it must never outrank the design's
+// own component rules the way the old canonical `min-height:44px; padding:10px
+// 14px` blanket did.
 export const STUDIO_COMPONENT_PATTERNS = [
 	{
 		name: "SearchInput",
@@ -28,6 +33,14 @@ export const STUDIO_COMPONENT_PATTERNS = [
 		name: "Responsive ActionGroup",
 		html: '<div data-ui="actions"><button type="button">Bandingkan</button><button type="button" data-primary>Ekspor CSV</button></div>',
 	},
+	{
+		name: "QuantityStepper",
+		html: '<div data-ui="stepper" role="group" aria-label="Jumlah"><button type="button" aria-label="Kurangi jumlah">−</button><output aria-label="Jumlah saat ini">1</output><button type="button" aria-label="Tambah jumlah">+</button></div>',
+	},
+	{
+		name: "HorizontalCarousel",
+		html: '<div data-ui="carousel" role="region" aria-label="Promo pilihan" tabindex="0"><article data-card><h3>Promo 1</h3><p>Diskon 20%</p></article><article data-card><h3>Promo 2</h3><p>Gratis ongkir</p></article></div>',
+	},
 ];
 
 export const STUDIO_COMPONENT_STYLE = `<style id="studio-component-patterns">
@@ -42,5 +55,10 @@ export const STUDIO_COMPONENT_STYLE = `<style id="studio-component-patterns">
 :where([data-ui="actions"]){display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:8px;min-width:0}
 :where([data-ui="actions"]>button,[data-ui="badge"],[data-ui="value"]){white-space:nowrap;word-break:normal;overflow-wrap:normal}
 :where([data-ui="alert"]){padding:16px;border:var(--app-border);border-radius:var(--app-radius)}
+:where([data-ui="stepper"]){display:inline-flex;align-items:center;border:var(--app-border);border-radius:var(--app-radius);background:var(--app-surface)}
+:where([data-ui="stepper"]>button){flex:0 0 36px;width:36px;height:36px;min-height:36px;padding:0;border:0;border-radius:0;background:transparent;font-size:18px;line-height:1}
+:where([data-ui="stepper"]>output){flex:0 0 auto;min-width:40px;padding:0 4px;text-align:center;font-variant-numeric:tabular-nums}
+:where([data-ui="carousel"]){display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;max-width:100%;padding-bottom:4px}
+:where([data-ui="carousel"]>*){flex:0 0 auto;scroll-snap-align:start}
 @media(max-width:640px){:where([data-ui="actions"]){justify-content:flex-start}:where([data-ui="actions"]>button){flex:1 0 auto}}
 </style>`;
