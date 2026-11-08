@@ -10,6 +10,7 @@ import {
 	studioDesignSkillIdSchema,
 } from "../services/studio-generation-options";
 import { studioTitleSourceSchema } from "../services/studio-project-title";
+import { deriveStudioLifecycle } from "../utils/studio-lifecycle";
 import { STUDIO_JOB_QUEUE_HEALTH_MS } from "./studio-constants";
 
 const date = z.union([
@@ -101,16 +102,8 @@ export interface StudioStatus {
 	activeJob: StudioJobRow | null;
 }
 
-export function isStudioProcessing({ frames, activeJob }: StudioStatus) {
-	return (
-		Boolean(
-			activeJob &&
-				["queued", "planning", "generating"].includes(activeJob.status),
-		) ||
-		frames.some(
-			(frame) => frame.status === "queued" || frame.status === "generating",
-		)
-	);
+export function isStudioProcessing(status: StudioStatus) {
+	return deriveStudioLifecycle(status).isProcessing;
 }
 
 export function resolveStudioQueueHealth(

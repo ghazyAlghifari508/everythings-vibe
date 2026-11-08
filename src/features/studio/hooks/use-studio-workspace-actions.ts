@@ -281,28 +281,6 @@ export function useStudioWorkspaceActions({
 		[clearFrameRetryError, project.id, setError, showToast, syncProjectStatus],
 	);
 
-	const handleRetryPlanning = useCallback(async () => {
-		try {
-			const res = await fetch("/api/studio/frame", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					action: "retry-planning",
-					projectId: project.id,
-				}),
-			});
-			if (!res.ok) {
-				setError(
-					await readStudioApiError(res, "Gagal mencoba lagi perencanaan."),
-				);
-				return;
-			}
-			await syncProjectStatus();
-		} catch {
-			setError("Jaringan bermasalah. Coba lagi.");
-		}
-	}, [project.id, setError, syncProjectStatus]);
-
 	const handleDownloadAllZip = useCallback(async () => {
 		if (frames.length === 0 || exportingZip) return;
 		setExportingZip(true);
@@ -328,7 +306,6 @@ export function useStudioWorkspaceActions({
 		handleComposerSubmit,
 		handleSkillChange,
 		handleRetryFrame,
-		handleRetryPlanning,
 		handleDownloadAllZip,
 	};
 }

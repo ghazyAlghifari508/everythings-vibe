@@ -6,7 +6,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { memo, useRef } from "react";
 import { Icon } from "@/components/ui/icon";
-import type { StudioFrameRow } from "@/db/schema";
+import type { StudioFrameRow, StudioJobRow } from "@/db/schema";
 import {
 	StudioFrameErrorPanel,
 	StudioFrameStatusStrip,
@@ -17,6 +17,7 @@ import { studioJobTiming } from "@/features/studio/services/studio-timing";
 import { STUDIO_VISUAL_WIDTH } from "@/features/studio/types/studio-constants";
 import { extractCleanHtml } from "@/features/studio/utils/clean-html";
 import { resolveFrameArtboardMode } from "@/features/studio/utils/studio-frame-artboard";
+import { resolveStudioFrameStatus } from "@/features/studio/utils/studio-lifecycle";
 
 export type { StudioFrameArtboardMode } from "@/features/studio/utils/studio-frame-artboard";
 export {
@@ -26,6 +27,7 @@ export {
 
 export interface StudioFrameProps {
 	frame: StudioFrameRow;
+	job?: StudioJobRow | null;
 	initialJobTiming?: { id: string; createdAt: Date };
 	priorityPreview?: boolean;
 	isSelected?: boolean;
@@ -64,6 +66,7 @@ function frameStatusMessage(status: string, retryError?: string): string {
  */
 export const StudioFrame = memo(function StudioFrame({
 	frame,
+	job = null,
 	initialJobTiming,
 	priorityPreview = false,
 	isSelected = false,
@@ -76,6 +79,7 @@ export const StudioFrame = memo(function StudioFrame({
 	onMeasure,
 }: StudioFrameProps) {
 	const visibleUrl = useRef<string | null>(null);
+	const status = resolveStudioFrameStatus(frame, job);
 	const isMobile = frame.viewport === "mobile";
 	const frameWidth = isMobile
 		? STUDIO_VISUAL_WIDTH.mobile
@@ -96,7 +100,7 @@ export const StudioFrame = memo(function StudioFrame({
 	// with no explanation and no recovery action.
 	const hasRenderableHtml = cleanHtml.length > 0;
 	const artboardMode = resolveFrameArtboardMode({
-		status: frame.status,
+		status,
 		hasRenderableHtml,
 		hasVisual: visual !== null,
 		hasVisualError: Boolean(visualError),
@@ -132,7 +136,7 @@ export const StudioFrame = memo(function StudioFrame({
 						<span className="truncate">{frame.name}</span>
 					</button>
 
-					{frame.status === "generating" ? (
+					{status === "generating" ? (
 						<Icon
 							icon={Loading03Icon}
 							size={13}
@@ -141,10 +145,10 @@ export const StudioFrame = memo(function StudioFrame({
 							className="shrink-0 text-fog motion-safe:animate-spin"
 						/>
 					) : null}
-					{frame.status === "queued" ? (
+					{status === "queued" ? (
 						<output aria-label="Menunggu antrean" className="sr-only" />
 					) : null}
-					{frame.status === "failed" ? (
+					{status === "failed" ? (
 						<Icon
 							icon={AlertCircleIcon}
 							size={13}
@@ -240,32 +244,30 @@ export const StudioFrame = memo(function StudioFrame({
 						actionPending={isRetryPending}
 					/>
 				) : (
-					<StudioFrameShimmer viewport={frame.viewport} status={frame.status} />
+					<StudioFrameShimmer viewport={frame.viewport} status={status} />
 				)}
 
 				{artboardMode === "last-good" ? (
 					<StudioFrameStatusStrip
 						message={
-							frame.status === "ready"
+							status === "ready"
 								? visualError
-								: frameStatusMessage(frame.status, retryError)
+								: frameStatusMessage(status, retryError)
 						}
 						tone={
-							frame.status === "failed" || frame.status === "ready"
-								? "danger"
-								: "progress"
+							status === "failed" || status === "ready" ? "danger" : "progress"
 						}
 						actionLabel={
-							frame.status === "ready"
+							status === "ready"
 								? "Muat ulang pratinjau"
-								: frame.status === "failed"
+								: status === "failed"
 									? "Coba lagi"
 									: undefined
 						}
 						onAction={
-							frame.status === "ready"
+							status === "ready"
 								? retryVisual
-								: frame.status === "failed"
+								: status === "failed"
 									? retry
 									: undefined
 						}

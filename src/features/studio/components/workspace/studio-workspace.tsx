@@ -49,7 +49,13 @@ export function StudioWorkspace({
 					onSelectFrame={workspace.selectFrame}
 					onSelectFrames={workspace.selectFrames}
 					onRetryFrame={workspace.handleRetryFrame}
-					onRetryPlanning={workspace.handleRetryPlanning}
+					onRetryPlanning={
+						workspace.canRetryPlanning
+							? workspace.handleRetryPlanning
+							: undefined
+					}
+					retryingPlanning={workspace.retryingPlanning}
+					onRefreshStatus={() => window.location.reload()}
 					retryingFrameIds={workspace.retryingFrameIds}
 					frameRetryErrors={workspace.frameRetryErrors}
 					className="size-full"

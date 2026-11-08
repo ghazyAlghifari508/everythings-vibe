@@ -1,5 +1,4 @@
 import { setTimeout as backoff } from "node:timers/promises";
-import type { StudioFrameRow } from "@/db/schema";
 import {
 	STUDIO_FRAME_CORRECTION_MAX,
 	STUDIO_FRAME_MAX_TOKENS,
@@ -42,16 +41,6 @@ export {
 	generateStudioHtml,
 	runWithConcurrency,
 };
-
-export function isTemporarySlot(
-	frame: Pick<StudioFrameRow, "name" | "description" | "htmlCode">,
-): boolean {
-	return (
-		/^Layar \d+$/.test(frame.name) &&
-		(frame.description ?? "") === "" &&
-		frame.htmlCode == null
-	);
-}
 
 type StudioOutputIssue = { stage: string; message: string };
 

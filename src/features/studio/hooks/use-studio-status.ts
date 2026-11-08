@@ -20,6 +20,30 @@ function retainRow<T extends { updatedAt: Date }>(previous: T, next: T): T {
 }
 
 function reconcile(previous: StudioStatus, next: StudioStatus): StudioStatus {
+	const previousJob = previous.activeJob;
+	const nextJob = next.activeJob;
+	if (
+		previous.project.updatedAt > next.project.updatedAt ||
+		(previousJob &&
+			(!nextJob ||
+				(previousJob.id === nextJob.id
+					? previousJob.updatedAt > nextJob.updatedAt
+					: previousJob.createdAt > nextJob.createdAt)))
+	)
+		return previous;
+	const nextUpdatedAt = Math.max(
+		next.project.updatedAt.getTime(),
+		nextJob?.updatedAt.getTime() ?? 0,
+		...next.frames.map((frame) => frame.updatedAt.getTime()),
+	);
+	if (
+		previous.frames.some(
+			(frame) =>
+				!next.frames.some((row) => row.id === frame.id) &&
+				frame.updatedAt.getTime() > nextUpdatedAt,
+		)
+	)
+		return previous;
 	const byId = new Map(previous.frames.map((frame) => [frame.id, frame]));
 	const frames = next.frames.map((frame) => {
 		const stored = byId.get(frame.id);
@@ -29,8 +53,6 @@ function reconcile(previous: StudioStatus, next: StudioStatus): StudioStatus {
 		frames.length === previous.frames.length &&
 		frames.every((frame, index) => frame === previous.frames[index]);
 	const project = retainRow(previous.project, next.project);
-	const previousJob = previous.activeJob;
-	const nextJob = next.activeJob;
 	const activeJob =
 		previousJob && nextJob
 			? previousJob.id === nextJob.id

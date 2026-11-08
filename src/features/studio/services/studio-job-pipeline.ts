@@ -7,12 +7,13 @@ import {
 	studioRevisions,
 } from "@/db/schema";
 import { STUDIO_FRAME_CONCURRENCY } from "../types/studio-constants";
+import { isTemporarySlot } from "../utils/studio-lifecycle";
 import { extractDesignSystemTokens } from "./studio-design-tokens";
 import {
 	studioFrameErrorCodeFor,
 	studioFrameFailureCategory,
 } from "./studio-frame-errors";
-import { isTemporarySlot, runWithConcurrency } from "./studio-frame-generation";
+import { runWithConcurrency } from "./studio-frame-generation";
 import { runStudioFrameOperation } from "./studio-frame-operation";
 import { generateInitialFrame } from "./studio-initial-frame";
 import {
