@@ -1,5 +1,15 @@
 import { LinkSquare01Icon } from "@hugeicons/core-free-icons";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+	generatePaginationPages,
+	Pagination,
+	PaginationContent,
+	PaginationEllipsis,
+	PaginationItem,
+	PaginationLink,
+	PaginationNext,
+	PaginationPrevious,
+} from "@/components/ui";
 import { Icon } from "@/components/ui/icon";
 import { imageResultCounts } from "@/features/scrape/utils/scrape-images";
 import { extractHost } from "../utils/scrape-image-failures";
@@ -14,6 +24,7 @@ import { ImageCard } from "./images-result-card";
 import { ScrapeFilterSelect } from "./scrape-filter-select";
 
 export type { ImageResult };
+export const PAGE_SIZE = 12;
 
 export function ImagesResult({
 	images,
@@ -28,6 +39,8 @@ export function ImagesResult({
 }) {
 	const [formatFilter, setFormatFilter] = useState("");
 	const [kindFilter, setKindFilter] = useState("");
+	const [page, setPage] = useState(1);
+	const galleryRef = useRef<HTMLDivElement>(null);
 	const [downloading, setDownloading] = useState<string | null>(null);
 	const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
 	const [downloadFailures, setDownloadFailures] = useState<
@@ -73,6 +86,45 @@ export function ImagesResult({
 	const gallerySummary = hasFilter
 		? `Menampilkan ${visible.length} dari ${counts.verified} gambar`
 		: `${counts.verified} gambar tersedia`;
+
+	const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
+	const safePage = Math.min(Math.max(1, page), totalPages);
+
+	useEffect(() => {
+		if (page > totalPages) {
+			setPage(totalPages);
+		}
+	}, [page, totalPages]);
+
+	const startIndex = (safePage - 1) * PAGE_SIZE;
+	const endIndex = Math.min(startIndex + PAGE_SIZE, visible.length);
+	const paginatedImages = visible.slice(startIndex, endIndex);
+	const from = visible.length === 0 ? 0 : startIndex + 1;
+	const to = endIndex;
+
+	function handlePageChange(newPage: number) {
+		const clamped = Math.min(Math.max(1, newPage), totalPages);
+		setPage(clamped);
+		if (typeof galleryRef.current?.scrollIntoView === "function") {
+			galleryRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+		}
+	}
+
+	function handleFormatFilterChange(format: string) {
+		setFormatFilter(format);
+		setPage(1);
+	}
+
+	function handleKindFilterChange(kind: string) {
+		setKindFilter(kind);
+		setPage(1);
+	}
+
+	function handleResetFilter() {
+		setFormatFilter("");
+		setKindFilter("");
+		setPage(1);
+	}
 	async function download(image: ImageResult) {
 		if (downloading || (downloadFailures[image.id]?.retryAt ?? 0) > Date.now())
 			return;
@@ -148,7 +200,10 @@ export function ImagesResult({
 			</header>
 
 			{saved > 0 && (
-				<div className="flex flex-wrap items-end justify-between gap-3">
+				<div
+					ref={galleryRef}
+					className="flex flex-wrap items-end justify-between gap-3 scroll-mt-6"
+				>
 					<p className="text-sm font-medium text-snow tabular-nums">
 						{gallerySummary}
 					</p>
@@ -159,7 +214,7 @@ export function ImagesResult({
 								label="Format"
 								className="w-36 sm:w-40"
 								value={formatFilter}
-								onChange={setFormatFilter}
+								onChange={handleFormatFilterChange}
 								options={[
 									{ value: "", label: "Semua" },
 									...formats.map((format) => ({
@@ -174,7 +229,7 @@ export function ImagesResult({
 								label="Jenis"
 								className="w-36 sm:w-40"
 								value={kindFilter}
-								onChange={setKindFilter}
+								onChange={handleKindFilterChange}
 								options={[
 									{ value: "", label: "Semua" },
 									...kinds.map((type) => ({ value: type, label: type })),
@@ -184,10 +239,7 @@ export function ImagesResult({
 						{hasFilter && (
 							<button
 								type="button"
-								onClick={() => {
-									setFormatFilter("");
-									setKindFilter("");
-								}}
+								onClick={handleResetFilter}
 								className="inline-flex min-h-11 items-center rounded-full px-4 text-sm text-fog underline underline-offset-4 hover:text-snow focus-visible:ring-2 focus-visible:ring-indigo"
 							>
 								Reset filter
@@ -213,25 +265,68 @@ export function ImagesResult({
 			)}
 
 			{visible.length > 0 ? (
-				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-					{visible.map((image) => (
-						<ImageCard
-							key={image.id}
-							image={image}
-							src={assetUrls[image.id] ?? image.assetUrl}
-							downloadDisabled={
-								downloading !== null ||
-								(downloadFailures[image.id]?.retryAt ?? 0) > now
-							}
-							copied={copied === image.id}
-							onRefresh={(url) =>
-								setAssetUrls((current) => ({ ...current, [image.id]: url }))
-							}
-							onDownload={() => void download(image)}
-							onCopy={() => void copySource(image)}
-						/>
-					))}
-				</div>
+				<>
+					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+						{paginatedImages.map((image) => (
+							<ImageCard
+								key={image.id}
+								image={image}
+								src={assetUrls[image.id] ?? image.assetUrl}
+								downloadDisabled={
+									downloading !== null ||
+									(downloadFailures[image.id]?.retryAt ?? 0) > now
+								}
+								copied={copied === image.id}
+								onRefresh={(url) =>
+									setAssetUrls((current) => ({ ...current, [image.id]: url }))
+								}
+								onDownload={() => void download(image)}
+								onCopy={() => void copySource(image)}
+							/>
+						))}
+					</div>
+
+					{visible.length > PAGE_SIZE && (
+						<div className="flex flex-col items-center justify-between gap-4 border-t border-graphite/40 pt-4 sm:flex-row">
+							<p className="font-mono text-xs text-fog tabular-nums">
+								Menampilkan {from}–{to} dari {visible.length} gambar
+							</p>
+							<Pagination className="mx-0 w-auto justify-end">
+								<PaginationContent>
+									<PaginationItem>
+										<PaginationPrevious
+											disabled={safePage <= 1}
+											onClick={() => handlePageChange(safePage - 1)}
+										/>
+									</PaginationItem>
+									{generatePaginationPages(safePage, totalPages).map((item) =>
+										typeof item === "string" ? (
+											<PaginationItem key={item}>
+												<PaginationEllipsis />
+											</PaginationItem>
+										) : (
+											<PaginationItem key={`page-${item}`}>
+												<PaginationLink
+													isActive={item === safePage}
+													onClick={() => handlePageChange(item)}
+													aria-label={`Halaman ${item}`}
+												>
+													{item}
+												</PaginationLink>
+											</PaginationItem>
+										),
+									)}
+									<PaginationItem>
+										<PaginationNext
+											disabled={safePage >= totalPages}
+											onClick={() => handlePageChange(safePage + 1)}
+										/>
+									</PaginationItem>
+								</PaginationContent>
+							</Pagination>
+						</div>
+					)}
+				</>
 			) : images.length === 0 ? (
 				<div className="rounded-xl border border-graphite bg-charcoal p-6">
 					{imageOutcome === "empty" ? (
