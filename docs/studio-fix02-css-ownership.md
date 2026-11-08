@@ -37,6 +37,16 @@ artboard, so only shapes (structure + class decisions) were adapted, never runti
 
 **None.** No package was added. Every change is plain CSS/HTML + existing modules.
 
+### 1.3b License check for the adapted sources
+
+No third-party source file was copied — the adaptation is limited to publicly documented structural
+conventions (per-component size axes, a carousel track that respects item width, data-attribute
+scoping). Licenses read from each repository's `LICENSE` file in this pass, all permissive:
+
+- shadcn/ui — MIT (Copyright (c) 2023 shadcn)
+- HeroUI — MIT (Copyright (c) 2020 Next UI Inc.)
+- SakaniUI — MIT (Copyright (c) 2026 Samuel Okpere)
+
 ### 1.4 Patterns added (justified by §8 acceptance criteria, not by preference)
 
 - `QuantityStepper` — acceptance #1 needs a proportional stepper. shadcn's `size-9` (36×36) icon
