@@ -183,3 +183,196 @@ test("refresh retries the persisted request and restores active conflict without
 	expect(result.current.error).toBeNull();
 	expect(result.current.analysis).toEqual(oldAnalysis);
 });
+
+function resyncPayload(sessionId: string, token: string) {
+	return {
+		projectId: "repo",
+		codebaseId: "repo",
+		sessionId,
+		status: "waiting_for_cli",
+		syncToken: token,
+		apiBaseUrl: "https://test.local",
+		syncCommand: "everythings-vibe codebase sync",
+		cliMinVersion: "2.0.0",
+		expiresAt: new Date(Date.now() + 600000).toISOString(),
+	};
+}
+
+test("re-sync never asks for credit approval and a restricted preflight cannot block it", async () => {
+	let preflightCalls = 0;
+	let postCalls = 0;
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async (url: string, init?: RequestInit) => {
+			if (url.includes("preflight")) {
+				preflightCalls++;
+				return Response.json(
+					resolveAnalysisCreditPolicy({
+						allowanceUsed: true,
+						allowanceInProgress: false,
+						subscriptionPaused: true,
+						availableCredits: 0,
+						isInitial: false,
+					}),
+				);
+			}
+			if (init?.method === "POST") {
+				postCalls++;
+				return Response.json(resyncPayload("sess-new", "tok-new"));
+			}
+			return Response.json({
+				projectId: "repo",
+				sessionId: "sess-new",
+				status: "waiting_for_cli",
+				snapshotId: null,
+			});
+		}),
+	);
+	const { result } = renderHook(() => useCodebaseSync(options));
+	await act(async () => {
+		await result.current.startSession("resync");
+	});
+	expect(preflightCalls).toBe(0);
+	expect(postCalls).toBe(1);
+	expect(result.current.payload?.syncToken).toBe("tok-new");
+	expect(result.current.sessionError).toBeNull();
+});
+
+test("a failed session request stays in the modal and clears on a successful retry", async () => {
+	let postCalls = 0;
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async (_url: string, init?: RequestInit) => {
+			if (init?.method === "POST") {
+				postCalls++;
+				if (postCalls === 1)
+					return Response.json(
+						{ error: "Sesi sync gagal dibuat. Coba lagi." },
+						{ status: 503 },
+					);
+				return Response.json(resyncPayload("sess-retried", "tok-retried"));
+			}
+			return Response.json({
+				projectId: "repo",
+				sessionId: "sess-old",
+				status: "uploaded",
+				snapshotId: "old",
+				workspaceSnapshotId: "old",
+			});
+		}),
+	);
+	const { result } = renderHook(() => useCodebaseSync(options));
+	await act(async () => {
+		await result.current.startSession("resync");
+	});
+	expect(result.current.error).toBeNull();
+	expect(result.current.sessionError).not.toBeNull();
+	expect(result.current.payload).toBeNull();
+
+	await act(async () => {
+		await result.current.retrySession();
+	});
+	expect(postCalls).toBe(2);
+	expect(result.current.error).toBeNull();
+	expect(result.current.sessionError).toBeNull();
+	expect(result.current.payload?.syncToken).toBe("tok-retried");
+});
+
+test("reopening a live attempt never creates a duplicate session", async () => {
+	let postCalls = 0;
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async (_url: string, init?: RequestInit) => {
+			if (init?.method === "POST") {
+				postCalls++;
+				return Response.json(resyncPayload("sess-live", "tok-live"));
+			}
+			return Response.json({
+				projectId: "repo",
+				sessionId: "sess-live",
+				status: "waiting_for_cli",
+				snapshotId: null,
+			});
+		}),
+	);
+	const { result } = renderHook(() => useCodebaseSync(options));
+	await act(async () => {
+		result.current.openResync();
+	});
+	await waitFor(() =>
+		expect(result.current.payload?.syncToken).toBe("tok-live"),
+	);
+	act(() => {
+		result.current.openResync();
+	});
+	await waitFor(() => expect(postCalls).toBe(1));
+});
+
+test("closing the modal never revokes the running attempt", async () => {
+	const methods: string[] = [];
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async (_url: string, init?: RequestInit) => {
+			methods.push(init?.method ?? "GET");
+			if (init?.method === "POST")
+				return Response.json(resyncPayload("sess-close", "tok-close"));
+			return Response.json({
+				projectId: "repo",
+				sessionId: "sess-close",
+				status: "uploading",
+				snapshotId: null,
+			});
+		}),
+	);
+	const { result } = renderHook(() => useCodebaseSync(options));
+	await act(async () => {
+		result.current.openResync();
+	});
+	await waitFor(() =>
+		expect(result.current.payload?.syncToken).toBe("tok-close"),
+	);
+	act(() => {
+		result.current.setIsResyncModalOpen(false);
+	});
+	expect(methods).not.toContain("DELETE");
+});
+
+test("a failed attempt is replaced through the explicit retry request", async () => {
+	const bodies: Record<string, unknown>[] = [];
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async (url: string, init?: RequestInit) => {
+			if (url.includes("preflight"))
+				return Response.json(
+					resolveAnalysisCreditPolicy({
+						allowanceUsed: true,
+						allowanceInProgress: false,
+						subscriptionPaused: false,
+						availableCredits: 100,
+						isInitial: false,
+					}),
+				);
+			if (init?.method === "POST") {
+				bodies.push(JSON.parse(String(init.body)));
+				return Response.json(resyncPayload("sess-replaced", "tok-replaced"));
+			}
+			return Response.json({
+				projectId: "repo",
+				sessionId: "sess-failed",
+				status: "failed",
+				snapshotId: null,
+			});
+		}),
+	);
+	const { result } = renderHook(() => useCodebaseSync(options));
+	await waitFor(() => expect(result.current.status?.status).toBe("failed"));
+	await act(async () => {
+		result.current.retrySync();
+	});
+	await waitFor(() => expect(bodies).toHaveLength(1));
+	expect(bodies[0]).toMatchObject({
+		action: "retry",
+		sessionId: "sess-failed",
+	});
+	expect(result.current.sessionError).toBeNull();
+});

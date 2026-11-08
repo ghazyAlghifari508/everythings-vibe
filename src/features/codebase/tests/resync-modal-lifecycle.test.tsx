@@ -10,20 +10,21 @@ import {
 import type { SyncPromptPayload, SyncStatusResponse } from "../services/sync";
 
 const samplePayload: SyncPromptPayload = {
-	projectId: "cb_p4_test_project",
-	sessionId: "sess_p4_new",
+	projectId: "cb_resync_contract",
+	sessionId: "sess_resync_new",
 	apiBaseUrl: "https://vibeeverything.test",
-	syncToken: "tok_secret_p4_verify",
+	syncToken: "tok_resync_contract",
 	cliMinVersion: "0.1.0",
-	syncCommand: "everythings-vibe codebase sync --project-id cb_p4_test_project",
+	syncCommand: "everythings-vibe codebase sync --project-id cb_resync_contract",
 	expiresAt: new Date(Date.now() + 600000).toISOString(),
 };
+
 function createStatus(
 	overrides: Partial<SyncStatusResponse> = {},
 ): SyncStatusResponse {
 	return {
-		projectId: "cb_p4_test_project",
-		sessionId: "sess_p4_new",
+		projectId: "cb_resync_contract",
+		sessionId: "sess_resync_new",
 		status: "waiting_for_cli",
 		snapshotId: null,
 		errorMessage: null,
@@ -31,284 +32,238 @@ function createStatus(
 		...overrides,
 	};
 }
+
 let container: HTMLDivElement;
 let root: Root;
+
 beforeEach(() => {
 	(globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 	container = document.createElement("div");
 	document.body.appendChild(container);
 	root = createRoot(container);
 });
+
 afterEach(() => {
 	act(() => root.unmount());
 	container.remove();
 	document.body.innerHTML = "";
 	vi.unstubAllGlobals();
 });
-describe("P6 Phase Requirements: Section 11 Verification Suite", () => {
-	const renderModal = (props: Partial<CodebaseResyncModalProps> = {}) => {
-		act(() => {
-			root?.render(
-				<CodebaseResyncModal
-					isOpen={true}
-					onClose={props.onClose ?? (() => {})}
-					projectName="Ocean Guard"
-					payload={props.payload !== undefined ? props.payload : samplePayload}
-					status={
-						props.status !== undefined
-							? props.status
-							: createStatus({ status: "uploading", fileCount: 15 })
-					}
-					activeSessionId={props.activeSessionId ?? "sess_p4_new"}
-					{...props}
-				/>,
-			);
-		});
-	};
 
-	it("1. Only one accessible Close button", () => {
+function renderModal(props: Partial<CodebaseResyncModalProps> = {}) {
+	act(() => {
+		root.render(
+			<CodebaseResyncModal
+				isOpen
+				onClose={() => {}}
+				projectName="Ocean Guard"
+				payload={props.payload !== undefined ? props.payload : samplePayload}
+				status={props.status !== undefined ? props.status : createStatus()}
+				activeSessionId={props.activeSessionId ?? "sess_resync_new"}
+				{...props}
+			/>,
+		);
+	});
+}
+
+function panel(): Element | null {
+	return document.querySelector('[data-testid="codebase-resync-panel"]');
+}
+
+describe("re-sync modal presentation contract", () => {
+	it("renders exactly one dialog with one close control and the approved header", () => {
 		renderModal();
-		// There should be exactly one close button in the panel
-		const closeButtons = document.querySelectorAll(
-			'button[aria-label="Tutup sync ulang"]',
-		);
-		expect(closeButtons).toHaveLength(1);
 
-		// Radix sr-only or close button in dialog should also be exactly 1
-		const allModalCloseButtons = document.querySelectorAll(
-			'[data-testid="codebase-resync-panel"] button',
-		);
-		const closeMatches = [...allModalCloseButtons].filter((btn) =>
-			/tutup|close/i.test(
-				btn.getAttribute("aria-label") ?? btn.textContent ?? "",
-			),
-		);
-		expect(closeMatches).toHaveLength(1);
+		const dialogs = document.querySelectorAll('[role="dialog"]');
+		expect(dialogs).toHaveLength(1);
+		expect(
+			document.querySelectorAll('[data-testid="codebase-resync-panel"]'),
+		).toHaveLength(1);
+		expect(panel()?.textContent).toContain("Perbarui repository");
+		expect(panel()?.textContent).toContain("Ocean Guard");
+		expect(
+			document.querySelectorAll('button[aria-label="Tutup sync ulang"]'),
+		).toHaveLength(1);
 	});
 
-	it("2. Closing modal doesn't cancel background sync unless explicitly designed", () => {
-		const onClose = vi.fn();
-		renderModal({ onClose });
-
-		const closeBtn = document.querySelector(
-			'button[aria-label="Tutup sync ulang"]',
-		) as HTMLButtonElement | null;
-		expect(closeBtn).not.toBeNull();
-
-		act(() => {
-			closeBtn?.click();
-		});
-
-		// Modal triggers dismissal request
-		expect(onClose).toHaveBeenCalledTimes(1);
-		// Background sync props are unaffected by UI closing
-	});
-
-	it("4. Step states follow backend status", () => {
-		// State 1: Instructions available, waiting for CLI
-		renderModal({
-			status: createStatus({ status: "waiting_for_cli" }),
-		});
-		const step1 = document.querySelector('[data-testid="resync-step-1"]');
-		const step2 = document.querySelector('[data-testid="resync-step-2"]');
-		const step3 = document.querySelector('[data-testid="resync-step-3"]');
-
-		expect(step1?.getAttribute("data-step-state")).toBe("done");
-		// The agent step waits for the user; it must not spin before the CLI
-		// actually contacts the server.
-		expect(step2?.getAttribute("data-step-state")).toBe("pending");
-		expect(step3?.getAttribute("data-step-state")).toBe("pending");
-
-		// State 2: CLI connected and syncing
-		renderModal({
-			status: createStatus({ status: "uploading", fileCount: 10 }),
-		});
-		expect(
-			document
-				.querySelector('[data-testid="resync-step-2"]')
-				?.getAttribute("data-step-state"),
-		).toBe("done");
-		expect(
-			document
-				.querySelector('[data-testid="resync-step-3"]')
-				?.getAttribute("data-step-state"),
-		).toBe("active");
-
-		// State 3: Snapshot received and verified
-		renderModal({
-			status: createStatus({
-				status: "uploaded",
-				snapshotId: "snap_verified_123",
-				analysisStatus: "ready",
-				analysisId: "analysis-new",
-			}),
-			activeSessionId: "sess_p4_new",
-		});
-		expect(
-			document
-				.querySelector('[data-testid="resync-step-3"]')
-				?.getAttribute("data-step-state"),
-		).toBe("done");
-
-		// State 4: Failed session
-		renderModal({
-			status: createStatus({ status: "failed" }),
-		});
-		expect(
-			document
-				.querySelector('[data-testid="resync-step-2"]')
-				?.getAttribute("data-step-state"),
-		).toBe("failed");
-		expect(
-			document
-				.querySelector('[data-testid="resync-step-3"]')
-				?.getAttribute("data-step-state"),
-		).toBe("failed");
-	});
-
-	it("4b. Waits passively for the user instead of spinning before the CLI runs", () => {
-		renderModal({ status: createStatus({ status: "waiting_for_cli" }) });
-		const panel = document.querySelector(
-			'[data-testid="codebase-resync-panel"]',
-		);
-		// Nothing is running: the prompt is on screen but has not been run, so no
-		// indicator — step badge or stage row — may spin.
-		expect(panel?.querySelectorAll('[data-testid="spinner"]')).toHaveLength(0);
-		expect(panel?.querySelector("[role='timer']")).toBeNull();
-		expect(
-			document.querySelectorAll(
-				'[data-testid="resync-step-3"] [data-stage-state="waiting"]',
-			),
-		).toHaveLength(4);
-		for (const testId of [
-			"sync-stage-agent",
-			"sync-stage-preparing",
-			"sync-stage-sync",
-			"sync-stage-analysis",
-		]) {
-			expect(
-				document
-					.querySelector(`[data-testid="${testId}"]`)
-					?.getAttribute("data-stage-state"),
-			).toBe("waiting");
-		}
-	});
-
-	it("5. Copy button copies entire prompt", async () => {
+	it("reuses the onboarding prompt row and copies the real re-sync prompt", async () => {
 		const writeText = vi.fn().mockResolvedValue(undefined);
-		vi.stubGlobal("navigator", {
-			...navigator,
-			clipboard: { writeText },
-		});
+		vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
+		renderModal();
 
-		renderModal({ projectName: "Ocean Guard" });
+		// Same prompt box as the onboarding sync screen.
+		expect(document.querySelector('[data-testid="prompt-box"]')).not.toBeNull();
+		expect(panel()?.textContent).toContain("Salin instruksi sync ulang");
+		expect(panel()?.textContent).toContain("Jalankan di AI coding agent");
+		expect(panel()?.textContent).toContain(
+			"Gunakan root repository yang sama.",
+		);
+		expect(panel()?.textContent).toContain("Pantau sinkronisasi");
+		const prompt = document.querySelector(
+			'[data-testid="resync-prompt-content"]',
+		);
+		expect(prompt?.textContent).toContain("tok_resync_contract");
+		expect(prompt?.textContent).toContain("Perbarui snapshot repository");
 
-		const copyBtn = document.querySelector(
-			'button[aria-label="Salin prompt instruksi sync"]',
+		const copyButton = document.querySelector(
+			'button[aria-label="Salin instruksi sync ulang"]',
 		) as HTMLButtonElement | null;
-		expect(copyBtn).not.toBeNull();
+		expect(copyButton?.textContent).toContain("Salin");
 
 		await act(async () => {
-			copyBtn?.click();
+			copyButton?.click();
 		});
-
 		expect(writeText).toHaveBeenCalledTimes(1);
-		const copiedArg = writeText.mock.calls[0][0];
-		expect(copiedArg).toContain("cb_p4_test_project");
-		expect(copiedArg).toContain("tok_secret_p4_verify");
-		expect(copiedArg).toContain("codebase sync");
-		expect(copiedArg).toContain("Ocean Guard");
+		expect(String(writeText.mock.calls[0]?.[0])).toContain(
+			"tok_resync_contract",
+		);
+		expect(copyButton?.textContent).toContain("Tersalin");
 	});
 
-	it("8. Selesai disabled before verification", () => {
-		renderModal({
-			status: createStatus({
-				status: "uploading",
-				snapshotId: null,
-			}),
-		});
-		const completeBtn = document.querySelector(
-			'[data-testid="resync-complete-button"]',
-		) as HTMLButtonElement | null;
-		expect(completeBtn?.disabled).toBe(true);
+	it("never shows a technical token warning for a normal re-sync", () => {
+		renderModal();
+		const text = panel()?.textContent ?? "";
+		expect(text).not.toContain("Token sync sudah kedaluwarsa");
+		expect(text).not.toContain("Dapatkan token baru");
 	});
 
-	it("9. Selesai enabled after current session success", () => {
-		renderModal({
-			status: createStatus({
-				sessionId: "sess_p4_new",
-				status: "uploaded",
-				snapshotId: "snap_success_current",
-				analysisStatus: "ready",
-				analysisId: "analysis-new",
-			}),
-			activeSessionId: "sess_p4_new",
-		});
-		const completeBtn = document.querySelector(
-			'[data-testid="resync-complete-button"]',
-		) as HTMLButtonElement | null;
-		expect(completeBtn?.disabled).toBe(false);
-	});
-
-	it("10. Old snapshot cannot enable Selesai", () => {
-		renderModal({
-			status: createStatus({
-				sessionId: "sess_p4_old",
-				status: "ready",
-				snapshotId: "snap_stale_prior",
-			}),
-			activeSessionId: "sess_p4_new",
-		});
-		const completeBtn = document.querySelector(
-			'[data-testid="resync-complete-button"]',
-		) as HTMLButtonElement | null;
-		expect(completeBtn?.disabled).toBe(true);
-	});
-
-	it("11. Reopen maintains active session", () => {
-		// Render opened
-		renderModal({
-			status: createStatus({ status: "uploading", fileCount: 7 }),
-		});
-		expect(document.body.textContent).toContain("Perbarui repository");
-
-		// Simulate closing and reopening with same active session
-		act(() => {
-			root?.render(
-				<CodebaseResyncModal
-					isOpen={false}
-					onClose={() => {}}
-					projectName="Ocean Guard"
-					payload={samplePayload}
-					status={createStatus({ status: "uploading", fileCount: 7 })}
-					activeSessionId="sess_p4_new"
-				/>,
-			);
-		});
-		expect(
-			document.querySelector('[data-testid="codebase-resync-panel"]'),
-		).toBeNull();
-
-		// Reopen
-		act(() => {
-			root?.render(
-				<CodebaseResyncModal
-					isOpen={true}
-					onClose={() => {}}
-					projectName="Ocean Guard"
-					payload={samplePayload}
-					status={createStatus({ status: "uploading", fileCount: 7 })}
-					activeSessionId="sess_p4_new"
-				/>,
-			);
-		});
-		expect(
-			document.querySelector('[data-testid="codebase-resync-panel"]'),
-		).not.toBeNull();
+	it("waits passively for the agent without spinning", () => {
+		renderModal({ status: createStatus({ status: "waiting_for_cli" }) });
+		expect(panel()?.querySelectorAll('[data-testid="spinner"]')).toHaveLength(
+			0,
+		);
 		expect(
 			document
-				.querySelector('[data-testid="resync-step-2"]')
-				?.getAttribute("data-step-state"),
-		).toBe("done");
+				.querySelector('[data-testid="sync-stage-agent"]')
+				?.getAttribute("data-stage-state"),
+		).toBe("waiting");
+		expect(panel()?.textContent).toContain("Menunggu agent");
+	});
+
+	it("renders the server-confirmed progress while the CLI is active", () => {
+		renderModal({
+			status: createStatus({ status: "uploading", fileCount: 12 }),
+		});
+		expect(
+			document
+				.querySelector('[data-testid="sync-stage-sync"]')
+				?.getAttribute("data-stage-state"),
+		).toBe("active");
+		expect(panel()?.textContent).toContain("Agent terhubung");
+		expect(panel()?.textContent).toContain("Source code siap");
+		expect(panel()?.textContent).toContain("Mengunggah repository...");
+	});
+
+	it("does not paint progress from a previous session under the new attempt", () => {
+		renderModal({
+			status: createStatus({
+				sessionId: "sess_resync_old",
+				status: "uploading",
+				fileCount: 99,
+			}),
+		});
+		expect(
+			document.querySelector('[data-testid="sync-stage-sync"]'),
+		).toBeNull();
+		expect(panel()?.textContent).not.toContain("Mengunggah repository");
+		expect(panel()?.textContent).not.toContain("99");
+	});
+
+	it("keeps Selesai disabled until the active attempt is verified", () => {
+		renderModal({ status: createStatus({ status: "uploading" }) });
+		const button = document.querySelector(
+			'[data-testid="resync-complete-button"]',
+		) as HTMLButtonElement | null;
+		expect(button?.disabled).toBe(true);
+		expect(button?.getAttribute("aria-label")).toBe(
+			"Selesai (menunggu verifikasi sinkronisasi)",
+		);
+	});
+
+	it("enables Selesai and marks analysis complete without a refresh", () => {
+		renderModal({
+			status: createStatus({
+				status: "uploaded",
+				snapshotId: "snap_verified",
+				analysisStatus: "ready",
+				analysisId: "analysis_verified",
+			}),
+		});
+		const button = document.querySelector(
+			'[data-testid="resync-complete-button"]',
+		) as HTMLButtonElement | null;
+		expect(button?.disabled).toBe(false);
+		expect(button?.getAttribute("aria-label")).toBe("Selesai");
+		expect(panel()?.textContent).toContain("Sinkronisasi selesai");
+		expect(panel()?.textContent).toContain("Analisis selesai");
+	});
+
+	it("shows a genuine session failure once, with one working retry", () => {
+		const onRetrySession = vi.fn();
+		renderModal({
+			payload: null,
+			status: null,
+			activeSessionId: null,
+			sessionError: "Sesi sync gagal dibuat. Coba lagi.",
+			onRetrySession,
+		});
+
+		const text = panel()?.textContent ?? "";
+		expect(text).toContain("Sinkronisasi belum bisa dimulai.");
+		expect(text).not.toContain("Sesi sync gagal dibuat.");
+		expect(
+			[...document.querySelectorAll("button")].filter((button) =>
+				/^Coba lagi$/.test(button.textContent?.trim() ?? ""),
+			),
+		).toHaveLength(1);
+
+		const retry = [...document.querySelectorAll("button")].find((button) =>
+			/^Coba lagi$/.test(button.textContent?.trim() ?? ""),
+		);
+		act(() => retry?.click());
+		expect(onRetrySession).toHaveBeenCalledTimes(1);
+	});
+
+	it("removes the failure and shows the real prompt after a successful retry", () => {
+		renderModal({
+			payload: null,
+			status: null,
+			activeSessionId: null,
+			sessionError: "Sesi sync gagal dibuat. Coba lagi.",
+		});
+		expect(panel()?.textContent).toContain("Sinkronisasi belum bisa dimulai.");
+
+		renderModal();
+		const text = panel()?.textContent ?? "";
+		expect(text).not.toContain("Sinkronisasi belum bisa dimulai.");
+		expect(text).toContain("tok_resync_contract");
+	});
+
+	it("closes without cancelling the server operation", () => {
+		const onClose = vi.fn();
+		renderModal({
+			onClose,
+			status: createStatus({ status: "uploading" }),
+		});
+		const close = document.querySelector(
+			'button[aria-label="Tutup sync ulang"]',
+		) as HTMLButtonElement | null;
+		act(() => close?.click());
+		expect(onClose).toHaveBeenCalledTimes(1);
+	});
+
+	it("keeps keyboard dismissal intact", () => {
+		const onClose = vi.fn();
+		renderModal({ onClose });
+		act(() => {
+			document.dispatchEvent(
+				new KeyboardEvent("keydown", {
+					key: "Escape",
+					code: "Escape",
+					bubbles: true,
+				}),
+			);
+		});
+		expect(onClose).toHaveBeenCalledTimes(1);
 	});
 });

@@ -229,7 +229,7 @@ describe("P4: Re-Sync Modal & Session-Verified Completion", () => {
 			).toBeNull();
 		});
 
-		it("enables Selesai button and shows success banner when session is verified", () => {
+		it("enables Selesai and marks the analysis complete when the session is verified", () => {
 			renderModal({
 				status: createStatus({
 					sessionId: "sess_p4_new",
@@ -247,13 +247,11 @@ describe("P4: Re-Sync Modal & Session-Verified Completion", () => {
 			expect(completeBtn).not.toBeNull();
 			expect(completeBtn?.disabled).toBe(false);
 			expect(completeBtn?.getAttribute("aria-label")).toBe("Selesai");
-
-			const banner = document.querySelector(
-				'[data-testid="resync-success-banner"]',
-			);
-			expect(banner).not.toBeNull();
-			expect(banner?.textContent).toContain("Sinkronisasi berhasil");
-			expect(banner?.textContent).toContain("Source code terbaru tersimpan.");
+			expect(document.body.textContent).toContain("Sinkronisasi selesai");
+			expect(document.body.textContent).toContain("Analisis selesai");
+			expect(
+				document.querySelector('[data-testid="resync-success-banner"]'),
+			).toBeNull();
 		});
 
 		it("closes modal only when user explicitly clicks Selesai", () => {
