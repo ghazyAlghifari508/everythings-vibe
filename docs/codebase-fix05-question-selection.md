@@ -103,6 +103,13 @@ No dependency was added.
 6. Editing starts from the persisted answer, edits are not rolled back, and
    cancel restores the original confirmed answer.
 
+Keyboard scope: jsdom cannot exercise a browser's native radio arrow-key
+traversal, so the tests pin the accessible contract that enables it — a
+`radiogroup` (single-select) or `fieldset` (multi-select) named after the
+question, one shared radio `name` per group, and focusable native inputs — and
+leave arrow-key behaviour to the platform primitive rather than reimplementing
+it in JS.
+
 ## Files
 
 | File | Change |
@@ -112,12 +119,24 @@ No dependency was added.
 
 ## Verification
 
-- New suite: `adaptive-question-selection-persistence.test.tsx` — 11/11 pass
-  (7 of these fail on the pre-fix hook: reallocated options, custom text,
-  multi-select, text draft, hydration, editing, workspace rerender).
-- Related existing suites pass: `adaptive-question`, `chat-workspace`,
-  `clarification-persistence-retry`, `clarification-persistence-save`,
-  `thinking-flow` — 127 tests.
-- `pnpm biome check` on both touched files: clean.
+- New suite: `adaptive-question-selection-persistence.test.tsx` — 11/11 pass on
+  the fixed hook. Before the fix, 7 of these 11 fail (reallocated options,
+  custom text, multi-select, text draft, repeated hydration, editing, and
+  workspace-level rerender), which is the recorded reproduction.
+- Question surface batch (`adaptive-question-selection-persistence`,
+  `adaptive-question`, `clarification-persistence-retry`,
+  `clarification-persistence-save`, `chat-workspace`, `thinking-flow`):
+  6 files / 138 tests pass.
+- `pnpm biome check` on the two touched files: clean.
 - `pnpm exec tsc --noEmit`: only the pre-existing
   `src/features/studio/tests/studio-composer.test.tsx:241` lib mismatch remains.
+- `pnpm build`: success (`✓ built in 32.84s`, Nitro output generated).
+- Full `src/features/codebase` suite: 160/176 files pass. The failures are not
+  this change's surface — `auto-name.test.ts` fails standalone (pre-existing,
+  recorded by FIX 03), and the rest reproduce as 5s jsdom timeouts only while
+  vitest, `tsc`, and the production build run concurrently on this machine;
+  sampling them standalone (`workspace-task-subnav`,
+  `prompt-recovery-presentation`, `composer-redesign-modes`) passes.
+
+No browser, Playwright, screenshot, or manual QA was used.
+
