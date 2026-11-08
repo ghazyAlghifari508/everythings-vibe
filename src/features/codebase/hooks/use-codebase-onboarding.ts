@@ -1,6 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useCodebaseSyncStatus } from "@/features/codebase/hooks/use-codebase-sync-status";
-import { useCodebaseSyncStream } from "@/features/codebase/hooks/use-codebase-sync-stream";
 import type { PlanCodebaseIntent } from "@/features/codebase/services/onboarding-intent";
 import {
 	clearPlanCodebaseProjectPointer,
@@ -32,6 +30,7 @@ export function useCodebaseOnboarding({
 	setStep,
 	intent,
 }: {
+import { useOnboardingSyncProgress } from "./use-onboarding-sync-progress";
 	analysisState: OnboardingAnalysisState;
 	step: PlanCodebaseStep;
 	setStep: (step: PlanCodebaseStep) => void;
@@ -72,38 +71,16 @@ export function useCodebaseOnboarding({
 		};
 	}, []);
 
-	// Stream and polling project the same persisted session; no simulated states.
-	const stream = useCodebaseSyncStream({
+	const {
+		status: lastStatus,
+		error: statusPollError,
+		streamNotice,
+	} = useOnboardingSyncProgress({
 		codebaseId: codebase?.id ?? null,
 		sessionId: activeSessionId,
 		analysisProjectId: analysisState.featureProjectId,
-		enabled: codebase !== null,
+		initialStatus: recoveredStatus,
 	});
-	// Polling only stands down once a real frame has landed, so a stream that opens
-	// but never delivers cannot leave the screen without a source.
-	const streamDelivers = stream.connection === "live" && stream.status !== null;
-	const { status: polledStatus, error: statusPollError } =
-		useCodebaseSyncStatus({
-			codebaseId: codebase?.id ?? null,
-			analysisProjectId: analysisState.featureProjectId,
-			sessionId: activeSessionId,
-			initialStatus: recoveredStatus,
-			enabled: codebase !== null && !streamDelivers,
-		});
-	const candidate =
-		(streamDelivers ? stream.status : null) ?? polledStatus ?? recoveredStatus;
-	const lastStatus =
-		candidate !== null &&
-		candidate.projectId === codebase?.id &&
-		(!activeSessionId || candidate.sessionId === activeSessionId)
-			? candidate
-			: null;
-	// A dropped update channel is reported as a channel problem only. It must
-	// never read as a failed sync, because the persisted attempt is untouched.
-	const streamNotice =
-		stream.connection === "reconnecting"
-			? "Koneksi pembaruan terputus. Menghubungkan kembali..."
-			: null;
 
 	useEffect(() => {
 		setStep("sync");
