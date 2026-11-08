@@ -6,7 +6,6 @@ import type { AdaptiveQuestion } from "@/features/codebase/services/chat-flow";
 import { CodebaseAdaptiveQuestionAnswerInput } from "./codebase-adaptive-question-answer-input";
 import { CodebaseAdaptiveQuestionOptions } from "./codebase-adaptive-question-options";
 import { CodebaseAdaptiveQuestionProgress } from "./codebase-adaptive-question-progress";
-import { CodebaseAdaptiveQuestionRecommendation } from "./codebase-adaptive-question-recommendation";
 
 interface CodebaseAdaptiveQuestionActiveProps {
 	question: AdaptiveQuestion;
@@ -31,7 +30,6 @@ export function CodebaseAdaptiveQuestionActive({
 		groupName,
 		customId,
 		inputId,
-		reasonId,
 		titleId,
 		isMulti,
 		isText,
@@ -88,21 +86,12 @@ export function CodebaseAdaptiveQuestionActive({
 					customText={customText}
 					customInputId={inputId}
 					customPlaceholder={question.customPlaceholder}
-					recommendationReasonId={
-						question.recommendedOptionId && question.recommendationReason
-							? reasonId
-							: undefined
-					}
+					recommendationReason={question.recommendationReason}
 					onSelect={handleOptionChange}
 					onCustomTextChange={setCustomText}
 					onCustomSubmit={handleSubmit}
 				/>
 			)}
-
-			<CodebaseAdaptiveQuestionRecommendation
-				question={question}
-				reasonId={reasonId}
-			/>
 
 			{active || isEditing ? (
 				<div className="mt-4 flex items-center justify-end gap-2 pt-3 border-t border-graphite/40">

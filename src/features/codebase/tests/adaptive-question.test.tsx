@@ -83,7 +83,7 @@ describe("CodebaseAdaptiveQuestion Component", () => {
 			).toBeDefined();
 		});
 
-		it("displays the recommendation label and reason grounded in codebase context", () => {
+		it("explains the recommended option on the option itself, not in a separate panel", () => {
 			const onSubmit = vi.fn();
 			render(
 				<CodebaseAdaptiveQuestion
@@ -96,13 +96,66 @@ describe("CodebaseAdaptiveQuestion Component", () => {
 				/>,
 			);
 
-			const reasonEl = screen.getByTestId(
-				"adaptive-question-reason-filter_type",
-			);
-			expect(reasonEl.textContent).toContain("Satu kategori sekaligus");
-			expect(reasonEl.textContent).toContain(
+			// Legacy stored question: no descriptions, so the recommendation reason
+			// stands in for the recommended option's explanation — attached to that
+			// option, never to a separate block under the whole list.
+			const recommendedRow = document.getElementById("filter_type-opt1-desc");
+			expect(recommendedRow?.textContent).toContain(
 				"Codebase saat ini menggunakan single filter parameter pada URL.",
 			);
+			expect(
+				screen.queryByTestId("adaptive-question-reason-filter_type"),
+			).toBeNull();
+		});
+
+		it("renders a heading and a description for every option that has one", () => {
+			const onSubmit = vi.fn();
+			const richQuestion: AdaptiveQuestion = {
+				id: "search_scope",
+				title: "Informasi apa saja yang perlu dicari?",
+				type: "select",
+				options: [
+					{
+						id: "search_scope-opt1",
+						label: "Judul, deskripsi, dan teknologi",
+						description:
+							"Pengunjung bisa menemukan proyek lewat nama, ringkasan, atau teknologi yang dipakai.",
+					},
+					{
+						id: "search_scope-opt2",
+						label: "Judul proyek saja",
+						description: "Pencarian hanya mencocokkan nama proyek.",
+						recommended: true,
+					},
+				],
+				recommendedOptionId: "search_scope-opt2",
+				recommendationReason: "Metadata internal",
+			};
+			render(
+				<CodebaseAdaptiveQuestion
+					question={richQuestion}
+					index={1}
+					totalQuestions={3}
+					submitted=""
+					active={true}
+					onSubmit={onSubmit}
+				/>,
+			);
+
+			for (const option of richQuestion.options) {
+				expect(screen.getByText(option.label)).toBeDefined();
+				expect(document.getElementById(`${option.id}-desc`)?.textContent).toBe(
+					option.description,
+				);
+			}
+			// The option already explains itself, so the internal recommendation
+			// metadata is not repeated on screen.
+			expect(document.body.textContent).not.toContain("Metadata internal");
+			// The recommended option is marked, but remains an unselected choice.
+			const recommended = screen.getByRole("radio", {
+				name: /Judul proyek saja/i,
+			});
+			expect((recommended as HTMLInputElement).checked).toBe(false);
 		});
 
 		it("keeps submit disabled until a choice is selected, then submits the choice", () => {

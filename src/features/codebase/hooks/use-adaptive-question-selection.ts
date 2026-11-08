@@ -15,7 +15,6 @@ export interface AdaptiveQuestionSelection {
 	groupName: string;
 	customId: string;
 	inputId: string;
-	reasonId: string;
 	titleId: string;
 	isMulti: boolean;
 	isText: boolean;
@@ -114,7 +113,6 @@ export function useAdaptiveQuestionSelection({
 }: AdaptiveQuestionSelectionParams): AdaptiveQuestionSelection {
 	const groupName = useId();
 	const inputId = `custom-${question.id}`;
-	const reasonId = `reason-${question.id}`;
 	const titleId = `question-title-${question.id}`;
 
 	const isMulti = question.type === "multiselect";
@@ -211,7 +209,6 @@ export function useAdaptiveQuestionSelection({
 		groupName,
 		customId,
 		inputId,
-		reasonId,
 		titleId,
 		isMulti,
 		isText,

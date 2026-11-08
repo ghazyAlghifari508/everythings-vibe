@@ -1215,12 +1215,15 @@ describe("CodebaseChatWorkspace one-by-one questions", () => {
 		expect(onSubmitAnswer).toHaveBeenCalledWith("q2", "Banner kilat");
 	});
 
-	it("shows the recommendation reason tied to a select option", () => {
+	it("shows the recommendation reason on the recommended option itself", () => {
 		renderWorkspace({ questions: sampleQuestions, answers: {} });
-		const reason = container.querySelector(
-			"[data-testid='adaptive-question-reason-q1']",
-		);
-		expect(reason?.textContent).toContain(
+		// No separate explanation panel exists; the reason is the recommended
+		// option's own supporting line when the stored option predates descriptions.
+		expect(
+			container.querySelector("[data-testid='adaptive-question-reason-q1']"),
+		).toBeNull();
+		const recommendedRow = container.querySelector("#q1-opt1-desc");
+		expect(recommendedRow?.textContent).toContain(
 			"Repo memakai penyimpanan lokal untuk preferensi.",
 		);
 	});

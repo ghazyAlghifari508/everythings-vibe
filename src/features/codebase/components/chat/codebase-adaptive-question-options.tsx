@@ -16,7 +16,9 @@ interface CodebaseAdaptiveQuestionOptionsProps {
 	customText: string;
 	customInputId: string;
 	customPlaceholder?: string;
-	recommendationReasonId?: string;
+	/** Legacy fallback: shown on the recommended option only when that stored
+	 *  option has no description of its own. */
+	recommendationReason?: string;
 	onSelect: (optionId: string) => void;
 	onCustomTextChange: (value: string) => void;
 	onCustomSubmit: () => void;
@@ -34,7 +36,7 @@ export function CodebaseAdaptiveQuestionOptions({
 	customText,
 	customInputId,
 	customPlaceholder,
-	recommendationReasonId,
+	recommendationReason,
 	onSelect,
 	onCustomTextChange,
 	onCustomSubmit,
@@ -44,20 +46,31 @@ export function CodebaseAdaptiveQuestionOptions({
 			? selectedIds.includes(optionId)
 			: selectedIds === optionId;
 
-	const rows = options.map((option) => (
-		<CodebaseAdaptiveQuestionOptionRow
-			key={option.id}
-			inputType={isMulti ? "checkbox" : "radio"}
-			name={groupName}
-			value={option.id}
-			checked={isChosen(option.id)}
-			disabled={disabled}
-			label={option.label}
-			recommended={option.recommended === true}
-			describedBy={option.recommended ? recommendationReasonId : undefined}
-			onChange={() => onSelect(option.id)}
-		/>
-	));
+	// The recommended option's own description carries the justification. Only
+	// when the stored option predates descriptions (legacy handoff) does the
+	// recommendation reason stand in for it, so the user never sees the same
+	// explanation twice and never sees an option explained by nothing.
+	const rows = options.map((option) => {
+		const description =
+			option.description ??
+			(option.recommended ? recommendationReason : undefined);
+		const descriptionId = description ? `${option.id}-desc` : undefined;
+		return (
+			<CodebaseAdaptiveQuestionOptionRow
+				key={option.id}
+				inputType={isMulti ? "checkbox" : "radio"}
+				name={groupName}
+				value={option.id}
+				checked={isChosen(option.id)}
+				disabled={disabled}
+				label={option.label}
+				description={description}
+				descriptionId={descriptionId}
+				recommended={option.recommended === true}
+				onChange={() => onSelect(option.id)}
+			/>
+		);
+	});
 	const customRow = (
 		<div className="flex flex-col gap-2">
 			<CodebaseAdaptiveQuestionOptionRow
