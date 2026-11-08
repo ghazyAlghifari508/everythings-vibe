@@ -39,12 +39,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 	// and while the history drawer overlays the page. Both writers must stay in
 	// this one effect: two competing effects would each clear the lock on cleanup.
 	const isWorkspace =
-		pathname.startsWith("/ask/") ||
-		pathname.startsWith("/fitur/") ||
-		(pathname.startsWith("/prd/") && !pathname.startsWith("/prd/share/")) ||
-		pathname.startsWith("/ac/") ||
-		pathname.startsWith("/task/") ||
-		pathname.startsWith("/kanban/") ||
+		pathname.startsWith("/vibeplan/") ||
 		isCodebaseWorkspace ||
 		isStudioWorkspace;
 

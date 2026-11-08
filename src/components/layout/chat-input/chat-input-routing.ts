@@ -11,12 +11,12 @@ export const GREENFIELD_PLACEHOLDER_EN =
 	"Describe your product idea — target users, key features, and the desired workflow...";
 
 export type HomePostCreationTarget =
-	| { to: "/ask/$id"; params: { id: string } }
+	| { to: "/vibeplan/$id/ask"; params: { id: string } }
 	| { to: "/codebases/$id"; params: { id: string } };
 
 /**
  * Post-creation routing: existing-codebase enters its sync connect screen,
- * everything else (including legacy responses without a mode) keeps the /ask/$id route.
+ * everything else (including legacy responses without a mode) keeps the /vibeplan/$id/ask route.
  */
 export function decideHomePostCreationTarget(project: {
 	id: string;
@@ -25,7 +25,7 @@ export function decideHomePostCreationTarget(project: {
 	if (project.projectMode === "existing_codebase") {
 		return { to: "/codebases/$id", params: { id: project.id } };
 	}
-	return { to: "/ask/$id", params: { id: project.id } };
+	return { to: "/vibeplan/$id/ask", params: { id: project.id } };
 }
 
 /**

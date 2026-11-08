@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { isValidHistoryUrl } from "@/lib/flow-progress";
 
 /**
@@ -28,46 +28,52 @@ export function useLastRoute(projectId: string): (url: string) => void {
 		[],
 	);
 
-	const fire = (url: string, seq: number) => {
-		// The id travels as an opaque path segment, and only validated
-		// same-project routes are ever persisted server-side.
-		if (!isValidHistoryUrl(url, projectId)) return;
-		abortRef.current?.abort();
-		const controller = new AbortController();
-		abortRef.current = controller;
-		fetch(`/api/projects/${encodeURIComponent(projectId)}/last-route`, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ url }),
-			signal: controller.signal,
-		})
-			.catch(() => {
-				/* best-effort; no UI impact */
+	const fire = useCallback(
+		(url: string, seq: number) => {
+			// The id travels as an opaque path segment, and only validated
+			// same-project routes are ever persisted server-side.
+			if (!isValidHistoryUrl(url, projectId)) return;
+			abortRef.current?.abort();
+			const controller = new AbortController();
+			abortRef.current = controller;
+			fetch(`/api/projects/${encodeURIComponent(projectId)}/last-route`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ url }),
+				signal: controller.signal,
 			})
-			.finally(() => {
-				// Convergence: an aborted/superseded request may still have
-				// reached the server and could land after a newer write. If a
-				// newer URL was scheduled since, re-fire it so the stored
-				// value converges to the latest route instead of the stale one.
-				if (
-					seqRef.current !== seq &&
-					latestUrlRef.current &&
-					latestUrlRef.current !== url
-				) {
-					const latest = latestUrlRef.current;
-					seqRef.current += 1;
-					fire(latest, seqRef.current);
-				}
-			});
-	};
+				.catch(() => {
+					/* best-effort; no UI impact */
+				})
+				.finally(() => {
+					// Convergence: an aborted/superseded request may still have
+					// reached the server and could land after a newer write. If a
+					// newer URL was scheduled since, re-fire it so the stored
+					// value converges to the latest route instead of the stale one.
+					if (
+						seqRef.current !== seq &&
+						latestUrlRef.current &&
+						latestUrlRef.current !== url
+					) {
+						const latest = latestUrlRef.current;
+						seqRef.current += 1;
+						fire(latest, seqRef.current);
+					}
+				});
+		},
+		[projectId],
+	);
 
-	return (url: string) => {
-		latestUrlRef.current = url;
-		if (timerRef.current) clearTimeout(timerRef.current);
-		timerRef.current = setTimeout(() => {
-			timerRef.current = null;
-			seqRef.current += 1;
-			fire(url, seqRef.current);
-		}, 500);
-	};
+	return useCallback(
+		(url: string) => {
+			latestUrlRef.current = url;
+			if (timerRef.current) clearTimeout(timerRef.current);
+			timerRef.current = setTimeout(() => {
+				timerRef.current = null;
+				seqRef.current += 1;
+				fire(url, seqRef.current);
+			}, 500);
+		},
+		[fire],
+	);
 }
