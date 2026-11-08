@@ -209,7 +209,8 @@ export function CodebaseChatWorkspace({
 			isMentionOpen={controls.isMentionPopoverOpen}
 			mentionSearch={controls.mentionSearch}
 			mentionDocuments={controls.mentionDocuments}
-			mentionFiles={controls.mentionFiles}
+			mentionHasDocuments={controls.mentionHasDocuments}
+			mentionSearchAutoFocus={controls.mentionSearchAutoFocus}
 			mentionActiveIndex={controls.mentionActiveIndex}
 			isSlashOpen={controls.isSlashPopoverOpen}
 			slashCommands={controls.slashCommands}
@@ -220,6 +221,7 @@ export function CodebaseChatWorkspace({
 			onToggleMention={controls.handleToggleMention}
 			onCloseMention={controls.handleCloseMention}
 			onMentionSearchChange={controls.setMentionSearch}
+			onMentionSearchKeyDown={controls.handleMentionSearchKeyDown}
 			onSelectMentionCandidate={controls.handleSelectMentionCandidate}
 			onRemoveReference={controls.handleRemoveReference}
 			onSelectSlashCommand={controls.handleSelectSlashCommand}
