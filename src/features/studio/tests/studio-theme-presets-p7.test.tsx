@@ -153,7 +153,7 @@ describe("TASK 07 — Nine Themes, Standardized Previews, and Fullscreen Picker"
 		expect(jadeBtn.getAttribute("aria-pressed")).toBe("true");
 
 		// Click apply
-		fireEvent.click(screen.getByRole("button", { name: "Gunakan Tema" }));
+		fireEvent.click(screen.getByRole("button", { name: "Terapkan Tema" }));
 		expect(onSelectTheme).toHaveBeenCalledWith("jade");
 		expect(onOpenChange).toHaveBeenCalledWith(false);
 	});
