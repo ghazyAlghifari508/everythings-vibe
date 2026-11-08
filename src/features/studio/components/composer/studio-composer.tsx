@@ -1,11 +1,11 @@
 import {
 	ArrowUp01Icon,
 	Cancel01Icon,
-	Loading01Icon,
 	PaintBoardIcon,
 } from "@hugeicons/core-free-icons";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
+import { Spinner } from "@/components/ui/spinner";
 import type { StudioDesignSkillId } from "@/features/studio/services/studio-generation-options";
 import { STUDIO_DESIGN_PRESETS } from "@/features/studio/services/studio-presets";
 import { STUDIO_MIN_PROMPT_CHARS } from "@/features/studio/services/studio-prompt-validation";
@@ -246,16 +246,13 @@ export function StudioComposer({
 						type="submit"
 						disabled={!canSubmit}
 						aria-label="Kirim prompt"
+						aria-busy={loading || sending ? "true" : undefined}
 						title="Kirim prompt (Enter)"
 						style={{ background: "var(--btn-bg)", color: "var(--btn-text)" }}
 						className="flex size-10 shrink-0 items-center justify-center rounded-lg hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-snow disabled:cursor-not-allowed disabled:opacity-40"
 					>
 						{loading || sending ? (
-							<Icon
-								icon={Loading01Icon}
-								size={18}
-								className="motion-safe:animate-spin"
-							/>
+							<Spinner size={18} className="text-current" />
 						) : (
 							<Icon icon={ArrowUp01Icon} size={18} />
 						)}
