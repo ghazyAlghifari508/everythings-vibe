@@ -115,15 +115,25 @@ export function computeCanvasFit({
 		maxZoom,
 	);
 	// The track box carries symmetric padding, so centring the padded box also
-	// centres the artboards: the leading padding shifts the content by exactly
-	// the same amount that the trailing padding adds to the box.
+	// centres the artboards when they fit. If they exceed the usable canvas
+	// band at minimum readable zoom, prioritize framing the leading artboard
+	// under the insets so content remains comfortably readable and pan-navigable.
+	const panX =
+		track.width * zoom > usable.width
+			? STUDIO_CANVAS_TOOLBAR_INSET_PX
+			: (available.width - track.width * zoom) / 2;
+
+	const panY =
+		track.height * zoom > usable.height
+			? STUDIO_CANVAS_HEADER_INSET_PX
+			: STUDIO_CANVAS_HEADER_INSET_PX +
+				(usable.height - track.height * zoom) / 2;
+
 	return {
 		zoom,
 		pan: {
-			x: (available.width - track.width * zoom) / 2,
-			y:
-				STUDIO_CANVAS_HEADER_INSET_PX +
-				(usable.height - track.height * zoom) / 2,
+			x: panX,
+			y: panY,
 		},
 	};
 }
