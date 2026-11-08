@@ -177,7 +177,9 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 		await renderConnectedOnboarding();
 
 		await waitFor(() => {
-			expect(screen.getByText("Server tidak dapat dihubungi.")).toBeDefined();
+			expect(
+				screen.getByText(/Hasil permintaan belum diketahui/),
+			).toBeDefined();
 		});
 
 		expect(screen.getByRole("button", { name: "Coba lagi" })).toBeDefined();

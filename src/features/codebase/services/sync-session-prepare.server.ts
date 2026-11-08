@@ -13,7 +13,17 @@ type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 export interface PreparedSyncSession {
 	session: typeof codebaseSyncSessions.$inferSelect;
 	token: string | null;
+	/**
+	 * The caller named a session that is no longer the latest one for this
+	 * codebase (another tab or an earlier response already replaced it). The
+	 * returned session is the authoritative current row and nothing was minted
+	 * or revoked, so the browser can re-read state instead of reporting an error.
+	 */
+	stale?: boolean;
 }
+
+/** Recovery never mints; a codebase with no session is answered as 404. */
+export const NO_SYNC_SESSION_FOR_RECOVERY = "NO_SYNC_SESSION_FOR_RECOVERY";
 
 export async function prepareSyncSession(
 	tx: Transaction,
@@ -65,6 +75,11 @@ export async function prepareSyncSession(
 			projectId: codebaseId,
 		}).usable;
 		if (replaceSessionId) {
+			// Stale identity: a newer session already replaced the one this tab
+			// holds. Report the current row; never mint on behalf of an obsolete
+			// request, and never revoke a session the caller did not name.
+			if (replaceSessionId !== latest.id)
+				return { session: latest, token: null, stale: true };
 			const [snapshot] = await tx
 				.select({ id: codebaseSnapshots.id })
 				.from(codebaseSnapshots)
@@ -80,12 +95,12 @@ export async function prepareSyncSession(
 					),
 				)
 				.limit(1);
-			if (
-				replaceSessionId !== latest.id ||
-				uploaded ||
-				snapshot ||
-				(cliActive && usable)
-			)
+			// An upload that already succeeded, or a CLI that is actively syncing,
+			// must never lose its credential to a browser refresh. `cliActive` is
+			// checked regardless of credential usability: a consumed or clock-
+			// expired row can still belong to an in-flight agent, and silently
+			// revoking it would abort real work.
+			if (uploaded || snapshot || cliActive)
 				return { session: latest, token: null };
 			await tx
 				.update(codebaseSyncSessions)
@@ -102,7 +117,7 @@ export async function prepareSyncSession(
 				);
 		} else if (usable) return { session: latest, token: null };
 	}
-	if (recoveryOnly) throw new Error("No sync session exists for recovery");
+	if (recoveryOnly) throw new Error(NO_SYNC_SESSION_FOR_RECOVERY);
 	const id = crypto.randomUUID();
 	const token = generateSyncToken();
 	const [session] = await tx

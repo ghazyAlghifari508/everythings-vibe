@@ -90,6 +90,7 @@ test("eligible session APIs are idempotent, tenant scoped, free to open and expi
 	const repeated =
 		replacementBodies[replacements.findIndex((r) => r.status === 409)];
 	expect(rotated.sessionId).toBe(repeated.sessionId);
+	expect(repeated.code).toBe("SYNC_SESSION_STALE");
 	expect(replacements.map((response) => response.status).sort()).toEqual([
 		200, 409,
 	]);

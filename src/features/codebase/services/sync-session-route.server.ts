@@ -21,6 +21,7 @@ import {
 	toSessionMetadata,
 } from "./sync";
 import {
+	NO_SYNC_SESSION_FOR_RECOVERY,
 	type PreparedSyncSession,
 	prepareSyncSession,
 } from "./sync-session-prepare.server";
@@ -205,6 +206,19 @@ export async function handleCodebaseSessionCreate({
 			),
 		);
 	} catch (error) {
+		if (
+			error instanceof Error &&
+			error.message === NO_SYNC_SESSION_FOR_RECOVERY
+		) {
+			diagnose("recovered", "NO_SYNC_SESSION", null);
+			return Response.json(
+				{
+					error: "Belum ada sync session untuk repository ini.",
+					code: "NO_SYNC_SESSION",
+				},
+				{ status: 404, headers: { "Cache-Control": "no-store" } },
+			);
+		}
 		diagnose(
 			"failed",
 			"CODEBASE_SESSION_REPLACEMENT_FAILED",
@@ -226,29 +240,39 @@ export async function handleCodebaseSessionCreate({
 		const uploaded = ["uploaded", "analyzing", "ready"].includes(
 			result.session.status,
 		);
-		const active =
-			["connected", "scanning", "filtering", "uploading"].includes(
-				result.session.status,
-			) && getSessionUsability(result.session).usable;
-		const code = uploaded
-			? "SYNC_SNAPSHOT_UPLOADED"
-			: active
-				? "SYNC_SESSION_ACTIVE"
-				: result.session.expiresAt.getTime() <= Date.now()
-					? "SYNC_SESSION_EXPIRED"
-					: "CODEBASE_SESSION_RECOVERY_REQUIRED";
+		// A live CLI is reported as active even if its credential is clock-expired:
+		// the agent may still be uploading, and the replacement guard above refuses
+		// to revoke it. The status read owns the lazy expiry that eventually
+		// releases the attempt.
+		const active = ["connected", "scanning", "filtering", "uploading"].includes(
+			result.session.status,
+		);
+		const code = result.stale
+			? "SYNC_SESSION_STALE"
+			: uploaded
+				? "SYNC_SNAPSHOT_UPLOADED"
+				: active
+					? "SYNC_SESSION_ACTIVE"
+					: result.session.expiresAt.getTime() <= Date.now()
+						? "SYNC_SESSION_EXPIRED"
+						: "CODEBASE_SESSION_RECOVERY_REQUIRED";
 		diagnose("recovered", code, result.session.id);
 		return Response.json(
 			{
 				code,
 				sessionId: result.session.id,
-				error: uploaded
-					? "Snapshot tersimpan. Lanjutkan analisis tanpa upload ulang."
-					: active
-						? "Agent masih melakukan sinkronisasi."
-						: code === "SYNC_SESSION_EXPIRED"
-							? "Sesi sinkronisasi berakhir. Buat sesi pengganti untuk repository ini."
-							: "Token sebelumnya hanya dikirim sekali. Buat sesi pengganti; token sebelumnya akan dinonaktifkan.",
+				// Safe, non-technical descriptions only. The UI models these as
+				// recoverable states (or live progress), never as failures; the raw
+				// credential is never described or returned.
+				error: result.stale
+					? "Sesi ini sudah digantikan oleh sesi yang lebih baru."
+					: uploaded
+						? "Snapshot tersimpan. Lanjutkan analisis tanpa upload ulang."
+						: active
+							? "Agent masih melakukan sinkronisasi."
+							: code === "SYNC_SESSION_EXPIRED"
+								? "Sesi sinkronisasi berakhir. Buat prompt baru untuk melanjutkan sinkronisasi repository ini."
+								: "Prompt sebelumnya tidak tersedia lagi setelah halaman ditutup. Buat prompt baru untuk melanjutkan repository ini.",
 			},
 			{ status: 409, headers: { "Cache-Control": "no-store" } },
 		);

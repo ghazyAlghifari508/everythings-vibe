@@ -205,7 +205,7 @@ describe("ScreenConnect", () => {
 		expect(rendered).toContain("https://nodejs.org");
 	});
 
-	it("shows neutral copy instead of the provisional creation name", () => {
+	it("never presents a repository identity eyebrow in the sync header", () => {
 		act(() => {
 			root?.render(
 				<ScreenConnect
@@ -216,13 +216,18 @@ describe("ScreenConnect", () => {
 			);
 		});
 
+		// The provisional creation name is storage-only, and the real folder name
+		// belongs to History/Workspace: the connect header carries no eyebrow.
 		const rendered = container.textContent ?? "";
-		expect(rendered).toContain("Repository belum terdeteksi");
-		expect(rendered).not.toContain("Nama Fitur");
+		expect(rendered).toContain(
+			"Salin instruksi berikut, lalu jalankan melalui",
+		);
+		expect(rendered).not.toContain("Project /");
+		expect(rendered).not.toContain("Repository belum terdeteksi");
 		expect(rendered).not.toContain("Repository Lokal");
 	});
 
-	it("shows the detected repository name once the CLI has reported it", () => {
+	it("keeps the detected repository name inside the prompt, not in the header", () => {
 		act(() => {
 			root?.render(
 				<ScreenConnect
@@ -234,7 +239,9 @@ describe("ScreenConnect", () => {
 		});
 
 		const rendered = container.textContent ?? "";
-		expect(rendered).toContain("Project / react-movie-app");
+		expect(rendered).not.toContain("Project / react-movie-app");
+		expect(rendered).not.toContain("Repository belum terdeteksi");
+		// The prompt still identifies the repository it syncs.
 		expect(rendered).toContain("react-movie-app");
 	});
 });

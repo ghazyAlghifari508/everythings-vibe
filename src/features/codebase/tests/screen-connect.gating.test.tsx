@@ -606,7 +606,9 @@ describe("Step 1 recovery affordances", () => {
 			onRequestNewToken,
 		});
 		const button = [...container.querySelectorAll("button")].find((b) =>
-			/Buat sesi baru|Dapatkan token baru/i.test(b.textContent ?? ""),
+			/Buat prompt baru|Buat sesi baru|Dapatkan token baru/i.test(
+				b.textContent ?? "",
+			),
 		);
 		expect(button).toBeDefined();
 		act(() => {
@@ -634,10 +636,12 @@ describe("Step 1 recovery affordances", () => {
 			onRetryAnalysis,
 		});
 		const renewal = [...container.querySelectorAll("button")].find((b) =>
-			/Buat sesi baru|Dapatkan token baru/i.test(b.textContent ?? ""),
+			/Buat prompt baru|Buat sesi baru|Dapatkan token baru/i.test(
+				b.textContent ?? "",
+			),
 		);
 		expect(renewal).toBeUndefined();
-		expect(container.textContent).toContain("Prompt sudah dijalankan");
+		expect(container.textContent).toContain("Source code berhasil diterima.");
 		expect(onRequestNewToken).not.toHaveBeenCalled();
 		// The absent one-time token must not block analysis recovery: the failed
 		// attempt is still retryable against the snapshot that already uploaded.

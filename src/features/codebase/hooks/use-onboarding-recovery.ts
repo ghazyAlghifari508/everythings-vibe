@@ -16,11 +16,13 @@ import {
 } from "@/features/codebase/services/sync";
 import type { AnalysisCreditStatus } from "../services/analysis-credit-policy";
 import { requestAnalysisCreditPreflight } from "../services/analysis-credit-requests";
-import {
-	requestCodebaseStatus,
-	requestRetrySession,
-} from "../services/onboarding-requests";
+import { requestCodebaseStatus } from "../services/onboarding-requests";
+import type { PromptRecovery } from "../services/prompt-recovery";
 import type { SyncPromptPayload } from "../services/sync";
+import {
+	forgetSyncPrompt,
+	readSyncPrompt,
+} from "../services/sync-prompt-vault";
 import type { OnboardingAnalysisState } from "./use-onboarding-analysis-state";
 
 /**
@@ -72,8 +74,12 @@ function resolveRecoveredStep(
  * Refresh recovery for `/plan/codebase`.
  *
  * The stored id is only a pointer. Authoritative sync state comes from GET
- * status. A missing token is never restored from storage. Recovery retains the
- * original session; explicit replacement revokes its waiting credential.
+ * status; the raw credential never comes from storage — only from the
+ * app-lifetime memory vault, which survives route navigation inside the running
+ * app but not a reload. A missing credential is a RECOVERABLE state (explicit
+ * "Buat prompt baru"), never a generic failure: nothing broke, the one-time
+ * token simply is not in this browser's memory. Recovery itself never mints or
+ * revokes anything — replacement is the user's explicit action.
  *
  * Kept apart from the create/retry session machine because it is the one branch
  * that has to read persisted analysis output before it can decide which step to
@@ -89,6 +95,7 @@ export function useOnboardingRecovery({
 	setStep,
 	setPayload,
 	setCreditStatus,
+	setPromptRecovery,
 }: {
 	analysisState: OnboardingAnalysisState;
 	setError: (error: string | null) => void;
@@ -99,6 +106,8 @@ export function useOnboardingRecovery({
 	setStep: (step: PlanCodebaseStep) => void;
 	setPayload: (payload: SyncPromptPayload | null) => void;
 	setCreditStatus: (status: AnalysisCreditStatus | null) => void;
+	/** Recoverable prompt states; never routed through `setError`. */
+	setPromptRecovery: (recovery: PromptRecovery | null) => void;
 }) {
 	const {
 		analysisAttemptedFor,
@@ -121,6 +130,7 @@ export function useOnboardingRecovery({
 			mounted.current && readPlanCodebasePointer()?.id === stored?.id;
 		if (!stored) return false;
 		setError(null);
+		setPromptRecovery(null);
 		setIsStarting(true);
 		try {
 			const statusOutcome = await requestCodebaseStatus(stored.id);
@@ -131,6 +141,7 @@ export function useOnboardingRecovery({
 				// start cannot inherit the previous attempt's analysis or error.
 				setIsStarting(false);
 				clearPlanOnboardingPointers();
+				forgetSyncPrompt(stored.id);
 				setRecoveredStatus(null);
 				setActiveSessionId(null);
 				setAnalysis(null);
@@ -194,22 +205,43 @@ export function useOnboardingRecovery({
 			if (recovered.status === "waiting_for_cli") {
 				setRecoveredStatus(recovered);
 				setActiveSessionId(recovered.sessionId);
-				const credit = await requestAnalysisCreditPreflight();
+				// Same running app: the one-time prompt is still in memory, so the
+				// user gets the SAME credential back. Never mint, never rotate.
+				// A reload has no memory, so this is a miss and falls through to the
+				// recoverable state below — never to a fabricated prompt.
+				const held = readSyncPrompt(stored.id, recovered.sessionId);
+				if (held) {
+					setPayload(held);
+					setPromptRecovery(null);
+					setStep("sync");
+					return true;
+				}
+				// A failed eligibility read must not hide the recoverable prompt: the
+				// server re-checks credit before minting, so the honest UI here is the
+				// explicit recovery action, not a status error.
+				const credit = await requestAnalysisCreditPreflight().catch(() => null);
 				if (!isCurrent()) return true;
 				setCreditStatus(credit);
-				if (credit.canStart) {
-					const result = await requestRetrySession(stored.id);
-					if (!isCurrent()) return true;
-					if (result.kind === "minted") {
-						setPayload(result.payload);
-						setActiveSessionId(result.payload.sessionId ?? null);
-						setRecoveredStatus(null);
-					} else if (result.kind === "recovery") {
-						setActiveSessionId(result.sessionId);
-						setError(result.message);
-					} else setError("Sesi sync gagal dibuat. Coba lagi.");
-				}
+				setPromptRecovery({
+					code: "PROMPT_UNAVAILABLE",
+					sessionId: recovered.sessionId,
+				});
 				setStep("sync");
+				return true;
+			}
+			if (recovered.status === "expired") {
+				// An expired credential can never be reused; the user creates a new
+				// prompt for THIS repository. Recovery does not rotate on its own.
+				setRecoveredStatus(recovered);
+				setActiveSessionId(recovered.sessionId);
+				const credit = await requestAnalysisCreditPreflight().catch(() => null);
+				if (!isCurrent()) return true;
+				setCreditStatus(credit);
+				setPromptRecovery({
+					code: "PROMPT_EXPIRED",
+					sessionId: recovered.sessionId,
+				});
+				setStep(resolveRecoveredStep(recovered, readPlanCodebaseStepPointer()));
 				return true;
 			}
 			// The CLI is mid-attempt. Return the user to the screen they left, and
@@ -236,6 +268,7 @@ export function useOnboardingRecovery({
 		setIsStarting,
 		setCodebase,
 		setRecoveredStatus,
+		setPromptRecovery,
 		setFeatureProjectId,
 		analysisAttemptedFor,
 		setAnalysis,

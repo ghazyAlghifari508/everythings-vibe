@@ -12,6 +12,7 @@ import {
 import { StrictMode } from "react";
 import { afterEach, test, vi } from "vitest";
 import { PlanCodebasePage } from "../components/workspace/plan-codebase-page";
+import { clearSyncPromptVault } from "../services/sync-prompt-vault";
 
 vi.mock("@tanstack/react-router", () => ({
 	useNavigate: () => vi.fn(),
@@ -24,6 +25,7 @@ vi.mock("@/features/billing/hooks/use-user-plan", () => ({
 }));
 afterEach(() => {
 	cleanup();
+	clearSyncPromptVault();
 	sessionStorage.clear();
 	vi.unstubAllGlobals();
 });

@@ -10,6 +10,7 @@ import {
 import { afterEach, expect, test, vi } from "vitest";
 import { PlanCodebasePage } from "../components/workspace/plan-codebase-page";
 import { readOnboardingRequestId } from "../services/onboarding-request-identity";
+import { clearSyncPromptVault } from "../services/sync-prompt-vault";
 
 vi.mock("@tanstack/react-router", () => ({
 	useNavigate: () => vi.fn(),
@@ -22,6 +23,7 @@ vi.mock("@/features/billing/hooks/use-user-plan", () => ({
 }));
 afterEach(() => {
 	cleanup();
+	clearSyncPromptVault();
 	sessionStorage.clear();
 	window.history.replaceState({}, "");
 	vi.unstubAllGlobals();
@@ -52,7 +54,7 @@ const status = {
 	expiresAt: new Date(Date.now() + 3600000).toISOString(),
 };
 
-test("lost response and refresh recover the same repository without automatic credential rotation", async () => {
+test("lost response and refresh recover the same repository with an explicit new prompt, never an automatic rotation", async () => {
 	const keys: string[] = [];
 	const sessionBodies: object[] = [];
 	let commitLost = false;
@@ -77,41 +79,112 @@ test("lost response and refresh recover the same repository without automatic cr
 			if (input.endsWith("/session")) {
 				const body = JSON.parse(String(init?.body));
 				sessionBodies.push(body);
-				return body.action === "recover"
-					? Response.json(
-							{
-								code: "CODEBASE_SESSION_RECOVERY_REQUIRED",
-								sessionId: "original",
-								error:
-									"Token hanya dikirim sekali. Penggantian menonaktifkan token sebelumnya.",
-							},
-							{ status: 409 },
-						)
-					: Response.json(prompt);
+				if (body.action === "recover")
+					throw new Error("recovery must never mint or rotate a credential");
+				return Response.json(prompt);
 			}
 			throw new Error(`Unexpected request ${input}`);
 		}),
 	);
 	const first = render(<PlanCodebasePage intent="new" />);
-	await screen.findByRole("button", { name: "Coba lagi" });
+	// The create response itself was lost: that is a genuinely unknown outcome,
+	// and the only safe action is replaying the SAME request identity.
+	await screen.findByText(/Hasil permintaan belum diketahui/);
 	const attempt = readOnboardingRequestId();
 	first.unmount();
+	// A reload loses app memory; the repository pointer survives. The replay
+	// resolves the SAME repository and session, so the credential is now
+	// recoverable instead of the attempt being reported as failed.
+	clearSyncPromptVault();
 	render(<PlanCodebasePage intent="new" />);
-	await screen.findByText(/Token hanya dikirim sekali/);
+	await screen.findByRole("button", { name: "Buat prompt baru" });
+	expect(screen.queryByText("Coba lagi")).toBeNull();
 	expect(keys).toEqual([attempt, attempt]);
-	expect(sessionBodies).toEqual([{ action: "recover" }]);
-	fireEvent.click(screen.getByRole("button", { name: "Coba lagi" }));
+	// Opening the repository rotated nothing on its own.
+	expect(sessionBodies).toEqual([]);
+	fireEvent.click(screen.getByRole("button", { name: "Buat prompt baru" }));
 	await screen.findByRole("button", { name: "Salin prompt untuk AI agent" });
-	expect(sessionBodies).toEqual([
-		{ action: "recover" },
-		{ action: "retry", sessionId: "original" },
-	]);
+	// Exactly one explicit replacement, for the SAME repository session.
+	expect(sessionBodies).toEqual([{ action: "retry", sessionId: "original" }]);
 	expect(screen.queryByTestId("locked-prompt-region")).toBeNull();
 	expect(screen.queryByText("Menghubungkan repository...")).toBeNull();
 	for (let i = 0; i < sessionStorage.length; i++)
 		expect(sessionStorage.getItem(sessionStorage.key(i) ?? "")).not.toContain(
 			prompt.syncToken,
 		);
+	for (let i = 0; i < localStorage.length; i++)
+		expect(localStorage.getItem(localStorage.key(i) ?? "")).not.toContain(
+			prompt.syncToken,
+		);
+});
+
+test("returning inside the same app instance reuses the held prompt without a session request", async () => {
+	const sessionBodies: object[] = [];
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async (input: string, init?: RequestInit) => {
+			if (input.includes("preflight")) return Response.json(credit);
+			if (input === "/api/codebases")
+				return Response.json({
+					id: "repo",
+					name: "Repository",
+					sync: prompt,
+				});
+			if (input.includes("/status"))
+				return Response.json({ ...status, sessionId: prompt.sessionId });
+			if (input.endsWith("/session")) {
+				sessionBodies.push(JSON.parse(String(init?.body)));
+				return Response.json(prompt);
+			}
+			throw new Error(`Unexpected request ${input}`);
+		}),
+	);
+	const first = render(<PlanCodebasePage intent="new" />);
+	await screen.findByText(new RegExp(prompt.syncToken));
+	first.unmount();
+	// Route navigation keeps the running app alive: no vault reset here.
+	render(<PlanCodebasePage intent="new" />);
+	await screen.findByText(new RegExp(prompt.syncToken));
+	expect(sessionBodies).toEqual([]);
+});
+
+test("a failed replacement keeps the recoverable state and the same repository", async () => {
+	let creates = 0;
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async (input: string, init?: RequestInit) => {
+			if (input.includes("preflight")) return Response.json(credit);
+			if (input === "/api/codebases") {
+				creates += 1;
+				return Response.json({
+					id: "repo",
+					name: "Repository",
+					sessionId: "original",
+					code: "CODEBASE_SESSION_RECOVERY_REQUIRED",
+				});
+			}
+			if (input.includes("/status")) return Response.json(status);
+			if (input.endsWith("/session") && init?.method === "POST")
+				return Response.json(
+					{ error: "Sesi sync gagal dibuat. Coba lagi." },
+					{ status: 503 },
+				);
+			throw new Error(`Unexpected request ${input}`);
+		}),
+	);
+	render(<PlanCodebasePage intent="new" />);
+	const button = await screen.findByRole("button", {
+		name: "Buat prompt baru",
+	});
+	fireEvent.click(button);
+	await screen.findByText("Permintaan belum berhasil. Coba buat prompt lagi.");
+	// The failure is stated once, inside the prompt row: no alert panel, no
+	// second action, no generic sync error, and no duplicate repository.
+	expect(screen.getByText("Prompt belum berhasil dibuat")).toBeDefined();
+	expect(screen.queryByRole("alert")).toBeNull();
+	expect(screen.getAllByRole("button", { name: "Coba lagi" })).toHaveLength(1);
+	expect(creates).toBe(1);
+	expect(sessionStorage.getItem("prdfy:plan-codebase-id")).toBe("repo");
 });
 
 test("an intentional navigation creates a different attempt; rerenders and repeated create actions do not", async () => {
