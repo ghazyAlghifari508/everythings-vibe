@@ -218,7 +218,8 @@ forbids Playwright/screenshot QA):
 | --- | --- | --- |
 | Typecheck | `tsc --noEmit` | PASS for every touched path. The single remaining error is pre-existing and unrelated: `src/features/studio/tests/studio-composer.test.tsx(241,55)` `Promise.withResolvers` lib-target error (already recorded in `docs/codebase-fix04-lifecycle.md` §8). |
 | Lint/format | `biome check` on all 24 touched files | PASS (0 errors after `--write`). |
-| Unit + component + integration (14 files, 223 tests) | `vitest run` on: `sync-connect.integration`, `sync-stage`, `sync-stage-list.indicators`, `onboarding-transport-controls`, `prompt-recovery-presentation`, `screen-connect.gating`, `onboarding-idempotency-ui`, `analysis-credit-onboarding`, `library-view`, `onboarding-idempotency.integration`, `onboarding-replacement.integration`, `onboarding-session.integration`, `packages/cli/src/lib/sync-client`, `packages/cli/src/commands/codebase` | PASS — 223/223. |
+| Unit + component + integration (14 files, 224 tests) | `vitest run` on: `sync-connect.integration`, `sync-stage`, `sync-stage-list.indicators`, `onboarding-transport-controls`, `prompt-recovery-presentation`, `screen-connect.gating`, `onboarding-idempotency-ui`, `analysis-credit-onboarding`, `library-view`, `onboarding-idempotency.integration`, `onboarding-replacement.integration`, `onboarding-session.integration`, `packages/cli/src/lib/sync-client`, `packages/cli/src/commands/codebase` | PASS — 224/224. |
+| Credit policy untouched | `vitest run src/features/billing` | 293 passed, 1 pre-existing failure (`tests/plans.test.ts` pricing-copy string, recorded in `docs/codebase-fix04-lifecycle.md` §8). |
 | Production build | `pnpm build` (`studio:assets:check` + `vite build`) | PASS (`✓ built in 24.64s`). |
 
 Known pre-existing, unrelated failures in `src/features/codebase` (unchanged by

@@ -77,6 +77,27 @@ test("a completed upload keeps the prompt it was handed and never swaps in a sta
 	expect(window.sessionStorage.length).toBe(0);
 });
 
+test("the prompt survives connecting and uploading without a status message", () => {
+	render(
+		<ScreenConnectPromptStep
+			projectName="Repository"
+			isStarting={false}
+			payload={PAYLOAD}
+			status={status({ status: "connected", snapshotId: null })}
+			onRequestNewToken={() => {
+				throw new Error("must not renew");
+			}}
+		/>,
+	);
+	// 12: the credential is still valid while the agent is linked, so the box
+	// keeps it (and its copy action) instead of reporting the connection.
+	expect(screen.getByTestId("prompt-box").textContent).toContain("secret");
+	expect(
+		screen.getByRole("button", { name: "Salin prompt untuk AI agent" }),
+	).toBeDefined();
+	expect(screen.queryByTestId("prompt-unavailable")).toBeNull();
+});
+
 test("a live prompt is never replaced by a billing lock", () => {
 	render(
 		<ScreenConnectPromptStep
