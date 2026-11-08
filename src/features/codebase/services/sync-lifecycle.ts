@@ -13,14 +13,18 @@ type SyncTransitionMap = Record<
 	readonly CodebaseSyncStatus[]
 >;
 
-// There is deliberately no `connecting` status between `waiting_for_cli` and
-// `connected`. The handshake is the CLI's FIRST contact with the server and it
-// commits `waiting_for_cli -> connected` in one transaction, so a "connection in
-// progress" window is not observable: persisting one would mean recording a
-// state the browser could not honestly last long enough to display, and a
-// handshake that failed afterwards would strand the session in it. A handshake
-// fast enough to skip the transition is rendered as already connected — accuracy
-// beats a spinner that only appears because it was fabricated.
+// There is deliberately no `connecting` STATUS between `waiting_for_cli` and
+// `connected`. The status column describes what the transport has committed, and
+// the handshake commits `waiting_for_cli -> connected` in one transaction, so a
+// persistent intermediate row would be a state the server could never leave
+// honestly (a failed handshake would strand the session in it).
+//
+// The connecting PHASE is therefore carried by a lifecycle event instead:
+// `cli_connecting` is appended by the announce endpoint when the CLI reports
+// that it has started the attempt, and `agent_connected` follows when the
+// handshake commits. The browser renders the phase from that event, and it ends
+// the moment the handshake lands — a fast handshake is simply rendered as
+// already connected, never held back to make the spinner readable.
 const SYNC_TRANSITIONS: SyncTransitionMap = {
 	waiting_for_cli: ["connected", "failed", "expired"],
 	connected: ["scanning", "failed", "expired"],

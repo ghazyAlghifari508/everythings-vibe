@@ -102,7 +102,16 @@ export const codebaseAnalysisStatusSchema = z.enum(CODEBASE_ANALYSIS_STATUSES);
 // Declared here (before the status DTO below) because the status response
 // validates the log against this same vocabulary.
 
+// `cli_connecting` is the first event of an attempt and the ONLY honest source
+// of a connecting phase. The CLI announces the attempt (POST
+// `/api/v1/codebases/$id/codebase/connect`) before it resolves the local root
+// and before the handshake commits, so the server observes a real "the agent
+// has started" fact instead of a browser-side guess. A CLI that never announces
+// (older release) produces no connecting phase at all, and the browser renders
+// the handshake as already connected — which is exactly what a fast handshake
+// looks like.
 export const SYNC_LIFECYCLE_EVENT_KINDS = [
+	"cli_connecting",
 	"agent_connected",
 	"upload_started",
 	"snapshot_persisted",
@@ -262,6 +271,27 @@ export const cliHandshakeResponseSchema = z.object({
 });
 
 export type CliHandshakeResponse = z.infer<typeof cliHandshakeResponseSchema>;
+
+// === CLI connect announcement DTO ===
+// The attempt's first contact, sent at the very start of `codebase sync` so the
+// browser can render a connecting phase from a real server-observed event. It
+// uses the handshake request body (only `cliVersion` is meaningful here) and
+// returns the bound attempt identity so a CLI that fails before (or during) its
+// handshake can still report that failure instead of leaving the browser on a
+// connecting row until the session expires.
+//
+// Additive by construction: an older CLI never calls it and behaves exactly as
+// before, and a newer CLI against an older server treats the 404 as "no
+// connecting phase" — the handshake below remains the operation that binds
+// everything.
+export const cliConnectResponseSchema = z.object({
+	sessionId: z.string().min(1),
+	attemptId: z.string().min(1),
+	status: codebaseSyncStatusSchema,
+	expiresAt: z.string().datetime(),
+});
+
+export type CliConnectResponse = z.infer<typeof cliConnectResponseSchema>;
 
 // === Upload transport DTOs (Task 5) ===
 // These schemas mirror `packages/cli/src/lib/sync-client.ts` request shapes
