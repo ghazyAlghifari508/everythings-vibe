@@ -7,6 +7,7 @@ import {
 	inferTechAnswersFromCodebase,
 } from "@/features/codebase/services/analysis";
 import type { NonTechAnswer } from "@/features/greenfield/components/ask/question-card";
+import type { AskOptionInput } from "@/features/greenfield/services/ask-service";
 import {
 	getAskLanguage,
 	getAskPlatform,
@@ -20,6 +21,20 @@ export interface AskQuestion {
 	question: string;
 	type: "select" | "text" | "multiselect";
 	options?: string[];
+}
+
+/**
+ * Question as stored in the authoritative handoff. Options may be the legacy
+ * short text or the rich `{ label, description }` form an Existing-Codebase
+ * handoff carries; this Ask flow renders headings only, so the description is
+ * dropped when the state is applied (see `applyState`). Typing the stored form
+ * here keeps the server handoff assignable without widening the view model.
+ */
+export interface AskHandoffQuestion {
+	id: string;
+	question: string;
+	type: AskQuestion["type"];
+	options?: AskOptionInput[];
 }
 
 export interface TechAnswers {
@@ -38,7 +53,7 @@ export interface AskHandoffState {
 		prompt?: string;
 		platform?: "web" | "mobile";
 		session?: 1 | 2 | 3;
-		questions?: AskQuestion[];
+		questions?: AskHandoffQuestion[];
 		nonTechAnswers?: Record<string, NonTechAnswer>;
 		techAnswers?: TechAnswers;
 		skippedTech?: string[];
@@ -50,6 +65,46 @@ interface UseAskSessionParams {
 	projectName: string;
 	analysis?: CodebaseAnalysis | null;
 	initialHandoff?: AskHandoffState | null;
+}
+
+const ASK_QUESTION_TYPES: AskQuestion["type"][] = [
+	"select",
+	"text",
+	"multiselect",
+];
+
+/**
+ * Project a stored or freshly served question list into this flow's view model.
+ * The Greenfield Ask UI renders option headings only, so a rich
+ * `{ label, description }` option is flattened to its heading here instead of
+ * widening the pill/radio contract — and an object can never reach JSX as a
+ * React child. Malformed entries are dropped rather than rendered.
+ */
+export function toAskViewQuestions(value: unknown): AskQuestion[] {
+	if (!Array.isArray(value)) return [];
+	const questions: AskQuestion[] = [];
+	for (const entry of value) {
+		if (!entry || typeof entry !== "object") continue;
+		const cand = entry as Partial<AskHandoffQuestion>;
+		if (typeof cand.id !== "string" || typeof cand.question !== "string") {
+			continue;
+		}
+		if (!cand.type || !ASK_QUESTION_TYPES.includes(cand.type)) continue;
+		const labels = (Array.isArray(cand.options) ? cand.options : []).flatMap(
+			(option) => {
+				const label = typeof option === "string" ? option : option?.label;
+				const trimmed = typeof label === "string" ? label.trim() : "";
+				return trimmed ? [trimmed] : [];
+			},
+		);
+		questions.push({
+			id: cand.id,
+			question: cand.question,
+			type: cand.type,
+			...(labels.length > 0 ? { options: labels } : {}),
+		});
+	}
+	return questions;
 }
 
 /**
@@ -179,23 +234,7 @@ export function useAskSession({
 				);
 			}
 			if (Array.isArray(s.questions) && s.questions.length > 0) {
-				const validTypes = ["select", "text", "multiselect"];
-				const validQuestions = s.questions.filter((q): q is AskQuestion => {
-					if (!q || typeof q !== "object") return false;
-					const cand = q as Partial<AskQuestion>;
-					if (
-						typeof cand.id !== "string" ||
-						typeof cand.question !== "string"
-					) {
-						return false;
-					}
-					if (!validTypes.includes(cand.type ?? "")) return false;
-					if (cand.options !== undefined) {
-						if (!Array.isArray(cand.options)) return false;
-						if (!cand.options.every((o) => typeof o === "string")) return false;
-					}
-					return true;
-				});
+				const validQuestions = toAskViewQuestions(s.questions);
 				if (validQuestions.length > 0) {
 					setQuestions(validQuestions);
 					setIsLoadingQuestions(false);
@@ -254,11 +293,11 @@ export function useAskSession({
 					}),
 				});
 				const data = (await res.json().catch(() => ({}))) as {
-					questions?: AskQuestion[];
+					questions?: unknown;
 					error?: string;
 				};
 				if (!res.ok) throw new Error(data.error || "Gagal memuat pertanyaan");
-				setQuestions(data.questions ?? []);
+				setQuestions(toAskViewQuestions(data.questions));
 			} catch (err) {
 				console.error("Fetch ask options error:", err);
 				setLoadError(

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, render, renderHook, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { validateAskQuestions } from "@/features/greenfield/services/ask-service";
 import { CodebaseChatWorkspace } from "../components/chat/codebase-chat-workspace";
 import { useWorkspaceFeatureGeneration } from "../hooks/use-workspace-feature-generation";
 import { useWorkspaceQuestions } from "../hooks/use-workspace-questions";
@@ -300,17 +301,28 @@ describe("Clarification Stage-Aware Retry & Error Contract", () => {
 	});
 
 	it("13. Existing greenfield Ask flow tidak mengalami regresi", () => {
+		// The Greenfield prompt still emits short-text options; the shared parser
+		// normalizes them into canonical options, and every label survives.
 		const greenfieldRawQuestions = [
 			{
 				id: "gf1",
 				question: "Tujuan aplikasi?",
-				type: "select" as const,
+				type: "select",
 				options: ["Bisnis", "Personal"],
 				recommended: 0,
+				recommendationReason: "Prompt menyebut kebutuhan bisnis.",
 			},
+			{ id: "gf2", question: "Siapa penggunanya?", type: "text" },
+			{ id: "gf3", question: "Skala awalnya?", type: "text" },
 		];
-		const mapped = mapAskQuestionsToAdaptive(greenfieldRawQuestions);
+		const parsed = validateAskQuestions(greenfieldRawQuestions);
+		expect(parsed).not.toBeNull();
+		const mapped = mapAskQuestionsToAdaptive(parsed ?? []);
 		expect(mapped[0].title).toBe("Tujuan aplikasi?");
+		expect(mapped[0].options.map((o) => o.label)).toEqual([
+			"Bisnis",
+			"Personal",
+		]);
 		expect(mapped[0].options[0].recommended).toBe(true);
 
 		const serialized = serializeAskQuestions(mapped);
