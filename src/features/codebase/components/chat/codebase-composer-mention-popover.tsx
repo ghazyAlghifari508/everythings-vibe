@@ -119,7 +119,7 @@ export function CodebaseComposerMentionPopover({
 							? `composer-mention-option-${activeOption.targetKind}`
 							: undefined
 					}
-					className="max-h-[min(18rem,var(--radix-popover-content-available-height))] overflow-y-auto p-1.5"
+					className="max-h-[min(18rem,var(--radix-popover-content-available-height,18rem))] overflow-y-auto p-1.5"
 				>
 					{documents.map((doc, idx) => {
 						const isSelected = idx === activeIndex;
