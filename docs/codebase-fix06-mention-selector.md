@@ -186,4 +186,11 @@ navigation for both entry points, and every mention button keeps
   recorded by FIX 05.
 - `pnpm build`: success.
 
+Pre-existing failure (not this change's surface, recorded for honesty):
+`codebases-pages.test.ts` → "selects the latest usable snapshot regardless of
+file count" asserts the snapshot `inArray(...)` source text inside
+`codebase-detail-page.tsx`. That selection now lives in
+`services/workspace-snapshot.server.ts` (earlier resync refactors, e.g.
+`45b6ff82`), and FIX 06 does not touch either file.
+
 No Playwright, browser automation, screenshot, or manual browser QA was used.
