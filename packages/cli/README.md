@@ -76,6 +76,16 @@ sync. Running the command from a subdirectory is safe.
 - **Version** — the server advertises its minimum version during handshake and
   the CLI fails closed when it is too old. When the running version is below
   that minimum, the notice and the exact upgrade command are printed.
+- **Attempt announcement** — the command announces the attempt
+  (`POST /api/v1/codebases/:id/codebase/connect`) before it does any local work,
+  so the web app can show a real "connecting" phase instead of an instant
+  checkmark. The announcement is best effort: a server without the boundary
+  (older release, HTTP 404) or a transport failure is ignored and the sync
+  proceeds. When it did land, a failure before the handshake is reported against
+  the announced attempt so the browser leaves the connecting state instead of
+  waiting for the session to expire. It adds no latency — it is sent
+  concurrently with root resolution and awaited only immediately before the
+  handshake.
 - **Ignore validation** — negation patterns (`!pattern`) are inert and are
   reported as a warning, because user rules must never lift the built-in
   secret and unsafe-path protection.

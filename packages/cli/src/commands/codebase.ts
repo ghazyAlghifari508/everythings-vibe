@@ -1,9 +1,14 @@
 /**
  * `everythings-vibe codebase sync` — sync a filtered repository snapshot to everythings-vibe.
  *
- * Pipeline (all local filtering first, then chunked upload):
- * scan → manifest → blocked-content refusal → handshake → manifest batches
- * → base64 text chunks (binaries excluded, never uploaded) → completion.
+ * Pipeline:
+ * announce connect → resolve root/identity → handshake → ignore + scan +
+ * manifest → blocked-content refusal → manifest batches → base64 text chunks
+ * (binaries excluded, never uploaded) → completion.
+ *
+ * The announcement is what makes the browser's connecting phase observable: it
+ * is sent before any local work and is the only contact that happens before the
+ * handshake commits `connected`.
  *
  * Status lines echo real server-persisted statuses; no percentages are
  * invented. The sync token travels in memory only and is never written to
@@ -158,8 +163,10 @@ function failure(
 }
 
 /**
- * Handshake failure: nothing was persisted beyond the handshake, so the session
- * keeps whatever it already held and there is no attempt to report against.
+ * Handshake failure: only the announcement may have reached the server, so the
+ * session keeps whatever it already held. The caller reports the failure against
+ * the announced attempt when one exists, which is what stops the browser from
+ * waiting on a connecting row.
  */
 function handshakeFailure(
 	projectId: string,
@@ -258,6 +265,45 @@ export async function syncCodebase(
 
 	const { projectId } = options;
 
+	const createClient =
+		deps.createClient ??
+		((token: string, apiUrl: string) =>
+			createSyncClient({
+				apiUrl,
+				syncToken: token,
+				timeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
+			}));
+
+	const client = createClient(syncToken, options.apiUrl ?? resolveApiUrl());
+
+	// The attempt's first server contact, fired before any local work: it is the
+	// one real signal that lets the browser render a connecting phase while this
+	// process resolves the repository. Never awaited here — a slow announcement
+	// must not delay the sync — and it never rejects (an old server answers 404
+	// and the sync simply has no connecting phase).
+	const announcedConnect = client.announceConnect(projectId);
+
+	// A failure between the announcement and the handshake still needs a terminal
+	// server state, otherwise the browser would keep showing the connecting row
+	// until the session expired. The announcement replied with the attempt
+	// identity, so the failure can be reported against it; when it never landed,
+	// the session keeps whatever it already held.
+	const reportAnnouncedFailure = async (errorCode: string): Promise<void> => {
+		const announced = await announcedConnect;
+		if (!announced) return;
+		try {
+			await client.reportFailureWithRetry(projectId, {
+				sessionId: announced.sessionId,
+				attemptId: announced.attemptId,
+				errorCode,
+			});
+		} catch {
+			// The local failure is the real outcome and is already fully described
+			// in the printed result; a failed report only means the browser keeps
+			// polling until expiry.
+		}
+	};
+
 	// Preparation is the CLI's job, not the agent prompt's: resolve the real
 	// repository root, then bootstrap the local ignore file so the user never
 	// has to create it by hand.
@@ -272,6 +318,7 @@ export async function syncCodebase(
 			err instanceof Error ? err.message : String(err),
 		);
 		printResult({ ...res, root: options.root }, output);
+		await reportAnnouncedFailure("ROOT_RESOLUTION_FAILED");
 		return res;
 	}
 
@@ -283,16 +330,10 @@ export async function syncCodebase(
 	const repositoryName =
 		resolveRepositoryDisplayName(root, repositoryIdentity) ?? undefined;
 
-	const createClient =
-		deps.createClient ??
-		((token: string, apiUrl: string) =>
-			createSyncClient({
-				apiUrl,
-				syncToken: token,
-				timeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
-			}));
-
-	const client = createClient(syncToken, options.apiUrl ?? resolveApiUrl());
+	// The announcement has had the whole local-preparation window to land; waiting
+	// for it here preserves the server's order (connecting before connected)
+	// without making local work wait on the network.
+	await announcedConnect;
 
 	// The handshake happens BEFORE local preparation. `connected` therefore
 	// spans the whole real preparation window (ignore setup, the repository
@@ -310,6 +351,9 @@ export async function syncCodebase(
 	} catch (err) {
 		const res = handshakeFailure(projectId, repositoryName, err);
 		printResult(res, output);
+		await reportAnnouncedFailure(
+			err instanceof ApiError ? (err.code ?? "SYNC_FAILED") : "SYNC_FAILED",
+		);
 		return res;
 	}
 
