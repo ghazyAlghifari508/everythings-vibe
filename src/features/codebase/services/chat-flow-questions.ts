@@ -1,20 +1,23 @@
+import type {
+	AskOptionDraft,
+	AskOptionInput,
+	AskQuestion,
+	AskQuestionType,
+} from "@/features/greenfield/services/ask-service";
+import { toCanonicalOptions } from "@/features/greenfield/services/ask-service";
 import type { FlowQuestion } from "./chat-flow-run";
 
-export type AskQuestionType = "select" | "text" | "multiselect";
+export type { AskQuestionType };
 
 /** Validated question shape from `/api/ask/options` (ask-service contract). */
-export interface RawAskQuestion {
-	id: string;
-	question: string;
-	type: AskQuestionType;
-	options?: string[];
-	recommended?: number;
-	recommendationReason?: string;
-}
+export type RawAskQuestion = AskQuestion;
 
 export interface AdaptiveQuestionOption {
 	id: string;
 	label: string;
+	/** What choosing this option changes. Absent only for legacy data written
+	 *  before FIX 01, or for the Greenfield short-text option form. */
+	description?: string;
 	recommended?: boolean;
 }
 
@@ -32,16 +35,23 @@ export interface AdaptiveQuestion {
  * Map validated ask-service questions to the UI model. Question type semantics
  * are preserved, and a recommendation is only surfaced when the server parsed
  * an explicit in-range index; option order never implies a recommendation.
+ *
+ * Option identity comes from the CANONICAL order (see `toCanonicalOptions`), so
+ * a renderer that shows the recommended option first sorts a copy and leaves
+ * both the saved answer (the label) and `recommendedOptionId` untouched.
  */
 export function mapAskQuestionsToAdaptive(
 	raw: readonly RawAskQuestion[],
 ): AdaptiveQuestion[] {
 	return raw.map((item) => {
-		const options = (item.options ?? []).map((label, optionIndex) => ({
-			id: `${item.id}-opt${optionIndex + 1}`,
-			label,
-			recommended: item.type === "select" && item.recommended === optionIndex,
-		}));
+		const options = toCanonicalOptions(item.id, item.options ?? []).map(
+			(option, optionIndex) => ({
+				id: option.id,
+				label: option.label,
+				...(option.description ? { description: option.description } : {}),
+				recommended: item.type === "select" && item.recommended === optionIndex,
+			}),
+		);
 		const recommendedOption =
 			item.type === "select" && item.recommended !== undefined
 				? options[item.recommended]
@@ -92,12 +102,15 @@ export function buildFeatureMessage(
 	return `Rencanakan fitur ${featureName}`;
 }
 
-/** Persisted Ask question shape (mirrors the handoff state schema). */
+/** Persisted Ask question shape (mirrors the handoff state schema). Options keep
+ *  the tolerant input form: handoffs written before FIX 01 stored `string[]`,
+ *  new writes always store `{ label, description }`. Only the heading is ever a
+ *  saved answer; the description is supporting information. */
 export interface PersistedAskQuestion {
 	id: string;
 	question: string;
 	type: AskQuestionType;
-	options?: string[];
+	options?: AskOptionInput[];
 	recommended?: number;
 	recommendationReason?: string;
 }
@@ -105,35 +118,49 @@ export interface PersistedAskQuestion {
 /**
  * Serialize the visible adaptive questions into the restorable handoff shape so
  * a refresh or History reopen can rebuild the exact question list and answer
- * mapping. Only the fields a question actually carries are written.
+ * mapping. Descriptions are persisted alongside the heading they belong to, and
+ * the recommendation is stored as an index into the very array written here, so
+ * the pair can never drift apart. Only the fields a question actually carries
+ * are written.
  */
 export function serializeAskQuestions(
 	questions: readonly AdaptiveQuestion[],
 ): PersistedAskQuestion[] {
-	return questions.map((question) => ({
-		id: question.id,
-		question: question.title,
-		type: question.type,
-		...(question.options.length > 0
-			? { options: question.options.map((option) => option.label) }
-			: {}),
-		...(question.recommendedOptionId !== undefined
-			? {
-					recommended: question.options.findIndex(
+	return questions.map((question) => {
+		const recommendedIndex =
+			question.recommendedOptionId !== undefined
+				? question.options.findIndex(
 						(option) => option.id === question.recommendedOptionId,
-					),
-				}
-			: {}),
-		...(question.recommendationReason
-			? { recommendationReason: question.recommendationReason }
-			: {}),
-	}));
+					)
+				: -1;
+		return {
+			id: question.id,
+			question: question.title,
+			type: question.type,
+			...(question.options.length > 0
+				? {
+						options: question.options.map((option) => ({
+							label: option.label,
+							...(option.description
+								? { description: option.description }
+								: {}),
+						})),
+					}
+				: {}),
+			...(recommendedIndex >= 0 ? { recommended: recommendedIndex } : {}),
+			...(question.recommendationReason
+				? { recommendationReason: question.recommendationReason }
+				: {}),
+		};
+	});
 }
 
 /**
  * Rebuild the UI questions and answers from a persisted handoff. Answers are
- * keyed by question id; option semantics (type, options, recommendation) are
- * reconstructed from the stored question fields so nothing is flattened.
+ * keyed by question id; option semantics (type, options, heading, description,
+ * recommendation) are reconstructed from the stored question fields so nothing
+ * is flattened. Option identity is re-derived from the canonical order, which
+ * is why the saved label keeps pointing at the same option.
  */
 export function restoreAskState(
 	questions: readonly PersistedAskQuestion[],
@@ -144,7 +171,9 @@ export function restoreAskState(
 			id: question.id,
 			question: question.question,
 			type: question.type,
-			...(question.options ? { options: question.options } : {}),
+			...(question.options
+				? { options: toCanonicalOptions(question.id, question.options) }
+				: {}),
 			...(question.recommended !== undefined
 				? { recommended: question.recommended }
 				: {}),
@@ -175,6 +204,28 @@ export function restoreAskState(
 	return { questions: restoredQuestions, answers: restoredAnswers };
 }
 
+/**
+ * Legacy-tolerant option normalization for restore only. Unlike the generation
+ * parser (which REJECTS an object option without a description, because that is
+ * a contract miss the model must repair), stored data is never thrown away: a
+ * plain string becomes a heading, and a description is kept only when it is
+ * genuinely present. Nothing is invented to fill a gap.
+ */
+function toStoredOptionDraft(value: unknown): AskOptionDraft | null {
+	if (typeof value === "string") {
+		const label = value.trim();
+		return label ? { label } : null;
+	}
+	if (typeof value !== "object" || value === null) return null;
+	const record = value as Record<string, unknown>;
+	if (typeof record.label !== "string") return null;
+	const label = record.label.trim();
+	if (!label) return null;
+	const description =
+		typeof record.description === "string" ? record.description.trim() : "";
+	return { label, ...(description ? { description } : {}) };
+}
+
 /** Defensive parse of the `/api/ask/options` get-handoff payload. Malformed
  *  entries are dropped per field rather than thrown, so a partial handoff
  *  degrades gracefully instead of blocking recovery. */
@@ -194,9 +245,9 @@ export function parseRestoredQuestions(value: unknown): PersistedAskQuestion[] {
 			continue;
 		}
 		const options = Array.isArray(record.options)
-			? record.options.filter(
-					(option): option is string => typeof option === "string",
-				)
+			? record.options
+					.map((option) => toStoredOptionDraft(option))
+					.filter((option): option is AskOptionDraft => option !== null)
 			: undefined;
 		const recommended =
 			typeof record.recommended === "number" ? record.recommended : undefined;

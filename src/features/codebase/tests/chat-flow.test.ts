@@ -64,14 +64,20 @@ describe("mapAskQuestionsToAdaptive", () => {
 				id: "store",
 				question: "Simpan di mana?",
 				type: "select",
-				options: ["Lokal", "Server"],
+				options: [
+					{ id: "store-opt1", label: "Lokal" },
+					{ id: "store-opt2", label: "Server" },
+				],
 			},
 			{ id: "name", question: "Nama fitur?", type: "text" },
 			{
 				id: "surfaces",
 				question: "Permukaan mana?",
 				type: "multiselect",
-				options: ["Kartu", "Detail"],
+				options: [
+					{ id: "surfaces-opt1", label: "Kartu" },
+					{ id: "surfaces-opt2", label: "Detail" },
+				],
 			},
 		]);
 		expect(mapped.map((q) => q.type)).toEqual([
@@ -81,13 +87,36 @@ describe("mapAskQuestionsToAdaptive", () => {
 		]);
 	});
 
+	test("carries each option's description into the UI model", () => {
+		const [mapped] = mapAskQuestionsToAdaptive([
+			{
+				id: "store",
+				question: "Simpan di mana?",
+				type: "select",
+				options: [
+					{
+						id: "store-opt1",
+						label: "Lokal",
+						description: "Tersimpan di perangkat user.",
+					},
+					{ id: "store-opt2", label: "Server" },
+				],
+			},
+		]);
+		expect(mapped.options[0].description).toBe("Tersimpan di perangkat user.");
+		expect(mapped.options[1]).not.toHaveProperty("description");
+	});
+
 	test("only marks the explicitly recommended option, never the first", () => {
 		const [mapped] = mapAskQuestionsToAdaptive([
 			{
 				id: "store",
 				question: "Simpan di mana?",
 				type: "select",
-				options: ["Lokal", "Server"],
+				options: [
+					{ id: "store-opt1", label: "Lokal" },
+					{ id: "store-opt2", label: "Server" },
+				],
 				recommended: 1,
 				recommendationReason: "Repo memakai penyimpanan lokal.",
 			},
@@ -103,7 +132,10 @@ describe("mapAskQuestionsToAdaptive", () => {
 				id: "store",
 				question: "Simpan di mana?",
 				type: "select",
-				options: ["Lokal", "Server"],
+				options: [
+					{ id: "store-opt1", label: "Lokal" },
+					{ id: "store-opt2", label: "Server" },
+				],
 			},
 		]);
 		expect(mapped.options.some((o) => o.recommended)).toBe(false);
@@ -117,7 +149,10 @@ describe("mapAskQuestionsToAdaptive", () => {
 				id: "surfaces",
 				question: "Permukaan mana?",
 				type: "multiselect",
-				options: ["Kartu", "Detail"],
+				options: [
+					{ id: "surfaces-opt1", label: "Kartu" },
+					{ id: "surfaces-opt2", label: "Detail" },
+				],
 				recommended: 0,
 				recommendationReason: "Ada.",
 			},
@@ -186,7 +221,10 @@ describe("ask handoff round-trip", () => {
 			id: "store",
 			question: "Simpan di mana?",
 			type: "select",
-			options: ["Lokal", "Server"],
+			options: [
+				{ id: "store-opt1", label: "Lokal" },
+				{ id: "store-opt2", label: "Server" },
+			],
 			recommended: 0,
 			recommendationReason: "Repo memakai penyimpanan lokal.",
 		},
@@ -194,7 +232,10 @@ describe("ask handoff round-trip", () => {
 			id: "surfaces",
 			question: "Permukaan mana?",
 			type: "multiselect",
-			options: ["Kartu", "Detail"],
+			options: [
+				{ id: "surfaces-opt1", label: "Kartu" },
+				{ id: "surfaces-opt2", label: "Detail" },
+			],
 		},
 		{ id: "notes", question: "Catatan?", type: "text" },
 	]);
@@ -203,13 +244,13 @@ describe("ask handoff round-trip", () => {
 		const serialized = serializeAskQuestions(questions);
 		expect(serialized[0]).toMatchObject({
 			type: "select",
-			options: ["Lokal", "Server"],
+			options: [{ label: "Lokal" }, { label: "Server" }],
 			recommended: 0,
 			recommendationReason: "Repo memakai penyimpanan lokal.",
 		});
 		expect(serialized[1]).toMatchObject({
 			type: "multiselect",
-			options: ["Kartu", "Detail"],
+			options: [{ label: "Kartu" }, { label: "Detail" }],
 		});
 		expect(serialized[2]).toMatchObject({ type: "text" });
 		expect(serialized[2]).not.toHaveProperty("options");
@@ -232,6 +273,82 @@ describe("ask handoff round-trip", () => {
 		});
 	});
 
+	test("keeps every option's description across a serialize/restore cycle", () => {
+		const rich = mapAskQuestionsToAdaptive([
+			{
+				id: "search",
+				question: "Informasi apa yang dicari?",
+				type: "select",
+				options: [
+					{
+						id: "search-opt1",
+						label: "Judul dan deskripsi",
+						description: "Pencarian mencakup nama dan ringkasan.",
+					},
+					{
+						id: "search-opt2",
+						label: "Judul saja",
+						description: "Hanya nama proyek yang dicocokkan.",
+					},
+				],
+				recommended: 1,
+				recommendationReason: "Analisis menunjukkan pencarian judul.",
+			},
+			{ id: "notes", question: "Catatan?", type: "text" },
+		]);
+		const restored = restoreAskState(serializeAskQuestions(rich), []);
+		expect(restored.questions[0].options.map((o) => o.description)).toEqual([
+			"Pencarian mencakup nama dan ringkasan.",
+			"Hanya nama proyek yang dicocokkan.",
+		]);
+		expect(restored.questions[0].recommendedOptionId).toBe("search-opt2");
+	});
+
+	test("restores legacy string options without inventing a description", () => {
+		const restored = restoreAskState(
+			[
+				{
+					id: "store",
+					question: "Simpan di mana?",
+					type: "select",
+					options: ["Lokal", "Server"],
+					recommended: 1,
+					recommendationReason: "Repo memakai penyimpanan server.",
+				},
+			],
+			[{ question: "Simpan di mana?", answer: "Server" }],
+		);
+		expect(restored.questions[0].options).toEqual([
+			{ id: "store-opt1", label: "Lokal", recommended: false },
+			{ id: "store-opt2", label: "Server", recommended: true },
+		]);
+		expect(restored.questions[0].options[1]).not.toHaveProperty("description");
+		expect(restored.questions[0].recommendedOptionId).toBe("store-opt2");
+		expect(restored.answers).toEqual({ store: "Server" });
+	});
+
+	test("a reordered display array cannot move the saved answer or the recommendation", () => {
+		const serialized = serializeAskQuestions(questions);
+		// FIX 02 renders the recommendation first by sorting a COPY. Restoring from
+		// the canonical order must still resolve the same option labels.
+		const first = restoreAskState(serialized, [
+			{ question: "Simpan di mana?", answer: "Lokal" },
+		]);
+		const shuffled = restoreAskState(
+			[
+				{
+					...serialized[0],
+					options: [...(serialized[0].options ?? [])].reverse(),
+					recommended: 1,
+				},
+			],
+			[{ question: "Simpan di mana?", answer: "Lokal" }],
+		);
+		expect(first.answers.store).toBe("Lokal");
+		expect(shuffled.answers.store).toBe("Lokal");
+		expect(shuffled.questions[0].recommendedOptionId).toBe("store-opt2");
+	});
+
 	test("a defensive parse keeps valid entries and drops malformed ones", () => {
 		const parsed = parseRestoredQuestions([
 			{ id: "ok", question: "Q?", type: "text" },
@@ -245,5 +362,26 @@ describe("ask handoff round-trip", () => {
 				{ question: "", answer: "A" },
 			]),
 		).toEqual([{ question: "Q?", answer: "A" }]);
+	});
+
+	test("parseRestoredQuestions accepts both stored option forms and drops junk", () => {
+		const parsed = parseRestoredQuestions([
+			{
+				id: "mixed",
+				question: "Q?",
+				type: "select",
+				options: [
+					"teks lama",
+					{ label: "Judul", description: "Deskripsi." },
+					{ label: "   " },
+					42,
+					{ description: "tanpa judul" },
+				],
+			},
+		]);
+		expect(parsed[0].options).toEqual([
+			{ label: "teks lama" },
+			{ label: "Judul", description: "Deskripsi." },
+		]);
 	});
 });

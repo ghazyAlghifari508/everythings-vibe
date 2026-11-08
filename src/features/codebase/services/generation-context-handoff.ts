@@ -19,11 +19,22 @@ export const askHandoffAnswerSchema = z.object({
 	questionId: z.string().max(128).optional(),
 });
 
+/** One answer option inside a restorable Ask snapshot. Both forms are real:
+ *  legacy handoffs (and the Greenfield short-text prompt) store a string, the
+ *  Existing-Codebase prompt stores heading + description. */
+export const askHandoffOptionSchema = z.union([
+	z.string().min(1).max(100),
+	z.object({
+		label: z.string().min(1).max(100),
+		description: z.string().min(1).max(400).optional(),
+	}),
+]);
+
 export const askHandoffQuestionSchema = z.object({
 	id: z.string().min(1).max(128),
 	question: z.string().min(1).max(500),
 	type: z.enum(["select", "text", "multiselect"]),
-	options: z.array(z.string().min(1).max(100)).max(12).optional(),
+	options: z.array(askHandoffOptionSchema).max(12).optional(),
 	recommended: z.number().int().min(0).max(11).optional(),
 	recommendationReason: z.string().min(1).max(400).optional(),
 });
@@ -93,7 +104,16 @@ export function sanitizeAskHandoffState(
 				? {
 						options: q.options
 							.slice(0, CODEBASE_ASK_HANDOFF_MAX_OPTIONS)
-							.map((o) => truncateText(o, 100)),
+							.map((o) =>
+								typeof o === "string"
+									? truncateText(o, 100)
+									: {
+											label: truncateText(o.label, 100),
+											...(o.description
+												? { description: truncateText(o.description, 400) }
+												: {}),
+										},
+							),
 					}
 				: {}),
 			// A recommendation is only meaningful when it indexes a surviving
