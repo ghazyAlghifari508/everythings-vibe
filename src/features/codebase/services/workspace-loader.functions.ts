@@ -3,7 +3,6 @@ import type { ActivePlanCandidate } from "@/features/codebase/services/active-pl
 import type { AnalysisResponse } from "@/features/codebase/services/analysis";
 import { selectWorkspaceAnalysis } from "@/features/codebase/services/analysis-selection";
 import { resolveOnboardingAnchorProject } from "@/features/codebase/services/anchor";
-import { SNAPSHOT_CONTEXT_STATUSES } from "@/features/codebase/services/sync";
 import { requireUserServer } from "@/lib/session";
 
 export const loadCodebase = createServerFn({ method: "GET" })
@@ -15,7 +14,6 @@ export const loadCodebase = createServerFn({ method: "GET" })
 			acVersions,
 			codebaseAnalyses,
 			codebaseGenerationContexts,
-			codebaseSnapshots,
 			codebases,
 			prdVersions,
 			projects,
@@ -100,17 +98,10 @@ export const loadCodebase = createServerFn({ method: "GET" })
 			projects: projectRows,
 			expectedCodebaseId: id,
 		});
-		const [currentSnapshot] = await db
-			.select({ id: codebaseSnapshots.id })
-			.from(codebaseSnapshots)
-			.where(
-				and(
-					eq(codebaseSnapshots.codebaseId, id),
-					inArray(codebaseSnapshots.status, [...SNAPSHOT_CONTEXT_STATUSES]),
-				),
-			)
-			.orderBy(desc(codebaseSnapshots.createdAt))
-			.limit(1);
+		const { readWorkspaceSnapshot } = await import(
+			"./workspace-snapshot.server"
+		);
+		const currentSnapshot = await readWorkspaceSnapshot(user.id, id);
 		const planningSnapshotRows =
 			projectIds.length === 0
 				? []

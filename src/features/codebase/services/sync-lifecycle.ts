@@ -121,10 +121,12 @@ export function isSyncStatusComplete(
  * - Snapshot deduplication is supported because completion gates on verified
  *   session completion rather than assuming a new snapshot ID was minted.
  */
-// ponytail: validates active session and snapshot presence; upgrade when multi-attempt replay diff inspection is required.
 export function isResyncSessionVerified(input: {
 	status:
-		| Pick<SyncStatusResponse, "status" | "snapshotId" | "sessionId">
+		| Pick<
+				SyncStatusResponse,
+				"status" | "snapshotId" | "sessionId" | "analysisStatus" | "analysisId"
+		  >
 		| null
 		| undefined;
 	activeSessionId?: string | null;
@@ -132,7 +134,11 @@ export function isResyncSessionVerified(input: {
 	const { status, activeSessionId } = input;
 	if (!status || !status.snapshotId) return false;
 	if (activeSessionId && status.sessionId !== activeSessionId) return false;
-	return isSyncStatusComplete(status);
+	return (
+		isSyncStatusComplete(status) &&
+		status.analysisStatus === "ready" &&
+		Boolean(status.analysisId)
+	);
 }
 
 export function canTransitionSyncStatus(

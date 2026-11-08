@@ -142,6 +142,9 @@ export type ManifestEntry = z.infer<typeof manifestEntrySchema>;
 
 export const syncPromptPayloadSchema = z.object({
 	projectId: z.string().min(1),
+	codebaseId: z.string().min(1).optional(),
+	requestId: z.uuid().optional(),
+	status: codebaseSyncStatusSchema.optional(),
 	sessionId: z.string().min(1).optional(),
 	apiBaseUrl: z.string().url(),
 	// Raw credential transferred once to the local agent. Never persisted.
@@ -179,6 +182,7 @@ export const syncStatusResponseSchema = z.object({
 	// review page scope its analysis read to the current attempt so a
 	// retry-sync never renders a stale review from a previous session.
 	snapshotId: z.string().min(1).nullable().optional(),
+	workspaceSnapshotId: z.string().min(1).nullable().optional(),
 	// Timestamp the CLI handshake transaction persisted for this session
 	// (`codebase_sync_sessions.metadata.handshakeAt`). Present only when the
 	// agent actually contacted the server, so it stays meaningful even for a
