@@ -77,26 +77,38 @@ describe("SyncStageList indicators", () => {
 		);
 		const spinner = active?.querySelector('[data-testid="spinner"]');
 		expect(spinner).not.toBeNull();
+		// Reduced motion is honoured by the same primitive.
+		expect(spinner?.getAttribute("class")).toContain(
+			"motion-safe:animate-spin",
+		);
+		expect(spinner?.getAttribute("class")).toContain(
+			"motion-reduce:animate-none",
+		);
 		// Exactly one spinner: finished rows carry a checkmark, not motion.
 		expect(container.querySelectorAll('[data-testid="spinner"]')).toHaveLength(
 			1,
 		);
 	});
 
-	it("spins only the waiting agent without inventing a measured duration", () => {
+	it("keeps the standby agent stage idle with a neutral dot and no motion", () => {
 		render(status());
+		// A session whose prompt has not been run yet is a wait for the user, not
+		// system activity: no spinner, no elapsed timer, no count.
 		expect(container.querySelectorAll('[data-testid="spinner"]')).toHaveLength(
-			1,
+			0,
 		);
 		expect(container.querySelector("[role='timer']")).toBeNull();
-		expect(stageState("sync-stage-agent")).toBe("active");
 		for (const testId of [
+			"sync-stage-agent",
 			"sync-stage-preparing",
 			"sync-stage-sync",
-			"sync-stage-analysis",
 		]) {
-			expect(stageState(testId)).toBe("waiting");
+			const row = container.querySelector(`[data-testid="${testId}"]`);
+			expect(row?.getAttribute("data-stage-state")).toBe("waiting");
+			expect(row?.querySelector("svg")).not.toBeNull();
+			expect(row?.querySelector('[data-testid="spinner"]')).toBeNull();
 		}
+		expect(container.textContent).toContain("Menunggu agent");
 	});
 
 	it("marks completed stages with the checkmark icon and no spinner", () => {

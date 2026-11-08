@@ -489,26 +489,24 @@ describe("P4: Re-Sync Modal & Session-Verified Completion", () => {
 			).toBe("failed");
 		});
 
-		it("4b. Shows only the genuine agent wait before the CLI runs", () => {
+		it("4b. Waits passively for the user instead of spinning before the CLI runs", () => {
 			renderModal({ status: createStatus({ status: "waiting_for_cli" }) });
 			const panel = document.querySelector(
 				'[data-testid="codebase-resync-panel"]',
 			);
+			// Nothing is running: the prompt is on screen but has not been run, so no
+			// indicator — step badge or stage row — may spin.
 			expect(panel?.querySelectorAll('[data-testid="spinner"]')).toHaveLength(
-				1,
+				0,
 			);
 			expect(panel?.querySelector("[role='timer']")).toBeNull();
-			expect(
-				document
-					.querySelector('[data-testid="sync-stage-agent"]')
-					?.getAttribute("data-stage-state"),
-			).toBe("active");
 			expect(
 				document.querySelectorAll(
 					'[data-testid="resync-step-3"] [data-stage-state="waiting"]',
 				),
-			).toHaveLength(3);
+			).toHaveLength(4);
 			for (const testId of [
+				"sync-stage-agent",
 				"sync-stage-preparing",
 				"sync-stage-sync",
 				"sync-stage-analysis",

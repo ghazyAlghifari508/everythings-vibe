@@ -91,17 +91,7 @@ export function ScreenConnect({
 	// copy until the CLI handshake reports the real repository folder name.
 	const displayName =
 		resolveCodebaseDisplayName(projectName) ?? "Repository belum terdeteksi";
-	// A validated session payload is real waiting evidence before the first frame.
-	const progressStatus: SyncStatusResponse | null =
-		status ??
-		(payload?.sessionId
-			? {
-					projectId: payload.projectId,
-					sessionId: payload.sessionId,
-					status: "waiting_for_cli",
-				}
-			: null);
-	const stageView = resolveSyncStageView(progressStatus);
+	const stageView = resolveSyncStageView(status);
 	const canAdvance =
 		canContinueToSummary && !isStarting && Boolean(onContinueToSummary);
 	const canRetry = stageView.canRetry && Boolean(onRetrySync);
@@ -132,7 +122,7 @@ export function ScreenConnect({
 						payload={payload}
 						isStarting={isStarting}
 						error={promptError}
-						status={progressStatus}
+						status={status}
 						transportComplete={stageView.syncComplete}
 						onRequestNewToken={onRequestNewToken}
 						lockedPrompt={lockedPrompt}

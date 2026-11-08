@@ -52,8 +52,8 @@ test("A waiting for CLI is the only claim, with no analysis or new session offer
 	expect(container.textContent).not.toContain("Menganalisis repository");
 	expect(container.textContent).not.toContain("Buat sesi baru");
 	expect(container.textContent).not.toContain("Analisis belum berhasil");
-	// Waiting is visible; no preparation, upload, or model work is implied.
-	expect(container.querySelectorAll('[data-testid="spinner"]')).toHaveLength(1);
+	// The wait for the user is passive: no spinner and no elapsed timer.
+	expect(container.querySelectorAll('[data-testid="spinner"]')).toHaveLength(0);
 	expect(container.querySelector("[role='timer']")).toBeNull();
 });
 

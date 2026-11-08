@@ -112,9 +112,7 @@ export function StageRow({
 	testId: string;
 	row: SyncStageRow;
 }) {
-	const elapsed = useElapsedSeconds(
-		row.state === "active" ? row.startedAt : undefined,
-	);
+	const elapsed = useElapsedSeconds(row.startedAt);
 	const completedAt = row.completedAt
 		? formatCompletedAt(row.completedAt)
 		: null;
@@ -149,12 +147,9 @@ export function StageRow({
 							{elapsed.toFixed(1)}s
 						</span>
 					) : completedAt ? (
-						<time
-							dateTime={row.completedAt}
-							className="font-mono text-[11px] tabular-nums text-fog"
-						>
+						<span className="font-mono text-[11px] tabular-nums text-fog">
 							{completedAt}
-						</time>
+						</span>
 					) : null}
 				</span>
 			) : null}

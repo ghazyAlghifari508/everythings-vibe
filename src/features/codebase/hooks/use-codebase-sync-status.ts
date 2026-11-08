@@ -7,7 +7,6 @@ import {
 	type SyncStatusResponse,
 	syncStatusResponseSchema,
 } from "@/features/codebase/services/sync";
-import { reconcileSyncStatus } from "@/features/codebase/services/sync-status-reconciliation";
 import {
 	CODEBASE_SYNC_ACTIVE_POLL_INTERVAL_MS,
 	CODEBASE_SYNC_POLL_INTERVAL_MS,
@@ -110,27 +109,15 @@ export function useCodebaseSyncStatus({
 	// attempt, so the loop adopts it synchronously inside this render.
 	if (sessionId !== undefined) pinnedSessionRef.current = sessionId;
 
-	// Recovery and a live frame may both seed fallback polling. Reconcile rather
-	// than rewinding to the last poll when the stream reconnects.
+	// The recovered seed fills an empty state only: once a live poll has
+	// landed, the live snapshot wins, so a late recovery read can never
+	// rewind the screen. A session prop change is an explicit new attempt
+	// and always resets through the effect below, whatever the seed holds.
 	useEffect(() => {
 		if (!initialStatus) return;
 		activeRef.current = isSyncStatusInFlight(initialStatus.status);
-		setStatus((current) =>
-			current?.sessionId === initialStatus.sessionId
-				? reconcileSyncStatus(current, initialStatus)
-				: (current ?? initialStatus),
-		);
+		setStatus((current) => (current === null ? initialStatus : current));
 	}, [initialStatus]);
-
-	// A repository switch must also release the session discovered by polling.
-	// biome-ignore lint/correctness/useExhaustiveDependencies: recovery and session changes are reconciled separately
-	useEffect(() => {
-		const seed = initialStatus?.projectId === codebaseId ? initialStatus : null;
-		pinnedSessionRef.current = sessionId ?? seed?.sessionId ?? null;
-		activeRef.current = seed ? isSyncStatusInFlight(seed.status) : false;
-		setStatus(seed);
-		setError(null);
-	}, [codebaseId]);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: the session id is the only trigger; initialStatus is read as the mount seed and must not restart the loop
 	useEffect(() => {
@@ -228,7 +215,7 @@ export function useCodebaseSyncStatus({
 					return;
 				pinnedSessionRef.current = parsed.data.sessionId;
 				activeRef.current = isSyncStatusInFlight(parsed.data.status);
-				setStatus((current) => reconcileSyncStatus(current, parsed.data));
+				setStatus(parsed.data);
 				setError(null);
 				if (isTerminalSyncStatus(parsed.data.status)) isTerminal = true;
 			} catch {

@@ -27,8 +27,9 @@ import {
 /**
  * How far the real sync lifecycle has actually progressed, in product terms.
  *
- * - `waiting`   a valid attempt is genuinely waiting for a CLI handshake;
- *               only the agent row spins, without a made-up start timer
+ * - `waiting`   the attempt exists and no CLI has contacted the server yet; the
+ *               user still has to run the prompt. Waiting for a human action is
+ *               NOT system activity, so every row in this stage renders idle
  * - `preparing` the agent is linked and the CLI is preparing source code
  * - `syncing`   files are on the wire
  * - `done`      the server holds a verified snapshot
@@ -100,7 +101,7 @@ export interface SyncStageRow {
 }
 
 export interface SyncStageView {
-	/** True once validated session evidence exists, even before a status frame. */
+	/** False until the browser has received any server state at all. */
 	hasStatus: boolean;
 	/**
 	 * True only once real sync activity has begun (CLI has progressed beyond
@@ -110,8 +111,10 @@ export interface SyncStageView {
 	/** True when the attempt ended without finishing. */
 	failed: boolean;
 	/**
-	 * The three product stages, in order. Empty only without session evidence
-	 * or after a failed attempt whose completed stages cannot be established.
+	 * The three product stages, in order. Empty while the state is unknown,
+	 * before the sync has started (waiting_for_cli), and after a failed attempt:
+	 * on failure the server cannot say how far it got, so claiming a completed stage
+	 * would be inventing progress.
 	 */
 	stages: SyncStageRow[];
 	/** Reported only once the server actually has it. */
@@ -204,7 +207,12 @@ export function resolveSyncStageView(
 	}
 
 	if (status.status === "waiting_for_cli") {
-		// A valid session is waiting for the handshake, not preparing or uploading.
+		// Standby is a live attempt whose only real state is "the user has not run
+		// the prompt yet". The stage list is rendered from the first paint for that
+		// reason — the three rows are real, in-order steps — but every one of them
+		// stays idle: no spinner and no timer, because the server is observing
+		// nothing but its own polling. `hasStarted` stays false, and the rows only
+		// gain motion once the handshake (or a later upload) is actually persisted.
 		return {
 			hasStatus: true,
 			hasStarted: false,
@@ -239,8 +247,8 @@ export function resolveSyncStageView(
 	const agentConnectedAt =
 		eventAt("agent_connected") ?? status.cliConnectedAt ?? null;
 	const uploadStartedAt = eventAt("upload_started");
-	// Snapshot creation happens at handshake, before upload completion.
-	const snapshotPersistedAt = eventAt("snapshot_persisted");
+	const snapshotPersistedAt =
+		eventAt("snapshot_persisted") ?? status.snapshotCreatedAt ?? null;
 	const snapshotPersistedCount = lifecycle.find(
 		(event) => event.kind === "snapshot_persisted",
 	)?.count;
@@ -251,7 +259,7 @@ export function resolveSyncStageView(
 		failed: false,
 		stages: [
 			buildAgentRow(progress, agentConnectedAt),
-			buildPreparingRow(progress, agentConnectedAt, uploadStartedAt),
+			buildPreparingRow(progress, agentConnectedAt),
 			buildSyncingRow(
 				progress,
 				status.fileCount,

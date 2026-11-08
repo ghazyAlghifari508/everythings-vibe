@@ -8,7 +8,7 @@ import type {
 	SyncStageRow,
 } from "@/features/codebase/services/sync-stages";
 
-const AGENT_TITLE = "Menunggu agent terhubung...";
+const AGENT_TITLE = "Menunggu agent";
 const AGENT_HINT =
 	"Jalankan prompt di AI coding agent untuk memulai sinkronisasi.";
 const PREPARE_TITLE = "Menyiapkan source code";
@@ -19,8 +19,14 @@ export function buildAgentRow(
 	agentConnectedAt: string | null,
 ): SyncStageRow {
 	if (progress === "waiting") {
+		// WAITING_FOR_CLI is not an active connection. The session exists and the
+		// prompt is on screen, but nothing has contacted the server: the browser is
+		// only polling. So this row stays a neutral idle indicator with no spinner
+		// and no timer — waiting for the USER is a different thing from the SYSTEM
+		// doing work, and rendering it as active would claim progress nobody made.
+		// It only turns into a checkmark once the handshake is persisted.
 		return {
-			state: "active",
+			state: "waiting",
 			title: AGENT_TITLE,
 			detail: AGENT_HINT,
 		};
@@ -36,7 +42,6 @@ export function buildAgentRow(
 export function buildPreparingRow(
 	progress: SyncStageProgress,
 	preparationStartedAt: string | null,
-	preparationCompletedAt: string | null = null,
 ): SyncStageRow {
 	if (progress === "preparing") {
 		return {
@@ -54,9 +59,6 @@ export function buildPreparingRow(
 			state: "done",
 			title: "Source code siap",
 			detail: "File project yang relevan sudah disiapkan.",
-			...(preparationCompletedAt
-				? { completedAt: preparationCompletedAt }
-				: {}),
 		};
 	}
 	return { state: "waiting", title: PREPARE_TITLE };

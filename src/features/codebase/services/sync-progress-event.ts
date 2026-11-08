@@ -12,7 +12,6 @@ export const SYNC_PROGRESS_EVENT_NAME = "sync";
 // when the backend actually recorded something new.
 const SYNC_PROGRESS_TIMESTAMP_FIELDS = [
 	"updatedAt",
-	"cliConnectedAt",
 	"createdAt",
 	"snapshotCreatedAt",
 	"analysisAttemptUpdatedAt",
@@ -26,10 +25,6 @@ export function syncProgressEventId(snapshot: SyncStatusResponse): string {
 		if (!value) continue;
 		const ms = Date.parse(value);
 		if (Number.isFinite(ms) && ms > newest) newest = ms;
-	}
-	for (const event of snapshot.lifecycle ?? []) {
-		const ms = Date.parse(event.at);
-		if (Number.isFinite(ms)) newest = Math.max(newest, ms);
 	}
 	return String(newest);
 }

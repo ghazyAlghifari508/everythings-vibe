@@ -81,8 +81,7 @@ function buildAnalysisRow(input: {
 				: {
 						detail: "Perlu pembaruan rekomendasi task awal untuk melanjutkan",
 					}),
-			...(status.analysisAttemptStatus === "ready" &&
-			status.analysisAttemptUpdatedAt
+			...(status.analysisAttemptUpdatedAt
 				? { completedAt: status.analysisAttemptUpdatedAt }
 				: {}),
 		};
@@ -94,7 +93,7 @@ function buildAnalysisRow(input: {
 		return {
 			state: "active",
 			title: "Menganalisis repository...",
-			...(liveStatus === "pending" && status.analysisAttemptCreatedAt
+			...(status.analysisAttemptCreatedAt
 				? { startedAt: status.analysisAttemptCreatedAt }
 				: {}),
 		};
@@ -108,7 +107,7 @@ function buildAnalysisRow(input: {
 }
 
 const ACTION_BUTTON =
-	"mt-1 inline-flex min-h-11 w-fit items-center rounded border border-iron bg-obsidian px-3 font-sans text-[11px] font-medium text-mist transition hover:bg-steel hover:text-snow disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo";
+	"mt-1 inline-flex min-h-8 w-fit items-center rounded border border-iron bg-obsidian px-3 font-sans text-[11px] font-medium text-mist transition hover:bg-steel hover:text-snow disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo";
 
 /** One recovery action for a credit-blocked analysis; the source is safe. */
 function AnalysisBlockedRow() {
@@ -202,10 +201,7 @@ export function SyncStageList({
 			})}
 			{analysisBlocked && status?.snapshotId ? (
 				<AnalysisBlockedRow />
-			) : showAnalysisFailure &&
-				onRetryAnalysis &&
-				!runningOverridesFailure &&
-				analysisRow?.state !== "done" ? (
+			) : showAnalysisFailure && onRetryAnalysis && !runningOverridesFailure ? (
 				<div
 					data-testid={ANALYSIS_TEST_ID}
 					data-stage-state="failed"
