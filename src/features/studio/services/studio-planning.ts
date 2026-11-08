@@ -8,12 +8,7 @@ import {
 	studioJobs,
 	studioProjects,
 } from "@/db/schema";
-import { STUDIO_PLANNING_MAX_TOKENS } from "@/features/studio/types/studio-constants";
 import { ScrapeError } from "@/lib/design-errors";
-import {
-	selectModels,
-	tryStreamWithFallback,
-} from "@/lib/services/ai-orchestrator";
 import type {
 	StudioDesignMode,
 	StudioScreenPlan,
@@ -30,7 +25,7 @@ import {
 	withStudioJobWrite,
 } from "./studio-job-lease";
 import { studioJobTiming } from "./studio-job-runtime";
-import { parseStudioPlanningWithBlueprint } from "./studio-planning-parser";
+import { generateStudioPlan } from "./studio-planning-generation";
 import { buildStudioPlanningPrompt } from "./studio-planning-prompt";
 
 export async function planStudioScreens(
@@ -79,131 +74,15 @@ export async function planStudioScreens(
 		systemChars: systemPrompt.length,
 		promptChars: planPrompt.length,
 	});
-	let screenPlan: StudioScreenPlan | null = null;
-	let designBlueprint: StudioDesignBlueprint | null = null;
-	let planError: string | null = null;
-
-	try {
-		const requestStartedAt = Date.now();
-		const { generator, firstChunk, outcome } = await tryStreamWithFallback(
-			selectModels(),
-			[
-				{
-					role: "system",
-					content: systemPrompt,
-				},
-				{ role: "user", content: planPrompt },
-			],
-			signal,
-			STUDIO_PLANNING_MAX_TOKENS,
-		);
-		studioJobTiming("planning-first-token", requestStartedAt, {
-			jobId: job.id,
-			projectId: project.id,
-			attempt: 1,
-		});
-		const outputStartedAt = Date.now();
-		let planRaw = firstChunk;
-		for await (const chunk of generator) planRaw += chunk;
-		const isTruncatedPlan =
-			outcome?.finishReason === "length" ||
-			outcome?.finishReason === "max_tokens" ||
-			outcome?.finishReason === "max_output_tokens";
-		const tokenLimitExceeded = isTruncatedPlan
-			? true
-			: outcome?.textTokens !== undefined
-				? outcome.textTokens > STUDIO_PLANNING_MAX_TOKENS
-				: outcome?.outputTokens !== undefined &&
-					outcome.outputTokens > STUDIO_PLANNING_MAX_TOKENS;
-		studioJobTiming("planning-output", outputStartedAt, {
-			jobId: job.id,
-			projectId: project.id,
-			attempt: 1,
-			outputChars: planRaw.length,
-			...outcome,
-			maxTokens: STUDIO_PLANNING_MAX_TOKENS,
-			tokenLimitExceeded,
-		});
-		signal.throwIfAborted();
-		const parsed = parseStudioPlanningWithBlueprint(
-			planRaw,
-			designMode,
-			project.initialPageCount,
-			!project.designMd?.trim(),
-		);
-		if (parsed.ok) {
-			screenPlan = parsed.plan;
-			designBlueprint = parsed.blueprint;
-		} else {
-			planError = parsed.error;
-		}
-	} catch (err) {
-		signal.throwIfAborted();
-		planError = err instanceof Error ? err.message : "Planning stream error";
-	}
-
-	if (!screenPlan || !designBlueprint) {
-		try {
-			const requestStartedAt = Date.now();
-			const correctivePrompt = `${planPrompt}\n\nPrevious plan violated the contract (${planError ?? "format error"}). Correct the plan and return ONLY valid JSON matching the required count, platform and order, including the complete shared design blueprint object.`;
-			const { generator, firstChunk, outcome } = await tryStreamWithFallback(
-				selectModels(),
-				[
-					{
-						role: "system",
-						content: systemPrompt,
-					},
-					{ role: "user", content: correctivePrompt },
-				],
-				signal,
-				STUDIO_PLANNING_MAX_TOKENS,
-			);
-			studioJobTiming("planning-first-token", requestStartedAt, {
-				jobId: job.id,
-				projectId: project.id,
-				attempt: 2,
-			});
-			const outputStartedAt = Date.now();
-			let planRaw = firstChunk;
-			for await (const chunk of generator) planRaw += chunk;
-			studioJobTiming("planning-output", outputStartedAt, {
-				jobId: job.id,
-				projectId: project.id,
-				attempt: 2,
-				outputChars: planRaw.length,
-				...outcome,
-				maxTokens: STUDIO_PLANNING_MAX_TOKENS,
-				tokenLimitExceeded:
-					outcome?.outputTokens !== undefined &&
-					outcome.outputTokens > STUDIO_PLANNING_MAX_TOKENS,
-			});
-			signal.throwIfAborted();
-			const parsed = parseStudioPlanningWithBlueprint(
-				planRaw,
-				designMode,
-				project.initialPageCount,
-				!project.designMd?.trim(),
-			);
-			if (parsed.ok) {
-				screenPlan = parsed.plan;
-				designBlueprint = parsed.blueprint;
-			} else {
-				planError = parsed.error;
-			}
-		} catch (err) {
-			signal.throwIfAborted();
-			planError = err instanceof Error ? err.message : "Planning stream error";
-		}
-	}
-
-	if (!screenPlan || !designBlueprint || screenPlan.screens.length === 0) {
-		throw new ScrapeError(
-			"AI_GENERATION_FAILED",
-			planError ?? "Gagal merencanakan layar aplikasi.",
-		);
-	}
-
-	return { screenPlan, designBlueprint };
+	return generateStudioPlan({
+		systemPrompt,
+		prompt: planPrompt,
+		designMode,
+		count: project.initialPageCount,
+		requireVisualDirection: !project.designMd?.trim(),
+		signal,
+		timing: { jobId: job.id, projectId: project.id },
+	});
 }
 
 export async function persistStudioPlannedFrames(

@@ -44,6 +44,11 @@ ${STUDIO_COMPONENT_PATTERNS.map((pattern) => `${pattern.name}: ${pattern.html}`)
 - Long Text & Currency:
   - Format currency cleanly with digit grouping (e.g. "Rp 125.500.000"), using whitespace-nowrap and tabular numbers.
   - Apply truncate or break-words on customer names, descriptions, or long labels so they never push columns out.
+- Real Media (destinations, products, people, places):
+  - Where a domain naturally demands photography, use genuine photos from a verified public HTTPS source (e.g. images.unsplash.com), never inline SVG landscapes or gradient shapes acting as a photo, and never base64 blobs or scraped hotlinked sites.
+  - Keep media honest and licensed: prefer Unsplash hotlinks (free license, source attribution optional) over arbitrary hotlinked Pinterest/personal CDNs; do not fabricate a provider key or claim an API integration that is not wired up.
+  - Media is a design element with bounded geometry: every image element gets width:100%, height:auto, aspect-ratio, and object-fit:cover; no fixed pixel heights that phone-crop into a sliver, no layout dependence on any single external file.
+  - Always supply a graceful fallback so an unavailable photo cannot break frame generation: wrap the photo in a container with the surface background and a muted caption of what is shown, and keep the rest of the card meaningful without the image. Never let a missing image leave an empty hole the size of the gallery.
 - Empty States: When a list or table is empty, render an informative box with an icon, Indonesian explanation, and action button:
   <div class="text-center py-10 px-4 border border-dashed border-[var(--app-border)] rounded-xl" data-card>
     <p class="font-medium text-sm text-[var(--app-ink)]">Belum ada data transaksi</p>
@@ -77,7 +82,8 @@ export function getDomainQualityContract(prompt?: string): string {
 	) {
 		return `DOMAIN-SPECIFIC UX (E-Commerce / Catalog):
 - Primary focus: Product discovery, clear pricing, category navigation, and cart affordances.
-- Layout: Filter/category bar, balanced responsive grid of product cards with clean image placeholders, price, and primary action button.`;
+- Layout: Filter/category bar, balanced responsive grid of product cards with real product photos, price, and primary action button.
+- Real product photography is required for a catalog surface: every product card leads with an actual product photo (verified public HTTPS source), not a placeholder box, inline SVG, or CSS-gradient stand-in. Keep each price line atomic on one line ("Rp 22.000", never split "Rp" from the amount).`;
 	}
 	if (
 		lower.includes("travel") ||
@@ -87,7 +93,9 @@ export function getDomainQualityContract(prompt?: string): string {
 		lower.includes("itinerary")
 	) {
 		return `DOMAIN-SPECIFIC UX (Travel & Hospitality):
-- Primary focus: Search parameters (origin, destination, date range), slot/flight comparison cards, and itinerary timelines.`;
+- Primary focus: Search parameters (origin, destination, date range), slot/flight comparison cards, and itinerary timelines.
+- Real destination photography is required for a travel booking surface: every destination card leads with a genuine candid location photo (verified public HTTPS source), not an inline SVG mountain/beach illustration or a CSS-gradient stand-in.
+- Keep the price row atomic on one line: "Mulai dari", then "Rp 3.900.000 / orang" as a single non-wrapping group, then the primary CTA. Never let "Rp", the amount, or "/ orang" wrap onto separate lines.`;
 	}
 	if (
 		lower.includes("portfolio") ||

@@ -1,12 +1,12 @@
 import { and, desc, eq } from "drizzle-orm";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { db } from "@/db";
 import { studioFrames, studioJobs, studioProjects, users } from "@/db/schema";
+import { runStudioJobPipeline } from "../services/studio-job-pipeline";
 import { getStudioProjectDetail } from "../services/studio-project-detail";
 import { createStudioProjectWithJob } from "../services/studio-project-enqueue";
 import { listStudioProjects } from "../services/studio-project-lifecycle";
 import { retryStudioFrame } from "../services/studio-retry-service";
-import { dispatchStudioWorkerBatch } from "../services/studio-worker-dispatch";
 
 const e2eState = vi.hoisted(() => ({
 	labels: [] as string[],
@@ -142,36 +142,38 @@ const sampleDesignMd = `# MindMarket — Style Reference
 `;
 
 describe("End-to-End Multi-Screen Generation Scenarios", () => {
-	// Helper to get or create a real user in the DB
+	const owners: string[] = [];
+	afterEach(async () => {
+		for (const userId of owners.splice(0))
+			await db.delete(users).where(eq(users.id, userId));
+		e2eState.failOnce = false;
+		e2eState.labels = [];
+	});
 	async function getTestUserId(): Promise<string> {
-		const [u] = await db.select({ id: users.id }).from(users).limit(1);
-		if (u) return u.id;
-		const [created] = await db
-			.insert(users)
-			.values({
-				id: `e2e-test-user-${Date.now()}`,
-				name: "E2E Test User",
-				email: "e2e@example.com",
-			})
-			.returning();
-		return created.id;
+		const userId = crypto.randomUUID();
+		owners.push(userId);
+		await db.insert(users).values({
+			id: userId,
+			name: "E2E Test User",
+			email: `${userId}@example.test`,
+		});
+		return userId;
 	}
 
 	const terminalStatuses = ["completed", "partial", "failed"];
 
-	// Drive the deployed durable path: the HTTP boundary only persists jobs, so
-	// the worker loop is what advances them. Dispatch is global, so re-dispatch
-	// until this project's newest job reaches a terminal state.
+	// Directly execute only this fixture's durable jobs; global dispatch could claim live work.
 	async function runStudioWorker(projectId: string): Promise<void> {
 		for (let round = 0; round < 60; round++) {
-			await dispatchStudioWorkerBatch();
 			const [job] = await db
 				.select()
 				.from(studioJobs)
 				.where(eq(studioJobs.projectId, projectId))
 				.orderBy(desc(studioJobs.createdAt))
 				.limit(1);
-			if (job && terminalStatuses.includes(job.status)) return;
+			if (!job) throw new Error("Fixture job missing");
+			if (terminalStatuses.includes(job.status)) return;
+			await runStudioJobPipeline(job.id, projectId, job.userId);
 		}
 		throw new Error("Studio worker did not reach a terminal job state");
 	}

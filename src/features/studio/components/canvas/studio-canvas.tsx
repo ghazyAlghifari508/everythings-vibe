@@ -66,6 +66,12 @@ export const StudioCanvas = memo(function StudioCanvas({
 }: StudioCanvasProps) {
 	const canvasRef = useRef<HTMLElement>(null);
 	const priorityFrameId = frames.find((frame) => frame.htmlCode)?.id;
+	// No blueprint and no saved screen means planning never completed: the frames
+	// are the provisional slots, so the only honest recovery is the whole plan.
+	const sharedPlanningFailed =
+		!project.designBlueprint &&
+		frames.length > 0 &&
+		frames.every((frame) => !frame.htmlCode);
 	const marqueeRef = useRef<HTMLDivElement>(null);
 	const preferredZoom =
 		STUDIO_CANVAS_INITIAL_ZOOM[
@@ -225,7 +231,7 @@ export const StudioCanvas = memo(function StudioCanvas({
 					transformOrigin: "0 0",
 				}}
 			>
-				{frames.length > 0 ? (
+				{frames.length > 0 && !sharedPlanningFailed ? (
 					frames.map((frame) => (
 						<StudioFrame
 							key={frame.id}
@@ -247,7 +253,7 @@ export const StudioCanvas = memo(function StudioCanvas({
 							isCanvasPanning={panMode}
 						/>
 					))
-				) : activeJob?.status === "failed" ? (
+				) : activeJob?.status === "failed" || sharedPlanningFailed ? (
 					<StudioCanvasPlanningFailure
 						error={activeJob?.error}
 						onRetryPlanning={onRetryPlanning}
@@ -279,6 +285,8 @@ export const StudioCanvas = memo(function StudioCanvas({
 
 			<StudioCanvasZoomCorner
 				zoom={zoom}
+				minZoom={minZoom}
+				maxZoom={maxZoom}
 				onZoomIn={zoomIn}
 				onZoomOut={zoomOut}
 				onFit={fitAll}

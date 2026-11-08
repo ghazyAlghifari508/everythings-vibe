@@ -18,6 +18,7 @@ export async function tryStreamWithFallback(
 	maxTokens?: number,
 	onThinking?: (text: string) => void,
 	onThinkingReset?: () => void,
+	options?: { maxAttempts: number },
 ): Promise<{
 	generator: AsyncGenerator<string, void, undefined>;
 	firstChunk: string;
@@ -39,7 +40,7 @@ export async function tryStreamWithFallback(
 		// yet. Once firstChunk is in hand the real stream has started, so we
 		// return and let the caller finish — retrying then would duplicate
 		// already-sent bytes to the client.
-		const attemptCeiling = 1 + AI_STREAM_RETRY_ATTEMPTS;
+		const attemptCeiling = options?.maxAttempts ?? 1 + AI_STREAM_RETRY_ATTEMPTS;
 		for (let attempt = 0; attempt < attemptCeiling; attempt++) {
 			const abortController = new AbortController();
 			const signal = externalSignal
@@ -66,6 +67,7 @@ export async function tryStreamWithFallback(
 							onThinking(text);
 						}
 					: undefined,
+				options ? 0 : undefined,
 			);
 
 			try {

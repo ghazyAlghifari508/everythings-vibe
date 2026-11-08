@@ -61,7 +61,7 @@ afterEach(async () => {
 it("turns a suggestion bubble into exactly one new screen and keeps the rest", async () => {
 	const { userId, project, beranda } = await seed();
 	const suggestion = (await suggestionsFor(project.id, userId)).find(
-		(entry) => entry.label === "Buat Catat Transaksi",
+		(entry) => entry.title === "Catat transaksi harian",
 	);
 	if (!suggestion) throw new Error("expected a transaction suggestion");
 
@@ -95,7 +95,7 @@ it("turns a suggestion bubble into exactly one new screen and keeps the rest", a
 it("stops proposing a screen once its suggestion has been added", async () => {
 	const { userId, project } = await seed();
 	const suggestion = (await suggestionsFor(project.id, userId)).find(
-		(entry) => entry.label === "Buat Laporan",
+		(entry) => entry.title === "Buat laporan berkala",
 	);
 	if (!suggestion) throw new Error("expected a report suggestion");
 	await enqueueStudioOperation(project.id, userId, {
@@ -103,10 +103,10 @@ it("stops proposing a screen once its suggestion has been added", async () => {
 		requestId: crypto.randomUUID(),
 	});
 
-	const labels = (await suggestionsFor(project.id, userId)).map(
-		(entry) => entry.label,
+	const titles = (await suggestionsFor(project.id, userId)).map(
+		(entry) => entry.title,
 	);
-	expect(labels).not.toContain("Buat Laporan");
+	expect(titles).not.toContain("Buat laporan berkala");
 });
 
 it("refuses a suggested screen for a project the caller does not own", async () => {

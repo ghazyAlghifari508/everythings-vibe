@@ -30,6 +30,10 @@ try {
 		assert.ok(child.stdout);
 		const stdout = child.stdout;
 		let output = "";
+		let errors = "";
+		child.stderr?.on("data", (data) => {
+			errors += data.toString();
+		});
 		const exited = once(child, "exit");
 		// tsx transpiles the whole worker import graph on a cold start; on a loaded
 		// machine this exceeds 15s. The smoke verifies readiness + signal handling,
@@ -42,8 +46,12 @@ try {
 					if (output.includes("Studio worker ready")) resolve();
 				});
 				child.once("error", reject);
-				child.once("exit", () =>
-					reject(new Error("Worker exited before readiness")),
+				child.once("exit", (code, signal) =>
+					reject(
+						new Error(
+							`Worker exited before readiness (code=${code}, signal=${signal}): ${errors}`,
+						),
+					),
 				);
 			});
 			await new Promise((resolve) => setTimeout(resolve, 250));

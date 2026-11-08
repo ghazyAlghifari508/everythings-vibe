@@ -113,11 +113,6 @@ export function isStudioProcessing({ frames, activeJob }: StudioStatus) {
 	);
 }
 
-/**
- * A job stays unclaimed only when no worker is polling, and stays past its
- * lease only when the worker heartbeat died. Both are jobs that will never
- * finish on their own, so they are named instead of leaving the shimmer silent.
- */
 export function resolveStudioQueueHealth(
 	activeJob: StudioJobRow | null,
 	now = Date.now(),
@@ -128,11 +123,11 @@ export function resolveStudioQueueHealth(
 	)
 		return null;
 	if (activeJob.leaseExpiresAt && activeJob.leaseExpiresAt.getTime() <= now)
-		return "Heartbeat worker tidak aktif. Job menunggu pemulihan otomatis.";
+		return "Lease worker berakhir. Job menunggu pemulihan otomatis.";
 	if (
 		now - activeJob.createdAt.getTime() > STUDIO_JOB_QUEUE_HEALTH_MS &&
 		!activeJob.claimedBy
 	)
-		return "Belum ada worker Studio yang mengambil job ini. Jalankan worker agar antrean dilanjutkan.";
+		return "Menunggu giliran diproses.";
 	return null;
 }

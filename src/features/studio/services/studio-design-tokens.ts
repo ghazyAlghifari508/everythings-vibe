@@ -230,8 +230,21 @@ export function extractDesignSystemTokens(
 		}
 	};
 
+	// The canonical model renderer states each measured family as a bold
+	// heading plus a verbatim CSS stack under "Fonts & Type Faces".
+	const typefaceSection = text.match(
+		/###\s*Fonts\s*(?:&|and)\s*Type\s*Faces\b([\s\S]*?)(?=\n###|\n## |$)/i,
+	);
+	const canonicalStack = typefaceSection?.[1].match(
+		/^-\s*CSS stack:\s*`([^`]+)`/im,
+	);
+	const canonicalFamily =
+		canonicalStack?.[1]?.split(",")[0]?.replace(/['"]/g, "").trim() ||
+		typefaceSection?.[1].match(/^\*\*([^*]+)\*\*\s*$/m)?.[1]?.trim();
 	if (fontMatch?.[1]) {
 		setFontFamily(fontMatch[1]);
+	} else if (canonicalFamily) {
+		setFontFamily(canonicalFamily);
 	} else {
 		// The model renderer lists one "### Family" heading per measured
 		// typeface inside the Fonts & Type Scale section.
@@ -263,7 +276,7 @@ export function extractDesignSystemTokens(
 	// 3. Extract Border Radius
 	// Match | Element | Value | e.g. | nav | 50px |
 	const radiusSection = text.match(
-		/###\s*Border\s*Radius[\s\S]*?(?=###|##|$)/i,
+		/###\s*(?:Border\s*Radius|Spacing\s*(?:&|and)\s*Shapes)[\s\S]*?(?=\n###|\n## |$)/i,
 	);
 	if (radiusSection?.[0]) {
 		// Values may be wrapped in backticks and annotated by the canonical
@@ -278,8 +291,10 @@ export function extractDesignSystemTokens(
 		for (const m of radRows) {
 			const key = m[1].toLowerCase().trim();
 			const val = m[2].trim();
-			if (key.includes("card")) shapes.borderRadius.cards = val;
-			else if (key.includes("button")) shapes.borderRadius.buttons = val;
+			if (key.includes("card") || key.includes("section"))
+				shapes.borderRadius.cards = val;
+			else if (key.includes("button") || key.includes("cta"))
+				shapes.borderRadius.buttons = val;
 			else if (key.includes("nav")) shapes.borderRadius.nav = val;
 			else if (key.includes("small")) shapes.borderRadius.small = val;
 			else if (!measured) measured = val;

@@ -68,6 +68,9 @@ body{margin:0}
 [data-studio-shell] :where(.grid>*,[class*="grid-cols"]>*){min-width:0}
 [data-studio-shell] :where(.flex>*,[class*="flex-"]>*){min-width:0}
 [data-studio-shell] :where(img,svg,video){max-width:100%}
+[data-studio-shell] :where(img,video){height:auto}
+[data-studio-shell] :where([data-media],figure img,img[src*="unsplash"]){aspect-ratio:16/9;width:100%;object-fit:cover}
+@supports not (aspect-ratio:16/9){[data-studio-shell] :where([data-media],figure img){min-height:200px;object-fit:cover;width:100%}}
 [data-studio-shell] :where(h1){font-size:28px;line-height:1.2}
 [data-studio-shell] :where(h2){font-size:22px;line-height:1.3}
 [data-studio-shell] :where(h3){font-size:18px;line-height:1.4}
@@ -153,18 +156,53 @@ export function assembleCanonicalShell(
 	}
 
 	// Contextual headings and tabs belong to the screen, not the shared shell.
+	// Remove application chrome (duplicate app bars/status bars) wherever it
+	// lands. Signature: a bare <nav> outside the content region, a status bar,
+	// or a <header> that carries none of the screen's own heading content. A
+	// content header that owns the screen title (e.g. <header
+	// data-studio-page-header><h1>) and an in-content nav that links into the
+	// page (section anchors) are screen-owned and must survive assembly.
 	for (const el of Array.from(
 		document.body.querySelectorAll(
-			"nav, header, [data-studio-status-bar], [data-status-bar], .status-bar, .system-status-bar",
+			"[data-studio-status-bar], [data-status-bar], .status-bar, .system-status-bar",
 		),
 	)) {
-		if (
-			el !== content &&
-			(!content.contains(el) ||
-				el.matches?.(
-					"[data-studio-header], [data-studio-navigation], [data-studio-status-bar], [data-status-bar], .status-bar, .system-status-bar",
-				))
-		) {
+		if (el !== content) {
+			el.remove();
+		}
+	}
+	for (const el of Array.from(document.body.querySelectorAll("nav"))) {
+		if (el === content) continue;
+		// A nav carrying the canonical attribute is Studio-consumed chrome even
+		// when an earlier model pass left it inside the content region: it must
+		// never survive into a shell that already injects the canonical bar.
+		if (el.matches("[data-studio-navigation]")) {
+			el.remove();
+			continue;
+		}
+		const insideContent = el.closest("[data-studio-content]") !== null;
+		const linksToPage = [...el.querySelectorAll("a[href]")].some((link) =>
+			/^#[\w-]+$/.test(link.getAttribute("href") ?? ""),
+		);
+		if (!insideContent || !linksToPage) {
+			el.remove();
+		}
+	}
+	for (const el of Array.from(document.body.querySelectorAll("header"))) {
+		if (el === content) continue;
+		const insideContent = el.closest("[data-studio-content]") !== null;
+		// Inside the content, any data-studio-header is a duplicate of the bar
+		// Studio injects (p3 duplicate-header defect). Outside the content it is
+		// the injected bar itself and is kept.
+		if (insideContent && el.matches("[data-studio-header]")) {
+			el.remove();
+			continue;
+		}
+		const ownsScreenHeading =
+			insideContent &&
+			(el.matches("[data-studio-page-header]") ||
+				el.querySelector("h1, h2, h3") !== null);
+		if (!ownsScreenHeading) {
 			el.remove();
 		}
 	}

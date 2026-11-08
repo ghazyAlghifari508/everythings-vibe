@@ -313,6 +313,59 @@ describe("StudioCanvas", () => {
 		expect(onRetryPlanning).toHaveBeenCalled();
 	});
 
+	it("offers planning recovery instead of per-frame retries for provisional slots", () => {
+		const onRetryPlanning = vi.fn();
+		const onRetryFrame = vi.fn();
+		const slots = [0, 1, 2, 3].map((order) => ({
+			...mockFrames[1],
+			id: `slot-${order}`,
+			name: `Layar ${order + 1}`,
+			description: "",
+			order,
+			status: "failed",
+			error: "Rencana layar belum berhasil disusun. Coba lagi.",
+		}));
+
+		render(
+			<StudioCanvas
+				project={mockProject}
+				frames={slots}
+				activeJob={{
+					id: "j-2",
+					projectId: "p-1",
+					userId: "u-1",
+					prompt: "Test",
+					jobType: "initial",
+					targetFrameId: null,
+					status: "failed",
+					error: "Rencana layar belum berhasil disusun. Coba lagi.",
+					claimedBy: null,
+					attempts: 1,
+					claimedAt: null,
+					leaseExpiresAt: null,
+					startedAt: null,
+					finishedAt: null,
+					createdAt: new Date(),
+					updatedAt: new Date(),
+				}}
+				onRetryPlanning={onRetryPlanning}
+				onRetryFrame={onRetryFrame}
+			/>,
+		);
+
+		// One shared plan failed, so the only offered recovery is the plan itself:
+		// four failed slots must not each grow their own retry button.
+		expect(screen.getByText("Perencanaan layar gagal")).toBeDefined();
+		expect(
+			screen.getByText("Rencana layar belum berhasil disusun. Coba lagi."),
+		).toBeDefined();
+		const retryButtons = screen.getAllByRole("button", { name: /Coba lagi/i });
+		expect(retryButtons).toHaveLength(1);
+		fireEvent.click(retryButtons[0] as HTMLElement);
+		expect(onRetryPlanning).toHaveBeenCalledTimes(1);
+		expect(onRetryFrame).not.toHaveBeenCalled();
+	});
+
 	describe("computeCanvasFit", () => {
 		const limits = {
 			minZoom: STUDIO_CANVAS_MIN_ZOOM,

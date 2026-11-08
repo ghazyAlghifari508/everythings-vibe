@@ -10,8 +10,10 @@ import {
 	resolveStudioFrameSystemPrompt,
 	resolveStudioSkillContext,
 } from "./studio-design-skill-registry.server";
+import { StudioFrameError } from "./studio-frame-errors";
 import type { StudioDesignSkillId } from "./studio-generation-options";
 import { studioJobTiming } from "./studio-job-runtime";
+import { studioStreamMetrics } from "./studio-stream-metrics";
 
 // Started tasks are never cancelled by another task's failure.
 export async function runWithConcurrency<T>(
@@ -39,7 +41,7 @@ export async function runWithConcurrency<T>(
 
 export function isRetryableProviderError(error: unknown): boolean {
 	const message = error instanceof Error ? error.message : String(error);
-	return /429|rate.?limit|too many requests|timeout|timed out|econn|socket|temporar|unavailable|overloaded|try again/i.test(
+	return /429|5\d\d|rate.?limit|too many requests|timeout|timed out|econn|socket|fetch failed|temporar|unavailable|overloaded|try again/i.test(
 		message,
 	);
 }
@@ -189,6 +191,9 @@ export async function generateStudioHtml(
 		],
 		signal,
 		maxTokens,
+		undefined,
+		undefined,
+		{ maxAttempts: 1 },
 	);
 	if (timing) studioJobTiming("first-token", startedAt, timing);
 	const outputStartedAt = Date.now();
@@ -199,25 +204,14 @@ export async function generateStudioHtml(
 		completed = true;
 	} finally {
 		if (timing) {
-			const isTruncatedFinish =
-				outcome?.finishReason === "length" ||
-				outcome?.finishReason === "max_tokens" ||
-				outcome?.finishReason === "max_output_tokens";
-			const tokenLimitExceeded = isTruncatedFinish
-				? true
-				: outcome?.textTokens !== undefined
-					? outcome.textTokens > maxTokens
-					: outcome?.outputTokens !== undefined &&
-						outcome.outputTokens > maxTokens;
 			studioJobTiming("frame-output", outputStartedAt, {
 				...timing,
 				outputChars: raw.length,
-				...outcome,
-				// The applied ceiling travels with the usage so a gateway that
-				// ignores or reinterprets maxOutputTokens is visible in the log.
-				maxTokens,
-				tokenLimitExceeded,
-				code: classifyStudioStreamCompletion(outcome?.finishReason, completed),
+				...studioStreamMetrics(
+					outcome,
+					maxTokens,
+					classifyStudioStreamCompletion(outcome?.finishReason, completed),
+				),
 			});
 		}
 	}
@@ -232,7 +226,13 @@ export async function generateStudioHtml(
 		outcome?.finishReason,
 		completed,
 	);
-	if (completion === "INCOMPLETE_OUTPUT" || completion === "FILTERED_OUTPUT")
+	if (completion === "INCOMPLETE_OUTPUT")
 		throw new StudioIncompleteOutputError(completion, cleaned);
+	if (completion !== "COMPLETED")
+		throw new StudioFrameError(
+			completion === "CANCELLED"
+				? "STUDIO_CANCELLED"
+				: "STUDIO_PROVIDER_UNAVAILABLE",
+		);
 	return cleaned;
 }

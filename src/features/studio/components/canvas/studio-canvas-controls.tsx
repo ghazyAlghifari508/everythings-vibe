@@ -57,6 +57,8 @@ export function StudioCanvasToolPalette({
 
 interface StudioCanvasZoomCornerProps {
 	zoom: number;
+	minZoom?: number;
+	maxZoom?: number;
 	onZoomIn: () => void;
 	onZoomOut: () => void;
 	onFit: () => void;
@@ -70,6 +72,8 @@ interface StudioCanvasZoomCornerProps {
  */
 export function StudioCanvasZoomCorner({
 	zoom,
+	minZoom,
+	maxZoom,
 	onZoomIn,
 	onZoomOut,
 	onFit,
@@ -81,6 +85,8 @@ export function StudioCanvasZoomCorner({
 		>
 			<ZoomControls
 				zoom={zoom}
+				minZoom={minZoom}
+				maxZoom={maxZoom}
 				onZoomIn={onZoomIn}
 				onZoomOut={onZoomOut}
 				onReset={onFit}

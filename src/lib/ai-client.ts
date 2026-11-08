@@ -33,6 +33,7 @@ interface ChatMessage {
  */
 export interface StreamOutcome {
 	finishReason?: string;
+	rawFinishReason?: string;
 	inputTokens?: number;
 	outputTokens?: number;
 	textTokens?: number;
@@ -72,6 +73,7 @@ export async function* streamChat(
 	maxTokens = 32768,
 	outcome?: StreamOutcome,
 	onThinking?: (text: string) => void,
+	sdkRetries?: number,
 ): AsyncGenerator<string, void, undefined> {
 	const systemMessages = messages
 		.filter((m) => m.role === "system")
@@ -95,13 +97,16 @@ export async function* streamChat(
 		include: { rawChunks: true },
 		abortSignal: signal,
 		maxOutputTokens: maxTokens,
+		maxRetries: sdkRetries,
 		stopSequences: ["<|eot_id|>", "<|end_of_text|>", "===DONE==="],
 		onError({ error }) {
 			// SDK suppresses stream errors into fullStream `error` parts (handled
 			// above), but captures non-stream errors here too. Re-emit so the
 			// caller's try/catch sees the real failure reason.
 			if (outcome) outcome.finishReason = "error";
-			console.error("streamText error:", error);
+			console.error("AI provider stream failed", {
+				category: error instanceof Error ? error.name : "ProviderError",
+			});
 		},
 	});
 
@@ -185,6 +190,7 @@ export async function* streamChat(
 			}
 			if (part.type === "finish") {
 				if (outcome) {
+					outcome.rawFinishReason = part.rawFinishReason;
 					outcome.inputTokens = part.totalUsage.inputTokens;
 					outcome.outputTokens = part.totalUsage.outputTokens;
 					outcome.textTokens = part.totalUsage.outputTokenDetails?.textTokens;
@@ -231,7 +237,8 @@ export async function* streamChat(
 	if (outcome) {
 		// ponytail: PromiseLike, not Promise - no .catch(), so try/catch it.
 		try {
-			outcome.finishReason = await result.finishReason;
+			outcome.finishReason =
+				(await result.finishReason) ?? outcome.finishReason;
 		} catch {
 			outcome.finishReason = "error";
 		}

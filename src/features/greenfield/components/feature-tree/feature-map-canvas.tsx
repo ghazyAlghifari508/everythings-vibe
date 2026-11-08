@@ -364,6 +364,8 @@ export const FeatureMapCanvas = memo(function FeatureMapCanvas({
 					</div>
 					<ZoomControls
 						zoom={zoom}
+						minZoom={minZoom}
+						maxZoom={maxZoom}
 						onZoomIn={zoomIn}
 						onZoomOut={zoomOut}
 						onReset={resetZoom}

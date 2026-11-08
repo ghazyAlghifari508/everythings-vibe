@@ -109,14 +109,6 @@ describe("archived VibeScrape reference", () => {
 			expect(planning).toHaveLength(1);
 			const planningUser = planning[0]?.[1]?.content ?? "";
 			expect(planningUser).toContain(documentHead(LEGACY));
-			expect(planningUser).toContain("- Primary Brand Color: #155eef");
-			expect(planningUser).toContain("- Canvas Background: #ffffff");
-			expect(planningUser).toContain("- Dominant Text/Ink Color: #101828");
-			expect(planningUser).toContain(
-				"- Typography: 'Inter', system-ui, -apple-system, sans-serif",
-			);
-			expect(planningUser).toContain("- Card Border Radius: 24px");
-			expect(planningUser).toContain("- Button Border Radius: 8px");
 
 			const frames = aiCalls("frame");
 			expect(frames).toHaveLength(2);

@@ -169,34 +169,35 @@ it("ignores non-telemetry, malformed, and non-finite input", () => {
 	expect(report.meanMeasuredOutputTokensPerRequest).toBeNull();
 });
 
-it("counts requests whose reported usage exceeded the applied token ceiling", () => {
+it("separates accounting anomalies from observed truncation", () => {
 	const lines = [
 		{
 			stage: "frame-output",
 			outputTokens: 29000,
-			maxTokens: 12000,
-			tokenLimitExceeded: true,
+			accountingAboveRequested: true,
+			ceilingReached: false,
 			durationMs: 10,
 		},
 		{
 			stage: "frame-output",
 			outputTokens: 8000,
-			maxTokens: 12000,
-			tokenLimitExceeded: false,
+			accountingAboveRequested: false,
+			ceilingReached: true,
 			durationMs: 10,
 		},
 		{
 			stage: "planning-output",
 			outputTokens: 1000,
-			maxTokens: 4000,
-			tokenLimitExceeded: false,
+			accountingAboveRequested: false,
+			ceilingReached: false,
 			durationMs: 10,
 		},
 	]
 		.map((event) => JSON.stringify({ scope: "studio", ...event }))
 		.join("\n");
 	const report = summarizeStudioTimings(lines);
-	expect(report.tokenLimitExceededCount).toBe(1);
+	expect(report.accountingAboveRequestedCount).toBe(1);
+	expect(report.ceilingReachedCount).toBe(1);
 });
 
 it("uses nearest-rank quantiles only with at least twenty observations", () => {
