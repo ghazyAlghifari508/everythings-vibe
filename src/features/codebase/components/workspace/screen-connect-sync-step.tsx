@@ -112,6 +112,9 @@ export function ScreenConnectSyncStep({
 					status={status}
 					isAnalysisReady={canContinueToSummary}
 					analysisBlocked={analysisBlocked}
+					isLegacyAnalysisMissingSuggestions={
+						isLegacyAnalysisMissingSuggestions
+					}
 					showAnalysisFailure={
 						!isLegacyAnalysisMissingSuggestions &&
 						!isRetrying &&
