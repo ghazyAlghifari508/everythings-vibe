@@ -116,12 +116,12 @@ export function CodebaseLibraryItemCard({
 
 	return (
 		<li
-			className={`group flex items-start gap-1 rounded-xl border bg-charcoal/60 transition-colors hover:bg-charcoal ${
+			className={`group flex items-stretch gap-1 rounded-xl border bg-charcoal/60 transition-colors hover:bg-charcoal ${
 				selected ? "border-fog/40" : "border-graphite hover:border-fog/40"
 			}`}
 		>
 			{selectionActive ? (
-				<label className="flex shrink-0 cursor-pointer items-start pl-4 pt-5">
+				<label className="flex shrink-0 cursor-pointer items-center pl-4 self-stretch">
 					<input
 						type="checkbox"
 						checked={selected}

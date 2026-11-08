@@ -134,6 +134,12 @@ export type RetrySessionOutcome =
 	| { kind: "minted"; payload: SyncPromptPayload }
 	| { kind: "cancelled" }
 	| { kind: "failed" }
+	/**
+	 * Server state, not a failure: `SYNC_SESSION_ACTIVE` and
+	 * `SYNC_SNAPSHOT_UPLOADED` mean real work exists and no replacement is
+	 * offered; `SYNC_SESSION_STALE` means a newer session already won and the
+	 * caller must re-read; the other two are explicit, recoverable prompts.
+	 */
 	| { kind: "recovery"; code: string; sessionId: string; message: string };
 
 export async function requestRetrySession(
@@ -158,6 +164,7 @@ export async function requestRetrySession(
 				"CODEBASE_SESSION_RECOVERY_REQUIRED",
 				"SYNC_SESSION_ACTIVE",
 				"SYNC_SNAPSHOT_UPLOADED",
+				"SYNC_SESSION_STALE",
 			]),
 			sessionId: z.string().min(1),
 			error: z.string(),

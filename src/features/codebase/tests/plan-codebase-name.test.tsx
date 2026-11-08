@@ -59,7 +59,7 @@ describe("PlanCodebasePage repository name", () => {
 		}
 	});
 
-	it("shows the placeholder until the CLI reports the real repository name", async () => {
+	it("never presents a repository identity in the sync header, not even the provisional name", async () => {
 		let statusCalls = 0;
 		vi.stubGlobal(
 			"fetch",
@@ -101,31 +101,32 @@ describe("PlanCodebasePage repository name", () => {
 
 		await renderConnectedOnboarding();
 
-		// The prompt carries no repository identity yet, because the server only
-		// knows the provisional creation placeholder before the agent runs —
-		// and a placeholder is never presented as the repository.
 		await waitFor(() => {
 			expect(
 				screen.getByText("Sync codebase dengan everythings-vibe"),
 			).toBeDefined();
 		});
-		expect(document.body.textContent).toContain("Repository belum terdeteksi");
-		expect(document.body.textContent).not.toContain(PLACEHOLDER);
+		// No eyebrow exists any more: a placeholder is never presented as the
+		// repository, and neither is a detected name on this screen. Identity
+		// belongs to History/Workspace once the CLI has identified it.
+		const headerText = document.body.textContent ?? "";
+		expect(headerText).not.toContain("Project /");
+		expect(headerText).not.toContain("Repository belum terdeteksi");
+		expect(headerText).not.toContain(PLACEHOLDER);
 
-		// Once the handshake lands, the live status on the SAME screen adopts the
-		// detected folder name instead of keeping the creation placeholder.
+		// The handshake still reaches the screen: the sync progress row reports
+		// the agent instead of a fabricated identity.
 		await waitFor(
 			() => {
-				expect(document.body.textContent).toContain(
-					`Project / ${DETECTED_NAME}`,
-				);
+				expect(document.body.textContent).toContain("Agent terhubung");
 			},
 			{ timeout: 15000, interval: 100 },
 		);
 		expect(statusCalls).toBeGreaterThanOrEqual(2);
+		expect(document.body.textContent ?? "").not.toContain(DETECTED_NAME);
 	}, 20000);
 
-	it("keeps showing a user-renamed name reported by the server", async () => {
+	it("keeps a server-reported repository name out of the sync header", async () => {
 		let statusCalls = 0;
 		vi.stubGlobal(
 			"fetch",
@@ -171,13 +172,13 @@ describe("PlanCodebasePage repository name", () => {
 
 		await waitFor(
 			() => {
-				expect(document.body.textContent).toContain(
-					"Project / Movie App Portfolio",
-				);
+				expect(document.body.textContent).toContain("Agent terhubung");
 			},
 			{ timeout: 15000, interval: 100 },
 		);
 		expect(statusCalls).toBeGreaterThanOrEqual(1);
-		expect(document.body.textContent).not.toContain(`Project / ${PLACEHOLDER}`);
+		const headerText = document.body.textContent ?? "";
+		expect(headerText).not.toContain("Project /");
+		expect(headerText).not.toContain(PLACEHOLDER);
 	}, 20000);
 });

@@ -48,7 +48,7 @@ NEW → RESUME remounts the machine instead of migrating old state into it.
 | B CLI syncing | `Agent terhubung` → `Mengunggah repository...` | analysis progress, new-session offer |
 | C uploaded, analysis pending | `Sinkronisasi selesai` + `Menganalisis repository...` | new-session offer |
 | D uploaded, analysis failed | `Sinkronisasi selesai` + `Analisis belum berhasil` + `Coba Analisis Lagi` | new-session offer |
-| E token expired before upload | `Buat sesi baru` | analysis progress |
+| E token expiring/expired before upload | `Buat prompt baru` (see `codebase-fix02-prompt-recovery.md`) | analysis progress |
 | F ready | `Analisis selesai` + enabled workspace CTA | retry panels |
 
 The prompt row is a single precedence chain: live prompt → transport done → CLI

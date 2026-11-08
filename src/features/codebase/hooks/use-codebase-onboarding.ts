@@ -22,6 +22,14 @@ import {
 	requestCreateCodebase,
 	requestRetrySession,
 } from "../services/onboarding-requests";
+import {
+	type PromptRecovery,
+	promptRecoveryFromSessionCode,
+} from "../services/prompt-recovery";
+import {
+	clearSyncPromptVault,
+	rememberSyncPrompt,
+} from "../services/sync-prompt-vault";
 import type { OnboardingAnalysisState } from "./use-onboarding-analysis-state";
 import { useOnboardingRecovery } from "./use-onboarding-recovery";
 
@@ -51,6 +59,12 @@ export function useCodebaseOnboarding({
 	const [isStarting, setIsStarting] = useState(false);
 	const [codebase, setCodebase] = useState<CreatedCodebase | null>(null);
 	const [payload, setPayload] = useState<SyncPromptPayload | null>(null);
+	// A recoverable prompt state: the repository/session exist, the one-time
+	// credential is not available in this browser. Never stored in `error`,
+	// because nothing failed and a generic retry is the wrong action.
+	const [promptRecovery, setPromptRecovery] = useState<PromptRecovery | null>(
+		null,
+	);
 	const queryInFlight = useRef(false);
 	// Recovered status is the poller's seed, so the first paint after a refresh
 	// already reflects persisted server state instead of an empty loading card.
@@ -121,8 +135,13 @@ export function useCodebaseOnboarding({
 		(next: SyncPromptPayload | null, seed: SyncStatusResponse | null) => {
 			// One atomic reset: every surface (prompt, expiry, poller, error,
 			// progress, analysis) follows the new session identity together.
+			// The raw credential is retained in app memory only, so a route
+			// navigation can hand back this exact prompt; a replacement overwrites
+			// the previous entry for the codebase.
+			if (next) rememberSyncPrompt(next);
 			setPayload(next);
 			setActiveSessionId(next?.sessionId ?? null);
+			setPromptRecovery(null);
 			setRecoveredStatus(seed);
 			setAnalysis(null);
 			setAnalysisError(null);
@@ -142,9 +161,11 @@ export function useCodebaseOnboarding({
 	// it is forgotten.
 	const resetForFreshStart = useCallback(() => {
 		clearPlanOnboardingPointers();
+		clearSyncPromptVault();
 		setCreditStatus(null);
 		setRecoveredStatus(null);
 		setActiveSessionId(null);
+		setPromptRecovery(null);
 		setFeatureProjectId(null);
 		setAnalysis(null);
 		setAnalysisError(null);
@@ -162,6 +183,19 @@ export function useCodebaseOnboarding({
 		analysisState.setAnalysisWorking,
 		analysisState.setCreditStatus,
 	]);
+
+	// The recoverable prompt state is only valid while the attempt is genuinely
+	// waiting (or expired). Once the server reports a real CLI connection, upload,
+	// or snapshot, the obsolete recovery message must disappear rather than sit
+	// next to live progress.
+	useEffect(() => {
+		if (!promptRecovery || !lastStatus) return;
+		if (
+			lastStatus.status !== "waiting_for_cli" &&
+			lastStatus.status !== "expired"
+		)
+			setPromptRecovery(null);
+	}, [lastStatus, promptRecovery]);
 
 	const refreshCreditStatus = useCallback(async () => {
 		if (queryInFlight.current) return;
@@ -194,6 +228,7 @@ export function useCodebaseOnboarding({
 		setStep,
 		setPayload,
 		setCreditStatus,
+		setPromptRecovery,
 	});
 	const createCodebase = useCallback(async () => {
 		if (createInFlight.current || codebase) return;
@@ -313,12 +348,31 @@ export function useCodebaseOnboarding({
 				return;
 			if (outcome.kind === "cancelled") return;
 			if (outcome.kind === "failed") {
-				setError("Sesi sync gagal dibuat. Coba lagi.");
+				// The repository and session are untouched. If a recoverable prompt was
+				// on screen, keep it and say the new prompt failed instead of replacing
+				// it with a generic sync error.
+				if (promptRecovery)
+					setPromptRecovery({ ...promptRecovery, failed: true });
+				else setError("Sesi sync gagal dibuat. Coba lagi.");
 				return;
 			}
 			if (outcome.kind === "recovery") {
 				setActiveSessionId(outcome.sessionId);
-				setError(outcome.message);
+				const recovery = promptRecoveryFromSessionCode(
+					outcome.code,
+					outcome.sessionId,
+				);
+				if (recovery) {
+					// Explicitly recoverable: repository and session stay exactly as
+					// they are; only a new credential is offered.
+					setPromptRecovery(recovery);
+					return;
+				}
+				// ACTIVE / UPLOADED / STALE are not failures and must not offer a
+				// replacement. Re-read authoritative state instead: the CLI may have
+				// connected, the upload may already be stored, or another tab may
+				// have produced a newer session.
+				setPromptRecovery(null);
 				await recoverCodebase();
 				return;
 			}
@@ -343,6 +397,7 @@ export function useCodebaseOnboarding({
 		setStep,
 		lastStatus?.snapshotId,
 		activeSessionId,
+		promptRecovery,
 		recoverCodebase,
 	]);
 
@@ -371,6 +426,7 @@ export function useCodebaseOnboarding({
 		isStarting,
 		codebase,
 		payload,
+		promptRecovery,
 		lastStatus,
 		statusPollError,
 		streamNotice,

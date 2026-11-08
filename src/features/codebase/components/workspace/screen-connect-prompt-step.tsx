@@ -16,6 +16,7 @@ import {
 	type LockedPromptState,
 	LockedPromptStateView,
 } from "./locked-prompt-state";
+import { buildPromptRecoveryState } from "./prompt-recovery-state";
 
 function resolveExpiryMs(value: string | undefined): number | null {
 	if (!value) return null;
@@ -40,6 +41,11 @@ interface ScreenConnectPromptStepProps {
 	lockedPrompt?: LockedPromptState | null;
 	/** Non-secret rate/saldo disclosure rendered outside the prompt box. */
 	creditNote?: string | null;
+	/**
+	 * The server genuinely failed this attempt. Only its presence is used: a
+	 * recoverable prompt never routes through here, and no raw server message is
+	 * shown, because the failure copy is fixed product wording.
+	 */
 	error?: string | null;
 }
 
@@ -80,9 +86,6 @@ export function ScreenConnectPromptStep({
 	const handleCopy = async () => {
 		await copy(promptText);
 	};
-
-	const showRenewal =
-		expiryState === "expired" || expiryState === "soon" || !payload;
 
 	// A schema-validated payload is the only proof that this session exists, so
 	// it always wins. A credit read taken before (or after) it landed is stale by
@@ -132,7 +135,10 @@ export function ScreenConnectPromptStep({
 						</Button>
 					)}
 				</div>
-				<div className="relative rounded-lg border border-graphite bg-onyx p-3.5 font-mono text-xs leading-relaxed text-mist sm:p-4">
+				<div
+					data-testid="prompt-box"
+					className="relative rounded-lg border border-graphite bg-onyx p-3.5 font-mono text-xs leading-relaxed text-mist sm:p-4"
+				>
 					{activeLock ? (
 						<LockedPromptStateView {...activeLock} />
 					) : promptUsable ? (
@@ -155,49 +161,35 @@ export function ScreenConnectPromptStep({
 					) : transportComplete ? (
 						<div
 							data-testid="prompt-transport-done"
-							className="flex min-h-[190px] flex-col items-center justify-center gap-2 py-6 text-center font-sans"
+							className="flex items-center gap-2 font-sans"
 						>
 							<Icon icon={Tick01Icon} size={14} className="text-emerald-400" />
-							<p className="max-w-[38ch] text-xs leading-relaxed text-fog">
-								Prompt sudah dijalankan dan source code tersimpan. Tidak ada
-								instruksi baru yang perlu dijalankan.
+							<p className="text-xs leading-relaxed text-fog">
+								Source code berhasil diterima.
 							</p>
 						</div>
 					) : cliActive ? (
-						<output className="block py-6 font-sans text-xs text-fog">
-							Agent terhubung. Sinkronisasi sedang berlangsung.
+						<output className="block font-sans text-xs text-fog">
+							Agent sedang menyinkronkan repository.
 						</output>
 					) : isStarting ? (
-						<div className="flex min-h-[190px] items-center justify-center gap-2 py-6 font-sans text-xs text-fog">
+						<div className="flex items-center gap-2 font-sans text-xs text-fog">
 							<Spinner size={14} className="text-blue-400" />
 							<span>Menghubungkan repository...</span>
 						</div>
 					) : (
-						<div className="flex min-h-[190px] flex-col items-center justify-center gap-3 py-6 text-center font-sans">
-							<p className="max-w-[38ch] text-xs text-fog">
-								{error ??
-									(sessionStatus === "expired" || expiryState === "expired"
-										? "Sesi sinkronisasi berakhir."
-										: "Token sync hanya berlaku sekali dan tidak disimpan di browser.")}
-							</p>
-							{showRenewal && onRequestNewToken && (
-								<Button
-									type="button"
-									onClick={onRequestNewToken}
-									disabled={isStarting}
-									variant="secondary"
-									className="min-h-11 px-3.5 text-xs"
-								>
-									{expiryState === "expired" || !payload
-										? error
-											? "Coba lagi"
-											: "Buat sesi baru"
-										: expiryState === "soon"
-											? "Perbarui sesi"
-											: "Dapatkan token baru"}
-								</Button>
+						<LockedPromptStateView
+							{...buildPromptRecoveryState(
+								// `error` is a genuine failure signal, never a recovery: a
+								// recoverable prompt is owned by the recovery state instead.
+								error
+									? "failed"
+									: sessionStatus === "expired" || expiryState === "expired"
+										? "expired"
+										: "unavailable",
+								onRequestNewToken ?? null,
 							)}
-						</div>
+						/>
 					)}
 				</div>
 				{creditNote && !activeLock && (

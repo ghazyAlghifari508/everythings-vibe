@@ -25,6 +25,7 @@ import { Logo } from "@/components/ui/logo";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { TopUpModal } from "@/features/billing/components/top-up-modal";
 import { useUserPlan } from "@/features/billing/hooks/use-user-plan";
+import { clearSyncPromptVault } from "@/features/codebase/services/sync-prompt-vault";
 import { authClient } from "@/lib/auth-client";
 import { historyFilterSchema } from "@/lib/history";
 import { isAdmin } from "@/lib/session";
@@ -115,6 +116,9 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 			await authClient.signOut();
 			// The router survives logout, so its user-scoped cache must not reach the next session.
 			queryClient.clear();
+			// A one-time sync prompt may still be retained in app memory; the next
+			// account in this tab must never inherit it.
+			clearSyncPromptVault();
 			navigate({ to: "/login" });
 			router.invalidate();
 		} catch (err) {

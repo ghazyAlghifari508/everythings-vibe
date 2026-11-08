@@ -8,6 +8,7 @@ import {
 	buildLockedPrompt,
 	type LockedPromptState,
 } from "@/features/codebase/components/workspace/locked-prompt-state";
+import { buildPromptRecoveryState } from "@/features/codebase/components/workspace/prompt-recovery-state";
 import { ScreenConnect } from "@/features/codebase/components/workspace/screen-connect";
 import { codebaseStarterSuggestionsSchema } from "@/features/codebase/services/analysis";
 import type { AnalysisCreditStatus } from "@/features/codebase/services/analysis-credit-policy";
@@ -58,6 +59,7 @@ export function PlanCodebasePage({
 		isStarting,
 		codebase,
 		payload,
+		promptRecovery,
 		lastStatus,
 		statusPollError,
 		streamNotice,
@@ -128,17 +130,38 @@ export function PlanCodebasePage({
 		error,
 	});
 
-	const lockedPrompt = useMemo<LockedPromptState | null>(
-		() =>
-			buildLockedPrompt(creditStatus, {
-				onTopUpClose: () =>
-					void (async () => {
-						await refreshCreditStatus();
-						if (codebase) await retrySession();
-					})(),
-			}),
-		[creditStatus, refreshCreditStatus, codebase, retrySession],
-	);
+	const lockedPrompt = useMemo<LockedPromptState | null>(() => {
+		// Credit eligibility outranks prompt recovery: if the account cannot start
+		// at all, the top-up path is the one action that helps. Otherwise the
+		// prompt is recoverable — nothing failed, so there is no error state.
+		const creditLock = buildLockedPrompt(creditStatus, {
+			onTopUpClose: () =>
+				void (async () => {
+					await refreshCreditStatus();
+					if (codebase) await retrySession();
+				})(),
+		});
+		if (creditLock) return creditLock;
+		if (!promptRecovery) return null;
+		// One exclusive presentation per state: a pending replacement is not an
+		// error, only a failed request is, and none of them mints a second
+		// repository or rotates a credential the CLI may be using.
+		const kind = isStarting
+			? "replacing"
+			: promptRecovery.failed
+				? "failed"
+				: promptRecovery.code === "PROMPT_EXPIRED"
+					? "expired"
+					: "unavailable";
+		return buildPromptRecoveryState(kind, () => void retrySession());
+	}, [
+		creditStatus,
+		refreshCreditStatus,
+		codebase,
+		retrySession,
+		promptRecovery,
+		isStarting,
+	]);
 
 	const creditNote = resolveCreditNote(creditStatus);
 

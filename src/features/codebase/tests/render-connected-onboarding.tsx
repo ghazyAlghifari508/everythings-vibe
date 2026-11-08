@@ -41,7 +41,7 @@ export async function renderConnectedOnboarding(options?: {
 		if (screen.queryByRole("alert")) return;
 		if (
 			screen.queryByRole("button", {
-				name: /Buat sesi baru|Dapatkan token baru|Perbarui sesi/,
+				name: /Buat prompt baru|Buat sesi baru|Dapatkan token baru|Perbarui sesi/,
 			})
 		)
 			return;

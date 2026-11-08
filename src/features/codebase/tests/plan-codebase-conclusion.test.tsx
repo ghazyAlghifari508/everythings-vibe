@@ -238,7 +238,7 @@ describe("PlanCodebasePage conclusion step recovery and retry", () => {
 			document
 				.querySelector('[data-testid="sync-stage-agent"]')
 				?.getAttribute("data-stage-state"),
-		).toBe("active");
+		).toBe("waiting");
 		expect(screen.queryByText("Agent terhubung")).toBeNull();
 	}, 20000);
 
