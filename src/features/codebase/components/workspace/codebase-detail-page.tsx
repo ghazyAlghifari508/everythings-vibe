@@ -155,7 +155,7 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 					fileCount={status?.fileCount ?? manifestFileCount}
 					onResync={ws.openResync}
 				/>
-				{error && (
+				{error && !ws.isResyncDrawerOpen && (
 					<div
 						role="alert"
 						className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-crimson/40 bg-crimson/10 px-4 py-2 text-xs text-crimson"

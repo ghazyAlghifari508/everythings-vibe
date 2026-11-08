@@ -30,8 +30,25 @@ export function useCodebaseSync({
 }) {
 	const [status, setStatus] = useState<SyncStatusResponse | null>(null);
 	const [error, setError] = useState<string | null>(null);
+	/**
+	 * A failed status read, separate from the shared workspace error. The re-sync
+	 * modal reports this inside its progress step; the banner outside the modal
+	 * reports the shared error, so the same failure never appears twice.
+	 */
+	const [statusError, setStatusError] = useState<string | null>(null);
 	const [isWorking, setIsWorking] = useState(false);
 	const inFlight = useRef(false);
+	/**
+	 * The exact shared-error string this hook last wrote. A later successful
+	 * read clears only that message, never a composer/analysis error it did not
+	 * own.
+	 */
+	const statusErrorMessageRef = useRef<string | null>(null);
+	const reportStatusError = useCallback((message: string) => {
+		statusErrorMessageRef.current = message;
+		setError(message);
+		setStatusError(message);
+	}, []);
 	const session = useWorkspaceSyncSession({
 		codebaseId,
 		status,
@@ -70,11 +87,10 @@ export function useCodebaseSync({
 				await response.json().catch(() => null),
 			);
 			if (!response.ok || !parsed.success) {
-				setError(
-					response.ok
-						? "Status sync tidak valid. Coba muat ulang."
-						: "Status sync tidak dapat dibaca. Coba lagi.",
-				);
+				const message = response.ok
+					? "Status sync tidak valid. Coba muat ulang."
+					: "Status sync tidak dapat dibaca. Coba lagi.";
+				reportStatusError(message);
 				return;
 			}
 			const activeSnapshotId = resolveWorkspaceSnapshotIdentity({
@@ -82,6 +98,12 @@ export function useCodebaseSync({
 				polledSnapshotId: parsed.data.workspaceSnapshotId ?? currentSnapshotId,
 			});
 			analysisIdentityRef.current = `${projectId ?? ""}:${activeSnapshotId ?? ""}`;
+			const staleStatusError = statusErrorMessageRef.current;
+			if (staleStatusError !== null) {
+				statusErrorMessageRef.current = null;
+				setError((current) => (current === staleStatusError ? null : current));
+				setStatusError(null);
+			}
 			setStatus(parsed.data);
 			if (!activeSessionId && parsed.data.sessionId) {
 				setActiveSessionId(parsed.data.sessionId);
@@ -113,7 +135,7 @@ export function useCodebaseSync({
 			}
 			// Reading status must never start billable analysis.
 		} catch {
-			setError("Server tidak dapat dihubungi. Coba lagi.");
+			reportStatusError("Server tidak dapat dihubungi. Coba lagi.");
 		} finally {
 			inFlight.current = false;
 		}
@@ -125,6 +147,7 @@ export function useCodebaseSync({
 		initialAnalysis,
 		projectId,
 		readWorkspaceAnalysis,
+		reportStatusError,
 		status?.sessionId,
 		analysisIdentityRef,
 		setAnalysis,
@@ -180,6 +203,7 @@ export function useCodebaseSync({
 		setIsResyncDrawerOpen: session.setIsResyncModalOpen,
 		status,
 		error,
+		statusError,
 		setError,
 		isWorking,
 		setIsWorking,

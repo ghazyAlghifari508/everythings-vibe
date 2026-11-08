@@ -40,6 +40,20 @@ interface ScreenConnectPromptStepProps {
 	 * shown, because the failure copy is fixed product wording.
 	 */
 	error?: string | null;
+	/** Step title. The re-sync modal names its own prompt action. */
+	heading?: string;
+	/** Which prompt document to build for the copied credential. */
+	promptMode?: "initial" | "resync";
+	/** Accessible name for the copy affordance. */
+	copyAriaLabel?: string;
+	/** Stable test hook for the scrollable prompt content. */
+	contentTestId?: string;
+	/**
+	 * Replaces the default recovery block (states A/B/E) when the caller owns
+	 * the approved wording for its own flow. The prompt box, copy affordance,
+	 * and one-time-credential rules stay identical.
+	 */
+	recoveryState?: LockedPromptState;
 }
 
 export function ScreenConnectPromptStep({
@@ -51,9 +65,16 @@ export function ScreenConnectPromptStep({
 	lockedPrompt = null,
 	creditNote = null,
 	error = null,
+	heading = "Salin instruksi untuk AI agent",
+	promptMode = "initial",
+	copyAriaLabel = "Salin prompt untuk AI agent",
+	contentTestId,
+	recoveryState,
 }: ScreenConnectPromptStepProps) {
 	const { copied, copyError, copy } = useCopyFeedback();
-	const promptText = payload ? buildAgentPrompt(payload, { projectName }) : "";
+	const promptText = payload
+		? buildAgentPrompt(payload, { projectName, mode: promptMode })
+		: "";
 	const sessionStatus = status?.status ?? null;
 	const expiryMs = resolveExpiryMs(payload?.expiresAt ?? status?.expiresAt);
 	const expiryState =
@@ -110,14 +131,12 @@ export function ScreenConnectPromptStep({
 			</span>
 			<div className="flex min-w-0 flex-1 flex-col gap-2">
 				<div className="flex items-center justify-between gap-3">
-					<div className="text-xs font-semibold text-mist">
-						Salin instruksi untuk AI agent
-					</div>
+					<div className="text-xs font-semibold text-mist">{heading}</div>
 					{promptUsable && !activeLock && (
 						<Button
 							type="button"
 							onClick={handleCopy}
-							aria-label="Salin prompt untuk AI agent"
+							aria-label={copyAriaLabel}
 							variant="secondary"
 							className="min-h-11 shrink-0 gap-1.5 px-3 text-xs"
 						>
@@ -147,7 +166,10 @@ export function ScreenConnectPromptStep({
 						<LockedPromptStateView {...activeLock} />
 					) : promptUsable ? (
 						<>
-							<div className="hide-scrollbar max-h-56 select-all overflow-x-auto overflow-y-auto whitespace-pre-wrap text-snow">
+							<div
+								data-testid={contentTestId}
+								className="hide-scrollbar max-h-56 select-all overflow-x-auto overflow-y-auto whitespace-pre-wrap text-snow"
+							>
 								{promptText}
 							</div>
 							{copyError && (
@@ -182,16 +204,17 @@ export function ScreenConnectPromptStep({
 						</div>
 					) : (
 						<LockedPromptStateView
-							{...buildPromptRecoveryState(
-								// `error` is a genuine failure signal, never a recovery: a
-								// recoverable prompt is owned by the recovery state instead.
-								error
-									? "failed"
-									: sessionStatus === "expired" || expiryState === "expired"
-										? "expired"
-										: "unavailable",
-								onRequestNewToken ?? null,
-							)}
+							{...(recoveryState ??
+								buildPromptRecoveryState(
+									// `error` is a genuine failure signal, never a recovery: a
+									// recoverable prompt is owned by the recovery state instead.
+									error
+										? "failed"
+										: sessionStatus === "expired" || expiryState === "expired"
+											? "expired"
+											: "unavailable",
+									onRequestNewToken ?? null,
+								))}
 						/>
 					)}
 				</div>
