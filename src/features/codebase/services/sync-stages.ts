@@ -239,8 +239,8 @@ export function resolveSyncStageView(
 	const agentConnectedAt =
 		eventAt("agent_connected") ?? status.cliConnectedAt ?? null;
 	const uploadStartedAt = eventAt("upload_started");
-	const snapshotPersistedAt =
-		eventAt("snapshot_persisted") ?? status.snapshotCreatedAt ?? null;
+	// Snapshot creation happens at handshake, before upload completion.
+	const snapshotPersistedAt = eventAt("snapshot_persisted");
 	const snapshotPersistedCount = lifecycle.find(
 		(event) => event.kind === "snapshot_persisted",
 	)?.count;

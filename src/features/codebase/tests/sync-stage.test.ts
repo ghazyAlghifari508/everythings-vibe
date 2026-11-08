@@ -269,6 +269,18 @@ describe("completed sync", () => {
 		expect(stage(view, 2).meta).toBeUndefined();
 	});
 
+	it("does not use handshake-time snapshot creation as upload completion", () => {
+		const view = resolveSyncStageView(
+			status({
+				status: "uploaded",
+				snapshotId: "snap_legacy",
+				snapshotCreatedAt: "2026-02-01T10:00:00.000Z",
+			}),
+		);
+		expect(view.syncComplete).toBe(true);
+		expect(stage(view, 2).completedAt).toBeUndefined();
+	});
+
 	it("keeps transport complete while a legacy analyzing session runs", () => {
 		const view = resolveSyncStageView(
 			status({
