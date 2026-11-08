@@ -49,9 +49,12 @@ function status(
 	};
 }
 
-function render(statusValue: SyncStatusResponse | null) {
+function render(
+	statusValue: SyncStatusResponse | null,
+	props: Partial<React.ComponentProps<typeof SyncStageList>> = {},
+) {
 	act(() => {
-		root?.render(<SyncStageList status={statusValue} />);
+		root?.render(<SyncStageList status={statusValue} {...props} />);
 	});
 }
 
@@ -143,12 +146,34 @@ describe("SyncStageList fast-sync reporting", () => {
 				analysisStatus: "ready",
 				analysisAttemptStatus: "failed",
 			}),
+			{ isAnalysisReady: true },
 		);
 		const analysis = container.querySelector(
 			"[data-testid='sync-stage-analysis']",
 		);
 		expect(analysis?.getAttribute("data-stage-state")).toBe("done");
 		expect(analysis?.textContent).toContain("Analisis selesai");
+	});
+
+	it("reads a server-ready analysis as preparing until this client holds its output", () => {
+		// Status naming a ready row is not the same fact as the browser holding a
+		// usable output: the row must not claim success next to a closed
+		// conclusion, and it must never report the newer failed retry instead.
+		render(
+			status({
+				status: "uploaded",
+				snapshotId: "snap_ui",
+				fileCount: 4,
+				analysisStatus: "ready",
+				analysisAttemptStatus: "failed",
+			}),
+		);
+		const analysis = container.querySelector(
+			"[data-testid='sync-stage-analysis']",
+		);
+		expect(analysis?.getAttribute("data-stage-state")).toBe("waiting");
+		expect(analysis?.textContent).toContain("Menyiapkan kesimpulan...");
+		expect(analysis?.textContent).not.toContain("Analisis belum berhasil");
 	});
 
 	it("repaints a persisted standby session as idle instead of starting motion", () => {

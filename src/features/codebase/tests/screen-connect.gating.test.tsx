@@ -318,6 +318,25 @@ describe("Step 1 live sync status", () => {
 			}),
 			canContinueToSummary: false,
 		});
+		// Ready on the server but not yet reconciled into a usable output: the
+		// row must not claim success next to a disabled action.
+		const reconcilingRow = container.querySelector(
+			'[data-testid="sync-stage-analysis"]',
+		);
+		expect(reconcilingRow).not.toBeNull();
+		expect(reconcilingRow?.getAttribute("data-stage-state")).toBe("waiting");
+		expect(reconcilingRow?.textContent).toContain("Menyiapkan kesimpulan...");
+		expect(reconcilingRow?.textContent).not.toContain("Analisis selesai");
+
+		renderConnect({
+			status: status({
+				status: "uploaded",
+				snapshotId: "snap_1",
+				analysisStatus: "ready",
+			}),
+			canContinueToSummary: false,
+			isLegacyAnalysisMissingSuggestions: true,
+		});
 		const legacyRow = container.querySelector(
 			'[data-testid="sync-stage-analysis"]',
 		);
