@@ -6,23 +6,132 @@ import { extractJson } from "@/lib/services/json-extract";
 
 export type AskQuestionType = "select" | "text" | "multiselect";
 
+/** One answer option before identity is assigned (model output, persisted form). */
+export interface AskOptionDraft {
+	/** Heading the user picks — short, specific, and free of app jargon. */
+	label: string;
+	/** What choosing this option changes: scope, behaviour, or limits. */
+	description?: string;
+}
+
+/**
+ * Option input accepted by the shared parser. Both forms are real: the legacy
+ * short-text form (what the Greenfield prompt emits and what handoffs written
+ * before FIX 01 store) and the rich object form (heading + description) the
+ * Existing-Codebase prompt emits.
+ */
+export type AskOptionInput = string | AskOptionDraft;
+
+/** Canonical option: stable identity + heading + optional description. */
+export interface AskQuestionOption extends AskOptionDraft {
+	id: string;
+}
+
 export interface AskQuestion {
 	id: string;
 	question: string;
 	type: AskQuestionType;
-	options?: string[];
+	options?: AskQuestionOption[];
 	/** 0-based index of the option the model recommends, only when the model
 	 *  declared it explicitly. Never inferred from array order. */
 	recommended?: number;
-	/** Short, evidence-tied justification for the recommendation. */
+	/** Short, evidence-tied justification for the recommendation. Metadata only:
+	 *  what the user reads must already be in the recommended option's own
+	 *  description, so no separate reason panel is required. */
 	recommendationReason?: string;
 }
 
 const MAX_OPTIONS_PER_QUESTION = 12;
-const MAX_OPTION_CHARS = 500;
+// Matches the persisted handoff bound (`askHandoffOptionSchema`): a heading the
+// parser accepts must be storable, otherwise a long label would pass generation
+// and then 400 the handoff save, which gates feature generation.
+const MAX_OPTION_CHARS = 100;
+const MAX_OPTION_DESC_CHARS = 400;
 const MAX_QUESTION_CHARS = 2000;
 const MAX_ID_CHARS = 128;
 const MAX_REASON_CHARS = 400;
+
+/**
+ * Canonical option identity: the question id plus the option's position in the
+ * CANONICAL array. Display code sorts a copy (recommendation first) and never
+ * reorders the canonical array, so the id — and with it the saved answer, which
+ * is the label — keeps pointing at the same option.
+ */
+export function buildAskOptionId(questionId: string, index: number): string {
+	return `${questionId}-opt${index + 1}`;
+}
+
+/**
+ * Assign canonical identities to accepted options, preserving order. Accepts
+ * both real forms: a plain string is the legacy short-text heading (no
+ * description available), an object carries heading + description. Validation
+ * and restore both come through here so identity is assigned by one rule.
+ */
+export function toCanonicalOptions(
+	questionId: string,
+	inputs: readonly AskOptionInput[],
+): AskQuestionOption[] {
+	return inputs.map((input, index) => {
+		const draft = typeof input === "string" ? { label: input } : input;
+		return {
+			id: buildAskOptionId(questionId, index),
+			label: draft.label,
+			...(draft.description ? { description: draft.description } : {}),
+		};
+	});
+}
+
+/**
+ * Accept one raw option as either form. Returns null when it misses the
+ * contract so the caller can reject (generation) or drop it (restore):
+ * - string: the legacy short-text heading (no description available).
+ * - object: `label` plus an optional `description`. When a description is
+ *   present it must carry information — blank, oversized, or a verbatim repeat
+ *   of the heading is rejected.
+ * Whether a description is REQUIRED is a mode question, not a shape question:
+ * `describeOptionContractMiss` enforces it for the Existing-Codebase prompt
+ * only, because the Greenfield prompt and every pre-FIX-01 handoff carry
+ * heading-only options that must stay valid.
+ */
+export function normalizeAskOptionInput(input: unknown): AskOptionDraft | null {
+	if (typeof input === "string") {
+		const label = input.trim();
+		if (!label || label.length > MAX_OPTION_CHARS) return null;
+		return { label };
+	}
+	if (typeof input !== "object" || input === null) return null;
+	const record = input as Record<string, unknown>;
+	if (typeof record.label !== "string") return null;
+	const label = record.label.trim();
+	if (!label || label.length > MAX_OPTION_CHARS) return null;
+	if (record.description === undefined || record.description === null) {
+		return { label };
+	}
+	if (typeof record.description !== "string") return null;
+	const description = record.description.trim();
+	if (!description || description.length > MAX_OPTION_DESC_CHARS) return null;
+	if (description.toLowerCase() === label.toLowerCase()) return null;
+	return { label, description };
+}
+
+/**
+ * Location of the first option that breaks the rich contract (heading without a
+ * description), or null when every option explains itself. Used to run the one
+ * bounded repair pass instead of silently shipping a half-explained list.
+ */
+export function describeOptionContractMiss(
+	questions: readonly AskQuestion[],
+): string | null {
+	for (const question of questions) {
+		const options = question.options ?? [];
+		for (let index = 0; index < options.length; index += 1) {
+			if (!options[index].description) {
+				return `${question.id}#opt${index + 1}`;
+			}
+		}
+	}
+	return null;
+}
 
 /**
  * Validate the `questions` array itself (the value `/api/ask/options` returns).
@@ -62,25 +171,24 @@ export function validateAskQuestions(value: unknown): AskQuestion[] | null {
 		const qType = q.type as string | undefined;
 		if (!qType || !["select", "text", "multiselect"].includes(qType))
 			return null;
-		let options: string[] | undefined;
+		let options: AskQuestionOption[] | undefined;
 		// select & multiselect require options array; text does not
 		if (qType === "select" || qType === "multiselect") {
 			if (!Array.isArray(q.options) || q.options.length === 0) return null;
 			if (q.options.length > MAX_OPTIONS_PER_QUESTION) return null;
-			if (
-				!q.options.every(
-					(o: unknown) =>
-						typeof o === "string" && !!o.trim() && o.length <= MAX_OPTION_CHARS,
-				)
-			)
-				return null;
-			options = q.options.map((o: string) => o.trim());
+			const drafts: AskOptionDraft[] = [];
+			for (const rawOption of q.options) {
+				const draft = normalizeAskOptionInput(rawOption);
+				if (!draft) return null;
+				drafts.push(draft);
+			}
 			const seenOpts = new Set<string>();
-			for (const opt of options) {
-				const lower = opt.toLowerCase();
+			for (const draft of drafts) {
+				const lower = draft.label.toLowerCase();
 				if (seenOpts.has(lower)) return null;
 				seenOpts.add(lower);
 			}
+			options = toCanonicalOptions(cleanId, drafts);
 		}
 		// A recommendation is only honored on a single-select question, and
 		// only when the model supplied an in-range index AND a non-empty
@@ -167,24 +275,36 @@ export function buildAskOptionsRepairPrompt(input: {
 	raw: string;
 	reason: AskOptionsFailureReason;
 	maxRawChars?: number;
+	/** Existing-Codebase mode: every option must carry a description too. */
+	requireOptionDescriptions?: boolean;
 }): string {
 	const maxRawChars = input.maxRawChars ?? REPAIR_MAX_RAW_CHARS;
 	const excerpt =
 		input.raw.length > maxRawChars
 			? `${input.raw.slice(0, maxRawChars)}\n...(dipotong)`
 			: input.raw;
+	const optionShape = input.requireOptionDescriptions
+		? '{ "label": "Judul opsi", "description": "Apa yang berubah bila opsi ini dipilih" }'
+		: '"Opsi singkat"';
 	return [
 		"Output sebelumnya tidak memenuhi kontrak JSON. Perbaiki dan kirim ulang HANYA JSON valid, tanpa teks lain.",
 		`Kegagalan: ${input.reason}`,
 		"Bentuk yang diwajibkan:",
-		'{ "questions": [ { "id": "snake_case_id", "question": "Pertanyaan?", "type": "select|text|multiselect", "options": ["Opsi 1", "Opsi 2", "Opsi 3"] } ] }',
+		`{ "questions": [ { "id": "snake_case_id", "question": "Pertanyaan?", "type": "select|text|multiselect", "options": [ ${optionShape} ] } ] }`,
 		"Output sebelumnya (dipotong):",
 		excerpt,
 		"Peraturan perbaikan:",
 		"1. Output HANYA JSON valid sesuai bentuk di atas.",
 		"2. Pertahankan jumlah, isi, dan bahasa pertanyaan yang sudah ada — jangan menambah atau menghapus pertanyaan untuk mengisi kekurangan.",
-		"3. type wajib salah satu dari select, text, multiselect. select dan multiselect wajib punya options berisi minimal 3 opsi singkat.",
-		"4. Jangan menambahkan komentar, penjelasan, atau markdown di luar JSON.",
+		"3. type wajib salah satu dari select, text, multiselect. select dan multiselect wajib punya options berisi minimal 3 opsi.",
+		...(input.requireOptionDescriptions
+			? [
+					"4. SETIAP opsi wajib punya label dan description. description menjelaskan dampak, cakupan, atau batas pilihan, bukan mengulang label, dan bukan kalimat promosi.",
+					"5. Jangan menambahkan komentar, penjelasan, atau markdown di luar JSON.",
+				]
+			: [
+					"4. Jangan menambahkan komentar, penjelasan, atau markdown di luar JSON.",
+				]),
 	].join("\n");
 }
 
@@ -229,6 +349,10 @@ export interface GenerateValidatedAskQuestionsInput {
 	/** One full model pass over the supplied conversation. */
 	collect: (messages: AskOptionsMessage[]) => Promise<AskOptionsCollection>;
 	messages: AskOptionsMessage[];
+	/** Existing-Codebase contract: an option without a description counts as a
+	 *  contract miss, so the bounded repair pass runs instead of shipping a
+	 *  half-explained list. Greenfield leaves this off. */
+	requireOptionDescriptions?: boolean;
 	/** Optional structured diagnostic sink; never receives model text. */
 	onDiagnostic?: (record: AskOptionsDiagnostic) => void;
 }
@@ -246,9 +370,15 @@ export async function generateValidatedAskQuestions(
 		};
 	}
 
+	const contractMiss = (questions: AskQuestion[]): boolean =>
+		Boolean(input.requireOptionDescriptions) &&
+		describeOptionContractMiss(questions) !== null;
+
 	const firstExtracted = extractJson(first.text);
 	const firstQuestions = parseAskOptionsJson(firstExtracted);
-	if (firstQuestions) return { ok: true, questions: firstQuestions };
+	if (firstQuestions && !contractMiss(firstQuestions)) {
+		return { ok: true, questions: firstQuestions };
+	}
 
 	const reason = classifyAskOptionsOutput(firstExtracted);
 	input.onDiagnostic?.({
@@ -264,7 +394,13 @@ export async function generateValidatedAskQuestions(
 		...input.messages,
 		{
 			role: "user",
-			content: buildAskOptionsRepairPrompt({ raw: first.text, reason }),
+			content: buildAskOptionsRepairPrompt({
+				raw: first.text,
+				reason,
+				...(input.requireOptionDescriptions
+					? { requireOptionDescriptions: true }
+					: {}),
+			}),
 		},
 	]);
 	if (!repaired.ok) {
@@ -278,7 +414,9 @@ export async function generateValidatedAskQuestions(
 
 	const repairedExtracted = extractJson(repaired.text);
 	const repairedQuestions = parseAskOptionsJson(repairedExtracted);
-	if (repairedQuestions) return { ok: true, questions: repairedQuestions };
+	if (repairedQuestions && !contractMiss(repairedQuestions)) {
+		return { ok: true, questions: repairedQuestions };
+	}
 
 	input.onDiagnostic?.({
 		stage: "repair",

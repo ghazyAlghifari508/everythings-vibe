@@ -184,4 +184,96 @@ describe("generateValidatedAskQuestions", () => {
 		expect(outcome.ok).toBe(true);
 		expect(diagnostics[0]?.category).toBe("schema");
 	});
+
+	const RICH_PAYLOAD = JSON.stringify({
+		questions: [
+			{
+				id: "cakupan",
+				question: "Informasi apa saja yang perlu dicari?",
+				type: "select",
+				options: [
+					{
+						label: "Judul, deskripsi, dan teknologi",
+						description: "Pengunjung bisa menemukan proyek lewat ketiganya.",
+					},
+					{
+						label: "Judul proyek saja",
+						description: "Hanya nama proyek yang dicocokkan.",
+					},
+				],
+				recommended: 1,
+				recommendationReason: "Analisis menunjukkan pencarian judul.",
+			},
+			{ id: "catatan", question: "Catatan tambahan?", type: "text" },
+			{
+				id: "permukaan",
+				question: "Permukaan UI mana?",
+				type: "multiselect",
+				options: [
+					{ label: "Kartu", description: "Ringkasan di daftar." },
+					{ label: "Detail", description: "Halaman rincian." },
+				],
+			},
+		],
+	});
+
+	const HEADING_ONLY_PAYLOAD = JSON.stringify({
+		questions: [
+			{
+				id: "cakupan",
+				question: "Informasi apa saja yang perlu dicari?",
+				type: "select",
+				options: ["Judul, deskripsi, dan teknologi", "Judul proyek saja"],
+			},
+			{ id: "catatan", question: "Catatan tambahan?", type: "text" },
+			{ id: "permukaan", question: "Permukaan UI mana?", type: "text" },
+		],
+	});
+
+	it("runs one repair when an existing-codebase option has no description", async () => {
+		const { collect, calls } = collectFrom(HEADING_ONLY_PAYLOAD, RICH_PAYLOAD);
+		const outcome = await generateValidatedAskQuestions({
+			collect,
+			messages: [{ role: "system", content: "sys" }],
+			requireOptionDescriptions: true,
+		});
+		expect(outcome.ok).toBe(true);
+		expect(calls).toHaveLength(2);
+		const repairTurn = calls[1][calls[1].length - 1];
+		expect(repairTurn.content).toContain(
+			"SETIAP opsi wajib punya label dan description",
+		);
+		if (outcome.ok) {
+			expect(
+				outcome.questions.every((q) =>
+					(q.options ?? []).every((o) => Boolean(o.description)),
+				),
+			).toBe(true);
+		}
+	});
+
+	it("accepts the same heading-only payload in greenfield mode", async () => {
+		const { collect, calls } = collectFrom(HEADING_ONLY_PAYLOAD);
+		const outcome = await generateValidatedAskQuestions({
+			collect,
+			messages: [{ role: "system", content: "sys" }],
+		});
+		expect(outcome.ok).toBe(true);
+		expect(calls).toHaveLength(1);
+	});
+
+	it("fails honestly when the repair still omits a description", async () => {
+		const { collect, calls } = collectFrom(
+			HEADING_ONLY_PAYLOAD,
+			HEADING_ONLY_PAYLOAD,
+		);
+		const outcome = await generateValidatedAskQuestions({
+			collect,
+			messages: [{ role: "system", content: "sys" }],
+			requireOptionDescriptions: true,
+		});
+		expect(outcome.ok).toBe(false);
+		if (!outcome.ok) expect(outcome.code).toBe("QUESTION_FORMAT_INVALID");
+		expect(calls).toHaveLength(2);
+	});
 });

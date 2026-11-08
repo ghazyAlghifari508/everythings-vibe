@@ -273,6 +273,9 @@ export async function handleAskOptionsRequest(
 		const outcome = await generateValidatedAskQuestions({
 			collect: collectOnce,
 			messages,
+			// Existing codebase answers must explain themselves; a heading-only
+			// option is a contract miss the repair pass gets a chance to fix.
+			requireOptionDescriptions: project.projectMode === "existing_codebase",
 			onDiagnostic: (record) => {
 				console.error("[ask/options] output rejected", record);
 			},

@@ -28,7 +28,12 @@ export function mapAskQuestionsForHandoff(
 			q.type === "text" || q.type === "multiselect" ? q.type : "select";
 
 		const options = Array.isArray(q.options)
-			? q.options.slice(0, 12).map((opt) => String(opt || "").slice(0, 100))
+			? q.options.slice(0, 12).map((opt) => ({
+					label: opt.label.slice(0, 100),
+					...(opt.description
+						? { description: opt.description.slice(0, 400) }
+						: {}),
+				}))
 			: undefined;
 
 		const recommended =

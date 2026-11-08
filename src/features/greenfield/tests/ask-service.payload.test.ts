@@ -23,7 +23,18 @@ const validQuestions: AskQuestion[] = [
 		id: "scope",
 		question: "Modul mana yang perlu diubah?",
 		type: "select",
-		options: ["Modul A", "Modul B"],
+		options: [
+			{
+				id: "scope-opt1",
+				label: "Modul A",
+				description: "Hanya alur ini yang ikut berubah.",
+			},
+			{
+				id: "scope-opt2",
+				label: "Modul B",
+				description: "Modul lain harus menyesuaikan pemanggilnya.",
+			},
+		],
 		recommended: 0,
 		recommendationReason: "Analisis menunjukkan modul A memegang alur ini.",
 	},
@@ -32,7 +43,10 @@ const validQuestions: AskQuestion[] = [
 		id: "surfaces",
 		question: "Permukaan UI mana?",
 		type: "multiselect",
-		options: ["A", "B"],
+		options: [
+			{ id: "surfaces-opt1", label: "A" },
+			{ id: "surfaces-opt2", label: "B" },
+		],
 	},
 ];
 
@@ -112,13 +126,19 @@ describe("validateAskQuestions (server payload boundary)", () => {
 			id: "a",
 			question: "Pilih?",
 			type: "select",
-			options: ["X", "Y"],
+			options: [
+				{ id: "a-opt1", label: "X" },
+				{ id: "a-opt2", label: "Y" },
+			],
 		});
 		expect(result?.[1]).toEqual({
 			id: "b",
 			question: "Pilih?",
 			type: "select",
-			options: ["X", "Y"],
+			options: [
+				{ id: "b-opt1", label: "X" },
+				{ id: "b-opt2", label: "Y" },
+			],
 		});
 	});
 
@@ -174,6 +194,24 @@ describe("bounded repair prompt", () => {
 			maxRawChars: 100,
 		});
 		expect(prompt).toContain("...(dipotong)");
-		expect(prompt.length).toBeLessThan(1_000);
+		// Exactly the bounded excerpt is echoed back — one character more is not.
+		expect(prompt).toContain("x".repeat(100));
+		expect(prompt).not.toContain("x".repeat(101));
+		expect(prompt.length).toBeLessThan(1_500);
+	});
+
+	it("asks for option descriptions only in the existing-codebase mode", () => {
+		const greenfield = buildAskOptionsRepairPrompt({
+			raw: "{}",
+			reason: "schema",
+		});
+		const codebase = buildAskOptionsRepairPrompt({
+			raw: "{}",
+			reason: "schema",
+			requireOptionDescriptions: true,
+		});
+		expect(greenfield).not.toContain("description");
+		expect(codebase).toContain('"description"');
+		expect(codebase).toContain("SETIAP opsi wajib punya label dan description");
 	});
 });
