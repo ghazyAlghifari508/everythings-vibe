@@ -27,12 +27,16 @@ import {
 /**
  * How far the real sync lifecycle has actually progressed, in product terms.
  *
- * - `waiting`   the attempt exists and no CLI has contacted the server yet; the
- *               user still has to run the prompt. Waiting for a human action is
- *               NOT system activity, so every row in this stage renders idle
- * - `preparing` the agent is linked and the CLI is preparing source code
- * - `syncing`   files are on the wire
- * - `done`      the server holds a verified snapshot
+ * - `waiting`    the attempt exists and no CLI has contacted the server yet; the
+ *                user still has to run the prompt. Waiting for a human action is
+ *                NOT system activity, so every row in this stage renders idle
+ * - `connecting` the CLI announced the attempt and is contacting the server,
+ *                but its handshake has not committed yet. Derived only from the
+ *                persisted `cli_connecting` lifecycle event — a CLI that never
+ *                announces (older release) never produces this stage
+ * - `preparing`  the agent is linked and the CLI is preparing source code
+ * - `syncing`    files are on the wire
+ * - `done`       the server holds a verified snapshot
  *
  * Every one of these is a real step the server already records. Nothing here is
  * a stage invented to make the list look busier, and none of them is a
@@ -40,7 +44,12 @@ import {
  * `done`, and the view then renders three completed rows with no replayed
  * intermediate.
  */
-export type SyncStageProgress = "waiting" | "preparing" | "syncing" | "done";
+export type SyncStageProgress =
+	| "waiting"
+	| "connecting"
+	| "preparing"
+	| "syncing"
+	| "done";
 
 /**
  * The backend lifecycle expressed as product stages.
@@ -104,8 +113,8 @@ export interface SyncStageView {
 	/** False until the browser has received any server state at all. */
 	hasStatus: boolean;
 	/**
-	 * True only once real sync activity has begun (CLI has progressed beyond
-	 * `waiting_for_cli`).
+	 * True only once real sync activity has begun: the CLI announced the attempt
+	 * (`cli_connecting`) or has already progressed beyond `waiting_for_cli`.
 	 */
 	hasStarted: boolean;
 	/** True when the attempt ended without finishing. */
@@ -211,14 +220,30 @@ export function resolveSyncStageView(
 		// the prompt yet". The stage list is rendered from the first paint for that
 		// reason — the three rows are real, in-order steps — but every one of them
 		// stays idle: no spinner and no timer, because the server is observing
-		// nothing but its own polling. `hasStarted` stays false, and the rows only
-		// gain motion once the handshake (or a later upload) is actually persisted.
+		// nothing but its own polling and waiting for a human is not system work.
+		//
+		// The one exception is a real announcement: the CLI reports that it started
+		// the attempt (`cli_connecting`) before its handshake commits. That event —
+		// and only that event — turns the agent row into a connecting row. Browser
+		// polling, copying the prompt, or a repaint can never produce it.
+		const lifecycle = status.lifecycle ?? [];
+		const connectingStartedAt =
+			lifecycle.find((event) => event.kind === "cli_connecting")?.at ?? null;
+		const agentConnectedAt =
+			lifecycle.find((event) => event.kind === "agent_connected")?.at ?? null;
+		const connecting =
+			connectingStartedAt !== null && agentConnectedAt === null;
+
 		return {
 			hasStatus: true,
-			hasStarted: false,
+			hasStarted: connecting,
 			failed: false,
 			stages: [
-				buildAgentRow("waiting", null),
+				buildAgentRow(
+					connecting ? "connecting" : "waiting",
+					agentConnectedAt,
+					connectingStartedAt,
+				),
 				buildPreparingRow("waiting", null),
 				buildSyncingRow("waiting", undefined, null, null, undefined, {}),
 			],

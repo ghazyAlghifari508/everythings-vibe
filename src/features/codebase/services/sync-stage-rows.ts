@@ -17,7 +17,21 @@ const SYNC_TITLE = "Mengunggah repository";
 export function buildAgentRow(
 	progress: SyncStageProgress,
 	agentConnectedAt: string | null,
+	connectingStartedAt: string | null = null,
 ): SyncStageRow {
+	if (progress === "connecting") {
+		// The CLI announced that it started this attempt, so the agent is
+		// genuinely contacting the server. The elapsed timer measures that real
+		// window from the announcement timestamp and stops the moment the
+		// handshake commits — a fast handshake is never held open to make the
+		// spinner readable.
+		return {
+			state: "active",
+			title: "Menghubungkan agent...",
+			detail: "Agent sedang menghubungi everythings-vibe.",
+			...(connectingStartedAt ? { startedAt: connectingStartedAt } : {}),
+		};
+	}
 	if (progress === "waiting") {
 		// WAITING_FOR_CLI is not an active connection. The session exists and the
 		// prompt is on screen, but nothing has contacted the server: the browser is
