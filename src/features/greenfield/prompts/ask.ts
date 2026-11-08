@@ -70,7 +70,7 @@ ATURAN:
    - Contoh yang BENAR untuk fitur filter: "Bagaimana filter kategori bekerja? Apakah satu kategori sekaligus atau multi-kategori?" — bukan "Di komponen mana filter state disimpan?".
    - Pertanyaan teknis BOLEH muncul HANYA jika keputusan itu murni preferensi user dan tidak bisa disimpulkan dari analisis (misal pilihan yang mengubah perilaku produk atau backward-compatibility). Jika kamu menyebut file atau modul, jelaskan peran fungsionalnya dengan bahasa yang dipahami user, bukan sekadar jalurnya.
 4. SETIAP OPSI WAJIB PUNYA "label" (JUDUL) DAN "description" (PENJELASAN):
-   - "label": 2-6 kata, menyebut apa yang dipilih. Spesifik terhadap pertanyaannya, dalam Bahasa Indonesia natural, tanpa jargon internal aplikasi. JANGAN memotong makna demi kependekan, dan JANGAN memberi judul berbeda kepada dua opsi yang konsekuensinya sama.
+   - "label": 2-6 kata, menyebut apa yang dipilih. Spesifik terhadap pertanyaannya, dalam Bahasa Indonesia natural, tanpa jargon internal aplikasi. JANGAN memotong makna demi kependekan, JANGAN memakai judul yang sama untuk dua opsi yang konsekuensinya berbeda, dan JANGAN memberi judul berbeda kepada dua opsi yang konsekuensinya sama.
    - "description": 1-2 kalimat yang menjelaskan dampak, cakupan, perilaku, atau batasan pilihan itu — informasi yang membuat user bisa MEMBANDINGKAN opsi.
    - JANGAN mengulang "label" dengan kata lain, JANGAN memakai pola pembuka yang sama di semua opsi, dan JANGAN memanjangkan kalimat hanya demi memenuhi panjang.
    - JANGAN mengarang klaim soal repository. Jika sebuah opsi hanya masuk akal karena sesuatu yang benar-benar terlihat di analisis, sebutkan hal itu; jika tidak, tulis konsekuensinya saja.
