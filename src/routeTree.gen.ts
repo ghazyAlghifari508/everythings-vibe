@@ -110,6 +110,7 @@ import { Route as ApiV1ProjectsIdTasksRouteImport } from './routes/api/v1/projec
 import { Route as ApiV1SubtasksIdStatusRouteImport } from './routes/api/v1/subtasks/$id/status'
 import { Route as ApiV1TasksIdStatusRouteImport } from './routes/api/v1/tasks/$id/status'
 import { Route as ApiV1CodebasesIdCodebaseCompleteRouteImport } from './routes/api/v1/codebases/$id/codebase/complete'
+import { Route as ApiV1CodebasesIdCodebaseConnectRouteImport } from './routes/api/v1/codebases/$id/codebase/connect'
 import { Route as ApiV1CodebasesIdCodebaseFailureRouteImport } from './routes/api/v1/codebases/$id/codebase/failure'
 import { Route as ApiV1CodebasesIdCodebaseFilesRouteImport } from './routes/api/v1/codebases/$id/codebase/files'
 import { Route as ApiV1CodebasesIdCodebaseManifestRouteImport } from './routes/api/v1/codebases/$id/codebase/manifest'
@@ -633,6 +634,12 @@ const ApiV1CodebasesIdCodebaseCompleteRoute =
     path: '/api/v1/codebases/$id/codebase/complete',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiV1CodebasesIdCodebaseConnectRoute =
+  ApiV1CodebasesIdCodebaseConnectRouteImport.update({
+    id: '/api/v1/codebases/$id/codebase/connect',
+    path: '/api/v1/codebases/$id/codebase/connect',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiV1CodebasesIdCodebaseFailureRoute =
   ApiV1CodebasesIdCodebaseFailureRouteImport.update({
     id: '/api/v1/codebases/$id/codebase/failure',
@@ -790,6 +797,7 @@ export interface FileRoutesByFullPath {
   '/api/v1/subtasks/$id/status': typeof ApiV1SubtasksIdStatusRoute
   '/api/v1/tasks/$id/status': typeof ApiV1TasksIdStatusRoute
   '/api/v1/codebases/$id/codebase/complete': typeof ApiV1CodebasesIdCodebaseCompleteRoute
+  '/api/v1/codebases/$id/codebase/connect': typeof ApiV1CodebasesIdCodebaseConnectRoute
   '/api/v1/codebases/$id/codebase/failure': typeof ApiV1CodebasesIdCodebaseFailureRoute
   '/api/v1/codebases/$id/codebase/files': typeof ApiV1CodebasesIdCodebaseFilesRoute
   '/api/v1/codebases/$id/codebase/manifest': typeof ApiV1CodebasesIdCodebaseManifestRoute
@@ -897,6 +905,7 @@ export interface FileRoutesByTo {
   '/api/v1/subtasks/$id/status': typeof ApiV1SubtasksIdStatusRoute
   '/api/v1/tasks/$id/status': typeof ApiV1TasksIdStatusRoute
   '/api/v1/codebases/$id/codebase/complete': typeof ApiV1CodebasesIdCodebaseCompleteRoute
+  '/api/v1/codebases/$id/codebase/connect': typeof ApiV1CodebasesIdCodebaseConnectRoute
   '/api/v1/codebases/$id/codebase/failure': typeof ApiV1CodebasesIdCodebaseFailureRoute
   '/api/v1/codebases/$id/codebase/files': typeof ApiV1CodebasesIdCodebaseFilesRoute
   '/api/v1/codebases/$id/codebase/manifest': typeof ApiV1CodebasesIdCodebaseManifestRoute
@@ -1010,6 +1019,7 @@ export interface FileRoutesById {
   '/api/v1/subtasks/$id/status': typeof ApiV1SubtasksIdStatusRoute
   '/api/v1/tasks/$id/status': typeof ApiV1TasksIdStatusRoute
   '/api/v1/codebases/$id/codebase/complete': typeof ApiV1CodebasesIdCodebaseCompleteRoute
+  '/api/v1/codebases/$id/codebase/connect': typeof ApiV1CodebasesIdCodebaseConnectRoute
   '/api/v1/codebases/$id/codebase/failure': typeof ApiV1CodebasesIdCodebaseFailureRoute
   '/api/v1/codebases/$id/codebase/files': typeof ApiV1CodebasesIdCodebaseFilesRoute
   '/api/v1/codebases/$id/codebase/manifest': typeof ApiV1CodebasesIdCodebaseManifestRoute
@@ -1124,6 +1134,7 @@ export interface FileRouteTypes {
     | '/api/v1/subtasks/$id/status'
     | '/api/v1/tasks/$id/status'
     | '/api/v1/codebases/$id/codebase/complete'
+    | '/api/v1/codebases/$id/codebase/connect'
     | '/api/v1/codebases/$id/codebase/failure'
     | '/api/v1/codebases/$id/codebase/files'
     | '/api/v1/codebases/$id/codebase/manifest'
@@ -1231,6 +1242,7 @@ export interface FileRouteTypes {
     | '/api/v1/subtasks/$id/status'
     | '/api/v1/tasks/$id/status'
     | '/api/v1/codebases/$id/codebase/complete'
+    | '/api/v1/codebases/$id/codebase/connect'
     | '/api/v1/codebases/$id/codebase/failure'
     | '/api/v1/codebases/$id/codebase/files'
     | '/api/v1/codebases/$id/codebase/manifest'
@@ -1343,6 +1355,7 @@ export interface FileRouteTypes {
     | '/api/v1/subtasks/$id/status'
     | '/api/v1/tasks/$id/status'
     | '/api/v1/codebases/$id/codebase/complete'
+    | '/api/v1/codebases/$id/codebase/connect'
     | '/api/v1/codebases/$id/codebase/failure'
     | '/api/v1/codebases/$id/codebase/files'
     | '/api/v1/codebases/$id/codebase/manifest'
@@ -1420,6 +1433,7 @@ export interface RootRouteChildren {
   ApiV1SubtasksIdStatusRoute: typeof ApiV1SubtasksIdStatusRoute
   ApiV1TasksIdStatusRoute: typeof ApiV1TasksIdStatusRoute
   ApiV1CodebasesIdCodebaseCompleteRoute: typeof ApiV1CodebasesIdCodebaseCompleteRoute
+  ApiV1CodebasesIdCodebaseConnectRoute: typeof ApiV1CodebasesIdCodebaseConnectRoute
   ApiV1CodebasesIdCodebaseFailureRoute: typeof ApiV1CodebasesIdCodebaseFailureRoute
   ApiV1CodebasesIdCodebaseFilesRoute: typeof ApiV1CodebasesIdCodebaseFilesRoute
   ApiV1CodebasesIdCodebaseManifestRoute: typeof ApiV1CodebasesIdCodebaseManifestRoute
@@ -2135,6 +2149,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiV1CodebasesIdCodebaseCompleteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/v1/codebases/$id/codebase/connect': {
+      id: '/api/v1/codebases/$id/codebase/connect'
+      path: '/api/v1/codebases/$id/codebase/connect'
+      fullPath: '/api/v1/codebases/$id/codebase/connect'
+      preLoaderRoute: typeof ApiV1CodebasesIdCodebaseConnectRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/v1/codebases/$id/codebase/failure': {
       id: '/api/v1/codebases/$id/codebase/failure'
       path: '/api/v1/codebases/$id/codebase/failure'
@@ -2440,6 +2461,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiV1SubtasksIdStatusRoute: ApiV1SubtasksIdStatusRoute,
   ApiV1TasksIdStatusRoute: ApiV1TasksIdStatusRoute,
   ApiV1CodebasesIdCodebaseCompleteRoute: ApiV1CodebasesIdCodebaseCompleteRoute,
+  ApiV1CodebasesIdCodebaseConnectRoute: ApiV1CodebasesIdCodebaseConnectRoute,
   ApiV1CodebasesIdCodebaseFailureRoute: ApiV1CodebasesIdCodebaseFailureRoute,
   ApiV1CodebasesIdCodebaseFilesRoute: ApiV1CodebasesIdCodebaseFilesRoute,
   ApiV1CodebasesIdCodebaseManifestRoute: ApiV1CodebasesIdCodebaseManifestRoute,

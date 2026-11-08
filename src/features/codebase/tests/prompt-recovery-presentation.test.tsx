@@ -278,9 +278,12 @@ test("state F: a live CLI never offers a replacement", () => {
 		/>,
 	);
 
-	// 10: the row reports the running agent and hides any replacement action.
+	// 10: no replacement action while the CLI is genuinely mid-sync, and no status
+	// sentence standing in for a prompt that this browser does not hold.
 	expect(
-		screen.getByText("Agent sedang menyinkronkan repository."),
+		screen.getByText(
+			"Prompt ini hanya tersedia sekali di browser tempat ia dibuat.",
+		),
 	).toBeDefined();
 	expect(screen.queryByTestId("locked-prompt-region")).toBeNull();
 	expect(screen.queryByRole("button", { name: "Buat prompt baru" })).toBeNull();
@@ -299,13 +302,16 @@ test("state G: a stored upload reports receipt and requires no further prompt", 
 		/>,
 	);
 
-	// 11: the transport is done — stated once in the prompt row, which is the
-	// surface this task owns; the sync stage list keeps its own wording.
+	// 11: the transport is done, and that is reported by the progress section
+	// only. The prompt row states what it is — a credential this browser no
+	// longer holds — instead of a success message or a dead renewal action.
+	const promptBox = within(screen.getByTestId("prompt-box"));
 	expect(
-		within(screen.getByTestId("prompt-box")).getByText(
-			"Source code berhasil diterima.",
+		promptBox.getByText(
+			"Prompt ini hanya tersedia sekali di browser tempat ia dibuat.",
 		),
 	).toBeDefined();
+	expect(promptBox.queryByText("Source code berhasil diterima.")).toBeNull();
 	expect(screen.queryByRole("button", { name: "Buat prompt baru" })).toBeNull();
 	expect(screen.queryByTestId("locked-prompt-region")).toBeNull();
 });

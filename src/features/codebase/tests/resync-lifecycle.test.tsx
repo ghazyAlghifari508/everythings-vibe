@@ -9,7 +9,7 @@ import {
 	type SyncPromptPayload,
 	type SyncStatusResponse,
 } from "@/features/codebase/services/sync";
-import { CodebaseResyncDrawer } from "../components/planning/codebase-resync-drawer";
+import { CodebaseResyncModal } from "../components/planning/codebase-resync-modal";
 
 let container: HTMLDivElement;
 let root: Root | null = null;
@@ -64,9 +64,7 @@ describe("Re-sync state transitions & reconciliation", () => {
 		expect(canTransitionSyncStatus("uploading", "uploaded")).toBe(true);
 		expect(canTransitionSyncStatus("uploaded", "analyzing")).toBe(true);
 		expect(canTransitionSyncStatus("analyzing", "ready")).toBe(true);
-		// Rollback on analysis failure returns to uploaded
 		expect(canTransitionSyncStatus("analyzing", "uploaded")).toBe(true);
-		// Terminal states cannot transition
 		expect(canTransitionSyncStatus("ready", "uploading")).toBe(false);
 	});
 
@@ -84,6 +82,11 @@ describe("Re-sync state transitions & reconciliation", () => {
 		expect(view.failed).toBe(false);
 		expect(view.syncComplete).toBe(false);
 		expect(view.stages.map((s) => s.state)).toEqual(["done", "done", "active"]);
+		expect(view.stages.map((s) => s.title)).toEqual([
+			"Agent terhubung",
+			"Source code siap",
+			"Mengunggah repository...",
+		]);
 		expect(view.stages[2]?.meta).toBe("45 file sedang dikirim.");
 
 		const finished = status({
@@ -108,18 +111,23 @@ describe("Re-sync state transitions & reconciliation", () => {
 			"done",
 			"done",
 		]);
+		expect(finishedView.stages.map((s) => s.title)).toEqual([
+			"Agent terhubung",
+			"Source code siap",
+			"Sinkronisasi selesai",
+		]);
 	});
 });
 
-describe("Re-sync Drawer non-interference & interactions", () => {
-	it("opens in a portal overlay and preserves workspace layout without shifting content", () => {
+describe("Re-sync modal non-interference & interactions", () => {
+	it("opens in a portal overlay and preserves the three-panel workspace", () => {
 		act(() => {
 			root?.render(
 				<div data-testid="workspace-root" className="flex h-screen">
 					<div data-testid="workspace-explorer">Explorer</div>
 					<div data-testid="workspace-chat">Chat</div>
 					<div data-testid="workspace-preview">Preview</div>
-					<CodebaseResyncDrawer
+					<CodebaseResyncModal
 						isOpen={true}
 						onClose={() => {}}
 						projectName="Existing App"
@@ -130,7 +138,6 @@ describe("Re-sync Drawer non-interference & interactions", () => {
 			);
 		});
 
-		// The 3 panels remain intact inside workspace root
 		expect(
 			container.querySelector('[data-testid="workspace-explorer"]'),
 		).not.toBeNull();
@@ -141,18 +148,17 @@ describe("Re-sync Drawer non-interference & interactions", () => {
 			container.querySelector('[data-testid="workspace-preview"]'),
 		).not.toBeNull();
 
-		// The drawer is portaled to document.body
-		const drawer = document.querySelector(
+		const panel = document.querySelector(
 			'[data-testid="codebase-resync-panel"]',
 		);
-		expect(drawer).not.toBeNull();
-		expect(drawer?.textContent).toContain("Perbarui repository");
+		expect(panel).not.toBeNull();
+		expect(panel?.textContent).toContain("Perbarui repository");
 	});
 
-	it("preserves formatted multiline prompt, indentation, and clean scrolling", () => {
+	it("preserves the multiline prompt with its real indentation", () => {
 		act(() => {
 			root?.render(
-				<CodebaseResyncDrawer
+				<CodebaseResyncModal
 					isOpen={true}
 					onClose={() => {}}
 					projectName="Existing App"
@@ -173,15 +179,13 @@ describe("Re-sync Drawer non-interference & interactions", () => {
 		expect(promptText).toContain("everythings-vibe codebase sync");
 	});
 
-	it("copies plain text prompt via clipboard helper without mangling tokens", async () => {
+	it("copies plain text without mangling the credential", async () => {
 		const writeText = vi.fn().mockResolvedValue(undefined);
-		vi.stubGlobal("navigator", {
-			clipboard: { writeText },
-		});
+		vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
 
 		act(() => {
 			root?.render(
-				<CodebaseResyncDrawer
+				<CodebaseResyncModal
 					isOpen={true}
 					onClose={() => {}}
 					projectName="Existing App"
@@ -192,7 +196,7 @@ describe("Re-sync Drawer non-interference & interactions", () => {
 		});
 
 		const copyBtn = document.querySelector(
-			'button[aria-label="Salin prompt instruksi sync"]',
+			'button[aria-label="Salin instruksi sync ulang"]',
 		) as HTMLButtonElement | null;
 		expect(copyBtn).not.toBeNull();
 
@@ -207,12 +211,12 @@ describe("Re-sync Drawer non-interference & interactions", () => {
 		expect(copyBtn?.textContent).toContain("Tersalin");
 	});
 
-	it("safely handles clipboard API unavailability without crashing", async () => {
+	it("reports a clipboard failure without crashing", async () => {
 		vi.stubGlobal("navigator", {});
 
 		act(() => {
 			root?.render(
-				<CodebaseResyncDrawer
+				<CodebaseResyncModal
 					isOpen={true}
 					onClose={() => {}}
 					projectName="Existing App"
@@ -223,7 +227,7 @@ describe("Re-sync Drawer non-interference & interactions", () => {
 		});
 
 		const copyBtn = document.querySelector(
-			'button[aria-label="Salin prompt instruksi sync"]',
+			'button[aria-label="Salin instruksi sync ulang"]',
 		) as HTMLButtonElement | null;
 
 		await act(async () => {
@@ -233,67 +237,39 @@ describe("Re-sync Drawer non-interference & interactions", () => {
 		expect(document.body.textContent).toContain("Gagal menyalin otomatis");
 	});
 
-	it("closing the drawer can be done anytime without cancelling sync or planning", () => {
+	it("closing never cancels the operation behind it", () => {
 		const onClose = vi.fn();
 		act(() => {
 			root?.render(
-				<CodebaseResyncDrawer
+				<CodebaseResyncModal
 					isOpen={true}
 					onClose={onClose}
 					projectName="Existing App"
 					payload={samplePayload}
-					status={status({
-						status: "uploading",
-						fileCount: 15,
-					})}
+					status={status({ status: "uploading", fileCount: 15 })}
 				/>,
 			);
 		});
 
-		// Can close from header X button
 		const closeBtn = document.querySelector(
 			'button[aria-label="Tutup sync ulang"]',
 		) as HTMLButtonElement | null;
-		expect(closeBtn).not.toBeNull();
 		act(() => {
 			closeBtn?.click();
 		});
-		expect(onClose).toHaveBeenCalled();
+		expect(onClose).toHaveBeenCalledTimes(1);
+		expect(
+			document
+				.querySelector('[data-testid="sync-stage-sync"]')
+				?.getAttribute("data-stage-state"),
+		).toBe("active");
 	});
 
-	it("handles expired sessions by offering a fresh token recovery action", () => {
-		const onRequestNewToken = vi.fn();
-		act(() => {
-			root?.render(
-				<CodebaseResyncDrawer
-					isOpen={true}
-					onClose={() => {}}
-					projectName="Existing App"
-					payload={null}
-					status={status({ status: "expired" })}
-					onRequestNewToken={onRequestNewToken}
-				/>,
-			);
-		});
-
-		expect(document.body.textContent).toContain(
-			"Token sync sudah kedaluwarsa atau belum tersedia.",
-		);
-		const refreshBtn = [...document.querySelectorAll("button")].find((b) =>
-			/Dapatkan token baru/i.test(b.textContent ?? ""),
-		);
-		expect(refreshBtn).toBeDefined();
-		act(() => {
-			refreshBtn?.click();
-		});
-		expect(onRequestNewToken).toHaveBeenCalledTimes(1);
-	});
-
-	it("handles failed sessions by offering retry without deleting prior snapshots", () => {
+	it("reports a failed attempt once, with one retry action", () => {
 		const onRetrySync = vi.fn();
 		act(() => {
 			root?.render(
-				<CodebaseResyncDrawer
+				<CodebaseResyncModal
 					isOpen={true}
 					onClose={() => {}}
 					projectName="Existing App"
@@ -307,10 +283,11 @@ describe("Re-sync Drawer non-interference & interactions", () => {
 			);
 		});
 
-		expect(document.body.textContent).toContain("Sinkronisasi belum berhasil");
-		expect(document.body.textContent).toContain(
-			"CLI timeout during chunk upload.",
-		);
+		const text = document.body.textContent ?? "";
+		expect(text).toContain("Sinkronisasi belum berhasil");
+		expect(text).toContain("CLI timeout during chunk upload.");
+		expect(text.split("Sinkronisasi belum berhasil")).toHaveLength(2);
+		expect(text).not.toContain("Token sync sudah kedaluwarsa");
 		const retryBtn = [...document.querySelectorAll("button")].find((b) =>
 			/^Coba lagi$/i.test(b.textContent?.trim() ?? ""),
 		);

@@ -77,6 +77,7 @@ export function Orb({
 	return (
 		<svg
 			ref={ref}
+			data-orb=""
 			width={size}
 			height={size}
 			viewBox={`0 0 ${size} ${size}`}

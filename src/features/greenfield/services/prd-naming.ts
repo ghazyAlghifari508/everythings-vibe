@@ -112,7 +112,7 @@ const PROJECT_NAME_FILLERS = [
  * (`--- Preferensi ... ---`) whose trailing lines (e.g. `Deployment: Biarkan
  * AI yang memilih`) otherwise hijack the fallback tail-word heuristic.
  */
-function stripPrdBoilerplate(message: string): string {
+export function stripPrdBoilerplate(message: string): string {
 	let cleanMsg = message;
 	cleanMsg = cleanMsg.replace(
 		/Generate PRD lengkap berdasarkan informasi berikut:\s*/gi,
@@ -182,6 +182,30 @@ function findExplicitProductName(
  */
 export function hasExplicitProductName(message: string): boolean {
 	return findExplicitProductName(message) !== null;
+}
+
+/**
+ * Whether the cosmetic AI rename may rewrite this project's name on a
+ * generation turn.
+ *
+ * A greenfield product row is created from a prompt with a provisional name, so
+ * one AI-quality rename after the first generation is an improvement. An
+ * existing-codebase feature is different: its title is derived from the user's
+ * own feature request (function + target entity) at creation, and the whole plan
+ * identity — questions, PRD, AC, tasks — is anchored to it. Renaming it later
+ * would show the same feature under two names in the planning dropdown and
+ * History, and would overwrite a manual rename. An explicit user-given name wins
+ * in both modes.
+ */
+export function shouldAutoRenameProject(input: {
+	mode: string;
+	projectId?: string;
+	projectMode?: string | null;
+	message: string;
+}): boolean {
+	if (input.mode !== "generate" || !input.projectId) return false;
+	if (input.projectMode === "existing_codebase") return false;
+	return !hasExplicitProductName(input.message);
 }
 
 /**

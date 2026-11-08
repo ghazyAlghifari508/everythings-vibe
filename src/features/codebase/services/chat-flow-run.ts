@@ -14,40 +14,13 @@ export type CodebaseRunStage = "questions" | "feature" | "prd" | "ac" | "task";
 export type CodebasePipelineStage = CodebaseRunStage | "handoff";
 
 /**
- * High-level operation summaries the client can only ever log after the server
- * confirmed them. There is deliberately no "reading files" or "analyzing
- * architecture" entry: neither endpoint reports those, so claiming them would
- * be invented progress.
- */
-export const CODEBASE_RUN_ACTIVITY_LABEL = {
-	"request.accepted": "Permintaan diterima server",
-	"generation.started": "Model mulai menghasilkan respons",
-	"result.persisted": "Hasil tersimpan di server",
-} as const;
-
-export type CodebaseRunActivityId = keyof typeof CODEBASE_RUN_ACTIVITY_LABEL;
-
-export interface CodebaseRunActivity {
-	id: CodebaseRunActivityId;
-	/** When the client observed the event. Ordering only; never used to invent progress. */
-	at: number;
-}
-
-/** The subset of a durable operation the activity log reads. */
-export interface ObservedOperation {
-	createdAt: string;
-	startedAt?: string | null;
-	status: string;
-}
-
-/**
  * What the workspace knows about one in-flight or finished AI request.
  *
- * Every field is a client-observable fact: when the request actually started,
- * when it actually settled, whether it succeeded, and the model's own streamed
- * reasoning when the endpoint streams one. There is deliberately no field for
- * "current phase" — the generators expose no phase events, so inventing one
- * here would be a fabricated progress indicator.
+ * Every field is a client-observable fact: when the request was accepted,
+ * when it settled, whether it succeeded, and the server's own failure message.
+ * There is deliberately no phase, activity log or reasoning field: the
+ * generators stream nothing but durable-operation status, so any "stage" the UI
+ * could invent here would be fabricated progress.
  */
 export interface CodebaseRunState {
 	stage: CodebaseRunStage;
@@ -56,43 +29,22 @@ export interface CodebaseRunState {
 	 * stale id and can never overwrite a newer run's status or duration.
 	 */
 	requestId: string;
-	/** Wall-clock start of the request, measured by the caller. */
+	/** Wall-clock acceptance of the request, from the server when it reported one. */
 	startedAt: number;
 	/** Wall-clock settle time, null while the request is still in flight. */
 	finishedAt: number | null;
 	status: "running" | "done" | "failed";
-	/** Active stage phase: "thinking" vs "generating" */
-	phase?: "thinking" | "generating" | null;
-	/** One honest description of what the request does. Never rotates. */
-	activity: string;
-	/** Backend events actually observed for this request, in the order observed. */
-	activities: CodebaseRunActivity[];
-	/** Real reasoning streamed by the model; empty when the endpoint is not streaming. */
-	thinkingText: string;
 	/** Server-reported failure message, null unless the run failed. */
 	error: string | null;
 }
-
-/**
- * Honest per-stage activity lines. Each states the real request being made and
- * the real inputs it is grounded in — never an invented internal phase.
- */
-export const CODEBASE_STAGE_ACTIVITY: Record<CodebaseRunStage, string> = {
-	questions:
-		"Menyusun pertanyaan klarifikasi dari prompt dan konteks repository.",
-	feature: "Menyusun spesifikasi fitur dari jawaban dan konteks repository.",
-	prd: "Menyusun PRD berdasarkan spesifikasi fitur dan konteks repository.",
-	ac: "Menyusun Acceptance Criteria dari PRD dan konteks repository.",
-	task: "Menyusun breakdown task dari PRD dan Acceptance Criteria.",
-};
 
 /** Short settled label per stage, shown once the request really succeeded. */
 export const CODEBASE_STAGE_DONE_LABEL: Record<CodebaseRunStage, string> = {
 	questions: "Pertanyaan siap",
 	feature: "Spesifikasi fitur siap",
-	prd: "PRD selesai",
-	ac: "Acceptance Criteria selesai",
-	task: "Task dan Kanban siap",
+	prd: "PRD siap",
+	ac: "Acceptance criteria siap",
+	task: "Task siap",
 };
 
 let runSequence = 0;
@@ -122,8 +74,6 @@ function ownedBy(
 export function startRun(
 	stage: CodebaseRunStage,
 	startedAt: number,
-	initialPhase: "thinking" | "generating" = "thinking",
-	activities: readonly CodebaseRunActivity[] = [],
 ): CodebaseRunState {
 	return {
 		stage,
@@ -131,26 +81,27 @@ export function startRun(
 		startedAt,
 		finishedAt: null,
 		status: "running",
-		phase: initialPhase,
-		activity: CODEBASE_STAGE_ACTIVITY[stage],
-		activities: [...activities],
-		thinkingText: "",
 		error: null,
 	};
 }
 
 /**
- * Update the observable generation phase ("thinking" vs "generating") when a real
- * backend signal arrives (e.g. onDelta stream chunks).
+ * Re-anchor a running request on the moment the server actually accepted it, so
+ * the elapsed timer measures the operation instead of the client's submit
+ * latency. Ignored for a settled run, a foreign request, or an unparseable
+ * timestamp — a missing server time never moves the clock.
  */
-export function setRunPhase(
+export function anchorRunStart(
 	run: CodebaseRunState | null,
-	phase: "thinking" | "generating",
+	acceptedAt: string | null | undefined,
 	requestId?: string,
 ): CodebaseRunState | null {
 	if (!run || run.status !== "running" || !ownedBy(run, requestId)) return run;
-	if (run.phase === phase) return run;
-	return { ...run, phase };
+	if (!acceptedAt) return run;
+	const epoch = parseEpoch(acceptedAt, Number.NaN);
+	if (!Number.isFinite(epoch)) return run;
+	if (epoch === run.startedAt) return run;
+	return { ...run, startedAt: epoch };
 }
 
 /**
@@ -187,52 +138,26 @@ export function settleRunIfCurrent(
 	return settleRun(run, status, finishedAt, error);
 }
 
-/**
- * Append one confirmed backend event. Duplicate ids collapse, and a settled run
- * is never reopened by a late event.
- */
-export function recordRunActivity(
-	run: CodebaseRunState | null,
-	id: CodebaseRunActivityId,
-	at: number,
-	requestId?: string,
-): CodebaseRunState | null {
-	if (!run || run.status !== "running" || !ownedBy(run, requestId)) return run;
-	if (run.activities.some((activity) => activity.id === id)) return run;
-	return { ...run, activities: [...run.activities, { id, at }] };
-}
-
 function parseEpoch(value: string, fallback: number): number {
 	const epoch = Date.parse(value);
 	return Number.isFinite(epoch) ? epoch : fallback;
 }
 
 /**
- * Log the events a durable operation has already confirmed. Hydration uses the
- * same function, so a remount replays real persisted facts rather than a
- * reconstructed narrative.
+ * The moment the server accepted the operation, taken from its own timestamps
+ * and never from the client's submit time. Falls back to the worker start, then
+ * to now, so a missing server field degrades to a client clock instead of
+ * inverting one.
  */
-export function recordOperationActivities(
-	run: CodebaseRunState | null,
-	op: ObservedOperation,
-	requestId?: string,
-): CodebaseRunState | null {
-	if (!run || run.status !== "running" || !ownedBy(run, requestId)) return run;
-	let next = recordRunActivity(
-		run,
-		"request.accepted",
-		parseEpoch(op.createdAt, Date.now()),
-		requestId,
-	);
-	if (op.startedAt && op.status !== "queued") {
-		next = recordRunActivity(
-			next,
-			"generation.started",
-			parseEpoch(op.startedAt, Date.now()),
-			requestId,
-		);
-	}
-	return next;
+export function operationStartEpoch(op: {
+	createdAt?: string | null;
+	startedAt?: string | null;
+}): number {
+	const accepted = op.createdAt ? Date.parse(op.createdAt) : Number.NaN;
+	if (Number.isFinite(accepted)) return accepted;
+	const started = op.startedAt ? Date.parse(op.startedAt) : Number.NaN;
+	if (Number.isFinite(started)) return started;
+	return Date.now();
 }
 
 /**
@@ -245,48 +170,6 @@ export function operationSettleEpoch(op: {
 }): number {
 	if (!op.finishedAt) return Date.now();
 	return parseEpoch(op.finishedAt, Date.now());
-}
-
-/**
- * Events a persisted operation already proves. Only facts the server stored are
- * replayed; no phase the client never observed is reconstructed.
- */
-export function activitiesFromOperation(
-	op: ObservedOperation,
-): CodebaseRunActivity[] {
-	const activities: CodebaseRunActivity[] = [];
-	const createdAt = Date.parse(op.createdAt);
-	if (Number.isFinite(createdAt)) {
-		activities.push({ id: "request.accepted", at: createdAt });
-	}
-	if (op.startedAt) {
-		const startedAt = Date.parse(op.startedAt);
-		if (Number.isFinite(startedAt)) {
-			activities.push({ id: "generation.started", at: startedAt });
-		}
-	}
-	return activities;
-}
-
-/**
- * Append streamed reasoning to the run. `thinking_reset` clears it first so a
- * provider retry replaces stale reasoning instead of concatenating onto it.
- */
-export function appendRunThinking(
-	run: CodebaseRunState | null,
-	chunk: string,
-	requestId?: string,
-): CodebaseRunState | null {
-	if (!run || run.status !== "running" || !ownedBy(run, requestId)) return run;
-	return { ...run, thinkingText: run.thinkingText + chunk };
-}
-
-export function resetRunThinking(
-	run: CodebaseRunState | null,
-	requestId?: string,
-): CodebaseRunState | null {
-	if (!run || run.status !== "running" || !ownedBy(run, requestId)) return run;
-	return { ...run, thinkingText: "" };
 }
 
 /** True only while the run's request is genuinely in flight. */

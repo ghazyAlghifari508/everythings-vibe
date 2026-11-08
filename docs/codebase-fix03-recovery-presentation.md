@@ -18,8 +18,8 @@ prompt row cannot drift apart.
 | C — replacement in progress | `Menyiapkan prompt baru...` (+ `Spinner`) | — | — (no action while a request is pending) | — |
 | D — prompt replaced | the real CLI prompt returns; the recovery copy disappears | — | `Salin` (existing) | no success card, no toast |
 | E — genuine replacement failure | `Prompt belum berhasil dibuat` | `Permintaan belum berhasil. Coba buat prompt lagi.` | `Coba lagi` | — |
-| F — CLI already active | `Agent sedang menyinkronkan repository.` | — | — (no replacement offered) | — |
-| G — upload completed | `Source code berhasil diterima.` | — | — (analysis owns the next step) | — |
+| F — CLI already active | no credential in this browser: `Prompt ini hanya tersedia sekali di browser tempat ia dibuat.` | — | — (no replacement offered while the CLI is mid-sync) | — |
+| G — upload completed | the live prompt stays exactly as it was (its credential is still valid); without a credential the same availability line is shown | — | `Salin` (existing) | progress is reported by the progress list only |
 
 Rejected wording is gone from the flow: "Token sebelumnya hanya dikirim sekali",
 "Buat sesi pengganti", "Token sebelumnya akan dinonaktifkan", "Recovery
@@ -39,8 +39,9 @@ session that merely lost its one-time credential.
   (`insufficient` | `unavailable` | `pending`).
 - Nothing is wrapped in a second card: state A/B/C/E renders *inside* the prompt
   box (border + background already owned by step 1). The decorative lock icon
-  was removed; the only remaining icon is the existing success tick on the
-  transport-done row, where it carries meaning.
+  was removed; the prompt box carries no icon at all (the transport-done row
+  that used a success tick was removed by FIX 01 — sync progress belongs to the
+  progress list).
 - The spinner appears only for `pending`, i.e. while a real `POST
   /api/codebases/:id/session` is in flight; no timer, no minimum display time.
 - Buttons keep the prompt row's existing sizing (`variant="secondary"`,

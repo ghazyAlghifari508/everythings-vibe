@@ -1,7 +1,6 @@
 "use client";
 
-import { LockIcon, Tick01Icon } from "@hugeicons/core-free-icons";
-import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
 import {
 	Dialog,
 	DialogContent,
@@ -10,25 +9,19 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { Icon } from "@/components/ui/icon";
 import type { AnalysisResponse } from "@/features/codebase/services/analysis";
 import { resolveCodebaseDisplayName } from "@/features/codebase/services/naming";
 import {
-	buildResyncPrompt,
 	isResyncSessionVerified,
 	resolveSyncStageView,
 	type SyncPromptPayload,
 	type SyncStatusResponse,
 } from "@/features/codebase/services/sync";
-import { copyToClipboard } from "@/features/codebase/utils/clipboard";
 import { cn } from "@/lib/utils";
 import type { LockedPromptState } from "../workspace/locked-prompt-state";
-import {
-	ResyncStep1Prompt,
-	ResyncStep2Agent,
-	ResyncStep3Progress,
-	type StepState,
-} from "./codebase-resync-modal-steps";
+import { ScreenConnectAgentStep } from "../workspace/screen-connect-agent-step";
+import { ScreenConnectPromptStep } from "../workspace/screen-connect-prompt-step";
+import { ScreenConnectSyncStep } from "../workspace/screen-connect-sync-step";
 
 export interface CodebaseResyncModalProps {
 	isOpen: boolean;
@@ -36,12 +29,15 @@ export interface CodebaseResyncModalProps {
 	projectName: string;
 	payload: SyncPromptPayload | null;
 	isStarting?: boolean;
-	creditMaximum?: number | null;
-	creditFree?: boolean;
-	lockedPrompt?: LockedPromptState | null;
+	/** A genuine session-creation failure; the only primary error this modal shows. */
+	sessionError?: string | null;
+	/** Runs the same request that failed, exactly once. */
+	onRetrySession?: () => void;
 	status: SyncStatusResponse | null;
 	statusError?: string | null;
-	onRequestNewToken?: () => void;
+	/** Replaces a lost one-time prompt for the current attempt. */
+	onReplacePrompt?: () => void;
+	/** Retries a failed or expired attempt through the canonical session endpoint. */
 	onRetrySync?: () => void;
 	analysis?: AnalysisResponse | null;
 	analysisError?: string | null;
@@ -50,18 +46,26 @@ export interface CodebaseResyncModalProps {
 	activeSessionId?: string | null;
 }
 
+/**
+ * Re-sync presentation: a compact adaptation of the onboarding sync screen.
+ *
+ * Every block below is the onboarding block itself — the same prompt row,
+ * agent step, and sync stage step — so the two flows cannot drift. The modal
+ * only supplies its own approved copy and owns exactly one error (a failed
+ * session request). Progress is never painted for a session other than the
+ * attempt the prompt belongs to.
+ */
 export function CodebaseResyncModal({
 	isOpen,
 	onClose,
 	projectName,
 	payload,
 	isStarting = false,
-	creditMaximum = null,
-	creditFree = false,
-	lockedPrompt = null,
+	sessionError = null,
+	onRetrySession,
 	status,
 	statusError = null,
-	onRequestNewToken,
+	onReplacePrompt,
 	onRetrySync,
 	analysis = null,
 	analysisError = null,
@@ -69,131 +73,109 @@ export function CodebaseResyncModal({
 	onRetryAnalysis,
 	activeSessionId,
 }: CodebaseResyncModalProps) {
-	const [copied, setCopied] = useState(false);
-	const [copyError, setCopyError] = useState<string | null>(null);
-	const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-	useEffect(() => {
-		return () => {
-			if (copyTimeoutRef.current) {
-				clearTimeout(copyTimeoutRef.current);
-				copyTimeoutRef.current = null;
-			}
-		};
-	}, []);
-
 	const resolvedRepositoryName =
 		resolveCodebaseDisplayName(projectName) ?? "Repository belum terdeteksi";
-	const promptText = payload
-		? buildResyncPrompt(payload, { projectName: resolvedRepositoryName })
-		: "";
-	const stageView = resolveSyncStageView(status);
 
-	const targetSessionId =
-		activeSessionId ?? payload?.sessionId ?? status?.sessionId ?? null;
+	// The prompt's session is the attempt on screen. A status frame from any
+	// other session is the previous attempt and must not paint progress,
+	// stages, or completion under this one.
+	const attemptSessionId =
+		payload?.sessionId ?? activeSessionId ?? status?.sessionId ?? null;
+	// While the server prepares a new session, no frame belongs to it yet. The
+	// previous attempt's polled status must not paint under the new operation.
+	const statusBelongsToAttempt =
+		!status ||
+		!attemptSessionId ||
+		!status.sessionId ||
+		status.sessionId === attemptSessionId;
+	const attemptStatus = isStarting || !statusBelongsToAttempt ? null : status;
+	const stageView = resolveSyncStageView(attemptStatus);
 	const isVerified = isResyncSessionVerified({
-		status,
-		activeSessionId: targetSessionId,
+		status: attemptStatus,
+		activeSessionId: attemptSessionId,
 	});
 
-	const step1State: StepState = lockedPrompt
-		? "failed"
-		: isStarting
-			? "active"
-			: payload
-				? "done"
-				: "failed";
-
-	// Step 2 is the user's own action ("run it in your agent"), so it is never
-	// *active* while the CLI has not reported in: a spinning indicator there would
-	// claim the system is working when it is only waiting for the user. Motion is
-	// reserved for the steps the server actually observed.
-	const step2State: StepState = stageView.hasStarted
-		? "done"
-		: stageView.failed
-			? "failed"
-			: "pending";
-
-	const step3State: StepState = isVerified
-		? "done"
-		: stageView.failed
-			? "failed"
-			: stageView.hasStarted
-				? "active"
-				: "pending";
-
-	const handleCopy = async () => {
-		if (!promptText) return;
-		const result = await copyToClipboard(promptText);
-		if (result.success) {
-			setCopied(true);
-			setCopyError(null);
-			if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
-			copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
-		} else {
-			setCopied(false);
-			setCopyError(
-				result.error ??
-					"Gagal menyalin otomatis. Silakan salin teks secara manual.",
-			);
-			if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
-			copyTimeoutRef.current = setTimeout(() => setCopyError(null), 4000);
-		}
-	};
+	const recoveryState: LockedPromptState | undefined = sessionError
+		? {
+				variant: "unavailable",
+				title: "Sinkronisasi belum bisa dimulai.",
+				action: onRetrySession ? (
+					<Button
+						type="button"
+						variant="secondary"
+						onClick={onRetrySession}
+						disabled={isStarting}
+						className="min-h-11 px-3.5 text-xs"
+					>
+						Coba lagi
+					</Button>
+				) : undefined,
+			}
+		: undefined;
 
 	return (
 		<Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
 			<DialogContent
 				data-testid="codebase-resync-panel"
 				closeAriaLabel="Tutup sync ulang"
-				className={cn(
-					"sm:max-w-xl max-h-[85vh] p-0 flex flex-col gap-0 overflow-hidden outline-none bg-obsidian",
-				)}
+				className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 outline-none sm:max-w-xl"
 			>
-				<DialogHeader className="flex shrink-0 flex-col border-b border-graphite p-5 sm:p-6 text-left pr-12">
+				<DialogHeader className="shrink-0 space-y-1 border-b border-graphite px-5 py-5 pr-12 text-left sm:px-6">
 					<DialogTitle className="font-inter text-base font-semibold text-snow sm:text-lg">
 						Perbarui repository
 					</DialogTitle>
-					<DialogDescription className="mt-1 text-xs leading-relaxed text-fog">
+					<DialogDescription className="text-xs leading-relaxed text-fog">
 						{resolvedRepositoryName}
-						{creditMaximum !== null && creditMaximum > 0 && !creditFree
-							? ` · Analisis: maksimal ${creditMaximum} kredit`
-							: null}
 					</DialogDescription>
 				</DialogHeader>
 
-				<div className="flex flex-1 flex-col gap-6 overflow-y-auto p-5 sm:p-6">
-					<ResyncStep1Prompt
-						stepState={step1State}
-						payload={payload}
-						isStarting={isStarting}
-						promptText={promptText}
-						copyError={copyError}
-						copied={copied}
-						onRequestNewToken={onRequestNewToken}
-						onCopy={() => void handleCopy()}
-						lockedPrompt={lockedPrompt}
-					/>
+				{/* One scroll container for the steps; the prompt owns its own
+				internal scroll because a long credential keeps its full text. */}
+				<div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+					<div className="flex flex-col gap-6">
+						<ScreenConnectPromptStep
+							key={payload?.sessionId ?? "no-session"}
+							projectName={projectName}
+							payload={payload}
+							isStarting={isStarting}
+							status={attemptStatus}
+							onRequestNewToken={onReplacePrompt}
+							heading="Salin instruksi sync ulang"
+							promptMode="resync"
+							copyAriaLabel="Salin instruksi sync ulang"
+							contentTestId="resync-prompt-content"
+							recoveryState={recoveryState}
+						/>
 
-					<ResyncStep2Agent stepState={step2State} />
+						<ScreenConnectAgentStep
+							title="Jalankan di AI coding agent"
+							description="Gunakan root repository yang sama."
+							showHarnesses={false}
+						/>
 
-					<ResyncStep3Progress
-						stepState={step3State}
-						status={status}
-						statusError={statusError}
-						stageView={stageView}
-						isVerified={isVerified}
-						isStarting={isStarting}
-						isAnalyzing={isAnalyzing}
-						analysis={analysis}
-						analysisError={analysisError}
-						onRetrySync={onRetrySync}
-						onRetryAnalysis={onRetryAnalysis}
-					/>
+						<ScreenConnectSyncStep
+							status={attemptStatus}
+							stageView={stageView}
+							canRetry={stageView.canRetry && Boolean(onRetrySync)}
+							statusError={sessionError ? null : statusError}
+							isStarting={isStarting}
+							hasSession={Boolean(payload || activeSessionId || attemptStatus)}
+							onRetrySync={onRetrySync}
+							canContinueToSummary={isVerified}
+							analysis={analysis}
+							analysisError={analysisError}
+							isAnalyzing={isAnalyzing}
+							onRetryAnalysis={onRetryAnalysis}
+							isLegacyAnalysisMissingSuggestions={false}
+							heading="Pantau sinkronisasi"
+							description={null}
+							idleLabel={sessionError ? "Belum dimulai" : "Menunggu agent"}
+						/>
+					</div>
 				</div>
 
-				<DialogFooter className="flex shrink-0 items-center justify-end border-t border-graphite bg-obsidian px-5 py-3 sm:px-6">
-					<button
+				<DialogFooter className="shrink-0 items-center justify-end border-t border-graphite px-5 py-3 sm:px-6">
+					<Button
 						type="button"
 						onClick={onClose}
 						disabled={!isVerified}
@@ -203,25 +185,14 @@ export function CodebaseResyncModal({
 								? "Selesai"
 								: "Selesai (menunggu verifikasi sinkronisasi)"
 						}
+						size="sm"
 						className={cn(
-							"inline-flex min-h-9 items-center gap-1.5 rounded-md px-4 font-sans text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo",
-							isVerified
-								? "bg-indigo text-snow hover:bg-indigo/90"
-								: "cursor-not-allowed border border-graphite bg-charcoal/50 text-fog opacity-50",
+							"font-sans text-xs font-semibold",
+							isVerified ? "bg-indigo text-snow hover:bg-indigo/90" : null,
 						)}
 					>
-						<span>Selesai</span>
-						{isVerified ? (
-							<Icon
-								icon={Tick01Icon}
-								size={14}
-								className="text-emerald-400"
-								aria-hidden="true"
-							/>
-						) : (
-							<Icon icon={LockIcon} size={14} aria-hidden="true" />
-						)}
-					</button>
+						Selesai
+					</Button>
 				</DialogFooter>
 			</DialogContent>
 		</Dialog>

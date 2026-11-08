@@ -143,9 +143,10 @@ export function CodebaseComposerToolbar({
 				disabled={disabled}
 				onClick={onToggleMention}
 				data-testid="composer-mention-trigger"
-				aria-label="Tambah referensi konteks"
+				data-composer-mention-trigger="true"
+				aria-label="Sisipkan referensi dokumen"
 				aria-expanded={isMentionOpen}
-				title="Referensi dokumen atau file (@)"
+				title="Sisipkan referensi dokumen (@)"
 				className={`inline-flex min-h-8 min-w-8 shrink-0 items-center justify-center rounded-md border px-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-50 ${
 					isMentionOpen
 						? "border-indigo/50 bg-indigo/15 text-snow"

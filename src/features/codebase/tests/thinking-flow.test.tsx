@@ -1,24 +1,14 @@
 // @vitest-environment jsdom
-import {
-	act,
-	cleanup,
-	fireEvent,
-	render,
-	screen,
-} from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AgentThinking } from "@/components/ui/agent-thinking";
 import {
-	activitiesFromOperation,
-	appendRunThinking,
 	type CodebaseRunState,
 	isRunWorking,
 	operationSettleEpoch,
-	recordOperationActivities,
-	recordRunActivity,
+	operationStartEpoch,
 	runConfirmGenerate,
 	runDurationSeconds,
-	setRunPhase,
 	settleRun,
 	settleRunIfCurrent,
 	shouldAutoRevealArtifact,
@@ -26,6 +16,17 @@ import {
 } from "@/features/codebase/services/chat-flow";
 import { consumeSseStream } from "@/lib/sse-consume";
 import { CodebaseChatWorkspace } from "../components/chat/codebase-chat-workspace";
+
+/** Copy the rejected interface showed: none of it may reach the user again. */
+const TRANSPORT_COPY = [
+	"Permintaan diterima server",
+	"Model mulai menghasilkan respons",
+	"Hasil tersimpan di server",
+	"Server sedang bekerja",
+	"AI memproses pikiran",
+	"Model sedang berpikir mendalam",
+	"Sistem sedang melakukan optimalisasi",
+];
 
 afterEach(() => {
 	cleanup();
@@ -288,7 +289,7 @@ describe("P5 Unified Agent Thinking & Cardless Generation Workflow", () => {
 		);
 
 		expect(screen.getByTestId("codebase-run-thinking").textContent).toContain(
-			"PRD selesai",
+			"PRD siap",
 		);
 
 		// Switch to Feature B -> run is reset to null
@@ -352,11 +353,8 @@ describe("P5 Unified Agent Thinking & Cardless Generation Workflow", () => {
 		const startedAt = 10_000;
 		const run = startRun("questions", startedAt);
 
-		// Pure request status, no fake chain of thought
-		expect(run.activity).toBe(
-			"Menyusun pertanyaan klarifikasi dari prompt dan konteks repository.",
-		);
-		expect(run.thinkingText).toBe("");
+		// Pure operation status: no chain of thought, no queued-phase guessing.
+		expect(run.error).toBeNull();
 		expect(isRunWorking(run)).toBe(true);
 
 		// Settles cleanly on response
@@ -366,23 +364,36 @@ describe("P5 Unified Agent Thinking & Cardless Generation Workflow", () => {
 	});
 
 	// 9. No fake progress transition
-	it("only advances to generating phase on authentic onDelta signal, never on synthetic timer", () => {
+	it("never fabricates a thinking/generating phase the backend does not report", () => {
 		const initialRun = startRun("prd", 1000);
-		expect(initialRun.phase).toBe("thinking");
+		// The run state has no phase, activity or reasoning field to rotate on its
+		// own: every render derives from the durable operation's real status.
+		expect(Object.keys(initialRun).sort()).toEqual([
+			"error",
+			"finishedAt",
+			"requestId",
+			"stage",
+			"startedAt",
+			"status",
+		]);
 
-		// Receiving thinking reasoning chunks keeps phase at thinking
-		const withThinking = appendRunThinking(
-			initialRun,
-			"Thinking about auth routes...",
+		render(
+			<CodebaseChatWorkspace
+				featureName="Search"
+				messages={[]}
+				questions={[]}
+				answers={{}}
+				run={initialRun}
+			/>,
 		);
-		expect(withThinking).not.toBeNull();
-		expect(withThinking?.phase).toBe("thinking");
-		expect(withThinking?.thinkingText).toBe("Thinking about auth routes...");
 
-		// Phase advances to generating ONLY when setRunPhase is explicitly triggered by onDelta
-		const generatingRun = setRunPhase(withThinking, "generating");
-		expect(generatingRun).not.toBeNull();
-		expect(generatingRun?.phase).toBe("generating");
+		// One status line, one indicator, no phase line, no reasoning block. The
+		// ticking clock is the only thing that changes while the run stays queued.
+		const thinking = screen.getByTestId("codebase-run-thinking");
+		expect(thinking.textContent).toContain("Menyusun PRD...");
+		expect(thinking.querySelectorAll("[data-orb]")).toHaveLength(1);
+		expect(thinking.querySelector("pre")).toBeNull();
+		expect(screen.queryByRole("button", { name: "Aktivitas" })).toBeNull();
 	});
 
 	// 10. No duplicate generation
@@ -454,89 +465,34 @@ describe("P5 Unified Agent Thinking & Cardless Generation Workflow", () => {
 	});
 });
 
-describe("P3 Authentic thinking, activity history and stale-run safety", () => {
+describe("P7 one accurate operation status and stale-run safety", () => {
 	const iso = (epoch: number) => new Date(epoch).toISOString();
 
-	// 9. Real activity events appear in the correct order
-	it("logs only confirmed backend events, in the order they were observed", () => {
-		const run = startRun("questions", 1_000);
-		expect(run.activities).toEqual([]);
-
-		// A queued operation proves acceptance only; no generation has begun.
-		const queued = recordOperationActivities(
-			run,
-			{ createdAt: iso(1_100), startedAt: null, status: "queued" },
-			run.requestId,
+	// 14. Queued operation does not fabricate reasoning
+	it("shows one honest label for a queued operation and invents no activity", () => {
+		const run = startRun("ac", 1_000);
+		render(
+			<CodebaseChatWorkspace
+				featureName="Search"
+				messages={[]}
+				questions={[]}
+				answers={{}}
+				run={run}
+			/>,
 		);
-		expect(queued?.activities.map((entry) => entry.id)).toEqual([
-			"request.accepted",
-		]);
 
-		const runningRun = recordOperationActivities(
-			queued,
-			{ createdAt: iso(1_100), startedAt: iso(1_400), status: "running" },
-			run.requestId,
-		);
-		expect(runningRun?.activities.map((entry) => entry.id)).toEqual([
-			"request.accepted",
-			"generation.started",
-		]);
-
-		// Re-observing the same operation must not duplicate its events.
-		const reobserved = recordOperationActivities(
-			runningRun,
-			{ createdAt: iso(1_100), startedAt: iso(1_400), status: "running" },
-			run.requestId,
-		);
-		expect(reobserved?.activities).toHaveLength(2);
-
-		const persisted = recordRunActivity(
-			reobserved,
-			"result.persisted",
-			2_100,
-			run.requestId,
-		);
-		expect(persisted?.activities.map((entry) => entry.id)).toEqual([
-			"request.accepted",
-			"generation.started",
-			"result.persisted",
-		]);
+		const thinking = screen.getByTestId("codebase-run-thinking");
+		expect(thinking.textContent).toContain("Menyusun acceptance criteria...");
+		expect(thinking.querySelectorAll("[data-orb]")).toHaveLength(1);
+		// 4. No disclosure without genuine detail.
+		expect(screen.queryByRole("button", { name: "Aktivitas" })).toBeNull();
+		// 3. No transport or generic AI copy reaches the user.
+		for (const copy of TRANSPORT_COPY) {
+			expect(thinking.textContent).not.toContain(copy);
+		}
 	});
 
-	it("never invents events for an operation the client never saw running", () => {
-		const run = startRun("questions", 1_000);
-		const queuedOnly = recordOperationActivities(
-			run,
-			{ createdAt: iso(1_100), startedAt: null, status: "queued" },
-			run.requestId,
-		);
-		const ids = queuedOnly?.activities.map((entry) => entry.id) ?? [];
-
-		expect(ids).not.toContain("generation.started");
-		expect(ids).not.toContain("result.persisted");
-	});
-
-	// 8. No mock activity rotation
-	it("adds no further events while the same operation keeps reporting the same state", () => {
-		const run = recordRunActivity(
-			startRun("prd", 1_000),
-			"request.accepted",
-			1_100,
-		);
-		if (!run) throw new Error("run must be running");
-
-		const stillQueued = recordOperationActivities(
-			run,
-			{ createdAt: iso(1_100), startedAt: null, status: "queued" },
-			run.requestId,
-		);
-
-		expect(stillQueued?.activities.map((entry) => entry.id)).toEqual([
-			"request.accepted",
-		]);
-	});
-
-	// 10. Stale operation events cannot change current status
+	// 17. No cross-operation state leakage
 	it("drops a late settle carrying an earlier request id", () => {
 		const earlier = startRun("questions", 1_000);
 		const current = startRun("prd", 2_000);
@@ -558,53 +514,8 @@ describe("P3 Authentic thinking, activity history and stale-run safety", () => {
 		expect(runDurationSeconds(own)).toBe(2);
 	});
 
-	it("ignores activity events that arrive after the run settled", () => {
-		const settled = settleRun(startRun("prd", 1_000), "done", 4_000);
-		const late = recordRunActivity(
-			settled,
-			"result.persisted",
-			5_000,
-			settled?.requestId,
-		);
-
-		expect(late).toBe(settled);
-		expect(settled?.activities).toEqual([]);
-	});
-
-	it("ignores activity events addressed to a different request", () => {
-		const current = startRun("prd", 2_000);
-		const other = startRun("questions", 1_000);
-
-		const ignored = recordRunActivity(
-			current,
-			"generation.started",
-			3_000,
-			other.requestId,
-		);
-
-		expect(ignored).toBe(current);
-		expect(current.activities).toEqual([]);
-	});
-
-	it("replays only the events a persisted operation actually proves", () => {
-		expect(
-			activitiesFromOperation({
-				createdAt: iso(1_000),
-				startedAt: null,
-				status: "queued",
-			}).map((entry) => entry.id),
-		).toEqual(["request.accepted"]);
-
-		expect(
-			activitiesFromOperation({
-				createdAt: iso(1_000),
-				startedAt: iso(1_500),
-				status: "completed",
-			}).map((entry) => entry.id),
-		).toEqual(["request.accepted", "generation.started"]);
-	});
-
-	it("reports the operation's own duration on remount, not the time since the page opened", () => {
+	// 13. Refresh/reconnect restores real operation state
+	it("rebuilds a reconnected operation from its own acceptance and settle times", () => {
 		const operation = {
 			createdAt: iso(1_000_000),
 			startedAt: iso(1_001_000),
@@ -614,20 +525,25 @@ describe("P3 Authentic thinking, activity history and stale-run safety", () => {
 		vi.spyOn(Date, "now").mockReturnValue(9_000_000);
 
 		const hydrated = settleRun(
-			startRun("questions", Date.parse(operation.startedAt)),
+			startRun("questions", operationStartEpoch(operation)),
 			"done",
 			operationSettleEpoch(operation),
 		);
 
-		expect(runDurationSeconds(hydrated)).toBe(4);
+		// The duration is the operation's own wait (acceptance to settle), never the
+		// time since the browser was reopened.
+		expect(runDurationSeconds(hydrated)).toBe(5);
 	});
 
 	it("falls back to the client clock when the operation has no recorded settle time", () => {
 		vi.spyOn(Date, "now").mockReturnValue(7_500);
 		expect(operationSettleEpoch({ finishedAt: null })).toBe(7_500);
+		expect(operationStartEpoch({ createdAt: null, startedAt: null })).toBe(
+			7_500,
+		);
 	});
 
-	// 6. Completed questions no longer show running state
+	// 15. Completed operation shows the correct status, frozen timer
 	it("renders settled questions as a compact summary instead of a running spinner", () => {
 		const run = settleRun(startRun("questions", 10_000), "done", 15_200);
 		render(
@@ -647,10 +563,10 @@ describe("P3 Authentic thinking, activity history and stale-run safety", () => {
 		expect(screen.getByRole("timer").textContent).toBe("5.2s");
 	});
 
-	// 7. No duplicated Thinking after stage transition
-	it("renders one thinking indicator with distinct thinking and generating labels", () => {
-		const run = setRunPhase(startRun("prd", 1_000), "generating");
-		render(
+	// 1 + 2. One primary indicator for the active operation, and no second one
+	it("keeps exactly one primary indicator with no duplicated thinking orb", () => {
+		const run = startRun("prd", 1_000);
+		const { container } = render(
 			<CodebaseChatWorkspace
 				featureName="Search"
 				messages={[]}
@@ -661,14 +577,18 @@ describe("P3 Authentic thinking, activity history and stale-run safety", () => {
 		);
 
 		expect(screen.getAllByTestId("agent-thinking")).toHaveLength(1);
+		expect(
+			container.querySelectorAll(
+				"[data-testid='codebase-run-thinking'] [data-orb]",
+			),
+		).toHaveLength(1);
 		const thinking =
 			screen.getByTestId("codebase-run-thinking").textContent ?? "";
-		expect(thinking).toContain("Menyusun PRD");
-		expect(thinking).toContain("Menulis PRD");
+		expect(thinking).toContain("Menyusun PRD...");
 	});
 
-	// 1 + 2. Click and keyboard toggle the details; 11. an empty trace renders no control
-	it("exposes the activity disclosure only when a trace exists", () => {
+	// 4. An empty detail set never produces a useless disclosure
+	it("renders no Aktivitas disclosure for a workspace run at any status", () => {
 		const { rerender } = render(
 			<CodebaseChatWorkspace
 				featureName="Search"
@@ -678,13 +598,18 @@ describe("P3 Authentic thinking, activity history and stale-run safety", () => {
 				run={startRun("questions", 1_000)}
 			/>,
 		);
+		expect(screen.queryByRole("button", { name: "Aktivitas" })).toBeNull();
 
-		const toggle = screen.getByRole("button", { name: "Aktivitas" });
-		expect(toggle.getAttribute("aria-expanded")).toBe("true");
-		fireEvent.click(toggle);
-		expect(toggle.getAttribute("aria-expanded")).toBe("false");
-		fireEvent.click(toggle);
-		expect(toggle.getAttribute("aria-expanded")).toBe("true");
+		rerender(
+			<CodebaseChatWorkspace
+				featureName="Search"
+				messages={[]}
+				questions={[]}
+				answers={{}}
+				run={settleRun(startRun("questions", 1_000), "done", 4_200)}
+			/>,
+		);
+		expect(screen.queryByRole("button", { name: "Aktivitas" })).toBeNull();
 
 		rerender(
 			<CodebaseChatWorkspace

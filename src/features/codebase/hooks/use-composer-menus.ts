@@ -159,11 +159,8 @@ export function useComposerMenus(input: {
 	const kb = useComposerKeyboard({
 		draft,
 		artifacts,
-		normalizedRepoFiles,
 		featureName,
 		resolvedProjectId,
-		codebaseId,
-		currentSnapshotId,
 		onSelectMentionCandidate: useCallback(
 			(
 				candidate: ComposerMentionCandidate,
@@ -180,22 +177,18 @@ export function useComposerMenus(input: {
 				}
 				const nextBinding = toReferenceBinding(candidate);
 				setSelectedReferences((current) => {
-					const filtered = current.filter((item) => {
-						if (item.kind === "artifact" && nextBinding.kind === "artifact")
-							return item.targetKind !== nextBinding.targetKind;
-						if (item.kind === "file" && nextBinding.kind === "file")
-							return item.path !== nextBinding.path;
-						return true;
-					});
+					const filtered = current.filter(
+						(item) =>
+							item.kind !== "artifact" ||
+							item.targetKind !== nextBinding.targetKind,
+					);
 					const updated = [...filtered, nextBinding];
 					onReferencesChange?.(updated);
 					return updated;
 				});
-				if (candidate.kind === "artifact") {
-					setInternalTarget(candidate.targetKind);
-					setExplicitTargetSelected(true);
-					onChangeRevisionTarget?.(candidate.targetKind);
-				}
+				setInternalTarget(candidate.targetKind);
+				setExplicitTargetSelected(true);
+				onChangeRevisionTarget?.(candidate.targetKind);
 				focusComposer();
 			},
 			[onChangeRevisionTarget, onReferencesChange, focusComposer, setDraft],
@@ -316,8 +309,9 @@ export function useComposerMenus(input: {
 		isMentionPopoverOpen: kb.isMentionPopoverOpen,
 		mentionSearch: kb.effectiveMentionQuery,
 		setMentionSearch: kb.setMentionSearch,
-		mentionDocuments: kb.mentionCandidates.documents,
-		mentionFiles: kb.mentionCandidates.files,
+		mentionDocuments: kb.filteredMentionDocuments,
+		mentionHasDocuments: kb.hasMentionDocuments,
+		mentionSearchAutoFocus: kb.isMentionButtonOpen,
 		mentionActiveIndex: kb.mentionActiveIndex,
 		isSlashPopoverOpen: kb.isSlashPopoverOpen,
 		slashCommands: kb.filteredSlashCommands,
@@ -331,15 +325,18 @@ export function useComposerMenus(input: {
 		handleChangeRevisionTarget,
 		handleToggleMention: () => {
 			kb.setIsMentionButtonOpen((prev) => !prev);
+			kb.setMentionSearch("");
 			kb.setMentionActiveIndex(0);
 		},
 		handleCloseMention: () => {
 			kb.setIsMentionButtonOpen(false);
+			kb.setMentionSearch("");
 			kb.setDismissedMentionToken(kb.inlineMentionTokenKey);
 		},
 		handleSelectMentionCandidate: kb.handleSelectMention,
 		handleRemoveReference,
 		handleSelectSlashCommand: kb.handleSelectSlash,
 		handleComposerKeyDown: kb.handleComposerKeyDown,
+		handleMentionSearchKeyDown: kb.handleMentionSearchKeyDown,
 	};
 }

@@ -1,9 +1,17 @@
 import type { CodebaseArtifactRef } from "../components/explorer/codebase-file-card";
-import type { ComposerReferenceBinding } from "../types/revision";
+import type {
+	ComposerArtifactReference,
+	ComposerReferenceBinding,
+} from "../types/revision";
 import type { RevisionTargetKind } from "./revision-base-version.server";
 import { isSafeRelativePath } from "./sync-validation";
 
-export interface ComposerArtifactMentionCandidate {
+/**
+ * A `@` suggestion. Only documents that are actually persisted for the active
+ * feature are ever represented, so a candidate always resolves to a real
+ * artifact identity — there is no "available" flag to fake readiness.
+ */
+export interface ComposerMentionCandidate {
 	kind: "artifact";
 	key: string;
 	id: string;
@@ -13,23 +21,7 @@ export interface ComposerArtifactMentionCandidate {
 	label: string;
 	chipLabel: string;
 	fileName: string;
-	available: boolean;
 }
-
-export interface ComposerFileMentionCandidate {
-	kind: "file";
-	key: string;
-	id: string;
-	path: string;
-	codebaseId: string;
-	snapshotId: string;
-	chipLabel: string;
-	available: boolean;
-}
-
-export type ComposerMentionCandidate =
-	| ComposerArtifactMentionCandidate
-	| ComposerFileMentionCandidate;
 
 export interface ReconciledComposerReference {
 	binding: ComposerReferenceBinding;
@@ -49,7 +41,7 @@ const ARTIFACT_META: Record<
 > = {
 	feature: {
 		mentionAlias: "@Feature",
-		label: "Feature Specification",
+		label: "Feature",
 		shortPrefix: "Feature",
 	},
 	prd: { mentionAlias: "@PRD", label: "PRD", shortPrefix: "PRD" },
@@ -60,6 +52,8 @@ const ARTIFACT_META: Record<
 	},
 	tasks: { mentionAlias: "@Task", label: "Task", shortPrefix: "Task" },
 };
+
+const ARTIFACT_KIND_ORDER = ["feature", "prd", "ac", "tasks"] as const;
 
 export function inferArtifactTargetKind(
 	artifact: Pick<CodebaseArtifactRef, "id" | "badge" | "fileName">,
@@ -84,12 +78,20 @@ export function inferArtifactTargetKind(
 	return null;
 }
 
+function projectIdFromArtifactId(artifactId: string): string | null {
+	const match = /^(?:feature|prd|ac|tasks?)-(.+)$/i.exec(artifactId.trim());
+	return match?.[1]?.trim() || null;
+}
+
 export function extractProjectIdFromArtifactId(
 	artifactId: string,
 	fallbackProjectId?: string | null,
 ): string {
-	const match = /^(?:feature|prd|ac|tasks?)-(.+)$/i.exec(artifactId.trim());
-	return match?.[1]?.trim() || fallbackProjectId?.trim() || "default";
+	return (
+		projectIdFromArtifactId(artifactId) ??
+		fallbackProjectId?.trim() ??
+		"default"
+	);
 }
 
 export function formatArtifactChipLabel(
@@ -114,6 +116,11 @@ export function formatArtifactChipLabel(
 	return `@${meta.shortPrefix} · ${artifact.fileName}`;
 }
 
+/**
+ * Repository files are no longer offered through `@`. They are still
+ * normalized here because references saved by older sessions must keep
+ * rendering (and reporting staleness) instead of disappearing or crashing.
+ */
 export function normalizeRepositoryFileList(
 	repositoryFiles?: ReadonlyArray<{ path: string } | string>,
 	contextFiles?: readonly string[],
@@ -138,100 +145,74 @@ export function normalizeRepositoryFileList(
 
 export function buildMentionCandidates(input: {
 	artifacts: readonly CodebaseArtifactRef[];
-	repositoryFiles: readonly string[];
 	featureName?: string | null;
 	projectId?: string | null;
-	codebaseId?: string | null;
-	snapshotId?: string | null;
-	query?: string;
-}): {
-	documents: ComposerArtifactMentionCandidate[];
-	files: ComposerFileMentionCandidate[];
-	all: ComposerMentionCandidate[];
-} {
-	const resolvedProjectId =
-		input.projectId?.trim() ||
-		(input.artifacts[0]
-			? extractProjectIdFromArtifactId(input.artifacts[0].id)
-			: "default");
-	const resolvedCodebaseId = input.codebaseId?.trim() || "default";
-	const resolvedSnapshotId = input.snapshotId?.trim() || "default";
-	const q = (input.query ?? "").trim().toLowerCase().replace(/^@/, "");
-
+}): ComposerMentionCandidate[] {
+	const activeProjectId = input.projectId?.trim() || null;
 	const artifactByKind = new Map<RevisionTargetKind, CodebaseArtifactRef>();
 	for (const artifact of input.artifacts) {
 		const kind = inferArtifactTargetKind(artifact);
-		if (kind && !artifactByKind.has(kind)) artifactByKind.set(kind, artifact);
+		if (!kind || artifactByKind.has(kind)) continue;
+		// A persisted artifact that names another feature must never be offered
+		// as a reference for the feature currently open in the workspace.
+		const artifactProjectId = projectIdFromArtifactId(artifact.id);
+		if (
+			activeProjectId &&
+			artifactProjectId &&
+			artifactProjectId !== activeProjectId
+		) {
+			continue;
+		}
+		artifactByKind.set(kind, artifact);
 	}
 
-	const documents: ComposerArtifactMentionCandidate[] = [];
-	for (const kind of ["feature", "prd", "ac", "tasks"] as const) {
-		const meta = ARTIFACT_META[kind];
+	const documents: ComposerMentionCandidate[] = [];
+	for (const kind of ARTIFACT_KIND_ORDER) {
 		const artifact = artifactByKind.get(kind);
-		const candidate: ComposerArtifactMentionCandidate = {
+		if (!artifact) continue;
+		const meta = ARTIFACT_META[kind];
+		documents.push({
 			kind: "artifact",
-			key: `artifact:${kind}:${artifact?.id ?? `${kind}-${resolvedProjectId}`}`,
-			id: artifact?.id ?? `${kind}-${resolvedProjectId}`,
-			projectId: artifact
-				? extractProjectIdFromArtifactId(artifact.id, resolvedProjectId)
-				: resolvedProjectId,
+			key: `artifact:${kind}:${artifact.id}`,
+			id: artifact.id,
+			projectId:
+				projectIdFromArtifactId(artifact.id) ?? activeProjectId ?? "default",
 			targetKind: kind,
 			mentionAlias: meta.mentionAlias,
 			label: meta.label,
-			chipLabel: artifact
-				? formatArtifactChipLabel(artifact, kind, input.featureName)
-				: meta.mentionAlias,
-			fileName: artifact?.fileName ?? `${kind}.md`,
-			available: Boolean(artifact),
-		};
-		if (
-			!q ||
-			candidate.label.toLowerCase().includes(q) ||
-			candidate.mentionAlias.toLowerCase().slice(1).includes(q) ||
-			candidate.chipLabel.toLowerCase().includes(q) ||
-			candidate.fileName.toLowerCase().includes(q)
-		) {
-			documents.push(candidate);
-		}
+			chipLabel: formatArtifactChipLabel(artifact, kind, input.featureName),
+			fileName: artifact.fileName,
+		});
 	}
+	return documents;
+}
 
-	const files = input.repositoryFiles
-		.filter((filePath) => !q || filePath.toLowerCase().includes(q))
-		.map(
-			(filePath): ComposerFileMentionCandidate => ({
-				kind: "file",
-				key: `file:${resolvedSnapshotId}:${filePath}`,
-				id: `file:${resolvedSnapshotId}:${filePath}`,
-				path: filePath,
-				codebaseId: resolvedCodebaseId,
-				snapshotId: resolvedSnapshotId,
-				chipLabel: `@${filePath}`,
-				available: true,
-			}),
-		);
-
-	return { documents, files, all: [...documents, ...files] };
+export function filterMentionCandidates(
+	documents: readonly ComposerMentionCandidate[],
+	query: string,
+): ComposerMentionCandidate[] {
+	const q = query.trim().toLowerCase().replace(/^@/, "");
+	if (!q) return [...documents];
+	return documents.filter(
+		(doc) =>
+			doc.label.toLowerCase().includes(q) ||
+			doc.mentionAlias.toLowerCase().slice(1).includes(q) ||
+			doc.chipLabel.toLowerCase().includes(q) ||
+			doc.fileName.toLowerCase().includes(q),
+	);
 }
 
 export function toReferenceBinding(
 	candidate: ComposerMentionCandidate,
-): ComposerReferenceBinding {
-	return candidate.kind === "artifact"
-		? {
-				kind: "artifact",
-				id: candidate.id,
-				projectId: candidate.projectId,
-				targetKind: candidate.targetKind,
-				label: candidate.chipLabel,
-				fileName: candidate.fileName,
-			}
-		: {
-				kind: "file",
-				id: candidate.id,
-				path: candidate.path,
-				codebaseId: candidate.codebaseId,
-				snapshotId: candidate.snapshotId,
-			};
+): ComposerArtifactReference {
+	return {
+		kind: "artifact",
+		id: candidate.id,
+		projectId: candidate.projectId,
+		targetKind: candidate.targetKind,
+		label: candidate.chipLabel,
+		fileName: candidate.fileName,
+	};
 }
 
 export function reconcileSelectedReferences(input: {
@@ -253,11 +234,13 @@ export function reconcileSelectedReferences(input: {
 
 	return input.references.map((binding) => {
 		if (binding.kind === "artifact") {
-			const matchingArtifact = input.artifacts.find(
-				(item) =>
-					item.id === binding.id ||
-					inferArtifactTargetKind(item) === binding.targetKind,
-			);
+			const matchingArtifact =
+				input.artifacts.find((item) => item.id === binding.id) ??
+				input.artifacts.find(
+					(item) =>
+						inferArtifactTargetKind(item) === binding.targetKind &&
+						projectIdFromArtifactId(item.id) === binding.projectId,
+				);
 			const projectMismatch = Boolean(
 				expectedProjectId &&
 					binding.projectId !== "default" &&

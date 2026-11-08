@@ -19,10 +19,15 @@ beforeAll(async () => {
 		"subscriptions",
 		"codebases",
 		"codebase_sync_sessions",
+		"codebase_sync_idempotency_keys",
 		"codebase_snapshots",
 		"codebase_snapshot_files",
 		"codebase_ask_handoffs",
 		"codebase_analyses",
+		"codebase_generation_contexts",
+		"prd_versions",
+		"ac_versions",
+		"tasks",
 		"credit_operations",
 		"credit_ledger_entries",
 	]) {
@@ -48,6 +53,15 @@ beforeAll(async () => {
 	);
 	await cleanupPool.query(
 		await readFile("drizzle/0045_codebase_onboarding_idempotency.sql", "utf8"),
+	);
+});
+beforeAll(async () => {
+	const migration = await readFile(
+		"drizzle/0046_codebase_resync_requests.sql",
+		"utf8",
+	);
+	await cleanupPool?.query(
+		migration.replaceAll('"public".', `"${schemaName}".`),
 	);
 });
 

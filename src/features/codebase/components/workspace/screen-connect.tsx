@@ -116,7 +116,6 @@ export function ScreenConnect({
 						isStarting={isStarting}
 						error={promptError}
 						status={status}
-						transportComplete={stageView.syncComplete}
 						onRequestNewToken={onRequestNewToken}
 						lockedPrompt={lockedPrompt}
 						creditNote={creditNote}

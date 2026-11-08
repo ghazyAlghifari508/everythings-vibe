@@ -9,13 +9,14 @@
 //
 // Every branch that stops the turn calls `guards.fail(...)`, which releases the
 // reservation and emits the client-visible error in one place.
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { projects } from "@/db/schema";
+import { refineProvisionalFeatureTitle } from "@/features/codebase/services/feature-naming";
 import { linkGenerationContext } from "@/features/codebase/services/generation-context";
 import {
 	deriveProjectName,
-	hasExplicitProductName,
+	shouldAutoRenameProject,
 } from "@/features/greenfield/services/prd-naming";
 import {
 	PrdRevisionConflictError,
@@ -65,6 +66,12 @@ export interface PrdTurnPersistInput {
 	codebaseSnapshotId?: string;
 	codebaseAnalysisId?: string;
 	codebaseSnapshotInfo?: { fileCount?: number; sourceBytes?: number };
+	/**
+	 * "greenfield" | "existing_codebase". An existing-codebase feature already
+	 * carries the user's own functional title, so the cosmetic AI rename below
+	 * must not touch it.
+	 */
+	projectMode?: string | null;
 }
 
 export type PrdTurnPersistResult =
@@ -199,11 +206,59 @@ export async function persistPrdTurn(
 		);
 	}
 
-	// AI rename of project (cosmetic only).
+	// Existing-codebase feature titles are the user's own functional title and
+	// stay fixed for the life of the plan. The single exception is a title that is
+	// still the neutral provisional label: once the feature's own words are known
+	// (the compiled prompt carries the answered questions), it is refined exactly
+	// once, deterministically and without a model call. The write is a
+	// compare-and-set on the name it read, so a manual rename always wins.
 	void (async () => {
 		try {
 			if (mode !== "generate" || !projectId) return;
-			if (hasExplicitProductName(message)) return;
+			if (input.projectMode !== "existing_codebase") return;
+			const [current] = await db
+				.select({ name: projects.name })
+				.from(projects)
+				.where(
+					and(eq(projects.id, projectId), eq(projects.userId, input.userId)),
+				)
+				.limit(1);
+			if (!current) return;
+			const refined = refineProvisionalFeatureTitle({
+				currentName: current.name,
+				message,
+				language: input.projectLanguage,
+			});
+			if (!refined) return;
+			await db
+				.update(projects)
+				.set({ name: refined })
+				.where(
+					and(
+						eq(projects.id, projectId),
+						eq(projects.userId, input.userId),
+						eq(projects.name, current.name),
+					),
+				);
+		} catch (e) {
+			console.warn("Feature title refinement skipped:", e);
+		}
+	})();
+
+	// AI rename of project (cosmetic only, and never for an existing-codebase
+	// feature whose title is already the user's own functional title).
+	void (async () => {
+		try {
+			if (!projectId) return;
+			if (
+				!shouldAutoRenameProject({
+					mode,
+					projectId,
+					projectMode: input.projectMode,
+					message,
+				})
+			)
+				return;
 			const better = await deriveProjectName(message);
 			if (!better || better === "Project Baru") return;
 			await db

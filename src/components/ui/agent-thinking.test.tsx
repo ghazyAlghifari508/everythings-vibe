@@ -8,16 +8,17 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AgentThinking, type AgentThinkingActivity } from "./agent-thinking";
+import { AgentThinking } from "./agent-thinking";
 
-const ACCEPTED: AgentThinkingActivity = {
-	id: "request.accepted",
-	label: "Permintaan diterima server",
-};
-const GENERATING: AgentThinkingActivity = {
-	id: "generation.started",
-	label: "Model mulai menghasilkan respons",
-};
+const TRANSPORT_COPY = [
+	"Permintaan diterima server",
+	"Model mulai menghasilkan respons",
+	"Hasil tersimpan di server",
+	"Server sedang bekerja",
+	"AI memproses pikiran",
+	"Model sedang berpikir mendalam",
+	"Sistem sedang melakukan optimalisasi",
+];
 
 afterEach(() => {
 	cleanup();
@@ -41,8 +42,6 @@ describe("AgentThinking Component", () => {
 		expect(thinking.textContent).toContain("Thinking...");
 		const timer = screen.getByRole("timer");
 		expect(timer.textContent).toBe("3.5s");
-
-		vi.restoreAllMocks();
 	});
 
 	it("renders completed state with frozen duration", () => {
@@ -64,7 +63,7 @@ describe("AgentThinking Component", () => {
 		expect(timer.textContent).toBe("8.4s");
 	});
 
-	it("timer remains frozen and does not tick after finishedAt is set", () => {
+	it("keeps the timer frozen and does not tick after finishedAt is set", () => {
 		vi.useFakeTimers();
 		const startedAt = 10_000;
 		const finishedAt = 14_200; // 4.2s
@@ -72,7 +71,7 @@ describe("AgentThinking Component", () => {
 		render(
 			<AgentThinking
 				status="done"
-				doneLabel="PRD selesai"
+				doneLabel="PRD siap"
 				startedAt={startedAt}
 				finishedAt={finishedAt}
 			/>,
@@ -118,36 +117,162 @@ describe("AgentThinking Component", () => {
 		expect(onRetry).toHaveBeenCalledTimes(1);
 	});
 
-	it("collapses and expands the activity details on click", () => {
+	it("freezes the timer after a failure instead of keeping it running", () => {
+		vi.useFakeTimers();
+		const startedAt = 4_000;
+		render(
+			<AgentThinking
+				status="failed"
+				failedLabel="Gagal menyusun task"
+				error="Worker berhenti"
+				startedAt={startedAt}
+				finishedAt={9_200}
+			/>,
+		);
+
+		const timer = screen.getByRole("timer");
+		expect(timer.textContent).toBe("5.2s");
+
+		act(() => {
+			vi.advanceTimersByTime(20_000);
+		});
+		expect(timer.textContent).toBe("5.2s");
+		vi.useRealTimers();
+	});
+
+	// Also covers a cancelled run: the workspace settles a cancelled operation as a
+	// failure carrying "Dibatalkan.", so its duration must freeze the same way.
+	it("freezes the timer after a cancellation reported as a failure", () => {
+		vi.useFakeTimers();
+		render(
+			<AgentThinking
+				status="failed"
+				failedLabel="Gagal menyusun PRD"
+				error="Dibatalkan."
+				startedAt={1_000}
+				finishedAt={3_000}
+			/>,
+		);
+
+		const timer = screen.getByRole("timer");
+		expect(timer.textContent).toBe("2.0s");
+		act(() => {
+			vi.advanceTimersByTime(15_000);
+		});
+		expect(timer.textContent).toBe("2.0s");
+		vi.useRealTimers();
+	});
+
+	it("starts the timer from the operation start, not from mount", () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(50_000);
 		render(
 			<AgentThinking
 				status="running"
 				thinkingLabel="Menyusun PRD"
-				activities={[ACCEPTED]}
+				startedAt={44_000}
+			/>,
+		);
+
+		// The operation had already been running for six seconds when it mounted.
+		expect(screen.getByRole("timer").textContent).toBe("6.0s");
+		vi.useRealTimers();
+	});
+
+	it("does not reset the elapsed time on an ordinary rerender", () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(1_000);
+		const { rerender } = render(
+			<AgentThinking
+				status="running"
+				thinkingLabel="Menyusun PRD"
+				startedAt={1_000}
+			/>,
+		);
+
+		act(() => {
+			vi.advanceTimersByTime(1_400);
+		});
+		expect(screen.getByRole("timer").textContent).toBe("1.4s");
+
+		rerender(
+			<AgentThinking
+				status="running"
+				thinkingLabel="Menyusun PRD"
+				startedAt={1_000}
+			/>,
+		);
+		expect(screen.getByRole("timer").textContent).toBe("1.4s");
+		vi.useRealTimers();
+	});
+
+	it("exposes exactly one primary Orb while a run is in flight", () => {
+		const { container } = render(
+			<AgentThinking
+				status="running"
+				thinkingLabel="Menyusun PRD"
+				thinkingText="Menimbang struktur dokumen"
+				startedAt={1000}
+			/>,
+		);
+
+		expect(container.querySelectorAll("[data-orb]")).toHaveLength(1);
+		expect(screen.getAllByTestId("agent-thinking-indicator")).toHaveLength(1);
+	});
+
+	it("never renders a second animated indicator when the activity is expanded", () => {
+		const { container } = render(
+			<AgentThinking
+				status="running"
+				thinkingLabel="Menyusun PRD"
+				thinkingText="Menimbang struktur dokumen"
+				startedAt={1000}
+			/>,
+		);
+
+		const toggle = screen.getByRole("button", { name: "Aktivitas" });
+		fireEvent.click(toggle); // collapse
+		expect(container.querySelectorAll("[data-orb]")).toHaveLength(1);
+		fireEvent.click(toggle); // expand again
+		expect(container.querySelectorAll("[data-orb]")).toHaveLength(1);
+	});
+
+	it("shows real provider reasoning details and toggles them on click", () => {
+		render(
+			<AgentThinking
+				status="running"
+				thinkingLabel="Menyusun PRD"
+				thinkingText="Menimbang struktur dokumen dari konteks repository"
 				startedAt={1000}
 			/>,
 		);
 
 		const toggle = screen.getByRole("button", { name: "Aktivitas" });
 		expect(toggle.getAttribute("aria-expanded")).toBe("true");
-		expect(screen.getByText(ACCEPTED.label)).toBeDefined();
+		expect(
+			screen.getByText("Menimbang struktur dokumen dari konteks repository"),
+		).toBeDefined();
 
 		fireEvent.click(toggle);
 		expect(toggle.getAttribute("aria-expanded")).toBe("false");
-		expect(screen.queryByText(ACCEPTED.label)).toBeNull();
+		expect(
+			screen.queryByText("Menimbang struktur dokumen dari konteks repository"),
+		).toBeNull();
 
 		fireEvent.click(toggle);
 		expect(toggle.getAttribute("aria-expanded")).toBe("true");
-		expect(screen.getByText(ACCEPTED.label)).toBeDefined();
+		expect(
+			screen.getByText("Menimbang struktur dokumen dari konteks repository"),
+		).toBeDefined();
 	});
 
-	it("toggles the activity details with Enter and Space", async () => {
+	it("toggles the details with Enter and Space", async () => {
 		const user = userEvent.setup();
 		render(
 			<AgentThinking
 				status="running"
 				thinkingLabel="Menyusun PRD"
-				activities={[ACCEPTED]}
+				thinkingText="Menimbang struktur dokumen"
 				startedAt={1000}
 			/>,
 		);
@@ -169,7 +294,7 @@ describe("AgentThinking Component", () => {
 			<AgentThinking
 				status="running"
 				thinkingLabel="Menyusun PRD"
-				activities={[ACCEPTED]}
+				thinkingText="Menimbang struktur dokumen"
 				startedAt={1_000}
 			/>,
 		);
@@ -185,7 +310,7 @@ describe("AgentThinking Component", () => {
 		});
 
 		expect(toggle.getAttribute("aria-expanded")).toBe("false");
-		expect(screen.queryByText(ACCEPTED.label)).toBeNull();
+		expect(screen.queryByText("Menimbang struktur dokumen")).toBeNull();
 		vi.useRealTimers();
 	});
 
@@ -196,7 +321,7 @@ describe("AgentThinking Component", () => {
 			<AgentThinking
 				status="running"
 				thinkingLabel="Menyusun PRD"
-				activities={[ACCEPTED]}
+				thinkingText="Menimbang struktur dokumen"
 				startedAt={1_000}
 			/>,
 		);
@@ -232,7 +357,7 @@ describe("AgentThinking Component", () => {
 		rerender(
 			<AgentThinking
 				status="done"
-				doneLabel="PRD selesai"
+				doneLabel="PRD siap"
 				startedAt={5_000}
 				finishedAt={7_000}
 			/>,
@@ -245,91 +370,67 @@ describe("AgentThinking Component", () => {
 		vi.useRealTimers();
 	});
 
-	it("renders confirmed activity events in observation order", () => {
+	it("renders no disclosure control when there is nothing genuine to show", () => {
 		render(
 			<AgentThinking
 				status="running"
+				thinkingLabel="Menyusun pertanyaan klarifikasi"
+				startedAt={1_000}
+			/>,
+		);
+
+		expect(screen.queryByRole("button", { name: "Aktivitas" })).toBeNull();
+		expect(screen.queryByRole("listitem")).toBeNull();
+	});
+
+	it("treats blank or whitespace reasoning as no disclosure at all", () => {
+		render(
+			<AgentThinking
+				status="done"
+				doneLabel="Task siap"
+				thinkingText={"   \n  "}
+				startedAt={1000}
+				finishedAt={4200}
+			/>,
+		);
+
+		expect(screen.queryByRole("button", { name: "Aktivitas" })).toBeNull();
+	});
+
+	it("never renders transport or generic AI copy", () => {
+		const { container } = render(
+			<AgentThinking
+				status="running"
 				thinkingLabel="Menyusun PRD"
-				activities={[ACCEPTED, GENERATING]}
+				thinkingText="Menimbang struktur dokumen"
 				startedAt={1000}
 			/>,
 		);
 
-		const labels = screen
-			.getAllByRole("listitem")
-			.map((item) => item.textContent);
-		expect(labels).toEqual([ACCEPTED.label, GENERATING.label]);
+		for (const copy of TRANSPORT_COPY) {
+			expect(container.textContent).not.toContain(copy);
+		}
 	});
 
-	it("never adds activity entries on its own as time passes", () => {
+	it("synthesizes no extra detail rows as time passes", () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(1_000);
 		render(
 			<AgentThinking
 				status="running"
 				thinkingLabel="Menyusun PRD"
-				activities={[ACCEPTED]}
+				thinkingText="Menimbang struktur dokumen"
 				startedAt={1_000}
 			/>,
 		);
 
 		act(() => {
-			vi.advanceTimersByTime(45_000);
+			vi.advanceTimersByTime(1_000);
 		});
 
-		const labels = screen
-			.getAllByRole("listitem")
-			.map((item) => item.textContent);
-		expect(labels).toEqual([ACCEPTED.label]);
+		expect(screen.queryAllByRole("listitem")).toHaveLength(0);
+		expect(screen.getByText("Menimbang struktur dokumen")).toBeDefined();
 		vi.useRealTimers();
-	});
-
-	it("lets the user expand a completed run that recorded real activity", () => {
-		render(
-			<AgentThinking
-				status="done"
-				doneLabel="PRD selesai"
-				activities={[ACCEPTED]}
-				startedAt={1000}
-				finishedAt={4200}
-			/>,
-		);
-
-		expect(screen.queryByText(ACCEPTED.label)).toBeNull();
-		fireEvent.click(screen.getByRole("button", { name: "Aktivitas" }));
-		expect(screen.getByText(ACCEPTED.label)).toBeDefined();
-	});
-
-	it("does not render an expandable control for an empty activity trace", () => {
-		render(
-			<AgentThinking
-				status="done"
-				doneLabel="Pertanyaan siap"
-				activities={[]}
-				startedAt={1000}
-				finishedAt={4200}
-			/>,
-		);
-
-		expect(screen.queryByRole("button", { name: /Aktivitas/i })).toBeNull();
-		expect(screen.queryByRole("listitem")).toBeNull();
-	});
-
-	it("renders verified generating phase with completed thinking line and active generating line", () => {
-		render(
-			<AgentThinking
-				status="running"
-				phase="generating"
-				thinkingLabel="Thinking"
-				generatingLabel="Menyusun PRD..."
-				startedAt={1000}
-				finishedAt={4500}
-			/>,
-		);
-
-		const thinking = screen.getByTestId("agent-thinking");
-		expect(thinking.textContent).toContain("Thinking");
-		expect(thinking.textContent).toContain("Menyusun PRD...");
 	});
 
 	it("collapses expandable details on settle", () => {
@@ -338,7 +439,6 @@ describe("AgentThinking Component", () => {
 				status="running"
 				thinkingLabel="Thinking"
 				thinkingText="Analisis dependensi arsitektur..."
-				activity="Menganalisis kebutuhan fitur..."
 				startedAt={1000}
 			/>,
 		);
@@ -354,7 +454,6 @@ describe("AgentThinking Component", () => {
 				status="done"
 				doneLabel="Selesai"
 				thinkingText="Analisis dependensi arsitektur..."
-				activity="Menganalisis kebutuhan fitur..."
 				startedAt={1000}
 				finishedAt={3000}
 			/>,
@@ -362,18 +461,6 @@ describe("AgentThinking Component", () => {
 
 		// Once done, details auto-collapse
 		expect(screen.queryByText("Analisis dependensi arsitektur...")).toBeNull();
-	});
-
-	it("does not render empty details dropdown if no activity and no thinkingText", () => {
-		render(
-			<AgentThinking
-				status="running"
-				thinkingLabel="Thinking"
-				startedAt={1000}
-			/>,
-		);
-
-		expect(screen.queryByRole("button", { name: /Aktivitas/i })).toBeNull();
 	});
 
 	it("fires onSettle once when status transitions from running to done", () => {
@@ -401,5 +488,43 @@ describe("AgentThinking Component", () => {
 
 		expect(onSettle).toHaveBeenCalledTimes(1);
 		expect(onSettle).toHaveBeenCalledWith(3.2);
+	});
+
+	// Keeps every existing consumer working: the legacy working/failed flags still
+	// drive the same three states as the newer status prop.
+	it("keeps the legacy working/failed flags compatible", () => {
+		const { rerender } = render(
+			<AgentThinking working thinkingLabel="Menyusun PRD" startedAt={1000} />,
+		);
+		expect(screen.getByTestId("agent-thinking").textContent).toContain(
+			"Menyusun PRD...",
+		);
+
+		rerender(
+			<AgentThinking
+				failed
+				failedLabel="Gagal menyusun PRD"
+				error="Timeout"
+				startedAt={1000}
+				finishedAt={2000}
+			/>,
+		);
+		expect(screen.getByTestId("agent-thinking").textContent).toContain(
+			"Gagal menyusun PRD",
+		);
+
+		rerender(
+			<AgentThinking working={false} doneLabel="PRD siap" startedAt={1000} />,
+		);
+		expect(screen.getByTestId("agent-thinking").textContent).toContain(
+			"PRD siap",
+		);
+	});
+
+	it("renders nothing while idle", () => {
+		const { container } = render(<AgentThinking status="idle" />);
+		expect(
+			container.querySelector("[data-testid='agent-thinking']"),
+		).toBeNull();
 	});
 });

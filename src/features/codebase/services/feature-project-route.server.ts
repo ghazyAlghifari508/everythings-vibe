@@ -8,12 +8,12 @@ import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { codebaseSnapshots, codebases, projects } from "@/db/schema";
-import { deriveProjectNameSync } from "@/features/greenfield/services/prd-naming";
 import { normalizeLanguage } from "@/lib/language";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { requireUser } from "@/lib/session";
 import { ONBOARDING_FEATURE_MESSAGE } from "./analysis";
 import { resolvePlan } from "./analysis-route-scope.server";
+import { deriveFeatureTitle } from "./feature-naming";
 import { saveAskHandoff } from "./generation-context";
 import { isProvisionalCodebaseName } from "./naming";
 import {
@@ -130,7 +130,7 @@ export async function handleCodebaseFeatureCreate({
 		typeof body === "object" && body !== null && "language" in body
 			? normalizeLanguage(body.language)
 			: normalizeLanguage(undefined);
-	const name = deriveProjectNameSync(prompt);
+	const name = deriveFeatureTitle(prompt, language);
 	const requestId = z
 		.object({ requestId: z.uuid().optional() })
 		.safeParse(body);

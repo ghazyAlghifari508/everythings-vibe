@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
+import { fireEvent } from "@testing-library/react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { SyncStatusResponse } from "@/features/codebase/services/sync";
+import { ScreenConnect } from "../components/workspace/screen-connect";
 import { SyncStageList } from "../components/workspace/sync-stage-list";
 
 /**
@@ -109,6 +111,59 @@ describe("SyncStageList indicators", () => {
 			expect(row?.querySelector('[data-testid="spinner"]')).toBeNull();
 		}
 		expect(container.textContent).toContain("Menunggu agent");
+	});
+
+	it("spins exactly one row while the CLI is connecting", () => {
+		render(
+			status({
+				lifecycle: [{ kind: "cli_connecting", at: "2026-02-01T10:00:00.000Z" }],
+			}),
+		);
+		const row = container.querySelector(
+			'[data-testid="sync-stage-agent"][data-stage-state="active"]',
+		);
+		expect(row?.querySelector('[data-testid="spinner"]')).not.toBeNull();
+		expect(row?.textContent).toContain("Menghubungkan agent");
+		// One moving stage only: the announcement never lights up the later rows.
+		expect(container.querySelectorAll('[data-testid="spinner"]')).toHaveLength(
+			1,
+		);
+		expect(stageState("sync-stage-preparing")).toBe("waiting");
+		expect(stageState("sync-stage-sync")).toBe("waiting");
+		expect(container.textContent).not.toContain("Menunggu agent");
+	});
+
+	it("does not start any stage when the prompt is copied", () => {
+		act(() => {
+			root?.render(
+				<ScreenConnect
+					projectName="repo"
+					payload={{
+						projectId: "cb_p5",
+						sessionId: "sess_p5",
+						apiBaseUrl: "https://test.local",
+						syncToken: "token-copy",
+						syncCommand: "sync",
+						cliMinVersion: "2.0.0",
+						expiresAt: new Date(Date.now() + 60_000).toISOString(),
+					}}
+					status={status()}
+				/>,
+			);
+		});
+		const copyButton = container.querySelector(
+			'[aria-label="Salin prompt untuk AI agent"]',
+		);
+		expect(copyButton).not.toBeNull();
+		if (copyButton) fireEvent.click(copyButton);
+		// The clipboard is browser-local feedback: no server fact changed, so no
+		// stage may start and nothing may spin.
+		expect(stageState("sync-stage-agent")).toBe("waiting");
+		expect(stageState("sync-stage-preparing")).toBe("waiting");
+		expect(stageState("sync-stage-sync")).toBe("waiting");
+		expect(container.querySelectorAll('[data-testid="spinner"]')).toHaveLength(
+			0,
+		);
 	});
 
 	it("marks completed stages with the checkmark icon and no spinner", () => {

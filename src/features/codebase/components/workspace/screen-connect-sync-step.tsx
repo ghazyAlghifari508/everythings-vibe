@@ -49,6 +49,12 @@ interface ScreenConnectSyncStepProps {
 	onRetryAnalysis?: () => void;
 	isLegacyAnalysisMissingSuggestions: boolean;
 	onRefreshLegacySuggestions?: () => void;
+	/** Step title; the re-sync modal names its own progress section. */
+	heading?: string;
+	/** Supporting line; `null` omits it instead of rendering filler copy. */
+	description?: string | null;
+	/** Wording for the pre-progress standby line. */
+	idleLabel?: string;
 }
 
 export function ScreenConnectSyncStep({
@@ -69,6 +75,9 @@ export function ScreenConnectSyncStep({
 	onRetryAnalysis,
 	isLegacyAnalysisMissingSuggestions,
 	onRefreshLegacySuggestions,
+	heading = "Pantau progres",
+	description = "Jalankan prompt dari root repository untuk mulai menyinkronkan codebase.",
+	idleLabel,
 }: ScreenConnectSyncStepProps) {
 	return (
 		<div className="flex items-start gap-3.5">
@@ -76,11 +85,10 @@ export function ScreenConnectSyncStep({
 				3
 			</span>
 			<div className="flex flex-1 flex-col gap-2">
-				<div className="text-xs font-semibold text-mist">Pantau progres</div>
-				<p className="text-[11px] leading-relaxed text-fog">
-					Jalankan prompt dari root repository untuk mulai menyinkronkan
-					codebase.
-				</p>
+				<div className="text-xs font-semibold text-mist">{heading}</div>
+				{description && (
+					<p className="text-[11px] leading-relaxed text-fog">{description}</p>
+				)}
 
 				{/* The browser has not heard from the server yet, so no stage can
 				honestly be claimed. Loading is rendered for one thing only: the
@@ -96,9 +104,8 @@ export function ScreenConnectSyncStep({
 						<span>
 							{isStarting
 								? "Menyiapkan sesi sync..."
-								: hasSession
-									? "Menunggu agent"
-									: "Belum dimulai"}
+								: (idleLabel ??
+									(hasSession ? "Menunggu agent" : "Belum dimulai"))}
 						</span>
 					</p>
 				)}
@@ -112,6 +119,9 @@ export function ScreenConnectSyncStep({
 					status={status}
 					isAnalysisReady={canContinueToSummary}
 					analysisBlocked={analysisBlocked}
+					isLegacyAnalysisMissingSuggestions={
+						isLegacyAnalysisMissingSuggestions
+					}
 					showAnalysisFailure={
 						!isLegacyAnalysisMissingSuggestions &&
 						!isRetrying &&

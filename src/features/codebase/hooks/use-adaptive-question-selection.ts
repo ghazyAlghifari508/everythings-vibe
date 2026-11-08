@@ -1,11 +1,4 @@
-import {
-	type Dispatch,
-	type SetStateAction,
-	useEffect,
-	useId,
-	useMemo,
-	useState,
-} from "react";
+import { type Dispatch, type SetStateAction, useId, useState } from "react";
 import type { AdaptiveQuestion } from "@/features/codebase/services/chat-flow";
 
 export interface AdaptiveQuestionSelectionParams {
@@ -36,6 +29,77 @@ export interface AdaptiveQuestionSelection {
 	handleSubmit: () => void;
 }
 
+/** Draft answer owned by one question card until the user confirms it. */
+interface DraftSelection {
+	/** Logical identity the draft was derived from; see `resetKey`. */
+	key: string;
+	selectedOptionId: string | null;
+	multiOptionIds: string[];
+	customText: string;
+}
+
+/**
+ * Seed a draft from the persisted answer. Pure: depends on the submitted value
+ * and the option labels, never on array identity.
+ */
+function deriveDraft(
+	question: AdaptiveQuestion,
+	customId: string,
+	submitted: string,
+): Omit<DraftSelection, "key"> {
+	if (!submitted) {
+		return { selectedOptionId: null, multiOptionIds: [], customText: "" };
+	}
+	if (question.type === "text") {
+		return {
+			selectedOptionId: null,
+			multiOptionIds: [],
+			customText: submitted,
+		};
+	}
+	if (question.type === "select") {
+		const matchingOpt = question.options.find(
+			(opt) => opt.label.trim() === submitted.trim(),
+		);
+		if (matchingOpt) {
+			return {
+				selectedOptionId: matchingOpt.id,
+				multiOptionIds: [],
+				customText: "",
+			};
+		}
+		return {
+			selectedOptionId: customId,
+			multiOptionIds: [],
+			customText: submitted,
+		};
+	}
+	if (question.type === "multiselect") {
+		const parts = submitted.split(",").map((s) => s.trim());
+		const matchedIds: string[] = [];
+		const unmatched: string[] = [];
+		for (const part of parts) {
+			const match = question.options.find(
+				(opt) => opt.label.trim().toLowerCase() === part.toLowerCase(),
+			);
+			if (match) {
+				matchedIds.push(match.id);
+			} else if (part.length > 0) {
+				unmatched.push(part);
+			}
+		}
+		if (unmatched.length > 0) {
+			matchedIds.push(customId);
+		}
+		return {
+			selectedOptionId: null,
+			multiOptionIds: matchedIds,
+			customText: unmatched.join(", "),
+		};
+	}
+	return { selectedOptionId: null, multiOptionIds: [], customText: "" };
+}
+
 /**
  * Selection state for one adaptive question: which options are chosen, the
  * free-text answer, and whether the answer can be submitted.
@@ -53,65 +117,40 @@ export function useAdaptiveQuestionSelection({
 	const reasonId = `reason-${question.id}`;
 	const titleId = `question-title-${question.id}`;
 
-	// Determine initial selection states when editing or answering
-	const initialSelections = useMemo(() => {
-		if (!submitted) {
-			return { selectedId: null, multiIds: [], custom: "" };
-		}
-		if (question.type === "text") {
-			return { selectedId: null, multiIds: [], custom: submitted };
-		}
-		if (question.type === "select") {
-			const matchingOpt = question.options.find(
-				(opt) => opt.label.trim() === submitted.trim(),
-			);
-			if (matchingOpt) {
-				return { selectedId: matchingOpt.id, multiIds: [], custom: "" };
-			}
-			return { selectedId: customId, multiIds: [], custom: submitted };
-		}
-		if (question.type === "multiselect") {
-			const parts = submitted.split(",").map((s) => s.trim());
-			const matchedIds: string[] = [];
-			const unmatched: string[] = [];
-			for (const part of parts) {
-				const match = question.options.find(
-					(opt) => opt.label.trim().toLowerCase() === part.toLowerCase(),
-				);
-				if (match) {
-					matchedIds.push(match.id);
-				} else if (part.length > 0) {
-					unmatched.push(part);
-				}
-			}
-			if (unmatched.length > 0) {
-				matchedIds.push(customId);
-			}
-			return {
-				selectedId: null,
-				multiIds: matchedIds,
-				custom: unmatched.join(", "),
-			};
-		}
-		return { selectedId: null, multiIds: [], custom: "" };
-	}, [submitted, question.type, question.options, customId]);
-
-	const [selectedOptionId, setSelectedOptionId] = useState<string | null>(
-		initialSelections.selectedId,
-	);
-	const [multiOptionIds, setMultiOptionIds] = useState<string[]>(
-		initialSelections.multiIds,
-	);
-	const [customText, setCustomText] = useState(initialSelections.custom);
-
-	useEffect(() => {
-		setSelectedOptionId(initialSelections.selectedId);
-		setMultiOptionIds(initialSelections.multiIds);
-		setCustomText(initialSelections.custom);
-	}, [initialSelections]);
-
 	const isMulti = question.type === "multiselect";
 	const isText = question.type === "text";
+
+	// Draft ownership: the user's in-progress selection is the source of truth
+	// until they confirm. Server-provided `submitted` only seeds the draft and
+	// re-seeds it when the logical question or the persisted answer changes.
+	// `question.options` identity is deliberately excluded — a parent that
+	// re-derives an equivalent array must never wipe an active selection.
+	const resetKey = `${question.id}\u0000${question.type}\u0000${submitted}`;
+	const [draft, setDraft] = useState<DraftSelection>(() => ({
+		key: resetKey,
+		...deriveDraft(question, customId, submitted),
+	}));
+	const current: DraftSelection =
+		draft.key === resetKey
+			? draft
+			: { key: resetKey, ...deriveDraft(question, customId, submitted) };
+
+	const { selectedOptionId, multiOptionIds, customText } = current;
+
+	const setCustomText: Dispatch<SetStateAction<string>> = (value) => {
+		setDraft((previous) => {
+			const base =
+				previous.key === resetKey
+					? previous
+					: { key: resetKey, ...deriveDraft(question, customId, submitted) };
+			return {
+				...base,
+				customText:
+					typeof value === "function" ? value(base.customText) : value,
+			};
+		});
+	};
+
 	const customChosen = isText
 		? true
 		: isMulti
@@ -153,15 +192,19 @@ export function useAdaptiveQuestionSelection({
 	};
 
 	const handleOptionChange = (optionId: string) => {
-		if (isMulti) {
-			setMultiOptionIds((current) =>
-				current.includes(optionId)
-					? current.filter((id) => id !== optionId)
-					: [...current, optionId],
-			);
-			return;
-		}
-		setSelectedOptionId(optionId);
+		setDraft((previous) => {
+			const base =
+				previous.key === resetKey
+					? previous
+					: { key: resetKey, ...deriveDraft(question, customId, submitted) };
+			if (!isMulti) return { ...base, selectedOptionId: optionId };
+			return {
+				...base,
+				multiOptionIds: base.multiOptionIds.includes(optionId)
+					? base.multiOptionIds.filter((id) => id !== optionId)
+					: [...base.multiOptionIds, optionId],
+			};
+		});
 	};
 
 	return {

@@ -67,6 +67,18 @@ export interface HandshakeResponse extends SyncSession {
 	repositoryIdentityMismatch?: boolean;
 }
 
+/**
+ * Reply to the attempt announcement. The sync token is the only credential, so
+ * the server can tell the CLI which attempt it may report a failure against
+ * before the handshake has bound one.
+ */
+export interface ConnectResponse {
+	sessionId: string;
+	attemptId: string;
+	status: string;
+	expiresAt?: string;
+}
+
 /** Manifest entry as sent to the server (subset of the Task 1 DTO). */
 export interface SyncManifestEntry {
 	path: string;
@@ -259,6 +271,15 @@ export function compareCliVersions(a: string, b: string): number {
 }
 
 export interface SyncClient {
+	/**
+	 * Announce that this attempt has started, so the browser can render a
+	 * connecting phase from a real server-observed event.
+	 *
+	 * Best effort by contract: an old server (404), a rate limit, or a dead
+	 * network must never delay or fail the sync, so every failure resolves to
+	 * `null` and the handshake remains the operation that binds it.
+	 */
+	announceConnect(projectId: string): Promise<ConnectResponse | null>;
 	handshake(
 		projectId: string,
 		repositoryName?: string,
@@ -295,7 +316,7 @@ export function createSyncClient(options: SyncClientOptions): SyncClient {
 
 	function post<T>(
 		projectId: string,
-		suffix: "sync" | "manifest" | "files" | "complete" | "failure",
+		suffix: "connect" | "sync" | "manifest" | "files" | "complete" | "failure",
 		body: unknown,
 	): Promise<T> {
 		const endpoint = new URL(buildCodebaseSyncUrl(apiUrl, projectId, suffix));
@@ -307,6 +328,21 @@ export function createSyncClient(options: SyncClientOptions): SyncClient {
 			timeoutMs,
 			maxBodyBytes: CODEBASE_MAX_CHUNK_BYTES,
 		});
+	}
+
+	async function announceConnect(
+		projectId: string,
+	): Promise<ConnectResponse | null> {
+		try {
+			return await post<ConnectResponse>(projectId, "connect", {
+				cliVersion: CODEBASE_CLI_VERSION,
+			});
+		} catch {
+			// Swallowed on purpose. The announcement only makes an existing window
+			// observable; failing to deliver it must not change the sync, and the
+			// handshake below re-checks the credential and the version gate anyway.
+			return null;
+		}
 	}
 
 	async function handshake(
@@ -429,6 +465,7 @@ export function createSyncClient(options: SyncClientOptions): SyncClient {
 	}
 
 	return {
+		announceConnect,
 		handshake,
 		handshakeWithRetry: (projectId, repositoryName, repositoryIdentity) =>
 			withSyncRetry(() =>

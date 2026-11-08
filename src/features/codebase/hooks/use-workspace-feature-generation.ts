@@ -9,12 +9,11 @@ import {
 import type { ProjectFeatureTree } from "@/db/schema";
 import {
 	type AdaptiveQuestion,
+	anchorRunStart,
 	buildFeatureMessage,
 	type CodebasePipelineStage,
 	type CodebaseRunState,
 	operationSettleEpoch,
-	recordOperationActivities,
-	recordRunActivity,
 	runConfirmGenerate,
 	serializeAskQuestions,
 	settleRunIfCurrent,
@@ -167,7 +166,7 @@ export function useWorkspaceFeatureGeneration({
 							let op = submitRes.operation;
 							observedOperation = op;
 							setRun((current) =>
-								recordOperationActivities(current, op, requestId),
+								anchorRunStart(current, op.createdAt, requestId),
 							);
 							if (op.status === "queued" || op.status === "running") {
 								const settled = await pollOperationUntilSettled({
@@ -176,23 +175,12 @@ export function useWorkspaceFeatureGeneration({
 									operationId: op.id,
 									onTick: (tick) => {
 										observedOperation = tick;
-										setRun((current) =>
-											recordOperationActivities(current, tick, requestId),
-										);
 									},
 								});
 								if (settled) op = settled;
 								observedOperation = op;
 							}
 							if (op.status === "completed") {
-								setRun((current) =>
-									recordRunActivity(
-										current,
-										"result.persisted",
-										settleAt(),
-										requestId,
-									),
-								);
 								return { status: 200 };
 							}
 							return {
@@ -247,9 +235,6 @@ export function useWorkspaceFeatureGeneration({
 						maxAttempts: 10,
 						onTick: (tick) => {
 							observedOperation = tick;
-							setRun((current) =>
-								recordOperationActivities(current, tick, requestId),
-							);
 						},
 					});
 					if (settled?.status === "completed") {
@@ -257,17 +242,7 @@ export function useWorkspaceFeatureGeneration({
 						if (tree && activeProjectIdRef.current === effectiveFeatureId) {
 							setPipelineStage("feature");
 							setRun((current) =>
-								settleRunIfCurrent(
-									recordRunActivity(
-										current,
-										"result.persisted",
-										settleAt(),
-										requestId,
-									),
-									requestId,
-									"done",
-									settleAt(),
-								),
+								settleRunIfCurrent(current, requestId, "done", settleAt()),
 							);
 							const specMessage = buildFeatureMessage(
 								featureName ?? codebaseName,
@@ -311,17 +286,7 @@ export function useWorkspaceFeatureGeneration({
 				}
 				setPipelineStage("feature");
 				setRun((current) =>
-					settleRunIfCurrent(
-						recordRunActivity(
-							current,
-							"result.persisted",
-							settleAt(),
-							requestId,
-						),
-						requestId,
-						"done",
-						settleAt(),
-					),
+					settleRunIfCurrent(current, requestId, "done", settleAt()),
 				);
 				const specMessage = buildFeatureMessage(
 					featureName ?? codebaseName,

@@ -1,6 +1,10 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import type { db } from "@/db";
-import { codebaseSnapshots, codebaseSyncSessions } from "@/db/schema";
+import {
+	codebaseSnapshots,
+	codebaseSyncRequests,
+	codebaseSyncSessions,
+} from "@/db/schema";
 import {
 	CODEBASE_CLI_MIN_VERSION,
 	CODEBASE_SYNC_SESSION_EXPIRY_MS,
@@ -134,5 +138,17 @@ export async function prepareSyncSession(
 		})
 		.returning();
 	if (!session) throw new Error("Sync session insert returned no row");
+	if (replaceSessionId && latest?.id === replaceSessionId) {
+		await tx
+			.update(codebaseSyncRequests)
+			.set({ sessionId: session.id })
+			.where(
+				and(
+					eq(codebaseSyncRequests.sessionId, replaceSessionId),
+					eq(codebaseSyncRequests.codebaseId, codebaseId),
+					eq(codebaseSyncRequests.userId, userId),
+				),
+			);
+	}
 	return { session, token };
 }

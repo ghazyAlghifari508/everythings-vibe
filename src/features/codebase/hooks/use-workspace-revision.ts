@@ -9,7 +9,6 @@ import {
 import {
 	type CodebasePipelineStage,
 	type CodebaseRunState,
-	recordRunActivity,
 	settleRunIfCurrent,
 	startRun,
 } from "@/features/codebase/services/chat-flow";
@@ -143,17 +142,7 @@ export function useWorkspaceRevision({
 				setPendingProposal(result.proposal);
 				setIsReviewOpen(true);
 				setRun((current) =>
-					settleRunIfCurrent(
-						recordRunActivity(
-							current,
-							"result.persisted",
-							Date.now(),
-							requestId,
-						),
-						requestId,
-						"done",
-						Date.now(),
-					),
+					settleRunIfCurrent(current, requestId, "done", Date.now()),
 				);
 				pushAssistantMessage(
 					`Proposal revisi untuk ${targetLabel} siap ditinjau. ${result.impactNote}`,

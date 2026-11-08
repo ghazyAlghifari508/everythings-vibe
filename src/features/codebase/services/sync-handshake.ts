@@ -68,6 +68,27 @@ export function buildHandshakeMetadata(input: {
 }
 
 /**
+ * Metadata patch recording the CLI version an attempt announced itself with.
+ *
+ * Deliberately separate from `buildHandshakeMetadata`: an announcement is not
+ * evidence of a handshake, so it must never write `handshakeAt` (that key is what
+ * gates the conclusion step). The version is recorded because every transport
+ * route — including the failure report — fails closed without one, which is what
+ * lets a CLI that dies before its handshake still terminate the attempt instead
+ * of leaving the browser on a connecting row.
+ */
+export function buildCliVersionMetadata(input: {
+	previous: unknown;
+	cliVersion: string;
+}): Record<string, unknown> {
+	const previous =
+		typeof input.previous === "object" && input.previous !== null
+			? (input.previous as Record<string, unknown>)
+			: {};
+	return { ...previous, cliVersion: input.cliVersion };
+}
+
+/**
  * "Has the server observed the CLI actually starting this sync attempt?"
  *
  * True when the session advanced past the pre-handshake states, or when the

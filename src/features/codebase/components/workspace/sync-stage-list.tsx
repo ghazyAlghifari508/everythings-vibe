@@ -36,11 +36,18 @@ function buildAnalysisRow(input: {
 	status: SyncStatusResponse | null;
 	isAnalysisReady: boolean;
 	analysisBlocked: boolean;
+	isLegacyAnalysisMissingSuggestions: boolean;
 	isRetrying?: boolean;
 	isWorking?: boolean;
 }): SyncStageRow | null {
-	const { status, isAnalysisReady, analysisBlocked, isRetrying, isWorking } =
-		input;
+	const {
+		status,
+		isAnalysisReady,
+		analysisBlocked,
+		isLegacyAnalysisMissingSuggestions,
+		isRetrying,
+		isWorking,
+	} = input;
 	if (!status) return null;
 
 	if (analysisBlocked && status.snapshotId) {
@@ -72,19 +79,28 @@ function buildAnalysisRow(input: {
 
 	if (liveStatus === "ready") {
 		// Ready is terminal for the paint: it wins even while a stale local
-		// retry flag has not been cleared yet.
-		return {
-			state: "done",
-			title: "Analisis selesai",
-			...(isAnalysisReady
-				? {}
-				: {
-						detail: "Perlu pembaruan rekomendasi task awal untuk melanjutkan",
-					}),
-			...(status.analysisAttemptUpdatedAt
-				? { completedAt: status.analysisAttemptUpdatedAt }
-				: {}),
-		};
+		// retry flag has not been cleared yet. It is not the same fact as
+		// "ready to conclude" though, and the row must never claim success the
+		// conclusion cannot act on:
+		// - output still being reconciled from the server reads as preparing,
+		//   which is exactly what the browser is doing;
+		// - a legacy row that still needs its starter recommendations names the
+		//   repair instead of blaming the sync.
+		const completedAt = status.analysisAttemptUpdatedAt
+			? { completedAt: status.analysisAttemptUpdatedAt }
+			: {};
+		if (isAnalysisReady) {
+			return { state: "done", title: "Analisis selesai", ...completedAt };
+		}
+		if (isLegacyAnalysisMissingSuggestions) {
+			return {
+				state: "done",
+				title: "Analisis selesai",
+				detail: "Perlu pembaruan rekomendasi task awal untuk melanjutkan",
+				...completedAt,
+			};
+		}
+		return { state: "waiting", title: "Menyiapkan kesimpulan..." };
 	}
 
 	if (liveStatus === "pending" || isRetrying || isWorking) {
@@ -139,6 +155,7 @@ export function SyncStageList({
 	className,
 	isAnalysisReady = false,
 	analysisBlocked = false,
+	isLegacyAnalysisMissingSuggestions = false,
 	showAnalysisFailure = false,
 	analysisError = null,
 	onRetryAnalysis,
@@ -150,6 +167,12 @@ export function SyncStageList({
 	isAnalysisReady?: boolean;
 	/** Billing/eligibility blocked the analysis; the snapshot is still usable. */
 	analysisBlocked?: boolean;
+	/**
+	 * The ready analysis predates starter suggestions, so the conclusion still
+	 * needs that repair. Explains a closed gate instead of leaving a finished
+	 * row next to a disabled action with no reason.
+	 */
+	isLegacyAnalysisMissingSuggestions?: boolean;
 	/**
 	 * Render the failed analysis as one integrated error area inside the
 	 * analysis row itself (message + retry), instead of a second alert
@@ -178,6 +201,7 @@ export function SyncStageList({
 		status,
 		isAnalysisReady,
 		analysisBlocked,
+		isLegacyAnalysisMissingSuggestions,
 		isRetrying,
 		isWorking: isAnalyzing,
 	});

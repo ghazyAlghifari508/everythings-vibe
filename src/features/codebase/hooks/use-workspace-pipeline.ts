@@ -6,12 +6,11 @@ import {
 	useRef,
 } from "react";
 import {
+	anchorRunStart,
 	type CodebasePipelineStage,
 	type CodebaseRunStage,
 	type CodebaseRunState,
 	operationSettleEpoch,
-	recordOperationActivities,
-	recordRunActivity,
 	settleRunIfCurrent,
 	startRun,
 } from "@/features/codebase/services/chat-flow";
@@ -99,15 +98,15 @@ export function useWorkspacePipeline({
 				}
 
 				let operation = submitRes.operation;
-				setRun((cur) => recordOperationActivities(cur, operation, requestId));
+				// The submit ack carries the server's own acceptance time: re-anchor the
+				// running clock so the timer excludes client submit latency.
+				setRun((cur) => anchorRunStart(cur, operation.createdAt, requestId));
 				if (operation.status === "queued" || operation.status === "running") {
 					const settled = await pollOperationUntilSettled({
 						projectId: requestedProjectId,
 						stage: target,
 						operationId: operation.id,
 						signal: ctrl.signal,
-						onTick: (tick) =>
-							setRun((cur) => recordOperationActivities(cur, tick, requestId)),
 					});
 
 					if (
@@ -141,12 +140,7 @@ export function useWorkspacePipeline({
 					}
 					setRun((current) =>
 						settleRunIfCurrent(
-							recordRunActivity(
-								current,
-								"result.persisted",
-								operationSettleEpoch(operation),
-								requestId,
-							),
+							current,
 							requestId,
 							"done",
 							operationSettleEpoch(operation),

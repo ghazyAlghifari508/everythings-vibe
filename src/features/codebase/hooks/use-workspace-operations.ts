@@ -7,13 +7,11 @@ import {
 	useRef,
 } from "react";
 import {
-	activitiesFromOperation,
 	type CodebasePipelineStage,
 	type CodebaseRunStage,
 	type CodebaseRunState,
 	operationSettleEpoch,
-	recordOperationActivities,
-	recordRunActivity,
+	operationStartEpoch,
 	settleRun,
 	startRun,
 } from "@/features/codebase/services/chat-flow";
@@ -59,14 +57,9 @@ export function useWorkspaceOperations({
 			inFlightStageRef.current = op.stage;
 			setStageBusy(op.stage);
 			setStageError(null);
-			// Hydration replays only the events the persisted operation already proves,
-			// so a remount never fabricates history the server did not record.
-			const hydrated = startRun(
-				op.stage,
-				op.startedAt ? Number(new Date(op.startedAt)) : Date.now(),
-				"thinking",
-				activitiesFromOperation(op),
-			);
+			// Hydration starts the clock at the operation's own acceptance time, so a
+			// remount reports the run the server recorded instead of a fresh timer.
+			const hydrated = startRun(op.stage, operationStartEpoch(op));
 			setRun((cur) => {
 				if (cur?.status === "running" && cur.stage === op.stage) return cur;
 				return hydrated;
@@ -78,41 +71,31 @@ export function useWorkspaceOperations({
 				stage: op.stage,
 				operationId: op.id,
 				signal,
-				onTick: (tick) =>
-					setRun((cur) =>
-						cur && cur.status === "running" && cur.stage === op.stage
-							? recordOperationActivities(cur, tick)
-							: cur,
-					),
 			});
 
 			if (signal.aborted || activeProjectIdRef.current !== projectId) return;
 			inFlightStageRef.current = null;
 			setStageBusy(null);
 
+			// A run that already exists keeps its own clock; only a run the client never
+			// observed is reconstructed from the server's acceptance timestamp.
+			const preserveOrRebuild =
+				(fallbackStage: CodebaseRunStage, op: DurableGenerationOperation) =>
+				(cur: CodebaseRunState | null) =>
+					cur?.status === "running"
+						? cur
+						: startRun(fallbackStage, operationStartEpoch(op));
+
 			if (settled?.status === "completed") {
 				const persisted = await onOperationCompleted(settled.stage, settled);
 				if (signal.aborted || activeProjectIdRef.current !== projectId) return;
-				const started = settled.startedAt
-					? Number(new Date(settled.startedAt))
-					: Date.now();
+				const finishedAt = operationSettleEpoch(settled);
 				if (persisted) {
 					setRun((cur) =>
 						settleRun(
-							recordRunActivity(
-								cur?.status === "running"
-									? cur
-									: startRun(
-											settled.stage,
-											started,
-											"thinking",
-											activitiesFromOperation(settled),
-										),
-								"result.persisted",
-								operationSettleEpoch(settled),
-							),
+							preserveOrRebuild(settled.stage, settled)(cur),
 							"done",
-							operationSettleEpoch(settled),
+							finishedAt,
 						),
 					);
 				} else {
@@ -121,16 +104,9 @@ export function useWorkspaceOperations({
 					setStageError(errorMsg);
 					setRun((cur) =>
 						settleRun(
-							cur?.status === "running"
-								? cur
-								: startRun(
-										settled.stage,
-										started,
-										"thinking",
-										activitiesFromOperation(settled),
-									),
+							preserveOrRebuild(settled.stage, settled)(cur),
 							"failed",
-							operationSettleEpoch(settled),
+							finishedAt,
 							errorMsg,
 						),
 					);
@@ -138,24 +114,18 @@ export function useWorkspaceOperations({
 			} else if (settled?.status === "failed") {
 				const errorMsg = settled.error ?? "Generasi gagal.";
 				setStageError(errorMsg);
-				const started = settled.startedAt
-					? Number(new Date(settled.startedAt))
-					: Date.now();
 				setRun((cur) =>
 					settleRun(
-						cur?.status === "running" ? cur : startRun(settled.stage, started),
+						preserveOrRebuild(settled.stage, settled)(cur),
 						"failed",
 						operationSettleEpoch(settled),
 						errorMsg,
 					),
 				);
 			} else if (settled?.status === "cancelled") {
-				const started = settled.startedAt
-					? Number(new Date(settled.startedAt))
-					: Date.now();
 				setRun((cur) =>
 					settleRun(
-						cur?.status === "running" ? cur : startRun(settled.stage, started),
+						preserveOrRebuild(settled.stage, settled)(cur),
 						"failed",
 						operationSettleEpoch(settled),
 						"Dibatalkan.",
@@ -214,27 +184,13 @@ export function useWorkspaceOperations({
 						const persisted = await onOperationCompleted(op.stage, op);
 						if (ctrl.signal.aborted || activeProjectIdRef.current !== projectId)
 							return;
-						const started = op.startedAt
-							? Number(new Date(op.startedAt))
-							: Date.now();
+						const hydrate = (cur: CodebaseRunState | null) =>
+							cur?.status === "running"
+								? cur
+								: startRun(op.stage, operationStartEpoch(op));
 						if (persisted) {
 							setRun((cur) =>
-								settleRun(
-									recordRunActivity(
-										cur?.status === "running"
-											? cur
-											: startRun(
-													op.stage,
-													started,
-													"thinking",
-													activitiesFromOperation(op),
-												),
-										"result.persisted",
-										operationSettleEpoch(op),
-									),
-									"done",
-									operationSettleEpoch(op),
-								),
+								settleRun(hydrate(cur), "done", operationSettleEpoch(op)),
 							);
 						} else {
 							const notSavedMsg =
@@ -242,14 +198,7 @@ export function useWorkspaceOperations({
 							setStageError(notSavedMsg);
 							setRun((cur) =>
 								settleRun(
-									cur?.status === "running"
-										? cur
-										: startRun(
-												op.stage,
-												started,
-												"thinking",
-												activitiesFromOperation(op),
-											),
+									hydrate(cur),
 									"failed",
 									operationSettleEpoch(op),
 									notSavedMsg,
@@ -261,12 +210,11 @@ export function useWorkspaceOperations({
 					if (op?.status === "failed") {
 						const errorMsg = op.error ?? "Generasi gagal.";
 						setStageError(errorMsg);
-						const started = op.startedAt
-							? Number(new Date(op.startedAt))
-							: Date.now();
 						setRun((cur) =>
 							settleRun(
-								cur?.status === "running" ? cur : startRun(op.stage, started),
+								cur?.status === "running"
+									? cur
+									: startRun(op.stage, operationStartEpoch(op)),
 								"failed",
 								operationSettleEpoch(op),
 								errorMsg,
@@ -275,12 +223,11 @@ export function useWorkspaceOperations({
 						break;
 					}
 					if (op?.status === "cancelled") {
-						const started = op.startedAt
-							? Number(new Date(op.startedAt))
-							: Date.now();
 						setRun((cur) =>
 							settleRun(
-								cur?.status === "running" ? cur : startRun(op.stage, started),
+								cur?.status === "running"
+									? cur
+									: startRun(op.stage, operationStartEpoch(op)),
 								"failed",
 								operationSettleEpoch(op),
 								"Dibatalkan.",

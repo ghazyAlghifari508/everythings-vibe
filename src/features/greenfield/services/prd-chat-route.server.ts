@@ -292,6 +292,7 @@ export async function handlePrdChatRequest(
 			codebaseSnapshotId,
 			codebaseAnalysisId,
 			codebaseSnapshotInfo,
+			projectMode,
 			ids,
 		}),
 	);

@@ -30,13 +30,6 @@ interface ScreenConnectPromptStepProps {
 	payload: SyncPromptPayload | null;
 	isStarting: boolean;
 	status?: SyncStatusResponse | null;
-	/**
-	 * The server persisted a snapshot, so the CLI already ran. A replacement
-	 * credential would be a second upload for an upload that already succeeded —
-	 * exactly the mixed state the user reported — so the prompt row states the
-	 * transport is done instead of offering a new session.
-	 */
-	transportComplete?: boolean;
 	onRequestNewToken?: () => void;
 	lockedPrompt?: LockedPromptState | null;
 	/** Non-secret rate/saldo disclosure rendered outside the prompt box. */
@@ -47,6 +40,20 @@ interface ScreenConnectPromptStepProps {
 	 * shown, because the failure copy is fixed product wording.
 	 */
 	error?: string | null;
+	/** Step title. The re-sync modal names its own prompt action. */
+	heading?: string;
+	/** Which prompt document to build for the copied credential. */
+	promptMode?: "initial" | "resync";
+	/** Accessible name for the copy affordance. */
+	copyAriaLabel?: string;
+	/** Stable test hook for the scrollable prompt content. */
+	contentTestId?: string;
+	/**
+	 * Replaces the default recovery block (states A/B/E) when the caller owns
+	 * the approved wording for its own flow. The prompt box, copy affordance,
+	 * and one-time-credential rules stay identical.
+	 */
+	recoveryState?: LockedPromptState;
 }
 
 export function ScreenConnectPromptStep({
@@ -54,21 +61,21 @@ export function ScreenConnectPromptStep({
 	payload,
 	isStarting,
 	status,
-	transportComplete = false,
 	onRequestNewToken,
 	lockedPrompt = null,
 	creditNote = null,
 	error = null,
+	heading = "Salin instruksi untuk AI agent",
+	promptMode = "initial",
+	copyAriaLabel = "Salin prompt untuk AI agent",
+	contentTestId,
+	recoveryState,
 }: ScreenConnectPromptStepProps) {
 	const { copied, copyError, copy } = useCopyFeedback();
-	const promptText = payload ? buildAgentPrompt(payload, { projectName }) : "";
+	const promptText = payload
+		? buildAgentPrompt(payload, { projectName, mode: promptMode })
+		: "";
 	const sessionStatus = status?.status ?? null;
-	const cliActive = [
-		"connected",
-		"scanning",
-		"filtering",
-		"uploading",
-	].includes(sessionStatus ?? "");
 	const expiryMs = resolveExpiryMs(payload?.expiresAt ?? status?.expiresAt);
 	const expiryState =
 		sessionStatus === "expired" || expiryMs === null || expiryMs <= 0
@@ -91,13 +98,31 @@ export function ScreenConnectPromptStep({
 	// it always wins. A credit read taken before (or after) it landed is stale by
 	// definition and must never replace a live prompt with the lock that caused
 	// the reported "locked prompt stays visible" blocker.
+	//
+	// Sync progress deliberately does NOT participate: starting, connecting,
+	// uploading, and finishing the upload are all states of the same prompt, so
+	// the prompt box keeps the exact credential (and its scroll position and
+	// size) it was handed. Only a credential that the server would now reject —
+	// an expired token, or a terminal session — stops being usable, and that case
+	// routes through the existing renewal state instead of a generic success
+	// message.
 	const promptUsable =
 		payload !== null &&
 		expiryState !== "expired" &&
-		!transportComplete &&
-		!cliActive;
-	const activeLock =
-		promptUsable || transportComplete || cliActive ? null : lockedPrompt;
+		sessionStatus !== "failed" &&
+		sessionStatus !== "expired";
+	// A replacement credential must never be offered while the CLI is genuinely
+	// mid-sync: the token it is using is the one on screen (or was), so minting
+	// another would rotate a credential out from under a live upload. The owner
+	// already clears its own recovery for that state; this is the second line of
+	// defence at the surface the user actually reads.
+	const cliInFlight = [
+		"connected",
+		"scanning",
+		"filtering",
+		"uploading",
+	].includes(sessionStatus ?? "");
+	const activeLock = promptUsable || cliInFlight ? null : lockedPrompt;
 
 	return (
 		<div className="flex items-start gap-3.5">
@@ -106,14 +131,12 @@ export function ScreenConnectPromptStep({
 			</span>
 			<div className="flex min-w-0 flex-1 flex-col gap-2">
 				<div className="flex items-center justify-between gap-3">
-					<div className="text-xs font-semibold text-mist">
-						Salin instruksi untuk AI agent
-					</div>
+					<div className="text-xs font-semibold text-mist">{heading}</div>
 					{promptUsable && !activeLock && (
 						<Button
 							type="button"
 							onClick={handleCopy}
-							aria-label="Salin prompt untuk AI agent"
+							aria-label={copyAriaLabel}
 							variant="secondary"
 							className="min-h-11 shrink-0 gap-1.5 px-3 text-xs"
 						>
@@ -143,7 +166,10 @@ export function ScreenConnectPromptStep({
 						<LockedPromptStateView {...activeLock} />
 					) : promptUsable ? (
 						<>
-							<div className="hide-scrollbar max-h-56 select-all overflow-x-auto overflow-y-auto whitespace-pre-wrap text-snow">
+							<div
+								data-testid={contentTestId}
+								className="hide-scrollbar max-h-56 select-all overflow-x-auto overflow-y-auto whitespace-pre-wrap text-snow"
+							>
 								{promptText}
 							</div>
 							{copyError && (
@@ -158,20 +184,19 @@ export function ScreenConnectPromptStep({
 								</p>
 							)}
 						</>
-					) : transportComplete ? (
-						<div
-							data-testid="prompt-transport-done"
-							className="flex items-center gap-2 font-sans"
+					) : status?.snapshotId || cliInFlight ? (
+						// No credential is left in this browser (a full reload, a session the
+						// page could not recover, or one whose token is already in the CLI's
+						// hands) and no replacement is legitimate: either the transport
+						// already stored its snapshot, or the agent is mid-sync. Stated as a
+						// prompt-availability fact only — the progress section owns the
+						// outcome, so no status copy is repeated here.
+						<p
+							data-testid="prompt-unavailable"
+							className="font-sans text-xs leading-relaxed text-fog"
 						>
-							<Icon icon={Tick01Icon} size={14} className="text-emerald-400" />
-							<p className="text-xs leading-relaxed text-fog">
-								Source code berhasil diterima.
-							</p>
-						</div>
-					) : cliActive ? (
-						<output className="block font-sans text-xs text-fog">
-							Agent sedang menyinkronkan repository.
-						</output>
+							Prompt ini hanya tersedia sekali di browser tempat ia dibuat.
+						</p>
 					) : isStarting ? (
 						<div className="flex items-center gap-2 font-sans text-xs text-fog">
 							<Spinner size={14} className="text-blue-400" />
@@ -179,16 +204,17 @@ export function ScreenConnectPromptStep({
 						</div>
 					) : (
 						<LockedPromptStateView
-							{...buildPromptRecoveryState(
-								// `error` is a genuine failure signal, never a recovery: a
-								// recoverable prompt is owned by the recovery state instead.
-								error
-									? "failed"
-									: sessionStatus === "expired" || expiryState === "expired"
-										? "expired"
-										: "unavailable",
-								onRequestNewToken ?? null,
-							)}
+							{...(recoveryState ??
+								buildPromptRecoveryState(
+									// `error` is a genuine failure signal, never a recovery: a
+									// recoverable prompt is owned by the recovery state instead.
+									error
+										? "failed"
+										: sessionStatus === "expired" || expiryState === "expired"
+											? "expired"
+											: "unavailable",
+									onRequestNewToken ?? null,
+								))}
 						/>
 					)}
 				</div>

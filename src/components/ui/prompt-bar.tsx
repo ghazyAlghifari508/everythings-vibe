@@ -41,6 +41,13 @@ export interface PromptBarProps {
 	 * submit as a compact icon-only control.
 	 */
 	submitAppearance?: PromptBarSubmitAppearance;
+	/**
+	 * Whether the busy submit swaps its glyph for a spinner. A surface that
+	 * already animates the same operation elsewhere (e.g. the chat Thinking
+	 * indicator) turns this off so one request never spins twice. The submit
+	 * action still closes while busy either way.
+	 */
+	showBusyGlyph?: boolean;
 }
 
 interface SendGlyphProps {
@@ -91,6 +98,7 @@ export function PromptBar({
 	ariaLabel = "Jelaskan fitur yang ingin dibangun di repositori ini",
 	sendButtonLabel,
 	submitAppearance = "label",
+	showBusyGlyph = true,
 }: PromptBarProps) {
 	const isControlled = value !== undefined;
 	const [internalDraft, setInternalDraft] = useState(defaultValue);
@@ -253,7 +261,7 @@ export function PromptBar({
 							: "inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-graphite/40 disabled:text-slate data-[armed]:bg-snow data-[armed]:text-onyx hover:data-[armed]:brightness-105"
 					}
 				>
-					<SendGlyph busy={isSending} />
+					<SendGlyph busy={isSending && showBusyGlyph} />
 					{isIconSubmit ? null : <span>{displayButtonLabel}</span>}
 				</button>
 			</div>
