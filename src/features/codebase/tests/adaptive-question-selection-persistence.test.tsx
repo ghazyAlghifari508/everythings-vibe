@@ -186,6 +186,14 @@ describe("FIX 05 — adaptive question selection never resets underneath the use
 		expect(checkbox("Artikel").checked).toBe(true);
 		expect(checkbox("Produk").checked).toBe(true);
 
+		// Multi-select is one labelled checkbox group, so keyboard users reach
+		// every field with Tab and toggle with Space.
+		expect(
+			screen.getByRole("group", {
+				name: "Permukaan mana yang ikut dicari?",
+			}),
+		).toBeTruthy();
+
 		fireEvent.click(confirmButton());
 		expect(onSubmit).toHaveBeenCalledWith("surfaces", "Artikel, Produk");
 	});
