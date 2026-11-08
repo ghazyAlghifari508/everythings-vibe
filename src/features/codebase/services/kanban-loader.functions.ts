@@ -52,7 +52,7 @@ export const loadExistingCodebaseKanban = createServerFn({ method: "GET" })
 		const { plan } = await getUserPlanAndQuota();
 		if (!hasFullWorkflow(plan)) {
 			throw redirect({
-				to: "/prd/$id",
+				to: "/vibeplan/$id/prd",
 				params: { id: data.projectId },
 				search: { paywall: "kanban" },
 			});

@@ -136,7 +136,7 @@ describe("ChatInput Component", () => {
 			}),
 		);
 		expect(navigateSpy).toHaveBeenCalledWith({
-			to: "/ask/$id",
+			to: "/vibeplan/$id/ask",
 			params: { id: "proj-abc" },
 		});
 

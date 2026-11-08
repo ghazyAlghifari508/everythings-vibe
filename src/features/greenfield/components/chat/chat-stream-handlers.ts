@@ -168,8 +168,13 @@ export function handleStreamHttpError({
 	setGeneratingPRD(false);
 
 	if (status === 403 && err.code === "NO_CREDITS") {
-		if (body.mode === "generate") {
-			savePendingPrdPrompt(body.message as string, "auto", originalMessage);
+		if (body.mode === "generate" && typeof body.message === "string") {
+			savePendingPrdPrompt(
+				body.message,
+				"auto",
+				originalMessage,
+				typeof body.projectId === "string" ? body.projectId : undefined,
+			);
 		}
 		setCreditsExhausted({
 			stage: "prd",

@@ -8,9 +8,11 @@
  */
 import {
 	type FlowStep,
+	type StepRouteTarget,
 	stepRank,
-	stepToRoute,
+	stepToRouteTarget,
 } from "@/features/greenfield/utils/flow-step";
+import { workspaceView } from "@/features/greenfield/utils/workspace-routing";
 
 /**
  * True when the project has progressed past the PRD stage (e.g. AC or Task).
@@ -64,73 +66,49 @@ export function isTruncatedGeneration(
 	return finishReason !== undefined && TRUNCATING_REASONS.has(finishReason);
 }
 
-/**
- * True when a URL is a project-internal route for the given project, i.e. a
- * route in the /(ask|fitur|prd|ac|task|kanban)/<projectId> namespace. History stores
- * last_url so it can send users back to where they were; this guard makes sure
- * that never lands on an arbitrary path or another project's page (anti-spoof).
- * Rejects non-project routes and `javascript:`/malformed URLs outright.
- */
-const HISTORY_URL_RE =
-	/^\/(?:ask|fitur|prd|ac|task|kanban)\/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})$/;
-const CODEBASES_LIST_URL = "/codebases";
+const PROJECT_ID_RE =
+	/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 
 export function isValidHistoryUrl(url: string, projectId: string): boolean {
-	if (url === CODEBASES_LIST_URL) return true;
-	const m = HISTORY_URL_RE.exec(url);
-	return m !== null && m[1] === projectId;
+	if (url === "/codebases") return true;
+	if (!PROJECT_ID_RE.test(projectId)) return false;
+	if (url === `/vibeplan/${projectId}`) return true;
+	const view = workspaceView(url);
+	return (
+		view !== null &&
+		(url === `/vibeplan/${projectId}/${view}` ||
+			url === `/${view}/${projectId}`)
+	);
 }
 
-/**
- * URL a History card links to. Prefers last_url when it's a valid
- * project-internal route for this project; falls back to stepToRoute so
- * brand-new projects and cleared/corrupted last_url rows keep working.
- * Lives here (pure module) so the client component can import it without
- * dragging db/pg into the client bundle.
- */
 export function resolveHistoryUrl(item: {
 	id: string;
 	step: string | null | undefined;
 	lastUrl: string | null | undefined;
 }): string {
+	if (item.lastUrl === "/codebases") return "/codebases";
 	if (item.lastUrl && isValidHistoryUrl(item.lastUrl, item.id)) {
-		return item.lastUrl;
+		const view = workspaceView(item.lastUrl);
+		if (view) return `/vibeplan/${encodeURIComponent(item.id)}/${view}`;
 	}
-	return stepToRoute(item.step, item.id);
+	// Availability must be checked on the server, not inferred from the DB step.
+	return `/vibeplan/${encodeURIComponent(item.id)}`;
 }
 
-/** A project workspace route, split into the typed shape `navigate` needs. */
 export type HistoryRouteTarget =
-	| { to: "/ask/$id"; params: { id: string } }
-	| { to: "/fitur/$id"; params: { id: string } }
-	| { to: "/prd/$id"; params: { id: string } }
-	| { to: "/ac/$id"; params: { id: string } }
-	| { to: "/task/$id"; params: { id: string } }
-	| { to: "/kanban/$id"; params: { id: string } }
+	| StepRouteTarget
+	| { to: "/vibeplan/$id"; params: { id: string } }
 	| { to: "/codebases" };
 
-/**
- * Parse a concrete history href into a typed TanStack route.
- * `Link`/`navigate` expect the pattern "/ask/$id" plus params, not the
- * concrete string; handing them the raw href would need an unchecked cast and
- * would degrade into a full page reload. Shared here so every surface that
- * links to a history row (history cards, the drawer) resolves the same way.
- *
- * Total over the set `isValidHistoryUrl` accepts: every href that can reach
- * history is either a project route below or the codebase list, which is the
- * one non-project URL the allowlist permits. A caller may therefore treat a
- * null result as "not a history URL at all" instead of a dead navigation.
- */
 export function parseHistoryHref(href: string): HistoryRouteTarget | null {
-	if (href === CODEBASES_LIST_URL) return { to: "/codebases" };
-	const m = href.match(/^\/(ask|fitur|prd|ac|task|kanban)\/([^/]+)$/);
-	if (!m) return null;
-	const [, seg, id] = m;
-	if (seg === "ask") return { to: "/ask/$id", params: { id } };
-	if (seg === "fitur") return { to: "/fitur/$id", params: { id } };
-	if (seg === "prd") return { to: "/prd/$id", params: { id } };
-	if (seg === "ac") return { to: "/ac/$id", params: { id } };
-	if (seg === "task") return { to: "/task/$id", params: { id } };
-	if (seg === "kanban") return { to: "/kanban/$id", params: { id } };
-	return null;
+	if (href === "/codebases") return { to: "/codebases" };
+	const match =
+		/^\/vibeplan\/([^/]+)(?:\/(?:ask|fitur|prd|ac|task|kanban))?$/.exec(href) ??
+		/^\/(?:ask|fitur|prd|ac|task|kanban)\/([^/]+)$/.exec(href);
+	const id = match?.[1];
+	if (!id || !isValidHistoryUrl(href, id)) return null;
+	const view = workspaceView(href);
+	return view
+		? stepToRouteTarget(view, id)
+		: { to: "/vibeplan/$id", params: { id } };
 }

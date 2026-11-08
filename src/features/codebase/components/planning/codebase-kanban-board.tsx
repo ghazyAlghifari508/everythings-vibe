@@ -227,7 +227,7 @@ export function CodebaseKanbanBoard({
 									href={
 										codebaseId
 											? `/codebases/kanban/${encodeURIComponent(codebaseId)}/${encodeURIComponent(projectId)}`
-											: `/kanban/${encodeURIComponent(projectId)}`
+											: `/vibeplan/${encodeURIComponent(projectId)}/kanban`
 									}
 									target="_blank"
 									rel="noopener noreferrer"

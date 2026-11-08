@@ -31,7 +31,7 @@ test("kanban phase filter has no Reset control", async ({ context, page }) => {
 		},
 	]);
 
-	await page.goto(`/kanban/${PROJECT_ID}`, { waitUntil: "networkidle" });
+	await page.goto(`/vibeplan/${PROJECT_ID}/kanban`, { waitUntil: "networkidle" });
 
 	const errors: string[] = [];
 	page.on("console", (m) => {

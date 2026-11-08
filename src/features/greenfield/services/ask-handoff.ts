@@ -60,7 +60,7 @@ export async function submitAskHandoff({
 		skippedTech,
 	});
 
-	savePendingPrdPrompt(compiledPrompt, "auto", projectName);
+	savePendingPrdPrompt(compiledPrompt, "auto", projectName, projectId);
 
 	// Authoritative server handoff: survives refresh and multi-device access.
 	// Cancel any autosave still in flight so its older snapshot cannot

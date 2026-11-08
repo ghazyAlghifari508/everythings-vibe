@@ -4,6 +4,8 @@
 // Ranking is defined here (not in @/lib/flow-progress) so progression policies
 // can rank steps without a back-import cycle.
 
+import { workspaceView } from "./workspace-routing";
+
 export type FlowStep = "question" | "fitur" | "prd" | "ac" | "task";
 
 /** Flow order. Index = progress rank; higher wins. */
@@ -23,11 +25,11 @@ export function stepRank(step: string | null | undefined): number {
 }
 
 export function routeToStep(pathname: string): FlowStep {
-	if (pathname.startsWith("/ask/") || pathname === "/ask") return "question";
-	if (pathname.startsWith("/fitur/") || pathname === "/fitur") return "fitur";
-	if (pathname.startsWith("/ac/") || pathname === "/ac") return "ac";
-	if (pathname.startsWith("/task/") || pathname === "/task") return "task";
-	if (pathname.startsWith("/kanban/") || pathname === "/kanban") return "task";
+	const view = workspaceView(pathname);
+	if (view === "ask" || pathname === "/ask") return "question";
+	if (view === "kanban") return "task";
+	if (view) return view;
+	if (pathname === "/fitur") return "fitur";
 	return "prd";
 }
 
@@ -160,36 +162,30 @@ export function getFlowStepCta(
 	return null;
 }
 
-// Map a project's persisted DB step to the route that resumes its furthest
-// progress. Used by History cards. /prd is the safe landing for null/legacy
-// steps - the PRD chat regenerates or restores from prdVersions.
-// The id is encoded as an opaque path segment: a value containing / ? # %
-// (e.g. from imported history data) must never escape its segment.
+/** Canonical UI routes; workflow progress is verified separately from the URL. */
 export function stepToRoute(
 	step: string | null | undefined,
 	projectId: string,
 ): string {
-	const id = encodeURIComponent(projectId);
-	switch (step) {
-		case "question":
-			return `/ask/${id}`;
-		case "fitur":
-			return `/fitur/${id}`;
-		case "ac":
-			return `/ac/${id}`;
-		case "task":
-			return `/task/${id}`;
-		default:
-			return `/prd/${id}`;
-	}
+	const view =
+		step === "question"
+			? "ask"
+			: step === "fitur" ||
+					step === "ac" ||
+					step === "task" ||
+					step === "kanban"
+				? step
+				: "prd";
+	return `/vibeplan/${encodeURIComponent(projectId)}/${view}`;
 }
 
 export type StepRouteTarget =
-	| { to: "/ask/$id"; params: { id: string } }
-	| { to: "/fitur/$id"; params: { id: string } }
-	| { to: "/prd/$id"; params: { id: string } }
-	| { to: "/ac/$id"; params: { id: string } }
-	| { to: "/task/$id"; params: { id: string } };
+	| { to: "/vibeplan/$id/ask"; params: { id: string } }
+	| { to: "/vibeplan/$id/fitur"; params: { id: string } }
+	| { to: "/vibeplan/$id/prd"; params: { id: string } }
+	| { to: "/vibeplan/$id/ac"; params: { id: string } }
+	| { to: "/vibeplan/$id/task"; params: { id: string } }
+	| { to: "/vibeplan/$id/kanban"; params: { id: string } };
 
 export function stepToRouteTarget(
 	step: string | null | undefined,
@@ -197,14 +193,17 @@ export function stepToRouteTarget(
 ): StepRouteTarget {
 	switch (step) {
 		case "question":
-			return { to: "/ask/$id", params: { id: projectId } };
+		case "ask":
+			return { to: "/vibeplan/$id/ask", params: { id: projectId } };
 		case "fitur":
-			return { to: "/fitur/$id", params: { id: projectId } };
+			return { to: "/vibeplan/$id/fitur", params: { id: projectId } };
 		case "ac":
-			return { to: "/ac/$id", params: { id: projectId } };
+			return { to: "/vibeplan/$id/ac", params: { id: projectId } };
 		case "task":
-			return { to: "/task/$id", params: { id: projectId } };
+			return { to: "/vibeplan/$id/task", params: { id: projectId } };
+		case "kanban":
+			return { to: "/vibeplan/$id/kanban", params: { id: projectId } };
 		default:
-			return { to: "/prd/$id", params: { id: projectId } };
+			return { to: "/vibeplan/$id/prd", params: { id: projectId } };
 	}
 }

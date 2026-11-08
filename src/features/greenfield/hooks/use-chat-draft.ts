@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { clearPrdDraft, getPrdDraft, savePrdDraft } from "@/lib/prompt-handoff";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { getPrdDraft, savePrdDraft } from "@/lib/prompt-handoff";
 
 export function useChatDraft(projectId?: string) {
 	const draftKey = projectId ?? "new";
@@ -10,23 +10,29 @@ export function useChatDraft(projectId?: string) {
 			draft.startsWith("[Platform:") ||
 			draft.includes("Generate PRD lengkap")
 		) {
-			clearPrdDraft();
+			savePrdDraft(draftKey, "");
 			return "";
 		}
 		return draft;
 	});
+	const latestInput = useRef(input);
+	latestInput.current = input;
+	useEffect(
+		() => () => savePrdDraft(draftKey, latestInput.current),
+		[draftKey],
+	);
 
 	// ponytail: keep follow-up draft in sessionStorage so refresh mid-typing
 	// doesn't wipe a half-typed PRD revision question.
 	useEffect(() => {
-		const t = setTimeout(() => savePrdDraft(draftKey, input), 300);
-		return () => clearTimeout(t);
+		const timer = setTimeout(() => savePrdDraft(draftKey, input), 300);
+		return () => clearTimeout(timer);
 	}, [input, draftKey]);
 
 	const clearDraft = useCallback(() => {
-		clearPrdDraft();
+		savePrdDraft(draftKey, "");
 		setInput("");
-	}, []);
+	}, [draftKey]);
 
 	return {
 		input,
