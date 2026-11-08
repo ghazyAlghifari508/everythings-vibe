@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto";
 import { getScrapeDesignMd } from "@/features/scrape/services/scrape-design-md-service";
 import { ScrapeError } from "@/lib/design-errors";
-import { extractDesignSystemTokens } from "./studio-design-tokens";
 import {
 	STUDIO_DESIGN_FILE_MAX_BYTES,
 	type StudioDesignReference,
@@ -12,9 +11,7 @@ import {
 	getStudioPresetDesignMd,
 	STUDIO_DESIGN_PRESETS,
 } from "./studio-presets";
-import { validateStudioDesignMd } from "./studio-prompt-validation";
-
-const DESIGN_COLOR = /^#(?:[a-f0-9]{3}|[a-f0-9]{4}|[a-f0-9]{6}|[a-f0-9]{8})$/i;
+import { inspectStudioDesignMd } from "./studio-prompt-validation";
 
 export type StudioReferenceFailure =
 	| "source-unavailable"
@@ -33,7 +30,7 @@ const REFERENCE_MESSAGES: Record<StudioReferenceFailure, string> = {
 	"unusable-stored-design":
 		"Referensi desain belum bisa digunakan. Pilih referensi lain atau periksa hasil VibeScrape.",
 	"invalid-design-file":
-		"File desain belum bisa digunakan. Periksa isinya lalu unggah kembali.",
+		"File desain belum bisa digunakan. Periksa bagian warna, tipografi, atau radius di dalamnya, lalu coba lagi.",
 	"unknown-theme": "Tema desain tidak tersedia. Pilih tema lain.",
 };
 
@@ -50,54 +47,19 @@ export class StudioReferenceError extends Error {
 }
 
 // Every source — a curated preset, an uploaded file, or a stored VibeScrape
-// document — passes the same token gate so no reference can smuggle a DESIGN.md
+// document — passes the same preflight so no reference can smuggle a DESIGN.md
 // the design-system enforcer cannot read.
-function assertUsableDesignMdTokens(
-	designMd: string,
-	failure: StudioReferenceFailure,
-): void {
-	const tokens = extractDesignSystemTokens(designMd);
-	const colors = tokens
-		? [
-				...Object.values(tokens.colors).filter(
-					(value): value is string => typeof value === "string",
-				),
-				...Object.values(tokens.colors.accents),
-			]
-		: [];
-	if (colors.some((color) => !DESIGN_COLOR.test(color)))
-		throw new StudioReferenceError(
-			failure,
-			"Token warna DESIGN.md tidak valid.",
-		);
-	if (
-		!tokens ||
-		(!tokens.typography.fontFamily &&
-			!Object.values(tokens.colors).some(
-				(value) => typeof value === "string" && value.length > 0,
-			) &&
-			!Object.keys(tokens.colors.accents).length)
-	)
-		throw new StudioReferenceError(
-			failure,
-			"DESIGN.md harus memuat token warna atau tipografi yang valid.",
-		);
-}
-
 function assertDesignMdWithinBudget(
 	raw: string | null | undefined,
 	failure: StudioReferenceFailure,
 ): string {
-	const checked = validateStudioDesignMd(raw);
+	const checked = inspectStudioDesignMd(raw);
 	if (!checked.ok) throw new StudioReferenceError(failure, checked.error);
-	if (!checked.designMd)
-		throw new StudioReferenceError(failure, "DESIGN.md diperlukan.");
 	if (Buffer.byteLength(raw ?? "", "utf8") > STUDIO_DESIGN_FILE_MAX_BYTES)
 		throw new StudioReferenceError(
 			failure,
 			"Ukuran file desain melebihi batas.",
 		);
-	assertUsableDesignMdTokens(checked.designMd, failure);
 	return checked.designMd;
 }
 
@@ -117,16 +79,31 @@ export async function resolveStudioDesignReference(
 	designMd: string | null;
 	designReference: StudioDesignReferenceMetadata | null;
 }> {
+	// An explicit null is the user choosing no reference, so a document sent
+	// alongside it is not promoted into one behind their back.
 	if (reference === null) return { designMd: null, designReference: null };
-	if (reference?.kind === "theme") {
+	if (reference === undefined) {
+		// Without a typed reference the document itself is the reference, so it
+		// passes the same preflight instead of reaching the pipeline unread.
+		if (raw === null || raw === undefined || raw === "") {
+			return { designMd: null, designReference: null };
+		}
+		return {
+			designMd: assertDesignMdWithinBudget(raw, "invalid-design-file"),
+			designReference: null,
+		};
+	}
+	if (reference.kind === "theme") {
 		const parsed = studioDesignReferenceSchema.parse(reference);
 		if (parsed.kind !== "theme")
 			throw new StudioReferenceError("unknown-theme");
 		const preset = STUDIO_DESIGN_PRESETS.find((item) => item.id === parsed.id);
-		const designMd = getStudioPresetDesignMd(parsed.id);
-		if (!preset || !designMd) throw new StudioReferenceError("unknown-theme");
+		const presetMd = getStudioPresetDesignMd(parsed.id);
+		if (!preset || !presetMd) throw new StudioReferenceError("unknown-theme");
+		// A preset is trusted input, not exempt input: a curated theme that the
+		// parser cannot read would fail every frame downstream.
 		return {
-			designMd,
+			designMd: assertDesignMdWithinBudget(presetMd, "unknown-theme"),
 			designReference: {
 				kind: "theme",
 				id: preset.id,
@@ -137,7 +114,7 @@ export async function resolveStudioDesignReference(
 	}
 	// A scrape reference carries no document in the request: the persisted
 	// DESIGN.md is read back under the caller's ownership.
-	if (reference?.kind === "scrape") {
+	if (reference.kind === "scrape") {
 		const parsed = studioDesignReferenceSchema.parse(reference);
 		if (parsed.kind !== "scrape")
 			throw new StudioReferenceError("source-unavailable");
@@ -167,10 +144,6 @@ export async function resolveStudioDesignReference(
 			},
 		};
 	}
-	const checked = validateStudioDesignMd(raw);
-	if (!checked.ok)
-		throw new StudioReferenceError("invalid-design-file", checked.error);
-	if (!reference) return { designMd: checked.designMd, designReference: null };
 	const parsed = studioDesignReferenceSchema.parse(reference);
 	if (parsed.kind !== "custom")
 		throw new StudioReferenceError("invalid-design-file");

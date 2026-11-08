@@ -15,11 +15,17 @@ export interface StudioProviderCall {
 export const studioProvider = {
 	messages: [] as StudioProviderCall[][],
 	labels: [] as string[],
+	/** Failure the planning call throws instead of returning a plan. */
+	planningError: null as unknown,
+	/** Failure the frame call for a screen name throws instead of returning HTML. */
+	frameError: null as ((screenName: string) => unknown) | null,
 };
 
 export function resetStudioProvider(): void {
 	studioProvider.messages = [];
 	studioProvider.labels = [];
+	studioProvider.planningError = null;
+	studioProvider.frameError = null;
 }
 
 // Mirrors the requested screen count so the pipeline never needs a corrective
@@ -32,6 +38,7 @@ export const studioProviderMock = {
 	) => {
 		studioProvider.messages.push(messages);
 		if (messages[0]?.content.includes("planning application screens")) {
+			if (studioProvider.planningError) throw studioProvider.planningError;
 			const requested = /exactly (\d+)/.exec(messages[1]?.content ?? "");
 			const count = Number(requested?.[1] ?? 2);
 			const viewport = "web";
@@ -93,6 +100,10 @@ export const studioProviderMock = {
 				generator: (async function* () {})(),
 			};
 		}
+		const screenName =
+			/SCREEN TO BUILD: "([^"]+)"/.exec(messages[1]?.content ?? "")?.[1] ?? "";
+		const frameFailure = studioProvider.frameError?.(screenName);
+		if (frameFailure) throw frameFailure;
 		return {
 			firstChunk: `<html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><nav>${studioProvider.labels
 				.map((label) => `<a href="#">${label}</a>`)
