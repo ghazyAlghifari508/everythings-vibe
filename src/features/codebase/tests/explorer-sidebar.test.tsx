@@ -404,7 +404,7 @@ describe("CodebaseExplorerSidebar component integration", () => {
 		);
 		expect(header?.firstElementChild?.contains(searchInput)).toBe(true);
 		expect(container.textContent).toContain("Struktur direktori codebase");
-		expect(container.textContent).toContain("Stack codebase terdeteksi");
+		expect(container.textContent).toContain("Teknologi proyek");
 		expect(container.textContent).toContain("react");
 
 		// The repository identity card is gone: the workspace header owns it.
@@ -726,15 +726,15 @@ describe("collectTreeFolderPaths", () => {
 			);
 		});
 
-		expect(container.textContent).toContain("Stack codebase terdeteksi");
+		expect(container.textContent).toContain("Teknologi proyek");
 		expect(container.textContent).toContain("Astro");
 		expect(container.textContent).toContain("Tailwind CSS");
 		expect(container.textContent).toContain("TypeScript");
 
-		// When stack is empty, shows "Tidak terdeteksi"
+		// When stack is empty, shows "Teknologi belum teridentifikasi"
 		act(() => {
 			root?.render(<CodebaseExplorerSidebar files={sampleFiles} stack={[]} />);
 		});
-		expect(container.textContent).toContain("Tidak terdeteksi");
+		expect(container.textContent).toContain("Teknologi belum teridentifikasi");
 	});
 });

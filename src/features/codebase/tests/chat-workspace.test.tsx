@@ -162,8 +162,8 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 		const titleEl = container.querySelector(
 			"[data-testid='codebase-chat-title']",
 		);
-		expect(titleEl?.textContent).toBe("Workspace · everythings-vibe");
-		expect(text).toContain("Planning workspace");
+		expect(titleEl?.textContent).toBe("everythings-vibe");
+		expect(text).toContain("Workspace perencanaan");
 
 		// 6. Pristine composition contains PromptBar
 		expect(
@@ -189,7 +189,7 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 		);
 	});
 
-	it("resolves provisional codebase name to neutral Workspace · Perencanaan codebase", () => {
+	it("resolves provisional codebase name to neutral Perencanaan codebase", () => {
 		renderWorkspace({
 			codebaseName: "Repository Lokal",
 			featureName: "Repository Lokal",
@@ -198,7 +198,7 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 		const titleEl = container.querySelector(
 			"[data-testid='codebase-chat-title']",
 		);
-		expect(titleEl?.textContent).toBe("Workspace · Perencanaan codebase");
+		expect(titleEl?.textContent).toBe("Perencanaan codebase");
 		expect(container.textContent).not.toContain("Repository Lokal");
 	});
 
@@ -214,7 +214,7 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 		const titleEl = container.querySelector(
 			"[data-testid='codebase-chat-title']",
 		);
-		expect(titleEl?.textContent).toBe("Workspace · Perencanaan codebase");
+		expect(titleEl?.textContent).toBe("Perencanaan codebase");
 		expect(titleEl?.textContent).not.toContain("Sistem Checkout Billing");
 	});
 
