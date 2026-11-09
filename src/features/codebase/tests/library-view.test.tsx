@@ -298,7 +298,7 @@ describe("CodebaseLibraryView", () => {
 		expect(screen.getByText("Perlu analisis")).toBeDefined();
 	});
 
-	it("maps readiness to the four public status labels", () => {
+	it("maps readiness to the public status labels without displaying redundant normal status", () => {
 		render(
 			<CodebaseLibraryView
 				items={[
@@ -328,7 +328,7 @@ describe("CodebaseLibraryView", () => {
 				]}
 			/>,
 		);
-		expect(screen.getByText("Siap")).toBeDefined();
+		expect(screen.queryByText("Siap")).toBeNull();
 		expect(screen.getByText("Menganalisis")).toBeDefined();
 		expect(screen.getByText("Perlu analisis")).toBeDefined();
 		expect(screen.getByText("Sinkronisasi belum selesai")).toBeDefined();
@@ -549,7 +549,7 @@ describe("CodebaseLibraryView primary actions", () => {
 				]}
 			/>,
 		);
-		expect(screen.getByText("Siap")).toBeDefined();
+		expect(screen.queryByText("Siap")).toBeNull();
 		expect(screen.getByText("Buka Workspace")).toBeDefined();
 		expect(screen.queryByText("Menganalisis")).toBeNull();
 	});
