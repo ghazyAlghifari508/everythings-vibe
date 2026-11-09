@@ -21,8 +21,12 @@ export function WorkspaceHeader({
 				<span aria-hidden="true" className="shrink-0 text-slate">
 					/
 				</span>
-				<span className="flex min-w-0 items-center gap-1.5 rounded-md border border-graphite bg-obsidian px-2 py-1 font-mono text-xs text-mist">
-					<span className="truncate">{name}</span>
+				<span
+					data-testid="codebase-workspace-repo-name"
+					title={name}
+					className="truncate text-xs font-medium text-snow"
+				>
+					{name}
 				</span>
 			</div>
 			<div className="flex shrink-0 items-center gap-2">

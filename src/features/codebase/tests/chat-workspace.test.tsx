@@ -162,8 +162,8 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 		const titleEl = container.querySelector(
 			"[data-testid='codebase-chat-title']",
 		);
-		expect(titleEl?.textContent).toBe("Workspace · everythings-vibe");
-		expect(text).toContain("Planning workspace");
+		expect(titleEl?.textContent).toBe("everythings-vibe");
+		expect(text).toContain("Workspace perencanaan");
 
 		// 6. Pristine composition contains PromptBar
 		expect(
@@ -189,7 +189,7 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 		);
 	});
 
-	it("resolves provisional codebase name to neutral Workspace · Perencanaan codebase", () => {
+	it("resolves provisional codebase name to neutral Perencanaan codebase", () => {
 		renderWorkspace({
 			codebaseName: "Repository Lokal",
 			featureName: "Repository Lokal",
@@ -198,7 +198,7 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 		const titleEl = container.querySelector(
 			"[data-testid='codebase-chat-title']",
 		);
-		expect(titleEl?.textContent).toBe("Workspace · Perencanaan codebase");
+		expect(titleEl?.textContent).toBe("Perencanaan codebase");
 		expect(container.textContent).not.toContain("Repository Lokal");
 	});
 
@@ -214,7 +214,7 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 		const titleEl = container.querySelector(
 			"[data-testid='codebase-chat-title']",
 		);
-		expect(titleEl?.textContent).toBe("Workspace · Perencanaan codebase");
+		expect(titleEl?.textContent).toBe("Perencanaan codebase");
 		expect(titleEl?.textContent).not.toContain("Sistem Checkout Billing");
 	});
 
@@ -1215,12 +1215,23 @@ describe("CodebaseChatWorkspace one-by-one questions", () => {
 		expect(onSubmitAnswer).toHaveBeenCalledWith("q2", "Banner kilat");
 	});
 
-	it("shows the recommendation reason tied to a select option", () => {
+	it("shows the recommendation reason on the recommended option itself", () => {
 		renderWorkspace({ questions: sampleQuestions, answers: {} });
-		const reason = container.querySelector(
-			"[data-testid='adaptive-question-reason-q1']",
+		// No separate explanation panel exists; the reason is the recommended
+		// option's own supporting line when the stored option predates descriptions.
+		expect(
+			container.querySelector("[data-testid='adaptive-question-reason-q1']"),
+		).toBeNull();
+		const recommended = container.querySelector<HTMLInputElement>(
+			"input[value='q1-opt1']",
 		);
-		expect(reason?.textContent).toContain(
+		const describedIds =
+			recommended?.getAttribute("aria-describedby")?.split(/\s+/) ?? [];
+		const described = describedIds
+			.map((id) => container.querySelector(`[id="${id}"]`)?.textContent)
+			.join(" ")
+			.trim();
+		expect(described).toContain(
 			"Repo memakai penyimpanan lokal untuk preferensi.",
 		);
 	});

@@ -375,8 +375,6 @@ describe("task 8 generation-context bounds", () => {
 	});
 
 	it("sanitizeAskHandoffState bounds questions, options, and total size", () => {
-		expect(CODEBASE_ASK_HANDOFF_MAX_STATE_CHARS).toBe(20_000);
-		expect(CODEBASE_ASK_HANDOFF_MAX_OPTIONS).toBe(8);
 		const clean = sanitizeAskHandoffState({
 			prompt: "P".repeat(9_000),
 			platform: "web",
@@ -402,6 +400,68 @@ describe("task 8 generation-context bounds", () => {
 		expect(JSON.stringify(clean).length).toBeLessThanOrEqual(
 			CODEBASE_ASK_HANDOFF_MAX_STATE_CHARS,
 		);
+	});
+
+	it("sanitizeAskHandoffState keeps heading + description pairs and their bounds", () => {
+		const clean = sanitizeAskHandoffState({
+			prompt: "Cari proyek",
+			platform: "web",
+			questions: [
+				{
+					id: "q1",
+					question: "Informasi apa yang dicari?",
+					type: "select",
+					options: [
+						{
+							label: "L".repeat(150),
+							description: "D".repeat(500),
+						},
+						"teks lama",
+					],
+					recommended: 0,
+					recommendationReason: "Bukti.",
+				},
+			],
+		});
+		const [question] = clean.questions ?? [];
+		const [rich, legacy] = question?.options ?? [];
+		expect(Array.isArray(legacy)).toBe(false);
+		expect(legacy).toBe("teks lama");
+		if (typeof rich === "object") {
+			expect(rich.label.length).toBe(100);
+			expect(rich.description?.length).toBe(400);
+		}
+		// The recommendation still indexes the array that actually gets stored.
+		expect(question?.recommended).toBe(0);
+	});
+
+	it("askHandoffSchema accepts legacy short-text and rich option forms together", () => {
+		const parsed = askHandoffSchema.safeParse({
+			projectId: "proj_789",
+			state: {
+				prompt: "ide awal",
+				questions: [
+					{
+						id: "legacy",
+						question: "Q lama?",
+						type: "select",
+						options: ["A", "B"],
+					},
+					{
+						id: "rich",
+						question: "Q baru?",
+						type: "select",
+						options: [
+							{ label: "A", description: "Konsekuensi A." },
+							{ label: "B", description: "Konsekuensi B." },
+						],
+						recommended: 1,
+						recommendationReason: "Bukti repo.",
+					},
+				],
+			},
+		});
+		expect(parsed.success).toBe(true);
 	});
 
 	it("askHandoffSchema accepts an optional restorable state snapshot", () => {

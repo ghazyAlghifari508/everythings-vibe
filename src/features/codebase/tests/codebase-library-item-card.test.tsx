@@ -1,7 +1,12 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CodebaseLibraryItemCard } from "@/features/codebase/components/planning/codebase-library-item-card";
+import {
+	CodebaseLibraryItemCard,
+	formatLibraryDate,
+	formatLibraryMetadata,
+	METADATA_SEPARATOR,
+} from "@/features/codebase/components/planning/codebase-library-item-card";
 import {
 	installRadixDomPolyfills,
 	makeItem,
@@ -216,5 +221,215 @@ describe("CodebaseLibraryItemCard selection layout & vertical alignment", () => 
 		expect(
 			screen.getByRole("button", { name: /Opsi repository Normal Mode Repo/i }),
 		).toBeDefined();
+	});
+});
+
+describe("CodebaseLibraryItemCard status presentation", () => {
+	it("does not render redundant 'Siap' for normal ready repositories", () => {
+		const onToggle = vi.fn();
+		const onRename = vi.fn();
+		const onDelete = vi.fn().mockResolvedValue(undefined);
+
+		render(
+			<CodebaseLibraryItemCard
+				item={makeItem("cb-ready", "Portfolio App", {
+					readiness: "planning_ready",
+					hasReadyAnalysis: true,
+					analysisAttemptStatus: "ready",
+				})}
+				selected={false}
+				selectionActive={false}
+				onToggleSelect={onToggle}
+				onRename={onRename}
+				onDelete={onDelete}
+			/>,
+		);
+
+		expect(screen.queryByText("Siap")).toBeNull();
+		expect(screen.queryByText("Ready")).toBeNull();
+		expect(screen.queryByText("Aktif")).toBeNull();
+		expect(screen.getByText("Portfolio App")).toBeDefined();
+	});
+
+	it("preserves actionable status when attention or progress is needed", () => {
+		const onToggle = vi.fn();
+		const onRename = vi.fn();
+		const onDelete = vi.fn().mockResolvedValue(undefined);
+
+		const actionableCases = [
+			{
+				readiness: "recovery_required" as const,
+				analysisAttemptStatus: "failed" as const,
+				expectedLabel: "Perlu analisis",
+			},
+			{
+				readiness: "analysis_pending" as const,
+				analysisAttemptStatus: "pending" as const,
+				expectedLabel: "Menganalisis",
+			},
+			{
+				readiness: "onboarding" as const,
+				hasUsableSnapshot: false,
+				expectedLabel: "Sinkronisasi belum selesai",
+			},
+		];
+
+		for (const c of actionableCases) {
+			const { unmount } = render(
+				<CodebaseLibraryItemCard
+					item={makeItem("cb-action", "Action Repo", {
+						readiness: c.readiness,
+						analysisAttemptStatus: c.analysisAttemptStatus,
+						hasUsableSnapshot: c.hasUsableSnapshot,
+					})}
+					selected={false}
+					selectionActive={false}
+					onToggleSelect={onToggle}
+					onRename={onRename}
+					onDelete={onDelete}
+				/>,
+			);
+
+			expect(screen.getByText(c.expectedLabel)).toBeDefined();
+			expect(screen.queryByText("Siap")).toBeNull();
+			unmount();
+		}
+	});
+});
+
+describe("CodebaseLibraryItemCard metadata formatting & microcopy", () => {
+	it("uses pipe separator and Indonesian microcopy (rencana fitur, Diperbarui)", () => {
+		const onToggle = vi.fn();
+		const onRename = vi.fn();
+		const onDelete = vi.fn().mockResolvedValue(undefined);
+
+		render(
+			<CodebaseLibraryItemCard
+				item={makeItem("cb-meta", "Ghazy Portofolio", {
+					framework: "Astro",
+					language: "TypeScript",
+					packageManager: "npm",
+					fileCount: 69,
+					planCount: 2,
+					snapshotCreatedAt: "2026-11-09T00:27:00.000Z",
+				})}
+				selected={false}
+				selectionActive={false}
+				onToggleSelect={onToggle}
+				onRename={onRename}
+				onDelete={onDelete}
+			/>,
+		);
+
+		const stackEl = screen.getByText("Astro | TypeScript | npm");
+		expect(stackEl).toBeDefined();
+		expect(stackEl.textContent).not.toContain("·");
+		expect(stackEl.textContent).not.toContain("—");
+
+		const metaEl = screen.getByText(/69 file \| 2 rencana fitur \| Diperbarui/);
+		expect(metaEl).toBeDefined();
+		expect(metaEl.textContent).not.toContain("fitur plan");
+		expect(metaEl.textContent).not.toContain("Terakhir diperbarui");
+		expect(metaEl.textContent).not.toContain("·");
+		expect(metaEl.textContent).not.toContain("—");
+	});
+
+	it("omits separators cleanly when metadata parts are missing", () => {
+		const onToggle = vi.fn();
+		const onRename = vi.fn();
+		const onDelete = vi.fn().mockResolvedValue(undefined);
+
+		const { unmount } = render(
+			<CodebaseLibraryItemCard
+				item={makeItem("cb-single-meta", "Single Meta Repo", {
+					framework: null,
+					language: null,
+					packageManager: null,
+					fileCount: 15,
+					planCount: 0,
+					snapshotCreatedAt: null,
+					updatedAt: "",
+				})}
+				selected={false}
+				selectionActive={false}
+				onToggleSelect={onToggle}
+				onRename={onRename}
+				onDelete={onDelete}
+			/>,
+		);
+
+		const singleMeta = screen.getByText("15 file");
+		expect(singleMeta.textContent).not.toContain("|");
+		expect(singleMeta.textContent).not.toContain("·");
+		unmount();
+
+		render(
+			<CodebaseLibraryItemCard
+				item={makeItem("cb-no-meta", "No Meta Repo", {
+					framework: null,
+					language: null,
+					packageManager: null,
+					fileCount: null,
+					planCount: 0,
+					snapshotCreatedAt: null,
+					updatedAt: "",
+				})}
+				selected={false}
+				selectionActive={false}
+				onToggleSelect={onToggle}
+				onRename={onRename}
+				onDelete={onDelete}
+			/>,
+		);
+
+		expect(screen.queryByText(/file/)).toBeNull();
+		expect(screen.queryByText(/rencana fitur/)).toBeNull();
+		expect(screen.queryByText(/Diperbarui/)).toBeNull();
+	});
+
+	it("reflects dynamic counts and formats properly in formatLibraryMetadata unit helper", () => {
+		const full = formatLibraryMetadata(
+			{ fileCount: 42, planCount: 3 },
+			"14 Okt 2026, 07.00",
+		);
+		expect(full).toEqual([
+			"42 file",
+			"3 rencana fitur",
+			"Diperbarui 14 Okt 2026, 07.00",
+		]);
+		expect(full.join(METADATA_SEPARATOR)).toBe(
+			"42 file | 3 rencana fitur | Diperbarui 14 Okt 2026, 07.00",
+		);
+
+		const zeroFiles = formatLibraryMetadata(
+			{ fileCount: 0, planCount: 1 },
+			null,
+		);
+		expect(zeroFiles).toEqual(["0 file", "1 rencana fitur"]);
+		expect(zeroFiles.join(METADATA_SEPARATOR)).toBe("0 file | 1 rencana fitur");
+
+		const zeroPlans = formatLibraryMetadata(
+			{ fileCount: 10, planCount: 0 },
+			null,
+		);
+		expect(zeroPlans).toEqual(["10 file"]);
+		expect(zeroPlans.join(METADATA_SEPARATOR)).toBe("10 file");
+
+		const empty = formatLibraryMetadata(
+			{ fileCount: null, planCount: 0 },
+			null,
+		);
+		expect(empty).toEqual([]);
+		expect(empty.join(METADATA_SEPARATOR)).toBe("");
+	});
+
+	it("formats Indonesian dates cleanly with formatLibraryDate", () => {
+		expect(formatLibraryDate(null)).toBeNull();
+		expect(formatLibraryDate("")).toBeNull();
+		expect(formatLibraryDate("invalid")).toBeNull();
+
+		const formatted = formatLibraryDate("2026-11-09T00:27:00.000Z");
+		expect(formatted).not.toBeNull();
+		expect(formatted).toMatch(/9 Nov 2026/);
 	});
 });

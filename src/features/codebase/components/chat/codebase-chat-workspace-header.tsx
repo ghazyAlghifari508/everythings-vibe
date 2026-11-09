@@ -5,7 +5,7 @@ import { resolveCodebaseDisplayName } from "@/features/codebase/services/naming"
 
 interface CodebaseChatWorkspaceHeaderProps {
 	codebaseName?: string;
-	featureName: string;
+	featureName?: string;
 	planSwitcher?: ReactNode;
 	kanbanProgress: { done: number; total: number; pct: number } | null;
 	planningMovedOn: boolean;
@@ -14,21 +14,17 @@ interface CodebaseChatWorkspaceHeaderProps {
 
 export function CodebaseChatWorkspaceHeader({
 	codebaseName,
-	featureName,
 	planSwitcher,
 	kanbanProgress,
 	planningMovedOn,
 	onReviewPlan,
 }: CodebaseChatWorkspaceHeaderProps) {
-	// Repository identity only. A feature plan title is a different identity,
-	// so it is never borrowed as the repository name; when the repository is not
-	// identified the header stays neutral instead of mislabeling the plan. The
-	// feature name still labels the subtitle, where it is context, not identity.
+	// Repository identity only. A feature plan title is a distinct identity,
+	// represented separately by the plan switcher on the right; it is never
+	// borrowed as repository name. When repository is not identified, the title
+	// uses a neutral fallback ("Perencanaan codebase") without middle dots or em dashes.
 	const resolvedRepoName = resolveCodebaseDisplayName(codebaseName);
-	const resolvedFeatureName = resolveCodebaseDisplayName(featureName);
-	const headerTitle = resolvedRepoName
-		? `Workspace · ${resolvedRepoName}`
-		: "Workspace · Perencanaan codebase";
+	const headerTitle = resolvedRepoName ?? "Perencanaan codebase";
 	const hasLiveData = kanbanProgress !== null && kanbanProgress.total > 0;
 
 	return (
@@ -38,19 +34,17 @@ export function CodebaseChatWorkspaceHeader({
 					<div className="min-w-0">
 						<p
 							data-testid="codebase-chat-title"
+							title={headerTitle}
 							className="truncate text-sm font-semibold text-snow"
 						>
 							{headerTitle}
 						</p>
-						{resolvedRepoName ? (
-							<p className="truncate text-[11px] text-fog">
-								Planning workspace
-							</p>
-						) : resolvedFeatureName ? (
-							<p className="truncate text-[11px] text-fog">
-								{`Perencanaan · ${resolvedFeatureName}`}
-							</p>
-						) : null}
+						<p
+							data-testid="codebase-chat-subtitle"
+							className="truncate text-[11px] text-fog"
+						>
+							Workspace perencanaan
+						</p>
 					</div>
 					<div className="flex shrink-0 items-center gap-2">
 						{planSwitcher}
