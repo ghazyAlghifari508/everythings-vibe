@@ -20,7 +20,7 @@ import {
 import {
 	type AskOptionsCollection,
 	generateValidatedAskQuestions,
-} from "@/features/greenfield/services/ask-service";
+} from "@/features/greenfield/services/ask-generation";
 import { sanitizeModelOutput } from "@/features/greenfield/services/prd-text";
 import { MAX_PROMPT_LENGTH } from "@/lib/constants";
 import { isTruncatedGeneration } from "@/lib/flow-progress";

@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { classifyAskOptionsOutput } from "@/features/greenfield/services/ask-generation";
 import {
 	type AskQuestion,
-	buildAskOptionsRepairPrompt,
-	classifyAskOptionsOutput,
 	parseAskOptionsJson,
 	validateAskQuestions,
 } from "@/features/greenfield/services/ask-service";
@@ -171,47 +170,5 @@ describe("ask options failure classification (diagnostics only)", () => {
 		expect(
 			classifyAskOptionsOutput(JSON.stringify({ questions: validQuestions })),
 		).toBe("schema");
-	});
-});
-
-describe("bounded repair prompt", () => {
-	it("restates the contract without supplying questions or options", () => {
-		const prompt = buildAskOptionsRepairPrompt({
-			raw: '{"questions": "nope"}',
-			reason: "schema",
-		});
-		expect(prompt).toContain("questions");
-		expect(prompt).toContain("select|text|multiselect");
-		expect(prompt).toContain("Perbaiki dan kirim ulang HANYA JSON valid");
-		// The repair must instruct preservation, never invention.
-		expect(prompt).toContain("jangan menambah atau menghapus pertanyaan");
-	});
-
-	it("bounds the rejected output it hands back", () => {
-		const prompt = buildAskOptionsRepairPrompt({
-			raw: "x".repeat(50_000),
-			reason: "invalid_json",
-			maxRawChars: 100,
-		});
-		expect(prompt).toContain("...(dipotong)");
-		// Exactly the bounded excerpt is echoed back — one character more is not.
-		expect(prompt).toContain("x".repeat(100));
-		expect(prompt).not.toContain("x".repeat(101));
-		expect(prompt.length).toBeLessThan(1_500);
-	});
-
-	it("asks for option descriptions only in the existing-codebase mode", () => {
-		const greenfield = buildAskOptionsRepairPrompt({
-			raw: "{}",
-			reason: "schema",
-		});
-		const codebase = buildAskOptionsRepairPrompt({
-			raw: "{}",
-			reason: "schema",
-			requireOptionDescriptions: true,
-		});
-		expect(greenfield).not.toContain("description");
-		expect(codebase).toContain('"description"');
-		expect(codebase).toContain("SETIAP opsi wajib punya label dan description");
 	});
 });

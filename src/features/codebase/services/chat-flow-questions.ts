@@ -265,13 +265,21 @@ export function parseRestoredQuestions(value: unknown): PersistedAskQuestion[] {
 		) {
 			continue;
 		}
+		const storedOptions = Array.isArray(record.options) ? record.options : [];
+		const drafts = storedOptions.map(toStoredOptionDraft);
 		const options = Array.isArray(record.options)
-			? record.options
-					.map((option) => toStoredOptionDraft(option))
-					.filter((option): option is AskOptionDraft => option !== null)
+			? drafts.filter((option): option is AskOptionDraft => option !== null)
 			: undefined;
+		const originalIndex = record.recommended;
 		const recommended =
-			typeof record.recommended === "number" ? record.recommended : undefined;
+			record.type === "select" &&
+			typeof originalIndex === "number" &&
+			Number.isInteger(originalIndex) &&
+			originalIndex >= 0 &&
+			drafts[originalIndex] != null
+				? drafts.slice(0, originalIndex).filter((option) => option !== null)
+						.length
+				: undefined;
 		const recommendationReason =
 			typeof record.recommendationReason === "string"
 				? record.recommendationReason

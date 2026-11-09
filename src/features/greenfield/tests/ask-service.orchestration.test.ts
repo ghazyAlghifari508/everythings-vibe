@@ -3,7 +3,7 @@ import {
 	type AskOptionsCollection,
 	type AskOptionsDiagnostic,
 	generateValidatedAskQuestions,
-} from "@/features/greenfield/services/ask-service";
+} from "@/features/greenfield/services/ask-generation";
 
 /**
  * Reliability contract for question generation.
