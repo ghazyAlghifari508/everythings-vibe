@@ -18,6 +18,7 @@ const KARYA = "Demi Kemudahan Eksplorasi Karya";
 const KATALOG = "Katalog Resep Nusantara";
 const CI = "Pipeline Integrasi Berkelanjutan";
 const BLOG = "Blog Artikel Teknis";
+const SOLO = "Manajemen Inventaris Toko";
 
 function plan(
 	id: string,
@@ -70,6 +71,19 @@ function repoB(): WorkspaceData {
 
 interface PlanApi {
 	current: ReturnType<typeof useWorkspacePlan> | null;
+}
+
+function repoSolo(): WorkspaceData {
+	return {
+		codebase: {
+			id: "repo-solo",
+			name: "Repo Solo",
+			onboardingProjectId: null,
+			repositoryIdentity: null,
+		},
+		plans: [plan("plan-only", SOLO, true)],
+		onboardingFeatureId: null,
+	};
 }
 
 function PlanHarness({ data, api }: { data: WorkspaceData; api?: PlanApi }) {
@@ -181,6 +195,17 @@ afterEach(() => {
 	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
 	sessionStorage.clear();
+});
+
+describe("a repository with a single feature plan", () => {
+	it("opens on that plan and self-heals a stale pointer", () => {
+		storeActivePlanPointer("repo-solo", "plan-gone");
+		const { recoverable, consoleErrors, container } = hydrateFresh(repoSolo());
+		expect(recoverable).toEqual([]);
+		expect(consoleErrors).toEqual([]);
+		expect(triggerText(container)).toContain(SOLO);
+		expect(readActivePlanPointer("repo-solo")).toBe("plan-only");
+	});
 });
 
 describe("server render and first client render agree on the active plan", () => {
