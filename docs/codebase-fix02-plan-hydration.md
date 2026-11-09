@@ -75,6 +75,14 @@ An external store with a server snapshot would add a subscription layer for the
 same result, and moving the workspace to client-only or suppressing the warning
 is prohibited by FIX 02.
 
+Server-readable navigation preference (evaluated, then rejected): nothing on the
+server can read `sessionStorage`, and the only ways to give SSR a preference
+would be a new store — a cookie or a column on the codebase row — which FIX 02
+forbids ("don't create storage that is not needed") and which would also make an
+unrelated navigation choice part of canonical database state. Applying the
+existing pointer after hydration restores the same user-visible preference with
+no new storage and no write to canonical state.
+
 ## 4. Targeted verification
 
 New: `src/features/codebase/tests/workspace-plan-hydration.test.tsx` (9 tests,
