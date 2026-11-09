@@ -85,7 +85,7 @@ no new storage and no write to canonical state.
 
 ## 4. Targeted verification
 
-New: `src/features/codebase/tests/workspace-plan-hydration.test.tsx` (9 tests,
+New: `src/features/codebase/tests/workspace-plan-hydration.test.tsx` (10 tests,
 jsdom). The server side is simulated by stubbing `sessionStorage` away during
 `renderToString`, and the client side hydrates the emitted markup with
 `hydrateRoot`, capturing `onRecoverableError` plus hydration-flavoured
@@ -93,25 +93,27 @@ jsdom). The server side is simulated by stubbing `sessionStorage` away during
 
 Covered:
 
-1. Server markup names the deterministic plan while a different pointer exists.
-2. Hydration produces no recoverable error / console mismatch while a different
+1. A single-plan repository opens on that plan and self-heals a stale pointer.
+2. Server markup names the deterministic plan while a different pointer exists.
+3. Hydration produces no recoverable error / console mismatch while a different
    plan is stored, then restores the valid stored preference.
-3. Empty storage keeps the deterministic plan and records it.
-4. Stale pointer (plan no longer owned) falls back to the valid plan and storage
+4. Empty storage keeps the deterministic plan and records it.
+5. Stale pointer (plan no longer owned) falls back to the valid plan and storage
    is rewritten with it.
-5. Pointer naming another repository's plan is ignored.
-6. Selection + refresh: the pointer survives a remount and re-hydrates without a
+6. Pointer naming another repository's plan is ignored.
+7. Selection + refresh: the pointer survives a remount and re-hydrates without a
    mismatch.
-7. Multiple plans are listed, the trigger label equals the active plan name, and
+8. Multiple plans are listed, the trigger label equals the active plan name, and
    the trigger contains no nested interactive / menu markup.
-8. Repository switching honours the new repository's own pointer and never the
+9. Repository switching honours the new repository's own pointer and never the
    previous repository's selection.
-9. A feature created in the previous repository disappears on switch (trigger,
-   and the plan list) instead of naming a plan the new repository does not own.
+10. A feature created in the previous repository disappears on switch (trigger,
+    and the plan list) instead of naming a plan the new repository does not own.
 
 Existing suites re-run and green: `workspace-plan-isolation.test.tsx`,
-`plan-switcher.test.tsx`, `workspace-feature-isolation.test.tsx`. Biome passed
-for both touched files.
+`plan-switcher.test.tsx`, `workspace-feature-isolation.test.tsx`,
+`workspace-header.test.tsx` (25 tests together). Biome passed for both touched
+files.
 
 `pnpm exec tsc --noEmit` still reports the previously documented, unrelated
 `studio-composer.test.tsx:241` `Promise.withResolvers` / ES2022 library error
