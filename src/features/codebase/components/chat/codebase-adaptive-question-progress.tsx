@@ -12,9 +12,11 @@ export function CodebaseAdaptiveQuestionProgress({
 	totalQuestions,
 }: CodebaseAdaptiveQuestionProgressProps) {
 	return (
-		<div className="flex items-center justify-between pb-3 mb-3 border-b border-graphite/50">
-			<span className="text-xs font-medium text-fog">Pertanyaan {index}</span>
-			<span className="font-mono text-xs text-fog">
+		<div className="mb-3 flex items-center justify-between gap-3 border-b border-graphite/50 pb-2.5">
+			<span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fog">
+				Pertanyaan {index}
+			</span>
+			<span className="font-mono text-[11px] tabular-nums text-fog">
 				{index} dari {totalQuestions ?? index}
 			</span>
 		</div>

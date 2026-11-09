@@ -40,6 +40,7 @@ export function CodebaseAdaptiveQuestionActive({
 		customText,
 		setCustomText,
 		handleOptionChange,
+		handleMultiChange,
 		handleSubmit,
 	} = selection;
 
@@ -53,15 +54,17 @@ export function CodebaseAdaptiveQuestionActive({
 				totalQuestions={totalQuestions}
 			/>
 
+			{/* The heading is the card's focal point: metadata stays small and the
+			    question itself carries the largest text on the surface. */}
 			<p
 				id={titleId}
-				className="text-sm sm:text-[15px] font-semibold text-snow leading-snug mb-3.5"
+				className="text-pretty text-[15px] font-semibold leading-snug text-snow sm:text-base"
 			>
 				{question.title}
 			</p>
 
 			{isText ? (
-				<div className="mt-2">
+				<div className="mt-3">
 					<CodebaseAdaptiveQuestionAnswerInput
 						id={inputId}
 						label={question.title}
@@ -78,7 +81,8 @@ export function CodebaseAdaptiveQuestionActive({
 					isMulti={isMulti}
 					labelledBy={titleId}
 					options={question.options}
-					selectedIds={isMulti ? multiOptionIds : selectedOptionId}
+					selectedMultiIds={multiOptionIds}
+					selectedId={selectedOptionId}
 					disabled={!active && !isEditing}
 					groupName={groupName}
 					customId={customId}
@@ -86,8 +90,10 @@ export function CodebaseAdaptiveQuestionActive({
 					customText={customText}
 					customInputId={inputId}
 					customPlaceholder={question.customPlaceholder}
+					recommendedOptionId={question.recommendedOptionId}
 					recommendationReason={question.recommendationReason}
 					onSelect={handleOptionChange}
+					onSelectMany={handleMultiChange}
 					onCustomTextChange={setCustomText}
 					onCustomSubmit={handleSubmit}
 				/>
@@ -108,9 +114,10 @@ export function CodebaseAdaptiveQuestionActive({
 					) : null}
 					<Button
 						type="button"
+						size="sm"
 						disabled={!canSubmit}
 						onClick={handleSubmit}
-						className="min-h-9 rounded-md bg-snow px-4 text-xs font-semibold text-onyx transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+						className="min-h-9 px-4 text-xs font-semibold"
 					>
 						Konfirmasi <span className="sr-only">Kirim Jawaban</span>
 					</Button>

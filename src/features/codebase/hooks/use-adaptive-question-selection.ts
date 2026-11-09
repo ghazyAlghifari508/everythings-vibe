@@ -24,7 +24,10 @@ export interface AdaptiveQuestionSelection {
 	multiOptionIds: string[];
 	customText: string;
 	setCustomText: Dispatch<SetStateAction<string>>;
+	/** Single-select: the control group resolved one option. */
 	handleOptionChange: (optionId: string) => void;
+	/** Multi-select: the control group resolved the whole selection. */
+	handleMultiChange: (optionIds: string[]) => void;
 	handleSubmit: () => void;
 }
 
@@ -135,12 +138,17 @@ export function useAdaptiveQuestionSelection({
 
 	const { selectedOptionId, multiOptionIds, customText } = current;
 
+	/** Rebase a mutation on the correct draft: the user's in-progress draft, or
+	 *  one re-derived from the persisted answer when the logical question or the
+	 *  persisted answer moved on. */
+	const rebaseDraft = (previous: DraftSelection): DraftSelection =>
+		previous.key === resetKey
+			? previous
+			: { key: resetKey, ...deriveDraft(question, customId, submitted) };
+
 	const setCustomText: Dispatch<SetStateAction<string>> = (value) => {
 		setDraft((previous) => {
-			const base =
-				previous.key === resetKey
-					? previous
-					: { key: resetKey, ...deriveDraft(question, customId, submitted) };
+			const base = rebaseDraft(previous);
 			return {
 				...base,
 				customText:
@@ -190,19 +198,17 @@ export function useAdaptiveQuestionSelection({
 	};
 
 	const handleOptionChange = (optionId: string) => {
-		setDraft((previous) => {
-			const base =
-				previous.key === resetKey
-					? previous
-					: { key: resetKey, ...deriveDraft(question, customId, submitted) };
-			if (!isMulti) return { ...base, selectedOptionId: optionId };
-			return {
-				...base,
-				multiOptionIds: base.multiOptionIds.includes(optionId)
-					? base.multiOptionIds.filter((id) => id !== optionId)
-					: [...base.multiOptionIds, optionId],
-			};
-		});
+		setDraft((previous) => ({
+			...rebaseDraft(previous),
+			selectedOptionId: optionId,
+		}));
+	};
+
+	const handleMultiChange = (optionIds: string[]) => {
+		setDraft((previous) => ({
+			...rebaseDraft(previous),
+			multiOptionIds: optionIds,
+		}));
 	};
 
 	return {
@@ -219,6 +225,7 @@ export function useAdaptiveQuestionSelection({
 		customText,
 		setCustomText,
 		handleOptionChange,
+		handleMultiChange,
 		handleSubmit,
 	};
 }
