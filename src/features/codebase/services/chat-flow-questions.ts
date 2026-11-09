@@ -71,6 +71,27 @@ export function mapAskQuestionsToAdaptive(
 	});
 }
 
+/**
+ * Presentation order for one question's options: the recommended option first,
+ * every other option in its canonical relative order.
+ *
+ * Pure and canonical-order preserving: the returned array holds the SAME option
+ * objects (ids untouched), so the saved answer, `recommendedOptionId`, and the
+ * persisted `recommended` index keep pointing at the option they always did.
+ * Without a valid recommendation nothing moves and no label is invented.
+ */
+export function orderOptionsForDisplay(
+	options: readonly AdaptiveQuestionOption[],
+	recommendedOptionId?: string,
+): AdaptiveQuestionOption[] {
+	if (!recommendedOptionId) return [...options];
+	const recommended = options.find(
+		(option) => option.id === recommendedOptionId,
+	);
+	if (!recommended || options[0] === recommended) return [...options];
+	return [recommended, ...options.filter((option) => option !== recommended)];
+}
+
 export function nextQuestionIndex(
 	answers: Record<string, string>,
 	questions: readonly FlowQuestion[],
