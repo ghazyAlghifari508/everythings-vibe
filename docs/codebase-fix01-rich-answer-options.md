@@ -142,5 +142,6 @@ biasanya sudah tahu proyek yang ingin dibuka.
 | `pnpm exec tsc --noEmit` | pass except the pre-existing `src/features/studio/tests/studio-composer.test.tsx` `Promise.withResolvers` lib error (untouched by this fix) |
 | Pipeline smoke (model JSON → parse → contract check → map → handoff zod → sanitize → restore → answers) | pass (throwaway, removed) |
 
-FIX 02 is not done: the recommendation still renders in canonical position; only
-the contract that lets it be displayed first is in place.
+FIX 02 (see `docs/codebase-fix02-question-card-ui.md`) built on this contract:
+the options view now renders the recommended option first and the choice cards
+were rebuilt on HeroUI's React Aria fields.
