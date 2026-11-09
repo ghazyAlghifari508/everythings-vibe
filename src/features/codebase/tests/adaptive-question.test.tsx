@@ -10,6 +10,25 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AdaptiveQuestion } from "@/features/codebase/services/chat-flow";
 import { CodebaseAdaptiveQuestion } from "../components/chat/codebase-adaptive-question";
 
+/** Option ids in the order the user actually sees them. */
+function controlValues(): string[] {
+	return screen
+		.getAllByRole("radio")
+		.map((control) => control.getAttribute("value") ?? "");
+}
+
+/** The text an option announces as its description, resolved the way an
+ *  assistive technology resolves it: through `aria-describedby`. */
+function describedText(control: HTMLElement): string {
+	const ids = control.getAttribute("aria-describedby");
+	if (!ids) return "";
+	return ids
+		.split(/\s+/)
+		.map((id) => document.getElementById(id)?.textContent ?? "")
+		.join(" ")
+		.trim();
+}
+
 describe("CodebaseAdaptiveQuestion Component", () => {
 	afterEach(() => {
 		cleanup();
@@ -97,10 +116,12 @@ describe("CodebaseAdaptiveQuestion Component", () => {
 			);
 
 			// Legacy stored question: no descriptions, so the recommendation reason
-			// stands in for the recommended option's explanation — attached to that
-			// option, never to a separate block under the whole list.
-			const recommendedRow = document.getElementById("filter_type-opt1-desc");
-			expect(recommendedRow?.textContent).toContain(
+			// stands in for the recommended option's explanation — announced as that
+			// option's description, never as a separate block under the whole list.
+			const recommended = screen.getByRole("radio", {
+				name: /Satu kategori sekaligus/i,
+			});
+			expect(describedText(recommended)).toContain(
 				"Codebase saat ini menggunakan single filter parameter pada URL.",
 			);
 			expect(
@@ -125,10 +146,15 @@ describe("CodebaseAdaptiveQuestion Component", () => {
 						id: "search_scope-opt2",
 						label: "Judul proyek saja",
 						description: "Pencarian hanya mencocokkan nama proyek.",
+					},
+					{
+						id: "search_scope-opt3",
+						label: "Tentukan sendiri",
+						description: "Cakupan ditentukan pengguna.",
 						recommended: true,
 					},
 				],
-				recommendedOptionId: "search_scope-opt2",
+				recommendedOptionId: "search_scope-opt3",
 				recommendationReason: "Metadata internal",
 			};
 			render(
@@ -143,17 +169,21 @@ describe("CodebaseAdaptiveQuestion Component", () => {
 			);
 
 			for (const option of richQuestion.options) {
-				expect(screen.getByText(option.label)).toBeDefined();
-				expect(document.getElementById(`${option.id}-desc`)?.textContent).toBe(
-					option.description,
-				);
+				const control = screen.getByRole("radio", {
+					name: new RegExp(option.label, "i"),
+				});
+				// The heading is the control's accessible name; the description is
+				// the text it announces, resolved through the same wiring an
+				// assistive technology uses.
+				expect(describedText(control)).toBe(option.description);
 			}
 			// The option already explains itself, so the internal recommendation
 			// metadata is not repeated on screen.
 			expect(document.body.textContent).not.toContain("Metadata internal");
-			// The recommended option is marked, but remains an unselected choice.
+			// The recommended option is first and marked, but never auto-selected.
+			expect(controlValues()[0]).toBe("search_scope-opt3");
 			const recommended = screen.getByRole("radio", {
-				name: /Judul proyek saja/i,
+				name: /Tentukan sendiri/i,
 			});
 			expect((recommended as HTMLInputElement).checked).toBe(false);
 		});
@@ -312,6 +342,211 @@ describe("CodebaseAdaptiveQuestion Component", () => {
 				"export_fields",
 				"Judul, Penulis tamu",
 			);
+		});
+	});
+
+	describe("Recommended option, choice cards, and keyboard access", () => {
+		const orderingQuestion: AdaptiveQuestion = {
+			id: "scope",
+			title: "Informasi apa saja yang perlu dicari?",
+			type: "select",
+			options: [
+				{ id: "scope-opt1", label: "Judul dan deskripsi" },
+				{
+					id: "scope-opt2",
+					label: "Judul proyek saja",
+					description: "Cocok untuk daftar proyek sederhana.",
+				},
+				{
+					id: "scope-opt3",
+					label: "Judul, deskripsi, dan teknologi",
+					description: "Cakupan terluas.",
+					recommended: true,
+				},
+			],
+			recommendedOptionId: "scope-opt3",
+		};
+
+		it("renders the recommended option first and keeps every option id stable", () => {
+			render(
+				<CodebaseAdaptiveQuestion
+					question={orderingQuestion}
+					index={1}
+					totalQuestions={4}
+					submitted=""
+					active={true}
+					onSubmit={vi.fn()}
+				/>,
+			);
+
+			// Recommended first, every other option in its original relative order.
+			// The custom option stays last: it is not part of the recommendation.
+			expect(controlValues()).toEqual([
+				"scope-opt3",
+				"scope-opt1",
+				"scope-opt2",
+				"scope-custom",
+			]);
+		});
+
+		it("marks only the recommended option and never pre-selects it", () => {
+			render(
+				<CodebaseAdaptiveQuestion
+					question={orderingQuestion}
+					index={1}
+					totalQuestions={4}
+					submitted=""
+					active={true}
+					onSubmit={vi.fn()}
+				/>,
+			);
+
+			expect(screen.getAllByText("Rekomendasi")).toHaveLength(1);
+			const recommended = screen.getByRole("radio", {
+				name: /Judul, deskripsi, dan teknologi/i,
+			});
+			expect((recommended as HTMLInputElement).checked).toBe(false);
+			expect(
+				screen.getByRole("button", { name: /Konfirmasi/i }),
+			).toHaveProperty("disabled", true);
+		});
+
+		it("keeps the already saved answer on its own option when the recommended one is shown first", () => {
+			render(
+				<CodebaseAdaptiveQuestion
+					question={orderingQuestion}
+					index={1}
+					totalQuestions={4}
+					submitted="Judul dan deskripsi"
+					active={true}
+					isEditing={true}
+					onSubmit={vi.fn()}
+					onCancelEdit={vi.fn()}
+				/>,
+			);
+
+			expect(controlValues()[0]).toBe("scope-opt3");
+			const saved = screen.getByRole("radio", {
+				name: /^Judul dan deskripsi$/i,
+			});
+			expect((saved as HTMLInputElement).checked).toBe(true);
+		});
+
+		it("exposes one tab stop, a labelled group, and native radio grouping", () => {
+			render(
+				<CodebaseAdaptiveQuestion
+					question={orderingQuestion}
+					index={1}
+					totalQuestions={4}
+					submitted=""
+					active={true}
+					onSubmit={vi.fn()}
+				/>,
+			);
+
+			// The group is labelled by the question heading, so a screen reader
+			// announces the question before the options.
+			const group = screen.getByRole("radiogroup");
+			expect(
+				document.getElementById(group.getAttribute("aria-labelledby") ?? "")
+					?.textContent,
+			).toBe(orderingQuestion.title);
+
+			// Native radios sharing one name: the browser and React Aria handle
+			// arrow-key selection, so the card must not invent its own keyboard model.
+			const controls = screen.getAllByRole("radio") as HTMLInputElement[];
+			expect(controls.every((control) => control.type === "radio")).toBe(true);
+			expect(new Set(controls.map((control) => control.name)).size).toBe(1);
+
+			// Choosing an option moves the single tab stop onto it, as a radio group
+			// must: the rest of the group leaves the tab order.
+			act(() => {
+				fireEvent.click(controls[1]);
+			});
+			expect(controls[1].checked).toBe(true);
+			const tabbable = controls.filter(
+				(control) => control.getAttribute("tabindex") === "0",
+			);
+			expect(tabbable).toEqual([controls[1]]);
+		});
+
+		it("reveals the free-text field inside the Lainnya option's own card", () => {
+			render(
+				<CodebaseAdaptiveQuestion
+					question={orderingQuestion}
+					index={1}
+					totalQuestions={4}
+					submitted=""
+					active={true}
+					onSubmit={vi.fn()}
+				/>,
+			);
+
+			const lainnya = screen.getByRole("radio", { name: /Lainnya/i });
+			expect(describedText(lainnya)).toBe(
+				"Tulis jawabanmu sendiri bila tidak ada pilihan yang sesuai.",
+			);
+
+			act(() => {
+				fireEvent.click(lainnya);
+			});
+
+			const input = screen.getByLabelText("Jawaban lain");
+			// Same card as the option it belongs to, not a second one beside the list.
+			expect(lainnya.closest("label")?.parentElement?.contains(input)).toBe(
+				true,
+			);
+		});
+
+		it("keeps two questions on one card independent", () => {
+			const onSubmit = vi.fn();
+			const second: AdaptiveQuestion = {
+				id: "surfaces",
+				title: "Permukaan mana yang ikut dicari?",
+				type: "multiselect",
+				options: [
+					{ id: "surfaces-opt1", label: "Artikel" },
+					{ id: "surfaces-opt2", label: "Produk" },
+				],
+			};
+			render(
+				<>
+					<CodebaseAdaptiveQuestion
+						question={orderingQuestion}
+						index={1}
+						totalQuestions={2}
+						submitted=""
+						active={true}
+						onSubmit={onSubmit}
+					/>
+					<CodebaseAdaptiveQuestion
+						question={second}
+						index={2}
+						totalQuestions={2}
+						submitted=""
+						active={true}
+						onSubmit={onSubmit}
+					/>
+				</>,
+			);
+
+			act(() => {
+				fireEvent.click(screen.getByRole("checkbox", { name: /Artikel/i }));
+			});
+
+			// The other question's draft is untouched by a choice made elsewhere.
+			expect(
+				screen
+					.getAllByRole("radio")
+					.some((control) => (control as HTMLInputElement).checked),
+			).toBe(false);
+
+			act(() => {
+				fireEvent.click(
+					screen.getAllByRole("button", { name: /Konfirmasi/i })[1],
+				);
+			});
+			expect(onSubmit).toHaveBeenCalledWith("surfaces", "Artikel");
 		});
 	});
 

@@ -1222,8 +1222,16 @@ describe("CodebaseChatWorkspace one-by-one questions", () => {
 		expect(
 			container.querySelector("[data-testid='adaptive-question-reason-q1']"),
 		).toBeNull();
-		const recommendedRow = container.querySelector("#q1-opt1-desc");
-		expect(recommendedRow?.textContent).toContain(
+		const recommended = container.querySelector<HTMLInputElement>(
+			"input[value='q1-opt1']",
+		);
+		const describedIds =
+			recommended?.getAttribute("aria-describedby")?.split(/\s+/) ?? [];
+		const described = describedIds
+			.map((id) => container.querySelector(`[id="${id}"]`)?.textContent)
+			.join(" ")
+			.trim();
+		expect(described).toContain(
 			"Repo memakai penyimpanan lokal untuk preferensi.",
 		);
 	});

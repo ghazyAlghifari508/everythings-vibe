@@ -4,6 +4,7 @@ import {
 	buildFeatureMessage,
 	mapAskQuestionsToAdaptive,
 	nextQuestionIndex,
+	orderOptionsForDisplay,
 	parseRestoredAnswers,
 	parseRestoredQuestions,
 	restoreAskState,
@@ -159,6 +160,107 @@ describe("mapAskQuestionsToAdaptive", () => {
 		]);
 		expect(mapped.options.some((o) => o.recommended)).toBe(false);
 		expect(mapped.recommendedOptionId).toBeUndefined();
+	});
+});
+
+describe("orderOptionsForDisplay", () => {
+	const options = [
+		{ id: "scope-opt1", label: "Judul" },
+		{ id: "scope-opt2", label: "Judul dan deskripsi" },
+		{ id: "scope-opt3", label: "Judul, deskripsi, dan teknologi" },
+		{ id: "scope-opt4", label: "Lainnya" },
+	];
+
+	test("places the recommended option first and keeps the rest in order", () => {
+		expect(
+			orderOptionsForDisplay(options, "scope-opt3").map((o) => o.id),
+		).toEqual(["scope-opt3", "scope-opt1", "scope-opt2", "scope-opt4"]);
+	});
+
+	test("keeps the same option objects so identity and saved labels never move", () => {
+		const ordered = orderOptionsForDisplay(options, "scope-opt3");
+		expect(ordered[0]).toBe(options[2]);
+		expect(new Set(ordered).size).toBe(options.length);
+	});
+
+	test("leaves the canonical array untouched", () => {
+		const canonical = [...options];
+		orderOptionsForDisplay(options, "scope-opt3");
+		expect(options).toEqual(canonical);
+	});
+
+	test("moves nothing without a valid recommendation", () => {
+		expect(orderOptionsForDisplay(options)).toEqual(options);
+		expect(orderOptionsForDisplay(options, "missing-opt")).toEqual(options);
+	});
+
+	test("never leaks the presentation order into the canonical model or the payload", () => {
+		const [question] = mapAskQuestionsToAdaptive([
+			{
+				id: "scope",
+				question: "Informasi apa saja yang perlu dicari?",
+				type: "select",
+				options: [
+					{ id: "scope-opt1", label: "Judul", description: "Nama saja." },
+					{
+						id: "scope-opt2",
+						label: "Judul dan deskripsi",
+						description: "Nama.",
+					},
+					{
+						id: "scope-opt3",
+						label: "Judul, deskripsi, dan teknologi",
+						description: "Nama dan teknologi.",
+					},
+				],
+				recommended: 2,
+				recommendationReason: "Analisis menunjukkan pencarian teknologi.",
+			},
+		]);
+		const ordered = orderOptionsForDisplay(
+			question.options,
+			question.recommendedOptionId,
+		);
+		expect(ordered.map((option) => option.id)).toEqual([
+			"scope-opt3",
+			"scope-opt1",
+			"scope-opt2",
+		]);
+		// Only the copy the view renders moved: the model stays canonical, so the
+		// handoff keeps writing canonical order and the same recommendation index.
+		expect(question.options.map((option) => option.id)).toEqual([
+			"scope-opt1",
+			"scope-opt2",
+			"scope-opt3",
+		]);
+		const [stored] = serializeAskQuestions([question]);
+		expect(stored.recommended).toBe(2);
+		expect(
+			stored.options?.map((option) =>
+				typeof option === "string" ? option : option.label,
+			),
+		).toEqual([
+			"Judul",
+			"Judul dan deskripsi",
+			"Judul, deskripsi, dan teknologi",
+		]);
+
+		// A reload rebuilds the same option identities, so the saved label (and the
+		// recommendation) still point at the option they always did.
+		const { questions } = restoreAskState(
+			[stored],
+			[
+				{
+					question: "Informasi apa saja yang perlu dicari?",
+					questionId: "scope",
+					answer: "Judul, deskripsi, dan teknologi",
+				},
+			],
+		);
+		expect(questions[0].recommendedOptionId).toBe("scope-opt3");
+		expect(
+			questions[0].options.find((option) => option.recommended)?.label,
+		).toBe("Judul, deskripsi, dan teknologi");
 	});
 });
 
