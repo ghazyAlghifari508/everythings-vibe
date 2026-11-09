@@ -37,6 +37,21 @@ Decision: reuse what is installed and already used in this codebase (HeroUI for
 the control primitives, project primitives for chrome) instead of adding a
 second selection component system.
 
+### Finalists against the brief's criteria
+
+| Criterion | HeroUI `RadioGroup`/`Radio`/`Checkbox`/`Description` | shadcn/ui Radio Group + Choice Card |
+| --- | --- | --- |
+| Function fit | Radio group and checkbox group, exactly the two shapes the question needs | Same shapes, but a different primitive family from the one already in use |
+| Heading + description support | `Description` is a field slot wired into `aria-describedby`; heading is the label | `FieldTitle` + `FieldDescription`, equally capable |
+| Controlled selection | `value` / `onChange` (single) and `value` / `onChange` (array, multi) | Same (Radix `onValueChange`) |
+| Single + multi select | Both, from one family | Both, from two components |
+| Keyboard accessibility | React Aria: roving tab stop, native radio grouping, arrow keys | Radix: roving focus and arrow keys |
+| Hover / selected / disabled / focus states | Render props (`isSelected`, `isDisabled`, `isHovered`, `isFocusVisible`) + `data-*` selectors | Same idea, via `data-state` |
+| React 19 + Tailwind 4 | Installed and already working in this repo (`Tabs`, `Tooltip`, `ToggleButtonGroup`) | Would add `@radix-ui/react-radio-group` plus the new `Field` set |
+| Design-system consistency | Styled with this repo's own tokens (`graphite`/`charcoal`/`snow`/`indigo`), like `workspace-task-subnav` | Needs its own `shadcn` token layer |
+| Dependency cost | Zero — already a dependency | New packages, second component system |
+| Reuse in existing architecture | One component in the existing `chat/` folder, no new tree | Same, but with new local primitives |
+
 ## 3. What was used in the end
 
 - `RadioGroup` + `Radio` / `Radio.Content` / `Radio.Control` / `Radio.Indicator`
@@ -144,16 +159,23 @@ Targeted automated tests only (no browser QA):
   plus the two clarification-persistence suites — 24 passed (re-render does not
   wipe a draft, custom input survives, answers persist).
 - `pnpm vitest run src/features/codebase/tests` — whole Existing-Codebase suite:
-  1967 passed, 14 failed. The 13 remaining failures are **pre-existing and
-  unrelated** (they fail at HEAD without this change, and none of those modules
-  import the files touched here): `auto-name.test.ts` (10, the sync handshake
-  answers 401), `plan-codebase-name.test.tsx` (1), `codebases-pages.test.ts` (1,
-  a source-text assertion on `loadCodebase`), and
-  `workspace-analysis-reconciliation.test.tsx` (1, a 5s timeout).
+  1967 passed, 14 failed. Those 14 are **pre-existing and unrelated** (they fail
+  at HEAD without this change, and none of the modules they exercise import a
+  file touched here): `auto-name.test.ts` (10, the sync handshake answers 401),
+  `plan-codebase-name.test.tsx`, `codebases-pages.test.ts` (a source-text
+  assertion on `loadCodebase`), and the timing-sensitive
+  `use-codebase-sync-status.test.tsx` / `workspace-analysis-reconciliation.test.tsx`
+  (these two vary between runs on a shared machine).
 - `pnpm biome check` on every touched file, and `pnpm exec tsc --noEmit`
   (the only error reported is the pre-existing
   `Promise.withResolvers` lib-setting error in
   `src/features/studio/tests/studio-composer.test.tsx`, untouched by this fix).
+- Tailwind compile check for the selected-state styling: the candidate
+  `group-data-[selected]/option:block` compiles to
+  `.group-data-\[selected\]\/option\:block:is(:where(.group\/option)[data-selected] *)`,
+  so the control/indicator selection rules are real utilities rather than dead
+  class names. `border-indigo` is not a default Tailwind colour; it resolves
+  because the project defines `--color-indigo`, so it is safe here.
 
 ## 9. Not verified (deliberately)
 

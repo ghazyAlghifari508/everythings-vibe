@@ -124,9 +124,13 @@ describe("CodebaseAdaptiveQuestion Component", () => {
 			expect(describedText(recommended)).toContain(
 				"Codebase saat ini menggunakan single filter parameter pada URL.",
 			);
+			// The justification is rendered exactly once — on the recommended option
+			// itself — so no second panel repeats it anywhere on the card.
 			expect(
-				screen.queryByTestId("adaptive-question-reason-filter_type"),
-			).toBeNull();
+				(document.body.textContent ?? "").split(
+					"Codebase saat ini menggunakan single filter parameter pada URL.",
+				).length - 1,
+			).toBe(1);
 		});
 
 		it("renders a heading and a description for every option that has one", () => {
