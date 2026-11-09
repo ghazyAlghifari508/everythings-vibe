@@ -10,6 +10,7 @@ import {
 } from "./generation-context-build";
 import {
 	type AskHandoff,
+	askHandoffSchema,
 	askHandoffStateSchema,
 	parseStoredHandoffAnswers,
 	sanitizeAskHandoff,
@@ -267,7 +268,7 @@ export async function saveAskHandoff(
 	input: AskHandoff,
 	executor?: Pick<typeof import("@/db").db, "insert">,
 ): Promise<void> {
-	const clean = sanitizeAskHandoff(input);
+	const clean = sanitizeAskHandoff(askHandoffSchema.parse(input));
 	const database = executor ?? (await import("@/db")).db;
 	const { codebaseAskHandoffs } = await import("@/db/schema");
 	await database

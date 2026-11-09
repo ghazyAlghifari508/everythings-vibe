@@ -14,7 +14,7 @@ import { truncateText } from "./generation-context-build";
 // cheap; sessionStorage remains for UI continuity.
 
 export const askHandoffAnswerSchema = z.object({
-	question: z.string().min(1).max(500),
+	question: z.string().min(1).max(2000),
 	answer: z.string().min(1).max(2000),
 	questionId: z.string().max(128).optional(),
 });
@@ -32,7 +32,7 @@ export const askHandoffOptionSchema = z.union([
 
 export const askHandoffQuestionSchema = z.object({
 	id: z.string().min(1).max(128),
-	question: z.string().min(1).max(500),
+	question: z.string().min(1).max(2000),
 	type: z.enum(["select", "text", "multiselect"]),
 	options: z.array(askHandoffOptionSchema).max(12).optional(),
 	recommended: z.number().int().min(0).max(11).optional(),
@@ -98,7 +98,7 @@ export function sanitizeAskHandoffState(
 		.slice(0, CODEBASE_ASK_HANDOFF_MAX_ANSWERS)
 		.map((q) => ({
 			id: truncateText(q.id, 128),
-			question: truncateText(q.question, 500),
+			question: truncateText(q.question, 2000),
 			type: q.type,
 			...(q.options
 				? {
@@ -121,7 +121,8 @@ export function sanitizeAskHandoffState(
 			...(q.recommended !== undefined &&
 			q.options &&
 			q.recommended >= 0 &&
-			q.recommended < q.options.length
+			q.recommended <
+				Math.min(q.options.length, CODEBASE_ASK_HANDOFF_MAX_OPTIONS)
 				? { recommended: q.recommended }
 				: {}),
 			...(q.recommendationReason
@@ -153,7 +154,12 @@ export function sanitizeAskHandoffState(
 		serialized = JSON.stringify(clean);
 	}
 	if (serialized.length > CODEBASE_ASK_HANDOFF_MAX_STATE_CHARS) {
-		clean.questions = [];
+		throw Object.assign(
+			new Error("Ask handoff state exceeds the persistence budget"),
+			{
+				code: "HANDOFF_VALIDATION_FAILED",
+			},
+		);
 	}
 	return clean;
 }

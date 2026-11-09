@@ -208,7 +208,11 @@ describe("bounded execution lifecycle", () => {
 		expect(result.artifactId).toBe("prd-artifact-123");
 	});
 
-	it("catches executor error and marks operation as failed with classified code", async () => {
+	it.each([
+		"MODEL_RATE_LIMIT",
+		"PERSISTENCE_FAILED",
+		"ARTIFACT_PERSISTENCE_FAILED",
+	])("marks questions failed with classified code %s", async (code) => {
 		const now = new Date();
 		dbState.updateRows = [[{ id: "op-1" }]];
 		dbState.selectRows = [
@@ -220,11 +224,11 @@ describe("bounded execution lifecycle", () => {
 					id: "op-1",
 					userId: "user-1",
 					projectId: "proj-1",
-					stage: "feature",
+					stage: "questions",
 					status: "failed",
 					attempt: 1,
 					error: "AI model rate limited",
-					errorCode: "MODEL_RATE_LIMIT",
+					errorCode: code,
 					createdAt: now,
 					updatedAt: now,
 					startedAt: now,
@@ -239,7 +243,7 @@ describe("bounded execution lifecycle", () => {
 			operationId: "op-1",
 			userId: "user-1",
 			projectId: "proj-1",
-			stage: "feature" as const,
+			stage: "questions" as const,
 			token: "token-1",
 			attempt: 1,
 			input: {},
@@ -249,7 +253,7 @@ describe("bounded execution lifecycle", () => {
 		const customError = new Error("AI model rate limited") as Error & {
 			code?: string;
 		};
-		customError.code = "MODEL_RATE_LIMIT";
+		customError.code = code;
 		const executor = vi.fn().mockRejectedValue(customError);
 
 		const result = await executeGenerationOperationBounded(claim, executor, {
@@ -258,7 +262,12 @@ describe("bounded execution lifecycle", () => {
 		});
 
 		expect(result.status).toBe("failed");
-		expect(result.errorCode).toBe("MODEL_RATE_LIMIT");
+		expect(result.errorCode).toBe(code);
+		expect(
+			dbState.queries
+				.filter((query) => query.type === "update-set")
+				.map((query) => query.values),
+		).toEqual([expect.objectContaining({ status: "failed", errorCode: code })]);
 	});
 });
 
