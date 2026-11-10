@@ -61,6 +61,10 @@ function createFrames(count: number) {
 		attempts: 0,
 		visualHash: null,
 		promptHash: null,
+		originJobId: null,
+		initialSlot: null,
+		revision: 0,
+		lastJobId: null,
 		createdAt: new Date(),
 		updatedAt: new Date(),
 	}));
