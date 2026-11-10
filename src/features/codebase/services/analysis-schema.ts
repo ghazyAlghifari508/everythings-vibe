@@ -22,6 +22,15 @@ export type CodebaseAnalysisFinding = z.infer<
 	typeof codebaseAnalysisFindingSchema
 >;
 
+export const codebaseApplicationModuleSchema = z.object({
+	name: z.string().min(1),
+	description: z.string().min(1),
+});
+
+export type CodebaseApplicationModule = z.infer<
+	typeof codebaseApplicationModuleSchema
+>;
+
 export const CODEBASE_STARTER_IDS = [
 	"feature",
 	"bugfix",
@@ -79,6 +88,7 @@ const codebaseAnalysisBaseSchema = z.object({
 		.optional(),
 	relevantFiles: z.array(z.string().min(1)).optional(),
 	impactAreas: z.array(z.string().min(1)).optional(),
+	applicationModules: z.array(codebaseApplicationModuleSchema).optional(),
 	limitations: z.array(z.string().min(1)).optional(),
 	findings: z.array(codebaseAnalysisFindingSchema).optional(),
 });

@@ -66,6 +66,7 @@ const NULLABLE_ADVISORY_KEYS = [
 	"moduleMap",
 	"relevantFiles",
 	"impactAreas",
+	"applicationModules",
 	"limitations",
 	"findings",
 ] as const;

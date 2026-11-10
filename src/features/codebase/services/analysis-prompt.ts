@@ -46,8 +46,9 @@ FORMAT JSON (output HANYA JSON, tanpa teks lain):
   "moduleMap": [{ "path": "jalur-modul", "summary": "ringkasan singkat" }],
   "relevantFiles": ["jalur file yang relevan"],
   "impactAreas": ["area yang terdampak fitur baru"],
+  "applicationModules": [{ "name": "nama bagian atau modul aplikasi", "description": "ringkasan fungsi bagian ini bagi pengguna" }],
   "limitations": ["keterbatasan snapshot/analisis"],
-  "findings": [{ "title": "...", "detail": "...", "uncertainty": "hal yang belum pasti (wajib diisi bila ragu)" }],
+  "findings": [{ "title": "judul temuan konkret dan ringkas", "detail": "penjelasan fakta fungsi nyata", "uncertainty": "hal yang belum pasti (wajib diisi bila ragu)" }],
   "starterSuggestions": [
     { "id": "feature", "title": "judul tugas konkret dalam Bahasa Indonesia", "description": "ringkasan singkat dalam Bahasa Indonesia", "prompt": "instruksi lengkap dalam Bahasa Indonesia dan siap diedit" },
     { "id": "bugfix", "title": "judul tugas konkret dalam Bahasa Indonesia", "description": "ringkasan singkat dalam Bahasa Indonesia", "prompt": "instruksi lengkap dalam Bahasa Indonesia dan siap diedit" },
@@ -70,7 +71,10 @@ ATURAN:
 11. Untuk kategori feature, usulkan kemampuan yang masuk akal dari bukti tentang fungsi aplikasi. Untuk bugfix, sebutkan kondisi yang benar-benar tampak bermasalah; bila belum ada bukti bug, pilih perbaikan alur konservatif dan jangan menyatakan bug pasti ada. Untuk refactor, pilih modul atau pola yang terlihat dan pertahankan stack/perilaku. Jangan usulkan migrasi stack kecuali findings secara eksplisit membuktikan kebutuhan. Untuk ui, rujuk antarmuka yang benar-benar terlihat dalam source snapshot.
 12. Title, description, dan prompt harus ditulis dalam Bahasa Indonesia. Gunakan istilah baku hanya bila istilah itu benar-benar dikenal pengguna (mis. Kanban, checkout, onboarding); istilah internal repository tidak boleh muncul di title, description, dan prompt. Prompt harus berupa permintaan lengkap dan siap diedit/dikirim, bukan fragmen atau template kosong. Title dan description singkat dan spesifik: title maksimal 80 karakter, description maksimal 180 karakter, prompt maksimal 1500 karakter. Jangan membuat klaim behavior yang tidak dibuktikan snapshot.
 13. relevantPaths hanya boleh berisi jalur yang benar-benar ada dalam manifest. Sertakan jalur saat saran menyentuh modul tertentu, karena jalur ini dipakai tahap perencanaan sebagai konteks teknis; bila tidak dapat membuktikan jalurnya, jangan mengarangnya.
-14. Nama repository adalah metadata identitas, bukan permintaan fitur: jangan menafsirkan atau mempermasalahkan nama tersebut sebagai permintaan user, dan jangan membuat temuan tentang ambiguitasnya. Simpulkan aplikasi HANYA dari manifest dan konteks sumber.`;
+14. Nama repository adalah metadata identitas, bukan permintaan fitur: jangan menafsirkan atau mempermasalahkan nama tersebut sebagai permintaan user, dan jangan membuat temuan tentang ambiguitasnya. Simpulkan aplikasi HANYA dari manifest dan konteks sumber.
+15. Bedakan secara tegas antara: (1) fakta yang terbukti dari source, (2) fitur yang terlihat dari struktur dan konten, (3) dugaan yang masuk akal tetapi belum dapat dipastikan (wajib isi field uncertainty), dan (4) batasan karena source yang dianalisis tidak lengkap (masukkan ke limitations).
+16. JANGAN menyimpulkan aplikasi menggunakan database hanya karena memiliki berkas konten statis atau data terstruktur lokal. JANGAN mengklaim autentikasi tersedia bila tidak ada bukti autentikasi. JANGAN menyebut bug sebagai fakta hanya dari ketidakhadiran berkas tertentu. JANGAN mengarang integrasi API eksternal.
+17. Judul temuan (findings.title) harus jelas, ringkas, menggambarkan fungsi atau kondisi nyata, dan tidak terdengar seperti judul laporan AI generik. Detail harus menjelaskan fakta nyata tanpa mengulang judul dan tanpa promosi kosong. Uncertainty harus spesifik menjelaskan apa yang belum dapat dipastikan dan mengapa penting.`;
 
 // Manifest entries come from `manifestEntrySchema` (Task 5); this structural
 // subset keeps the prompt builder decoupled from the sync DTO module.
