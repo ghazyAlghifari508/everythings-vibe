@@ -79,15 +79,34 @@ describe("CodebaseKanbanBoard panel layout", () => {
 		);
 		expect(titleNode?.className).not.toContain("line-clamp");
 	});
-	it("keeps status, feature grouping, and subtask progress", () => {
+	it("keeps status, feature grouping, priority, and subtask progress without false agent activity", () => {
 		render();
 		expect(container.textContent).toContain("Ekspor Ringkasan");
 		expect(container.textContent).toContain("1/4 subtask");
-		expect(container.textContent).toContain("Agent coding...");
+		expect(container.textContent).toContain("Penting");
+		expect(container.textContent).not.toContain("Agent coding...");
 		expect(
 			container.querySelector("[data-testid='codebase-kanban-progress']")
 				?.textContent,
 		).toBe("1 dari 3 selesai");
+	});
+	it("opens task detail dialog upon clicking a shared card without nested conflicts", () => {
+		render();
+		const cardEl = container.querySelector<HTMLElement>(
+			"[data-testid='kanban-card']",
+		);
+		expect(cardEl).not.toBeNull();
+		act(() => {
+			cardEl?.click();
+		});
+		const dialog = document.body.querySelector(
+			"[data-testid='task-detail-dialog']",
+		);
+		expect(dialog).not.toBeNull();
+		expect(dialog?.textContent).toContain("Detail Task");
+		expect(dialog?.textContent).toContain(
+			"Tambah tombol ekspor di halaman rekomendasi",
+		);
 	});
 	it("updates a single progress summary from new data without mutating task input", () => {
 		const before = structuredClone(columns);

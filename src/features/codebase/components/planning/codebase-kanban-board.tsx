@@ -84,7 +84,6 @@ export function CodebaseKanbanBoard({
 				key: "doing",
 				title: "In Progress",
 				cards: doing,
-				highlightInProgress: true,
 			},
 			{ key: "done", title: "Done", cards: done },
 		];
