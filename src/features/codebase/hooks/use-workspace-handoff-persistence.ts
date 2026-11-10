@@ -180,9 +180,8 @@ export function useWorkspaceHandoffPersistence({
 		};
 	}, [chatAnswers, aiQuestions, effectiveFeatureId, readOnly, saveAnswers]);
 
-	const hasLocalAskStateRef = useRef(false);
-	hasLocalAskStateRef.current =
-		aiQuestions.length > 0 || Object.keys(chatAnswers).length > 0;
+	const hasLocalAnswersRef = useRef(false);
+	hasLocalAnswersRef.current = Object.keys(chatAnswers).length > 0;
 
 	useEffect(() => {
 		const projectId = effectiveFeatureId;
@@ -200,26 +199,38 @@ export function useWorkspaceHandoffPersistence({
 					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify({ projectId, action: "get-handoff" }),
 				});
-				if (!response.ok) return;
+				if (!response.ok) {
+					restoreSettled.current = true;
+					return;
+				}
 				const body: unknown = await response.json().catch(() => null);
 				if (
 					requestEpochRef.current !== epoch ||
 					activeProjectRef.current !== projectId ||
 					typeof body !== "object" ||
 					body === null
-				)
+				) {
+					restoreSettled.current = true;
 					return;
-				const handoff = (body as { handoff?: unknown }).handoff;
-				if (typeof handoff !== "object" || handoff === null) return;
+				}
+				const handoff =
+					typeof body === "object" && body !== null && "handoff" in body
+						? body.handoff
+						: null;
+				if (typeof handoff !== "object" || handoff === null) {
+					restoreSettled.current = true;
+					return;
+				}
 				const record = handoff as {
 					answers?: unknown;
 					updatedAt?: unknown;
+					compiledPrompt?: unknown;
 					state?: { questions?: unknown; prompt?: unknown } | null;
 				};
 				if (typeof record.updatedAt === "string") {
 					lastPersistedUpdatedAt.current = record.updatedAt;
 				}
-				if (hasLocalAskStateRef.current) {
+				if (hasLocalAnswersRef.current) {
 					restoreSettled.current = true;
 					return;
 				}
@@ -254,13 +265,20 @@ export function useWorkspaceHandoffPersistence({
 					restoreSettled.current = true;
 					return;
 				}
-				setAiQuestions(restored.questions);
-				setChatAnswers(restored.answers);
-				if (
-					typeof record.state?.prompt === "string" &&
-					record.state.prompt.trim()
-				)
-					setLastFeaturePrompt(record.state.prompt.trim());
+				setAiQuestions((current) =>
+					current.length > 0 ? current : restored.questions,
+				);
+				setChatAnswers((current) => ({
+					...restored.answers,
+					...current,
+				}));
+				const restoredPrompt =
+					(typeof record.state?.prompt === "string" &&
+						record.state.prompt.trim()) ||
+					(typeof record.compiledPrompt === "string" &&
+						record.compiledPrompt.trim()) ||
+					"";
+				if (restoredPrompt) setLastFeaturePrompt(restoredPrompt);
 				restoreSettled.current = true;
 			} catch {
 				restoreSettled.current = true;

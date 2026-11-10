@@ -58,18 +58,17 @@ export function CodebaseAdaptiveQuestion({
 		onSubmit,
 	});
 
-	// 1. Answered State: Render as compact completed line
-	if (submitted && !isEditing) {
+	// 1. Answered or Read-Only State: Render as compact line
+	if ((submitted || (!active && !onEdit)) && !isEditing) {
 		return (
 			<CodebaseAdaptiveQuestionAnswered
 				question={question}
 				index={index}
-				submitted={submitted}
+				submitted={submitted || "-"}
 				onEdit={onEdit}
 			/>
 		);
 	}
-
 	// 2. Active Question Card
 	return (
 		<CodebaseAdaptiveQuestionActive

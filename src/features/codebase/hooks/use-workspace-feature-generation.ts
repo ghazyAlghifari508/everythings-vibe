@@ -237,7 +237,7 @@ export function useWorkspaceFeatureGeneration({
 					const settled = await pollOperationUntilSettled({
 						projectId: effectiveFeatureId,
 						stage: "feature",
-						maxAttempts: 10,
+						maxAttempts: 60,
 						onTick: (tick) => {
 							observedOperation = tick;
 						},
