@@ -9,6 +9,7 @@ import {
 	unique,
 	uniqueIndex,
 } from "drizzle-orm/pg-core";
+import type { WorkspaceEvent } from "@/features/codebase/types/workspace-timeline";
 import { users } from "./auth";
 import { codebases } from "./codebase";
 
@@ -164,6 +165,8 @@ export const messages = pgTable(
 		role: text("role").notNull(), // user, assistant, system
 		content: text("content").notNull(),
 		metadata: jsonb("metadata"),
+		// Existing-codebase activity shares the conversation store; legacy messages remain nullable.
+		workspaceEvent: jsonb("workspace_event").$type<WorkspaceEvent>(),
 		createdAt: timestamp("created_at").defaultNow(),
 	},
 	(t) => [
