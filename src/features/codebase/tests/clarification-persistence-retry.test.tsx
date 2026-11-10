@@ -109,11 +109,16 @@ describe("Clarification Stage-Aware Retry & Error Contract", () => {
 		});
 
 		expect(result.current.specError).toBeNull();
-		const runningRunCalls = setRun.mock.calls.filter(
-			(call) => typeof call[0] === "object" && call[0]?.status === "running",
+		// Each attempt begins with a fresh run: queued while no worker has claimed the
+		// operation, then running once one does. Neither inherits the old error.
+		const attemptStarts = setRun.mock.calls.filter(
+			(call) =>
+				typeof call[0] === "object" &&
+				call[0] !== null &&
+				(call[0]?.status === "queued" || call[0]?.status === "running"),
 		);
-		expect(runningRunCalls.length).toBeGreaterThanOrEqual(2);
-		expect(runningRunCalls[1][0].error).toBeNull();
+		expect(attemptStarts.length).toBeGreaterThanOrEqual(2);
+		expect(attemptStarts[1][0].error).toBeNull();
 	});
 
 	it("8. Tombol generate biasa tidak muncul bersamaan dengan retry aktif", () => {

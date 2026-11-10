@@ -3,10 +3,11 @@ import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AgentThinking } from "@/components/ui/agent-thinking";
 import {
+	attemptStartEpoch,
 	type CodebaseRunState,
 	isRunWorking,
 	operationSettleEpoch,
-	operationStartEpoch,
+	queueRun,
 	runConfirmGenerate,
 	runDurationSeconds,
 	settleRun,
@@ -369,8 +370,10 @@ describe("P5 Unified Agent Thinking & Cardless Generation Workflow", () => {
 		// The run state has no phase, activity or reasoning field to rotate on its
 		// own: every render derives from the durable operation's real status.
 		expect(Object.keys(initialRun).sort()).toEqual([
+			"attempt",
 			"error",
 			"finishedAt",
+			"operationId",
 			"requestId",
 			"stage",
 			"startedAt",
@@ -469,7 +472,7 @@ describe("P7 one accurate operation status and stale-run safety", () => {
 	const iso = (epoch: number) => new Date(epoch).toISOString();
 
 	// 14. Queued operation does not fabricate reasoning
-	it("shows one honest label for a queued operation and invents no activity", () => {
+	it("shows one honest label for a RUNNING attempt and invents no activity", () => {
 		const run = startRun("ac", 1_000);
 		render(
 			<CodebaseChatWorkspace
@@ -490,6 +493,30 @@ describe("P7 one accurate operation status and stale-run safety", () => {
 		for (const copy of TRANSPORT_COPY) {
 			expect(thinking.textContent).not.toContain(copy);
 		}
+	});
+
+	it("shows a waiting state with no orb and no timer while the worker has not started", () => {
+		// A queued operation is accepted work that no worker has claimed: claiming the
+		// AI is composing questions here would be a fabricated signal.
+		const queued = queueRun("questions");
+		const { container } = render(
+			<CodebaseChatWorkspace
+				featureName="Search"
+				messages={[]}
+				questions={[]}
+				answers={{}}
+				run={queued}
+			/>,
+		);
+
+		const thinking = screen.getByTestId("codebase-run-thinking");
+		expect(thinking.textContent).toContain("Menunggu proses generasi");
+		expect(thinking.textContent).not.toContain(
+			"Menyusun pertanyaan klarifikasi",
+		);
+		expect(container.querySelectorAll("[data-orb]")).toHaveLength(0);
+		expect(screen.queryByRole("timer")).toBeNull();
+		expect(screen.queryByRole("button", { name: "Aktivitas" })).toBeNull();
 	});
 
 	// 17. No cross-operation state leakage
@@ -515,7 +542,7 @@ describe("P7 one accurate operation status and stale-run safety", () => {
 	});
 
 	// 13. Refresh/reconnect restores real operation state
-	it("rebuilds a reconnected operation from its own acceptance and settle times", () => {
+	it("rebuilds a reconnected operation from its own attempt and settle times", () => {
 		const operation = {
 			createdAt: iso(1_000_000),
 			startedAt: iso(1_001_000),
@@ -525,22 +552,43 @@ describe("P7 one accurate operation status and stale-run safety", () => {
 		vi.spyOn(Date, "now").mockReturnValue(9_000_000);
 
 		const hydrated = settleRun(
-			startRun("questions", operationStartEpoch(operation)),
+			startRun("questions", attemptStartEpoch(operation) ?? 0),
 			"done",
 			operationSettleEpoch(operation),
 		);
 
-		// The duration is the operation's own wait (acceptance to settle), never the
-		// time since the browser was reopened.
-		expect(runDurationSeconds(hydrated)).toBe(5);
+		// The duration is the CURRENT attempt's own execution window, never the wait
+		// from acceptance to completion and never the time since the browser reopened.
+		expect(runDurationSeconds(hydrated)).toBe(4);
+	});
+
+	it("reports no attempt clock for an operation a worker has not claimed yet", () => {
+		expect(
+			attemptStartEpoch({
+				status: "queued",
+				createdAt: iso(1_000_000),
+				startedAt: null,
+			}),
+		).toBeNull();
+		expect(
+			attemptStartEpoch({
+				status: "running",
+				createdAt: iso(1_000_000),
+				startedAt: iso(1_002_000),
+			}),
+		).toBe(1_002_000);
 	});
 
 	it("falls back to the client clock when the operation has no recorded settle time", () => {
 		vi.spyOn(Date, "now").mockReturnValue(7_500);
 		expect(operationSettleEpoch({ finishedAt: null })).toBe(7_500);
-		expect(operationStartEpoch({ createdAt: null, startedAt: null })).toBe(
-			7_500,
-		);
+		expect(
+			attemptStartEpoch({
+				status: "running",
+				createdAt: null,
+				startedAt: null,
+			}),
+		).toBeNull();
 	});
 
 	// 15. Completed operation shows the correct status, frozen timer

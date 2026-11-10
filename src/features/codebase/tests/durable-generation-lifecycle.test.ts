@@ -146,6 +146,10 @@ describe("heartbeat and fencing enforcement", () => {
 			| undefined;
 		expect(updateValues?.status).toBe("failed");
 		expect(updateValues?.errorCode).toBe("TIMEOUT_ERROR");
+		// The attempt window is frozen, not rewritten: `startedAt` stays as the claim
+		// stamped it, so the settled duration is the attempt's own elapsed time.
+		expect(updateValues?.finishedAt).toBeInstanceOf(Date);
+		expect(updateValues && "startedAt" in updateValues).toBe(false);
 	});
 });
 
@@ -206,6 +210,65 @@ describe("bounded execution lifecycle", () => {
 		expect(executor).toHaveBeenCalled();
 		expect(result.status).toBe("completed");
 		expect(result.artifactId).toBe("prd-artifact-123");
+	});
+
+	it("never completes an operation whose result has no matching persisted artifact", async () => {
+		const now = new Date();
+		// The executor claims success, but nothing of that attempt reached storage.
+		artifactMock.read.mockResolvedValue(null);
+		dbState.updateRows = [[{ id: "op-1" }]];
+		dbState.selectRows = [
+			// verifyClaimLeaseFence: select from codebaseGenerationOperations
+			[{ id: "op-1" }],
+			// getGenerationOperation: select from codebaseGenerationOperations
+			[
+				{
+					id: "op-1",
+					userId: "user-1",
+					projectId: "proj-1",
+					stage: "questions",
+					status: "failed",
+					attempt: 1,
+					error: "Generation result has no matching persisted artifact",
+					errorCode: "EXECUTION_ERROR",
+					createdAt: now,
+					updatedAt: now,
+					startedAt: now,
+					finishedAt: now,
+				},
+			],
+			// assertProjectTenantAccess: select from projects
+			[{ id: "proj-1", userId: "user-1", deletedAt: null }],
+		];
+
+		const claim = {
+			operationId: "op-1",
+			userId: "user-1",
+			projectId: "proj-1",
+			stage: "questions" as const,
+			token: "token-1",
+			attempt: 1,
+			input: {},
+			signal: new AbortController().signal,
+		};
+		const executor = vi.fn().mockResolvedValue({
+			artifactId: "art-never-persisted",
+			result: { questions: [] },
+		});
+
+		const result = await executeGenerationOperationBounded(claim, executor, {
+			timeoutMs: 5000,
+			heartbeatMs: 10000,
+		});
+
+		expect(executor).toHaveBeenCalled();
+		expect(result.status).toBe("failed");
+		// Success is recorded ONLY after the persisted artifact is read back.
+		expect(
+			dbState.queries
+				.filter((query) => query.type === "update-set")
+				.map((query) => query.values),
+		).toEqual([expect.objectContaining({ status: "failed" })]);
 	});
 
 	it.each([

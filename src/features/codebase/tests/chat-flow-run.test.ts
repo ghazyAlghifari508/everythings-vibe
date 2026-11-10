@@ -1,14 +1,17 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-	anchorRunStart,
+	attemptStartEpoch,
 	CODEBASE_STAGE_DONE_LABEL,
+	isRunActive,
 	isRunWorking,
-	operationStartEpoch,
+	observeOperation,
+	queueRun,
 	reconcilePipelineStage,
 	resolvePersistedStage,
 	resolveResumeStage,
 	runDurationSeconds,
 	settleRun,
+	settleRunForOperation,
 	settleRunIfCurrent,
 	shouldAutoRevealArtifact,
 	startRun,
@@ -21,15 +24,20 @@ describe("codebase run state (real request facts only)", () => {
 		expect(run.startedAt).toBe(1_000);
 		expect(run.finishedAt).toBeNull();
 		expect(run.status).toBe("running");
+		expect(run.operationId).toBeNull();
+		expect(run.attempt).toBe(0);
 		expect(run.error).toBeNull();
 		expect(isRunWorking(run)).toBe(true);
+		expect(isRunActive(run)).toBe(true);
 	});
 
 	it("carries no phase, activity log or reasoning field to render", () => {
 		const run = startRun("questions", 1_000);
 		expect(Object.keys(run).sort()).toEqual([
+			"attempt",
 			"error",
 			"finishedAt",
+			"operationId",
 			"requestId",
 			"stage",
 			"startedAt",
@@ -47,45 +55,155 @@ describe("codebase run state (real request facts only)", () => {
 		});
 	});
 
-	it("re-anchors a running request on the server's acceptance time", () => {
-		const run = startRun("prd", 1_000);
-		const accepted = new Date(1_600).toISOString();
-
-		const anchored = anchorRunStart(run, accepted, run.requestId);
-		expect(anchored?.startedAt).toBe(1_600);
-		// Re-anchoring does not restart the run or move its identity.
-		expect(anchored?.requestId).toBe(run.requestId);
-		expect(anchored?.status).toBe("running");
+	it("starts a queued run with no attempt clock at all", () => {
+		const run = queueRun("questions");
+		expect(run.status).toBe("queued");
+		expect(run.startedAt).toBeNull();
+		expect(run.finishedAt).toBeNull();
+		expect(isRunWorking(run)).toBe(false);
+		expect(isRunActive(run)).toBe(true);
+		expect(runDurationSeconds(run)).toBeNull();
 	});
 
-	it("never moves the clock for a settled run, a foreign request, or junk input", () => {
+	it("opens the attempt clock when the worker really claims the operation", () => {
+		const queued = queueRun("questions");
+		const observed = observeOperation(queued, {
+			id: "op-1",
+			stage: "questions",
+			status: "running",
+			attempt: 1,
+			createdAt: new Date(1_000).toISOString(),
+			startedAt: new Date(1_600).toISOString(),
+		});
+		// The attempt's own start, never the operation's creation time.
+		expect(observed?.startedAt).toBe(1_600);
+		expect(observed?.attempt).toBe(1);
+		expect(observed?.operationId).toBe("op-1");
+		expect(observed?.status).toBe("running");
+	});
+
+	it("resets the attempt timing on a retry instead of inheriting the previous attempt", () => {
+		const firstAttempt = observeOperation(queueRun("questions"), {
+			id: "op-1",
+			stage: "questions",
+			status: "running",
+			attempt: 1,
+			createdAt: new Date(1_000).toISOString(),
+			startedAt: new Date(1_600).toISOString(),
+		});
+		const failed = settleRunForOperation(
+			firstAttempt,
+			{ id: "op-1", stage: "questions", status: "failed", attempt: 1 },
+			"failed",
+			44_600,
+			"Generasi terhenti.",
+		);
+		expect(runDurationSeconds(failed)).toBe(43);
+
+		// The user clicks "Coba lagi": the same operation is re-queued, then claimed
+		// again at a later time.
+		const retried = queueRun("questions");
+		const requeued = observeOperation(retried, {
+			id: "op-1",
+			stage: "questions",
+			status: "queued",
+			attempt: 1,
+		});
+		expect(requeued?.startedAt).toBeNull();
+		const secondAttempt = observeOperation(requeued, {
+			id: "op-1",
+			stage: "questions",
+			status: "running",
+			attempt: 2,
+			createdAt: new Date(1_000).toISOString(),
+			startedAt: new Date(90_000).toISOString(),
+		});
+		expect(secondAttempt?.startedAt).toBe(90_000);
+		expect(secondAttempt?.attempt).toBe(2);
+		// Nothing of the first attempt's 43s leaks into the retry.
+		expect(runDurationSeconds(secondAttempt)).toBeNull();
+	});
+
+	it("never moves a settled run, or one owned by another operation or attempt", () => {
 		const settled = settleRun(startRun("prd", 1_000), "done", 5_000);
-		const accepted = new Date(1_600).toISOString();
-		expect(anchorRunStart(settled, accepted, settled?.requestId)).toBe(settled);
+		const snapshot = {
+			id: "op-1",
+			stage: "prd" as const,
+			status: "running" as const,
+			attempt: 1,
+			startedAt: new Date(1_600).toISOString(),
+		};
+		expect(observeOperation(settled, snapshot)).toBe(settled);
 
-		const run = startRun("prd", 1_000);
-		expect(anchorRunStart(run, accepted, "run-other-1")).toBe(run);
-		expect(anchorRunStart(run, "not-a-date", run.requestId)).toBe(run);
-		expect(anchorRunStart(run, null, run.requestId)).toBe(run);
+		const run = observeOperation(queueRun("prd"), snapshot);
+		expect(
+			observeOperation(run, { ...snapshot, id: "op-other", attempt: 3 }),
+		).toBe(run);
+		expect(observeOperation(run, { ...snapshot, attempt: 0 })).toBe(run);
+		expect(observeOperation(run, { ...snapshot, stage: "ac" })).toBe(run);
+		expect(observeOperation(null, snapshot)).toBeNull();
 	});
 
-	it("prefers the acceptance timestamp and falls back to the worker start", () => {
-		vi.spyOn(Date, "now").mockReturnValue(9_000_000);
+	it("refuses to settle a run with an older attempt's callback", () => {
+		const run = observeOperation(queueRun("task"), {
+			id: "op-1",
+			stage: "task",
+			status: "running",
+			attempt: 2,
+			startedAt: new Date(2_000).toISOString(),
+		});
+
+		const stale = settleRunForOperation(
+			run,
+			{ id: "op-1", stage: "task", status: "failed", attempt: 1 },
+			"failed",
+			9_000,
+			"late failure from attempt 1",
+		);
+		expect(stale?.status).toBe("running");
+		expect(stale?.startedAt).toBe(2_000);
+
+		const own = settleRunForOperation(
+			run,
+			{ id: "op-1", stage: "task", status: "completed", attempt: 2 },
+			"done",
+			4_000,
+		);
+		expect(own?.status).toBe("done");
+		expect(runDurationSeconds(own)).toBe(2);
+	});
+
+	it("reads the attempt start, never the operation's creation time", () => {
 		expect(
-			operationStartEpoch({
+			attemptStartEpoch({
+				status: "running",
 				createdAt: new Date(2_000).toISOString(),
 				startedAt: new Date(3_000).toISOString(),
 			}),
+		).toBe(3_000);
+		expect(
+			attemptStartEpoch({
+				status: "queued",
+				createdAt: new Date(2_000).toISOString(),
+				startedAt: null,
+			}),
+		).toBeNull();
+		// Legacy rows written before attempt timestamps existed only have their
+		// creation time, which is the only acceptance they recorded.
+		expect(
+			attemptStartEpoch({
+				status: "completed",
+				createdAt: new Date(2_000).toISOString(),
+				startedAt: null,
+			}),
 		).toBe(2_000);
 		expect(
-			operationStartEpoch({
+			attemptStartEpoch({
+				status: "running",
 				createdAt: null,
-				startedAt: new Date(3_000).toISOString(),
+				startedAt: null,
 			}),
-		).toBe(3_000);
-		expect(operationStartEpoch({ createdAt: "junk", startedAt: null })).toBe(
-			9_000_000,
-		);
+		).toBeNull();
 	});
 
 	it("records the real measured duration only after settling", () => {
@@ -107,6 +225,16 @@ describe("codebase run state (real request facts only)", () => {
 		expect(settleRun(null, "done", 1)).toBeNull();
 		expect(isRunWorking(null)).toBe(false);
 		expect(runDurationSeconds(null)).toBeNull();
+	});
+
+	it("settles a queued run whose attempt the client never observed", () => {
+		// An operation can complete without the client ever seeing it run (artifact
+		// adopted or reconciled after a reconnect): the queue settles, and it reports
+		// no duration because no attempt clock was ever recorded for it.
+		const settled = settleRun(queueRun("prd"), "done", 9_000);
+		expect(settled?.status).toBe("done");
+		expect(settled?.finishedAt).toBe(9_000);
+		expect(runDurationSeconds(settled)).toBeNull();
 	});
 
 	it("keeps a late settle from a previous request away from the current run", () => {
