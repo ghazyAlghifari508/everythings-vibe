@@ -2,7 +2,10 @@
 
 import { FeatureGroup } from "@/features/greenfield/components/kanban/feature-group";
 import type { TaskCard } from "@/features/greenfield/hooks/use-kanban-polling";
-import { groupCardsByFeature } from "@/lib/kanban-utils";
+import {
+	getKanbanColumnEmptyLabel,
+	groupCardsByFeature,
+} from "@/lib/kanban-utils";
 
 export interface ColumnSpec {
 	key: string;
@@ -33,7 +36,11 @@ export function CodebaseKanbanColumn({
 			</div>
 			<div className="flex flex-1 flex-col gap-2 p-2.5 overflow-y-auto">
 				{featuresList.length === 0 ? (
-					<p className="text-[11px] leading-4 text-slate">Kosong</p>
+					<div className="flex flex-1 items-center justify-center p-3 text-center">
+						<p className="text-xs text-fog/60">
+							{getKanbanColumnEmptyLabel(title)}
+						</p>
+					</div>
 				) : (
 					featuresList.map((featureName, idx) => (
 						<FeatureGroup

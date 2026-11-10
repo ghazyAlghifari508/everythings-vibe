@@ -79,13 +79,13 @@ export function CodebaseKanbanBoard({
 		const doing = columns?.in_progress ?? [];
 		const done = columns?.completed ?? [];
 		const specs: ColumnSpec[] = [
-			{ key: "todo", title: "To Do", cards: todo },
+			{ key: "todo", title: "Belum Mulai", cards: todo },
 			{
 				key: "doing",
-				title: "In Progress",
+				title: "Dikerjakan",
 				cards: doing,
 			},
-			{ key: "done", title: "Done", cards: done },
+			{ key: "done", title: "Selesai", cards: done },
 		];
 		if (failed.length > 0) {
 			specs.push({ key: "failed", title: "Gagal", cards: failed });
