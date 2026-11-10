@@ -193,3 +193,95 @@ test("database failures remain HTTP 503 with safe nested SQLSTATE diagnostics an
 	expect(retry.status).toBe(200);
 	expect((await retry.json()).syncToken).toBeTypeOf("string");
 });
+test("active CLI, stale replacement and expired unused recovery never corrupt an attempt", async () => {
+	const f = await seed();
+	const requestId = crypto.randomUUID();
+	const minted = await (
+		await request(f.codebaseId, { action: "resync", requestId })
+	).json();
+	const { handleCodebaseSyncHandshake } = await import(
+		"../services/sync-handshake-route.server"
+	);
+	const handshake = () =>
+		handleCodebaseSyncHandshake({
+			params: { id: f.codebaseId },
+			request: new Request(
+				`https://test.local/api/v1/codebases/${f.codebaseId}/codebase/sync`,
+				{
+					method: "POST",
+					headers: { Authorization: `Bearer ${minted.syncToken}` },
+					body: JSON.stringify({ cliVersion: "3.2.1" }),
+				},
+			),
+		});
+	expect((await handshake()).status).toBe(200);
+	const active = await (
+		await request(f.codebaseId, {
+			action: "resync",
+			requestId: crypto.randomUUID(),
+		})
+	).json();
+	expect(active).toMatchObject({
+		sessionId: minted.sessionId,
+		status: "connected",
+	});
+	const stale = await request(f.codebaseId, {
+		action: "retry",
+		sessionId: f.sessionId,
+	});
+	expect(stale.status).toBe(409);
+	expect(await stale.json()).toMatchObject({
+		code: "SYNC_SESSION_STALE",
+		sessionId: minted.sessionId,
+	});
+	const replacement = await request(f.codebaseId, {
+		action: "retry",
+		sessionId: minted.sessionId,
+	});
+	expect(replacement.status).toBe(409);
+	expect(await replacement.json()).toMatchObject({
+		code: "SYNC_SESSION_ACTIVE",
+	});
+	const connected = await handshake();
+	expect(connected.status).toBe(200);
+	const binding = await connected.json();
+	const { handleSyncFailureReport } = await import(
+		"../services/sync-upload-failure-route.server"
+	);
+	expect(
+		(
+			await handleSyncFailureReport(
+				new Request("https://test.local/failure", {
+					method: "POST",
+					headers: { Authorization: `Bearer ${minted.syncToken}` },
+					body: JSON.stringify({
+						sessionId: binding.sessionId,
+						attemptId: binding.attemptId,
+						idempotencyKey: `${binding.attemptId}:failure:0`,
+						errorCode: "SYNC_FAILED",
+					}),
+				}),
+				{ id: f.codebaseId },
+			)
+		).status,
+	).toBe(200);
+	const unused = await (
+		await request(f.codebaseId, {
+			action: "resync",
+			requestId: crypto.randomUUID(),
+		})
+	).json();
+	vi.useFakeTimers({ toFake: ["Date"] });
+	vi.setSystemTime(Date.now() + 30 * 60 * 1000 + 1);
+	const renewed = await request(f.codebaseId, {
+		action: "retry",
+		sessionId: unused.sessionId,
+	});
+	expect(renewed.status).toBe(200);
+	expect((await renewed.json()).sessionId).not.toBe(unused.sessionId);
+	const [old] = await f.db
+		.select()
+		.from(f.s.codebaseSyncSessions)
+		.where(eq(f.s.codebaseSyncSessions.id, unused.sessionId));
+	expect(old?.consumedAt).toBeInstanceOf(Date);
+}, 30000);

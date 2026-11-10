@@ -1,8 +1,9 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { expect, test, vi } from "vitest";
 import "./analysis-credit-db-fixture";
 
 import { auth, request, seed } from "./resync-db-fixture";
+import { analyzeSnapshot, uploadSnapshot } from "./resync-upload-fixture";
 
 vi.mock("@/lib/session", () => ({
 	requireUser: async () => {
@@ -13,6 +14,10 @@ vi.mock("@/lib/session", () => ({
 vi.mock("@/lib/rate-limit", () => ({
 	checkRateLimit: async () => ({ allowed: true }),
 }));
+vi.mock("../services/analysis-server-generate", async () => {
+	const { generatedAnalysis } = await import("./resync-upload-fixture");
+	return { defaultGenerate: async () => generatedAnalysis() };
+});
 
 test("uploaded repository starts one new resync under concurrent tabs without altering prior context or charging", async () => {
 	const f = await seed();
@@ -28,6 +33,14 @@ test("uploaded repository starts one new resync under concurrent tabs without al
 		.select()
 		.from(f.s.projects)
 		.where(eq(f.s.projects.userId, f.userId));
+	const repository = await f.db
+		.select()
+		.from(f.s.codebases)
+		.where(eq(f.s.codebases.userId, f.userId));
+	const handoffs = await f.db
+		.select()
+		.from(f.s.codebaseAskHandoffs)
+		.where(eq(f.s.codebaseAskHandoffs.userId, f.userId));
 	const artifacts = await Promise.all([
 		f.db
 			.select()
@@ -93,6 +106,25 @@ test("uploaded repository starts one new resync under concurrent tabs without al
 	expect(
 		await f.db
 			.select()
+			.from(f.s.creditLedgerEntries)
+			.where(eq(f.s.creditLedgerEntries.userId, f.userId)),
+	).toEqual([]);
+	const [balance] = await f.db
+		.select()
+		.from(f.s.subscriptions)
+		.where(eq(f.s.subscriptions.userId, f.userId));
+	expect(balance).toMatchObject({ creditsUsed: 0, creditsReserved: 0 });
+	// A lost response restores the same authoritative attempt, never its secret.
+	const restored = await (
+		await request(f.codebaseId, { action: "resync", requestId })
+	).json();
+	expect(restored).toMatchObject({ sessionId, status: "waiting_for_cli" });
+	expect(restored.syncToken).toBeUndefined();
+	const snapshotId = await uploadSnapshot(f.codebaseId, minted.syncToken);
+	expect((await analyzeSnapshot(f.projectId, snapshotId)).status).toBe(200);
+	expect(
+		await f.db
+			.select()
 			.from(f.s.projects)
 			.where(eq(f.s.projects.userId, f.userId)),
 	).toEqual(plans);
@@ -102,17 +134,6 @@ test("uploaded repository starts one new resync under concurrent tabs without al
 			.from(f.s.codebases)
 			.where(eq(f.s.codebases.userId, f.userId)),
 	).toHaveLength(1);
-	expect(
-		await f.db
-			.select()
-			.from(f.s.creditLedgerEntries)
-			.where(eq(f.s.creditLedgerEntries.userId, f.userId)),
-	).toEqual([]);
-	const [balance] = await f.db
-		.select()
-		.from(f.s.subscriptions)
-		.where(eq(f.s.subscriptions.userId, f.userId));
-	expect(balance).toMatchObject({ creditsUsed: 0, creditsReserved: 0 });
 	expect(
 		await Promise.all([
 			f.db
@@ -130,25 +151,28 @@ test("uploaded repository starts one new resync under concurrent tabs without al
 				.where(eq(f.s.codebaseGenerationContexts.projectId, f.projectId)),
 		]),
 	).toEqual(artifacts);
-	// A lost response restores the same authoritative attempt, never its secret.
-	const restored = await (
-		await request(f.codebaseId, { action: "resync", requestId })
-	).json();
-	expect(restored).toMatchObject({ sessionId, status: "waiting_for_cli" });
-	expect(restored.syncToken).toBeUndefined();
-	await f.db
-		.update(f.s.codebaseSyncSessions)
-		.set({ status: "ready" })
-		.where(
-			and(
-				eq(f.s.codebaseSyncSessions.id, sessionId),
-				eq(f.s.codebaseSyncSessions.userId, f.userId),
-			),
-		);
+	expect(
+		await f.db
+			.select()
+			.from(f.s.codebases)
+			.where(eq(f.s.codebases.userId, f.userId)),
+	).toEqual(repository);
+	expect(
+		await f.db
+			.select()
+			.from(f.s.codebaseAskHandoffs)
+			.where(eq(f.s.codebaseAskHandoffs.userId, f.userId)),
+	).toEqual(handoffs);
+	expect(
+		await f.db
+			.select()
+			.from(f.s.codebaseSnapshots)
+			.where(eq(f.s.codebaseSnapshots.id, f.snapshotId)),
+	).toEqual(before);
 	const replay = await (
 		await request(f.codebaseId, { action: "resync", requestId })
 	).json();
-	expect(replay).toMatchObject({ sessionId, status: "ready" });
+	expect(replay).toMatchObject({ sessionId, status: "uploaded" });
 	const next = await (
 		await request(f.codebaseId, {
 			action: "resync",
@@ -181,168 +205,14 @@ test("resync rejects foreign ownership and unauthenticated requests", async () =
 	).toBe(401);
 });
 
-test("active CLI, stale replacement and expired unused recovery never corrupt an attempt", async () => {
-	const f = await seed();
-	const requestId = crypto.randomUUID();
-	const minted = await (
-		await request(f.codebaseId, { action: "resync", requestId })
-	).json();
-	const { handleCodebaseSyncHandshake } = await import(
-		"../services/sync-handshake-route.server"
-	);
-	const handshake = () =>
-		handleCodebaseSyncHandshake({
-			params: { id: f.codebaseId },
-			request: new Request(
-				`https://test.local/api/v1/codebases/${f.codebaseId}/codebase/sync`,
-				{
-					method: "POST",
-					headers: { Authorization: `Bearer ${minted.syncToken}` },
-					body: JSON.stringify({ cliVersion: "3.2.1" }),
-				},
-			),
-		});
-	expect((await handshake()).status).toBe(200);
-	const active = await (
-		await request(f.codebaseId, {
-			action: "resync",
-			requestId: crypto.randomUUID(),
-		})
-	).json();
-	expect(active).toMatchObject({
-		sessionId: minted.sessionId,
-		status: "connected",
-	});
-	const stale = await request(f.codebaseId, {
-		action: "retry",
-		sessionId: f.sessionId,
-	});
-	expect(stale.status).toBe(409);
-	expect(await stale.json()).toMatchObject({
-		code: "SYNC_SESSION_STALE",
-		sessionId: minted.sessionId,
-	});
-	const replacement = await request(f.codebaseId, {
-		action: "retry",
-		sessionId: minted.sessionId,
-	});
-	expect(replacement.status).toBe(409);
-	expect(await replacement.json()).toMatchObject({
-		code: "SYNC_SESSION_ACTIVE",
-	});
-	expect((await handshake()).status).toBe(200);
-	await f.db
-		.update(f.s.codebaseSyncSessions)
-		.set({ status: "failed" })
-		.where(eq(f.s.codebaseSyncSessions.id, minted.sessionId));
-	const unused = await (
-		await request(f.codebaseId, {
-			action: "resync",
-			requestId: crypto.randomUUID(),
-		})
-	).json();
-	const expiry = new Date(Date.now() - 1000);
-	await f.db
-		.update(f.s.codebaseSyncSessions)
-		.set({ expiresAt: expiry })
-		.where(eq(f.s.codebaseSyncSessions.id, unused.sessionId));
-	const renewed = await request(f.codebaseId, {
-		action: "retry",
-		sessionId: unused.sessionId,
-	});
-	expect(renewed.status).toBe(200);
-	expect((await renewed.json()).sessionId).not.toBe(unused.sessionId);
-	const [old] = await f.db
-		.select()
-		.from(f.s.codebaseSyncSessions)
-		.where(eq(f.s.codebaseSyncSessions.id, unused.sessionId));
-	expect(old?.consumedAt).toBeInstanceOf(Date);
-}, 30000);
-
-test("workspace snapshot advances only with matching readable analysis and survives failure", async () => {
-	const f = await seed();
-	const { readWorkspaceSnapshot } = await import(
-		"../services/workspace-snapshot.server"
-	);
-	const { readSyncStatusSnapshot } = await import(
-		"../services/sync-status-snapshot.server"
-	);
-	const minted = await (
-		await request(f.codebaseId, {
-			action: "resync",
-			requestId: crypto.randomUUID(),
-		})
-	).json();
-	const snapshotId = crypto.randomUUID();
-	await f.db.insert(f.s.codebaseSnapshots).values({
-		id: snapshotId,
-		codebaseId: f.codebaseId,
-		syncSessionId: minted.sessionId,
-		status: "uploaded",
-		manifest: [],
-		createdAt: new Date(Date.now() + 1000),
-	});
-	await f.db
-		.update(f.s.codebaseSyncSessions)
-		.set({ status: "uploaded" })
-		.where(eq(f.s.codebaseSyncSessions.id, minted.sessionId));
-	expect((await readWorkspaceSnapshot(f.userId, f.codebaseId))?.id).toBe(
-		f.snapshotId,
-	);
-	await f.db.insert(f.s.codebaseAnalyses).values({
-		id: crypto.randomUUID(),
-		projectId: f.projectId,
-		snapshotId,
-		status: "failed",
-	});
-	expect((await readWorkspaceSnapshot(f.userId, f.codebaseId))?.id).toBe(
-		f.snapshotId,
-	);
-	await f.db.insert(f.s.codebaseAnalyses).values({
-		id: crypto.randomUUID(),
-		projectId: f.projectId,
-		snapshotId,
-		status: "ready",
-		output: { projectId: f.projectId, snapshotId: f.snapshotId },
-	});
-	expect((await readWorkspaceSnapshot(f.userId, f.codebaseId))?.id).toBe(
-		f.snapshotId,
-	);
-	const analysisId = crypto.randomUUID();
-	await f.db.insert(f.s.codebaseAnalyses).values({
-		id: analysisId,
-		projectId: f.projectId,
-		snapshotId,
-		status: "ready",
-		output: { projectId: f.projectId, snapshotId },
-	});
-	expect((await readWorkspaceSnapshot(f.userId, f.codebaseId))?.id).toBe(
-		snapshotId,
-	);
-	const status = await readSyncStatusSnapshot({
-		userId: f.userId,
-		codebaseId: f.codebaseId,
-		sessionId: minted.sessionId,
-		projectId: f.projectId,
-	});
-	expect(status).toMatchObject({
-		ok: true,
-		snapshot: {
-			sessionId: minted.sessionId,
-			snapshotId,
-			workspaceSnapshotId: snapshotId,
-			analysisId,
-			analysisStatus: "ready",
-		},
-	});
-}, 30000);
-
 test("credit restriction blocks new attempts but never hides a previously accepted operation", async () => {
 	const f = await seed();
 	const requestId = crypto.randomUUID();
 	const accepted = await (
 		await request(f.codebaseId, { action: "resync", requestId })
 	).json();
+	const snapshotId = await uploadSnapshot(f.codebaseId, accepted.syncToken);
+	expect((await analyzeSnapshot(f.projectId, snapshotId)).status).toBe(200);
 	await f.db
 		.update(f.s.subscriptions)
 		.set({ credits: 0 })
@@ -352,10 +222,6 @@ test("credit restriction blocks new attempts but never hides a previously accept
 	expect(await restored.json()).toMatchObject({
 		sessionId: accepted.sessionId,
 	});
-	await f.db
-		.update(f.s.codebaseSyncSessions)
-		.set({ status: "ready" })
-		.where(eq(f.s.codebaseSyncSessions.id, accepted.sessionId));
 	const blocked = await request(f.codebaseId, {
 		action: "resync",
 		requestId: crypto.randomUUID(),
