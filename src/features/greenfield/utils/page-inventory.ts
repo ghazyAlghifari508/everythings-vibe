@@ -102,14 +102,33 @@ export function findUnknownSurfaces(
 	inventory: string[],
 ): string[] {
 	if (inventory.length === 0) return [];
-	const known = new Set(inventory.map(normalizePageName));
+	const known = new Set<string>();
+	for (const item of inventory) {
+		const norm = normalizePageName(item);
+		if (norm) known.add(norm);
+		const parenMatch = /^([^(]+?)\s*\(([^)]+)\)$/.exec(item);
+		if (parenMatch) {
+			const baseName = normalizePageName(parenMatch[1]);
+			const innerPath = normalizePageName(parenMatch[2]);
+			if (baseName) known.add(baseName);
+			if (innerPath) known.add(innerPath);
+		}
+	}
 	const unknown: string[] = [];
 	for (const surface of surfaces) {
 		const name = surface.trim();
 		if (!name) continue;
-		if (known.has(normalizePageName(name))) continue;
-		if (unknown.includes(name)) continue;
-		unknown.push(name);
+		const norm = normalizePageName(name);
+		if (known.has(norm)) continue;
+		const parenMatch = /^([^(]+?)\s*\(([^)]+)\)$/.exec(name);
+		if (parenMatch) {
+			const baseName = normalizePageName(parenMatch[1]);
+			const innerPath = normalizePageName(parenMatch[2]);
+			if (known.has(baseName) || known.has(innerPath)) continue;
+		}
+		if (!unknown.includes(name)) {
+			unknown.push(name);
+		}
 	}
 	return unknown;
 }

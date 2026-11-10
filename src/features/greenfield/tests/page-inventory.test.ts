@@ -155,6 +155,20 @@ describe("findUnknownSurfaces", () => {
 			),
 		).toEqual([]);
 	});
+	it("resolves surfaces when inventory heading includes path in parentheses", () => {
+		expect(
+			findUnknownSurfaces(
+				["Halaman Katalog Proyek"],
+				["Halaman Katalog Proyek (src/pages/projects.astro)"],
+			),
+		).toEqual([]);
+		expect(
+			findUnknownSurfaces(
+				["src/pages/projects.astro"],
+				["Halaman Katalog Proyek (src/pages/projects.astro)"],
+			),
+		).toEqual([]);
+	});
 
 	it("reports surfaces the PRD never defines", () => {
 		expect(
