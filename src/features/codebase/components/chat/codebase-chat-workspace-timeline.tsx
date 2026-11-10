@@ -1,8 +1,8 @@
+import { useState } from "react";
 import type { useWorkspaceChatControls } from "../../hooks/use-workspace-chat-controls";
 import { restoreAskState } from "../../services/chat-flow";
 import { buildWorkspaceTimeline } from "../../services/workspace-timeline-presentation";
 import type { WorkspaceEvent } from "../../types/workspace-timeline";
-import { CodebaseFileCard } from "../explorer/codebase-file-card";
 import {
 	CodebaseChatWorkspaceSpecError,
 	CodebaseChatWorkspaceStageError,
@@ -12,7 +12,7 @@ import { CodebaseChatWorkspaceMessages } from "./codebase-chat-workspace-message
 import type { CodebaseChatWorkspaceProps } from "./codebase-chat-workspace-props";
 import { CodebaseChatWorkspaceQuestions } from "./codebase-chat-workspace-questions";
 import { CodebaseChatWorkspacePendingRevisionBanner } from "./codebase-chat-workspace-revision-controls";
-import { CodebaseChatWorkspaceStageHandoffs } from "./codebase-chat-workspace-stage-handoffs";
+import { CodebasePlanningStageCard } from "./codebase-planning-stage-card";
 
 const STAGES = {
 	questions: "Pertanyaan klarifikasi",
@@ -87,22 +87,34 @@ export function CodebaseChatWorkspaceTimeline({
 	const latestQuestionsId = entries
 		.filter((entry) => entry.kind === "questions")
 		.at(-1)?.id;
-	const stageActions = (
-		<CodebaseChatWorkspaceStageHandoffs
+	const [handoffRevealed, setHandoffRevealed] = useState(false);
+	const isHandoffActive =
+		handoffRevealed ||
+		stage === "handoff" ||
+		Boolean(props.projectIdForHandoff);
+	const shouldShowPlanningCard = stage !== "questions" || artifacts.length > 0;
+	let hasRenderedPlanningCard = false;
+
+	const planningStageCard = shouldShowPlanningCard ? (
+		<CodebasePlanningStageCard
+			featureName={props.featureName}
 			stage={stage}
 			stageBusy={stageBusy}
+			stageError={run?.status !== "failed" ? stageError : null}
 			tasksUnresolved={tasksUnresolved}
 			artifacts={artifacts}
+			activeArtifactId={activeArtifactId}
+			taskCount={kanbanProgress?.total}
 			onGeneratePrd={onGeneratePrd}
 			onGenerateAc={onGenerateAc}
 			onGenerateTask={onGenerateTask}
+			onTriggerHandoff={() => setHandoffRevealed(true)}
+			onStartRevision={controls.handleStartRevision}
 			onOpenArtifact={onOpenArtifact}
 			onDownloadArtifact={onDownloadArtifact}
+			onRetryStage={onRetryStage}
 		/>
-	);
-	const hasStageArtifact = entries.some(
-		(entry) => entry.kind === "artifact" && entry.stage === stage,
-	);
+	) : null;
 	const hasProposalEvent = entries.some(
 		(entry) =>
 			entry.kind === "revision" &&
@@ -149,21 +161,14 @@ export function CodebaseChatWorkspaceTimeline({
 							onSubmit={controls.handleSubmitAnswer}
 						/>
 					) : null}
-					{entry.kind === "artifact" ? (
-						entry.stage === stage &&
-						((stage === "feature" && onGeneratePrd) ||
-							(stage === "prd" && onGenerateAc) ||
-							(stage === "ac" && onGenerateTask && !tasksUnresolved)) ? (
-							stageActions
-						) : (
-							<CodebaseFileCard
-								artifact={entry.artifact}
-								active={entry.artifact.id === activeArtifactId}
-								onOpen={onOpenArtifact}
-								onDownload={onDownloadArtifact}
-							/>
-						)
-					) : null}
+					{entry.kind === "artifact"
+						? !hasRenderedPlanningCard
+							? (() => {
+									hasRenderedPlanningCard = true;
+									return planningStageCard;
+								})()
+							: null
+						: null}
 					{entry.kind === "operation" ? (
 						entry.run ? (
 							<CodebaseChatWorkspaceMessages
@@ -204,6 +209,7 @@ export function CodebaseChatWorkspaceTimeline({
 						</>
 					) : null}
 					{entry.kind === "handoff" &&
+					isHandoffActive &&
 					controls.handoffPrompt &&
 					controls.exportCmd ? (
 						<CodebaseChatWorkspaceHandoffCard
@@ -244,13 +250,41 @@ export function CodebaseChatWorkspaceTimeline({
 					onRetry={onRetryGenerate}
 				/>
 			) : null}
-			{stageError && run?.status !== "failed" ? (
+			{!shouldShowPlanningCard && stageError && run?.status !== "failed" ? (
 				<CodebaseChatWorkspaceStageError
 					message={stageError}
 					onRetry={onRetryStage}
 				/>
 			) : null}
-			{!hasStageArtifact ? stageActions : null}
+			{!hasRenderedPlanningCard ? planningStageCard : null}
+			{isHandoffActive &&
+			!entries.some((entry) => entry.kind === "handoff") &&
+			controls.handoffPrompt &&
+			controls.exportCmd ? (
+				<CodebaseChatWorkspaceHandoffCard
+					exportCmd={controls.exportCmd}
+					taskCount={kanbanProgress?.total}
+					onOpenKanban={
+						tasksArtifact && onOpenArtifact
+							? () => onOpenArtifact(tasksArtifact)
+							: undefined
+					}
+					handoffPrompt={controls.handoffPrompt}
+					codebaseName={codebaseName}
+					copiedCmd={controls.copiedCmd}
+					copiedExport={controls.copiedExport}
+					onCopyCmd={controls.handleCopyCmd}
+					onCopyExport={() =>
+						controls.handleCopy(
+							controls.exportCmd ?? "",
+							controls.setCopiedExport,
+						)
+					}
+					isRevisingCompletedPlan={controls.isCompletedRevisionOpen}
+					onStartCompletedRevision={controls.openCompletedRevision}
+					onCancelCompletedRevision={controls.cancelCompletedRevision}
+				/>
+			) : null}
 		</section>
 	);
 }
