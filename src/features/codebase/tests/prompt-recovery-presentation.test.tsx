@@ -111,17 +111,17 @@ test("state A: an unavailable prompt is a recovery with the approved copy, not a
 	render(<PlanCodebasePage intent="new" />);
 
 	// 1-3: exact heading, description, and action label.
-	expect(await screen.findByText("Lanjutkan sinkronisasi")).toBeDefined();
 	expect(
-		screen.getByText(
-			"Prompt sebelumnya tidak tersedia lagi setelah halaman ditutup. Buat prompt baru untuk melanjutkan repository ini.",
-		),
+		await screen.findByText("Instruksi sync sebelumnya tidak tersedia."),
 	).toBeDefined();
 	expect(
-		screen.getByRole("button", { name: "Buat prompt baru" }),
+		screen.getByText("Buat instruksi baru untuk melanjutkan."),
 	).toBeDefined();
 	expect(
-		screen.getByText("Prompt sebelumnya tidak berlaku setelah diganti."),
+		screen.getByRole("button", { name: "Buat instruksi baru" }),
+	).toBeDefined();
+	expect(
+		screen.getByText("Instruksi sebelumnya tidak berlaku setelah diganti."),
 	).toBeDefined();
 
 	// 4: expected recovery is not an error, and none of the rejected technical
@@ -166,21 +166,21 @@ test("state B: an expired session shows its own heading and one action", async (
 	render(<PlanCodebasePage intent="new" />);
 
 	fireEvent.click(
-		await screen.findByRole("button", { name: "Buat prompt baru" }),
+		await screen.findByRole("button", { name: "Buat instruksi baru" }),
 	);
 
 	expect(await screen.findByText("Sesi sinkronisasi berakhir")).toBeDefined();
 	expect(
 		screen.getByText(
-			"Buat prompt baru untuk melanjutkan sinkronisasi repository ini.",
+			"Buat instruksi baru untuk melanjutkan sinkronisasi repository ini.",
 		),
 	).toBeDefined();
 	expect(
-		screen.getByRole("button", { name: "Buat prompt baru" }),
+		screen.getByRole("button", { name: "Buat instruksi baru" }),
 	).toBeDefined();
 	// No unrelated technical explanation, and no error treatment.
 	expect(
-		screen.queryByText("Prompt sebelumnya tidak berlaku setelah diganti."),
+		screen.queryByText("Instruksi sebelumnya tidak berlaku setelah diganti."),
 	).toBeNull();
 	expect(screen.queryByRole("alert")).toBeNull();
 	// The expired session was re-requested on the same repository, and no second
@@ -203,7 +203,7 @@ test("state C to D: the spinner runs only while the replacement is genuinely pen
 	render(<PlanCodebasePage intent="new" />);
 
 	fireEvent.click(
-		await screen.findByRole("button", { name: "Buat prompt baru" }),
+		await screen.findByRole("button", { name: "Buat instruksi baru" }),
 	);
 
 	// 7: real pending request → label + spinner, and no action to double-click.
@@ -212,9 +212,11 @@ test("state C to D: the spinner runs only while the replacement is genuinely pen
 			screen.getByTestId("locked-prompt-region").dataset.lockedVariant,
 		).toBe("pending"),
 	);
-	expect(screen.getByText("Menyiapkan prompt baru...")).toBeDefined();
+	expect(screen.getByText("Menyiapkan instruksi baru...")).toBeDefined();
 	expect(screen.getByTestId("spinner")).toBeDefined();
-	expect(screen.queryByRole("button", { name: "Buat prompt baru" })).toBeNull();
+	expect(
+		screen.queryByRole("button", { name: "Buat instruksi baru" }),
+	).toBeNull();
 
 	await act(async () => {
 		release(Response.json(REPLACEMENT_PROMPT));
@@ -225,8 +227,10 @@ test("state C to D: the spinner runs only while the replacement is genuinely pen
 	await screen.findByRole("button", { name: "Salin prompt untuk AI agent" });
 	expect(document.body.textContent).toContain("fresh-raw-token");
 	expect(screen.queryByTestId("locked-prompt-region")).toBeNull();
-	expect(screen.queryByText("Menyiapkan prompt baru...")).toBeNull();
-	expect(screen.queryByText("Lanjutkan sinkronisasi")).toBeNull();
+	expect(screen.queryByText("Menyiapkan instruksi baru...")).toBeNull();
+	expect(
+		screen.queryByText("Instruksi sync sebelumnya tidak tersedia."),
+	).toBeNull();
 
 	// 17: the replacement targeted the same repository and session.
 	expect(backend.sessionBodies).toEqual([
@@ -242,13 +246,15 @@ test("state E: only a failed request reports failure, with one retry that keeps 
 	render(<PlanCodebasePage intent="new" />);
 
 	fireEvent.click(
-		await screen.findByRole("button", { name: "Buat prompt baru" }),
+		await screen.findByRole("button", { name: "Buat instruksi baru" }),
 	);
 
 	// 5-6: exact failure title, description, and single retry action.
-	expect(await screen.findByText("Prompt belum berhasil dibuat")).toBeDefined();
 	expect(
-		screen.getByText("Permintaan belum berhasil. Coba buat prompt lagi."),
+		await screen.findByText("Instruksi belum berhasil dibuat"),
+	).toBeDefined();
+	expect(
+		screen.getByText("Permintaan belum berhasil. Coba buat instruksi lagi."),
 	).toBeDefined();
 	const retry = screen.getByRole("button", { name: "Coba lagi" });
 	expect(screen.getAllByRole("button", { name: "Coba lagi" })).toHaveLength(1);
@@ -280,13 +286,12 @@ test("state F: a live CLI never offers a replacement", () => {
 
 	// 10: no replacement action while the CLI is genuinely mid-sync, and no status
 	// sentence standing in for a prompt that this browser does not hold.
-	expect(
-		screen.getByText(
-			"Prompt ini hanya tersedia sekali di browser tempat ia dibuat.",
-		),
-	).toBeDefined();
+	expect(screen.getByText("Repository sedang disinkronkan.")).toBeDefined();
+	expect(screen.getByText("Pantau progresnya di bawah.")).toBeDefined();
 	expect(screen.queryByTestId("locked-prompt-region")).toBeNull();
-	expect(screen.queryByRole("button", { name: "Buat prompt baru" })).toBeNull();
+	expect(
+		screen.queryByRole("button", { name: "Buat instruksi baru" }),
+	).toBeNull();
 	expect(screen.queryByRole("button", { name: "Coba lagi" })).toBeNull();
 });
 
@@ -306,13 +311,11 @@ test("state G: a stored upload reports receipt and requires no further prompt", 
 	// only. The prompt row states what it is — a credential this browser no
 	// longer holds — instead of a success message or a dead renewal action.
 	const promptBox = within(screen.getByTestId("prompt-box"));
-	expect(
-		promptBox.getByText(
-			"Prompt ini hanya tersedia sekali di browser tempat ia dibuat.",
-		),
-	).toBeDefined();
+	expect(promptBox.getByText("Sinkronisasi selesai.")).toBeDefined();
 	expect(promptBox.queryByText("Source code berhasil diterima.")).toBeNull();
-	expect(screen.queryByRole("button", { name: "Buat prompt baru" })).toBeNull();
+	expect(
+		screen.queryByRole("button", { name: "Buat instruksi baru" }),
+	).toBeNull();
 	expect(screen.queryByTestId("locked-prompt-region")).toBeNull();
 });
 
