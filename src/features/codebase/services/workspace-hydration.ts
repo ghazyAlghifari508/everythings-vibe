@@ -63,7 +63,7 @@ export interface ResolveWorkspaceViewInput {
 	hasMessages: boolean;
 	hasQuestions: boolean;
 	isSending: boolean;
-	runStatus: "idle" | "running" | "failed" | "done";
+	runStatus: "idle" | "queued" | "running" | "failed" | "done";
 }
 
 export function emptyArtifactHydration(): WorkspaceArtifactHydration {
@@ -93,6 +93,7 @@ function hasLocalActivity(input: ResolveWorkspaceViewInput): boolean {
 		input.hasMessages ||
 		input.hasQuestions ||
 		input.isSending ||
+		input.runStatus === "queued" ||
 		input.runStatus === "running" ||
 		input.runStatus === "failed" ||
 		input.runStatus === "done"
