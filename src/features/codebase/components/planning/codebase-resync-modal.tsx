@@ -13,6 +13,7 @@ import type { AnalysisResponse } from "@/features/codebase/services/analysis";
 import { resolveCodebaseDisplayName } from "@/features/codebase/services/naming";
 import {
 	isResyncSessionVerified,
+	isSyncStatusComplete,
 	resolveSyncStageView,
 	type SyncPromptPayload,
 	type SyncStatusResponse,
@@ -76,19 +77,15 @@ export function CodebaseResyncModal({
 	const resolvedRepositoryName =
 		resolveCodebaseDisplayName(projectName) ?? "Repository belum terdeteksi";
 
-	// The prompt's session is the attempt on screen. A status frame from any
-	// other session is the previous attempt and must not paint progress,
-	// stages, or completion under this one.
-	const attemptSessionId =
-		payload?.sessionId ?? activeSessionId ?? status?.sessionId ?? null;
-	// While the server prepares a new session, no frame belongs to it yet. The
-	// previous attempt's polled status must not paint under the new operation.
-	const statusBelongsToAttempt =
-		!status ||
-		!attemptSessionId ||
-		!status.sessionId ||
-		status.sessionId === attemptSessionId;
-	const attemptStatus = isStarting || !statusBelongsToAttempt ? null : status;
+	// Only the explicit attempt may supply progress; an unbound status is not recovery.
+	const attemptSessionId = payload?.sessionId ?? activeSessionId ?? null;
+	const attemptStatus =
+		!isStarting &&
+		!sessionError &&
+		attemptSessionId &&
+		status?.sessionId === attemptSessionId
+			? status
+			: null;
 	const stageView = resolveSyncStageView(attemptStatus);
 	const isVerified = isResyncSessionVerified({
 		status: attemptStatus,
@@ -136,7 +133,13 @@ export function CodebaseResyncModal({
 						<ScreenConnectPromptStep
 							key={payload?.sessionId ?? "no-session"}
 							projectName={projectName}
-							payload={payload}
+							payload={
+								!isStarting &&
+								!sessionError &&
+								!isSyncStatusComplete(attemptStatus)
+									? payload
+									: null
+							}
 							isStarting={isStarting}
 							status={attemptStatus}
 							onRequestNewToken={onReplacePrompt}
@@ -159,7 +162,7 @@ export function CodebaseResyncModal({
 							canRetry={stageView.canRetry && Boolean(onRetrySync)}
 							statusError={sessionError ? null : statusError}
 							isStarting={isStarting}
-							hasSession={Boolean(payload || activeSessionId || attemptStatus)}
+							hasSession={Boolean(attemptSessionId)}
 							onRetrySync={onRetrySync}
 							canContinueToSummary={isVerified}
 							analysis={analysis}

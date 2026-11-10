@@ -155,10 +155,12 @@ function analysisResponse(snapshotId: string, titles: readonly string[]) {
 
 function syncStatus(snapshotId: string, analysisStatus: "pending" | "ready") {
 	return {
-		projectId: PROJECT_ID,
+		projectId: "codebase-1",
+		analysisProjectId: PROJECT_ID,
 		sessionId: "sync-session",
 		status: "uploaded",
 		snapshotId,
+		workspaceSnapshotId: snapshotId,
 		analysisId: `analysis-${snapshotId}`,
 		analysisStatus,
 		fileCount: 4,
@@ -383,7 +385,8 @@ describe("existing-codebase workspace analysis reconciliation", () => {
 				const url = String(input);
 				if (url.startsWith("/api/codebases/codebase-1/status")) {
 					return response({
-						projectId: PROJECT_ID,
+						projectId: "codebase-1",
+						analysisProjectId: PROJECT_ID,
 						sessionId: "expired-session",
 						status: "expired",
 						snapshotId: "snapshot-empty",
@@ -488,7 +491,8 @@ describe("workspace reopen never reports an empty plan", () => {
 					// The snapshot has no analysis at all: the old build treated
 					// that as a reason to start one.
 					return response({
-						projectId: PROJECT_ID,
+						projectId: "codebase-1",
+						analysisProjectId: PROJECT_ID,
 						sessionId: "sync-session",
 						status: "uploaded",
 						snapshotId: CURRENT_SNAPSHOT_ID,

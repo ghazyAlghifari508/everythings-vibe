@@ -37,3 +37,17 @@ test("resync completion requires the new attempt's readable analysis, not only i
 		}),
 	).toBe(false);
 });
+
+test("completion cannot be inferred without an explicit current attempt", () => {
+	const status = {
+		sessionId: "old",
+		status: "uploaded" as const,
+		snapshotId: "old-snapshot",
+		analysisStatus: "ready" as const,
+		analysisId: "old-analysis",
+	};
+	expect(isResyncSessionVerified({ status, activeSessionId: null })).toBe(
+		false,
+	);
+	expect(isResyncSessionVerified({ status })).toBe(false);
+});
