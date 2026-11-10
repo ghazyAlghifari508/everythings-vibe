@@ -10,9 +10,11 @@ import { CodebasePlanSwitcher } from "@/features/codebase/components/planning/co
 import { CodebaseWorkspaceResync } from "@/features/codebase/components/workspace/codebase-workspace-resync";
 import { CodebaseWorkspaceShell } from "@/features/codebase/components/workspace/codebase-workspace-shell";
 import { codebaseStarterSuggestionsSchema } from "@/features/codebase/services/analysis";
+import { inferArtifactTargetKind } from "@/features/codebase/services/composer-interactions";
 import { canReadExistingPlans } from "@/features/codebase/services/workspace-readiness";
 import { useCodebaseWorkspace } from "../../hooks/use-codebase-workspace";
 import type { CodebaseWorkspaceData } from "../../services/workspace-loader.functions";
+import type { CodebaseArtifactRef } from "../explorer/codebase-file-card";
 import { WorkspaceConnectionScreenWrapper as ConnectionScreen } from "./workspace-connection-screen";
 import { WorkspaceHeader } from "./workspace-header";
 import { WorkspaceScreenResolver } from "./workspace-screen-resolver";
@@ -122,6 +124,17 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 		requestChangesCurrentProposal,
 		history,
 	} = ws;
+	const handleReviseFromCanvas = (artifact: CodebaseArtifactRef) => {
+		const kind = inferArtifactTargetKind(artifact);
+		if (kind) {
+			setRevisionTarget(kind);
+		}
+		setComposerMode("revise");
+		const el = document.getElementById(
+			"codebase-chat-composer",
+		) as HTMLTextAreaElement | null;
+		el?.focus();
+	};
 
 	if (snapshotReady) {
 		if (!canReadExistingPlans(readiness)) {
@@ -340,6 +353,11 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 								onDownload={
 									!isSourcePreviewOpen && activeArtifact
 										? () => handleDownloadArtifact(activeArtifact)
+										: undefined
+								}
+								onRevise={
+									!isSourcePreviewOpen && activeArtifact
+										? () => handleReviseFromCanvas(activeArtifact)
 										: undefined
 								}
 								isLoading={
