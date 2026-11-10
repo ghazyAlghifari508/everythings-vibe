@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { handleCodebaseFeatureCreate } from "@/features/codebase/services/feature-project-route.server";
+import { guardCodebaseHandler } from "@/features/codebase/services/route-failure";
 
 // Browser feature-plan boundary for a synced repository.
 //
@@ -11,6 +12,9 @@ import { handleCodebaseFeatureCreate } from "@/features/codebase/services/featur
 // Auth (`requireUser`), the sync rate-limit budget, ownership and synced-snapshot
 // checks, project creation, and the ask-handoff write live in
 // `src/features/codebase/services/feature-project-route.server.ts`.
+//
+// `guardCodebaseHandler` keeps a transient database outage from escaping as an
+// unhandled 500: it answers a classified 503 instead.
 
 export const Route = createFileRoute("/api/codebases/$codebaseId/features")({
 	server: {
@@ -21,7 +25,10 @@ export const Route = createFileRoute("/api/codebases/$codebaseId/features")({
 			}: {
 				request: Request;
 				params: { codebaseId: string };
-			}) => handleCodebaseFeatureCreate({ request, params }),
+			}) =>
+				guardCodebaseHandler("codebases/features", () =>
+					handleCodebaseFeatureCreate({ request, params }),
+				),
 		},
 	},
 });

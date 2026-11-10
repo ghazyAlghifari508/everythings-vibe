@@ -30,6 +30,12 @@ import {
 } from "@/features/codebase/types/codebase-constants";
 import { requireUser } from "@/lib/session";
 import {
+	authFailureResponse,
+	isTransientDependencyFailure,
+	logRouteFailure,
+	logTransientFailure,
+} from "./route-failure";
+import {
 	SYNC_PROGRESS_HEARTBEAT_FRAME,
 	syncProgressFrame,
 } from "./sync-progress-event";
@@ -59,8 +65,8 @@ export async function handleCodebaseSyncStream(input: {
 	let user: { id: string };
 	try {
 		user = await requireUser(headers ?? request.headers);
-	} catch {
-		return Response.json({ error: "Unauthorized" }, { status: 401 });
+	} catch (error) {
+		return authFailureResponse(error);
 	}
 
 	const codebaseId = params.codebaseId;
@@ -167,10 +173,13 @@ export async function handleCodebaseSyncStream(input: {
 						lastSentAt = Date.now();
 						write(SYNC_PROGRESS_HEARTBEAT_FRAME);
 					}
-				} catch (e) {
+				} catch (error) {
 					// A failed read is a transient transport problem: stop so the browser
-					// can reconnect. It must never be reported as a sync failure.
-					console.error("sync progress stream read failed:", e);
+					// can reconnect. It must never be reported as a sync failure, and an
+					// interrupted connection gets one classified line instead of a stack.
+					if (isTransientDependencyFailure(error))
+						logTransientFailure("codebases/sync-stream", error);
+					else logRouteFailure("codebases/sync-stream", error);
 					stop();
 					return;
 				}

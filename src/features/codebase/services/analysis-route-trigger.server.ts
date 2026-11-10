@@ -41,6 +41,7 @@ import {
 	sessionOwnershipCondition,
 	toResponse,
 } from "./analysis-route-scope.server";
+import { authFailureResponse } from "./route-failure";
 import { CODEBASE_SYNC_RATE_LIMIT_ACTION, isSyncCapableProject } from "./sync";
 
 type SnapshotRow = {
@@ -58,8 +59,8 @@ export async function triggerCodebaseAnalysis(
 	let user: { id: string };
 	try {
 		user = await requireUser(request.headers);
-	} catch {
-		return Response.json({ error: "Unauthorized" }, { status: 401 });
+	} catch (error) {
+		return authFailureResponse(error);
 	}
 
 	const plan = await resolvePlan(user.id);

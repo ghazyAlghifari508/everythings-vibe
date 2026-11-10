@@ -12,6 +12,7 @@ import { requireUser } from "@/lib/session";
 import { checkPreSyncCredit } from "./analysis-credit-preflight.server";
 import { serializeAnalysisError } from "./analysis-diagnostics";
 import { resolvePlan } from "./analysis-route-scope.server";
+import { authFailureResponse } from "./route-failure";
 import {
 	buildSyncCommand,
 	CODEBASE_SYNC_RATE_LIMIT_ACTION,
@@ -49,8 +50,8 @@ export async function handleCodebaseSessionRead({
 	let user: { id: string };
 	try {
 		user = await requireUser(request.headers);
-	} catch {
-		return Response.json({ error: "Unauthorized" }, { status: 401 });
+	} catch (error) {
+		return authFailureResponse(error);
 	}
 	const { codebaseId } = params;
 
@@ -142,8 +143,8 @@ export async function handleCodebaseSessionCreate({
 	let user: { id: string };
 	try {
 		user = await requireUser(request.headers);
-	} catch {
-		return Response.json({ error: "Unauthorized" }, { status: 401 });
+	} catch (error) {
+		return authFailureResponse(error);
 	}
 	const { codebaseId } = params;
 
@@ -342,8 +343,8 @@ export async function handleCodebaseSessionRevoke({
 	let user: { id: string };
 	try {
 		user = await requireUser(request.headers);
-	} catch {
-		return Response.json({ error: "Unauthorized" }, { status: 401 });
+	} catch (error) {
+		return authFailureResponse(error);
 	}
 	const { codebaseId } = params;
 
