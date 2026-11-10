@@ -957,7 +957,13 @@ describe("toSourcePreviewState", () => {
 });
 
 describe("workspace onboarding analysis selection", () => {
-	const detailSource = workspaceLoaderSource;
+	const detailSource = [
+		workspaceLoaderSource,
+		readFileSync(
+			"src/features/codebase/services/workspace-snapshot.server.ts",
+			"utf8",
+		),
+	].join("\n");
 
 	it("loads analysis by the immutable onboarding anchor and active snapshot", () => {
 		expect(detailSource).toContain(

@@ -155,6 +155,52 @@ describe("WorkspaceHeader component", () => {
 		);
 		expect(syncBadge?.textContent).toBe("Menunggu snapshot");
 	});
+
+	it("ensures file count metadata is plain text with icon and not an interactive button", () => {
+		act(() => {
+			root?.render(
+				<WorkspaceHeader
+					name="Ghazy Portofolio"
+					isStarting={false}
+					fileCount={120}
+					onResync={vi.fn()}
+				/>,
+			);
+		});
+
+		const syncBadge = container.querySelector(
+			"[data-testid='codebase-sync-badge']",
+		);
+		expect(syncBadge).not.toBeNull();
+		expect(syncBadge?.tagName.toLowerCase()).toBe("span");
+		expect(syncBadge?.closest("button")).toBeNull();
+		expect(syncBadge?.getAttribute("role")).not.toBe("button");
+		expect(syncBadge?.getAttribute("tabindex")).toBeNull();
+		expect(syncBadge?.textContent).toBe("120 file tersinkron");
+
+		// Subtle file icon is present
+		const icon = syncBadge?.querySelector("svg");
+		expect(icon).not.toBeNull();
+		expect(icon?.getAttribute("aria-hidden")).toBe("true");
+	});
+
+	it("dynamically displays zero file count correctly", () => {
+		act(() => {
+			root?.render(
+				<WorkspaceHeader
+					name="Ghazy Portofolio"
+					isStarting={false}
+					fileCount={0}
+					onResync={vi.fn()}
+				/>,
+			);
+		});
+
+		const syncBadge = container.querySelector(
+			"[data-testid='codebase-sync-badge']",
+		);
+		expect(syncBadge?.textContent).toBe("0 file tersinkron");
+	});
 });
 
 describe("CodebaseChatWorkspaceHeader component", () => {
