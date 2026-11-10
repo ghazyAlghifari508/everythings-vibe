@@ -7,20 +7,17 @@ import { PopoverContent } from "@/components/ui/popover";
 import type { ComposerMentionCandidate } from "@/features/codebase/services/composer-interactions";
 
 /**
- * The `@` selector floats above the composer and overlaps its top edge, like
- * the model picker in the reference screenshot: side "top" for the upward
- * direction, align "start" to hug the composer's left edge, a negative
- * sideOffset so the surface slightly covers the composer's top border, and
- * collision padding so a short viewport repositions it instead of resizing the
- * composer.
+ * The `@` selector floats above the composer toolbar anchored to the `@` button:
+ * side "top" for the upward direction, align "start" to align with the trigger,
+ * a clean positive sideOffset (8px) so it floats cleanly above the toolbar without
+ * artificial border overlap hacks, and collision padding so short viewports reposition it.
  */
 export const MENTION_POPOVER_PLACEMENT = {
 	side: "top",
 	align: "start",
-	sideOffset: -6,
+	sideOffset: 8,
 	collisionPadding: 12,
 } as const;
-
 interface CodebaseComposerMentionPopoverProps {
 	isOpen: boolean;
 	hasDocuments: boolean;
@@ -79,7 +76,7 @@ export function CodebaseComposerMentionPopover({
 					event.preventDefault();
 				}
 			}}
-			className="flex w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw_-_2rem)] flex-col overflow-hidden"
+			className="flex w-72 max-w-[calc(100vw_-_2rem)] flex-col overflow-hidden p-0"
 		>
 			<div className="flex items-center gap-2 border-b border-graphite px-3 py-2">
 				<Icon
@@ -102,11 +99,14 @@ export function CodebaseComposerMentionPopover({
 			</div>
 
 			{!hasDocuments ? (
-				<p className="px-3 py-2 text-xs text-slate">
-					Belum ada dokumen planning pada fitur ini.
-				</p>
+				<div className="flex flex-col gap-1 px-3 py-3 text-xs">
+					<p className="font-semibold text-snow">Belum ada dokumen planning</p>
+					<p className="text-[11px] leading-relaxed text-slate">
+						Dokumen akan tersedia setelah PRD, AC, atau Tasks dibuat.
+					</p>
+				</div>
 			) : documents.length === 0 ? (
-				<p className="px-3 py-2 text-xs text-slate">
+				<p className="px-3 py-3 text-xs text-slate">
 					Tidak ada dokumen yang cocok.
 				</p>
 			) : (
@@ -133,25 +133,27 @@ export function CodebaseComposerMentionPopover({
 								data-testid={`composer-mention-doc-${doc.targetKind}`}
 								data-active={isSelected ? "true" : undefined}
 								onClick={() => onSelectCandidate(doc)}
-								className={`flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors ${
+								className={`flex w-full items-start gap-2.5 rounded-md px-2.5 py-2 text-left text-xs transition-colors ${
 									isSelected
 										? "bg-white/10 text-snow"
 										: "text-fog hover:bg-white/5 hover:text-snow"
 								}`}
 							>
-								<span className="flex min-w-0 items-center gap-2">
-									<Icon
-										icon={File01Icon}
-										size={13}
-										aria-hidden="true"
-										className="shrink-0 text-indigo-300"
-									/>
-									<span className="truncate font-medium text-snow">
+								<Icon
+									icon={File01Icon}
+									size={14}
+									aria-hidden="true"
+									className="mt-0.5 shrink-0 text-indigo-300"
+								/>
+								<span className="flex min-w-0 flex-1 flex-col gap-0.5">
+									<span className="truncate font-semibold text-snow">
 										{doc.label}
 									</span>
-								</span>
-								<span className="max-w-[45%] shrink-0 truncate font-mono text-[10px] text-slate">
-									{doc.fileName}
+									{doc.description ? (
+										<span className="text-[11px] text-slate">
+											{doc.description}
+										</span>
+									) : null}
 								</span>
 							</button>
 						);
