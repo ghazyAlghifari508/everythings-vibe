@@ -89,9 +89,11 @@ export function CodebaseChatWorkspaceTimeline({
 		.at(-1)?.id;
 	const [handoffRevealed, setHandoffRevealed] = useState(false);
 	const isHandoffActive =
-		handoffRevealed ||
-		stage === "handoff" ||
-		Boolean(props.projectIdForHandoff);
+		!tasksUnresolved &&
+		!(stage === "task" && (Boolean(stageError) || run?.status === "failed")) &&
+		(handoffRevealed ||
+			stage === "handoff" ||
+			Boolean(props.projectIdForHandoff));
 	const shouldShowPlanningCard = stage !== "questions" || artifacts.length > 0;
 	let hasRenderedPlanningCard = false;
 
@@ -215,6 +217,8 @@ export function CodebaseChatWorkspaceTimeline({
 						<CodebaseChatWorkspaceHandoffCard
 							exportCmd={controls.exportCmd}
 							taskCount={kanbanProgress?.total}
+							featureName={props.featureName}
+							copyError={controls.copyError}
 							onOpenKanban={
 								tasksArtifact && onOpenArtifact
 									? () => onOpenArtifact(tasksArtifact)
@@ -264,6 +268,8 @@ export function CodebaseChatWorkspaceTimeline({
 				<CodebaseChatWorkspaceHandoffCard
 					exportCmd={controls.exportCmd}
 					taskCount={kanbanProgress?.total}
+					featureName={props.featureName}
+					copyError={controls.copyError}
 					onOpenKanban={
 						tasksArtifact && onOpenArtifact
 							? () => onOpenArtifact(tasksArtifact)

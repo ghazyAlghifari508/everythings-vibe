@@ -144,7 +144,8 @@ export function CodebasePlanningStageCard({
 	};
 
 	// Next stage states
-	const isTasksCompleted = Boolean(tasksArtifact) || stage === "handoff";
+	const isTasksCompleted =
+		(Boolean(tasksArtifact) || stage === "handoff") && !tasksUnresolved;
 	const isAcNext =
 		(stage === "prd" || (Boolean(prdArtifact) && !acArtifact)) &&
 		!isTasksCompleted;

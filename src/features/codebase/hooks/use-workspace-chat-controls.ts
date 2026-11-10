@@ -18,6 +18,7 @@ import type {
 	ComposerFileReference,
 	ComposerReferenceBinding,
 } from "../types/revision";
+import { copyToClipboard } from "../utils/clipboard";
 import { useComposerMenus } from "./use-composer-menus";
 
 export function useWorkspaceChatControls({
@@ -76,7 +77,7 @@ export function useWorkspaceChatControls({
 	const [draft, setDraft] = useState("");
 	const [copiedCmd, setCopiedCmd] = useState(false);
 	const [copiedExport, setCopiedExport] = useState(false);
-
+	const [copyError, setCopyError] = useState<string | null>(null);
 	const menus = useComposerMenus({
 		draft,
 		setDraft,
@@ -109,13 +110,17 @@ export function useWorkspaceChatControls({
 
 	const handleCopyCmd = async () => {
 		if (!handoffPrompt) return;
-		try {
-			if (!navigator.clipboard?.writeText) return;
-			await navigator.clipboard.writeText(handoffPrompt);
+		const result = await copyToClipboard(handoffPrompt);
+		if (result.success) {
 			setCopiedCmd(true);
+			setCopyError(null);
 			setTimeout(() => setCopiedCmd(false), 2000);
-		} catch {
-			return;
+		} else {
+			setCopyError(
+				result.error ??
+					"Gagal menyalin otomatis. Silakan salin teks secara manual.",
+			);
+			setTimeout(() => setCopyError(null), 3500);
 		}
 	};
 
@@ -123,13 +128,17 @@ export function useWorkspaceChatControls({
 		text: string,
 		setState: (value: boolean) => void,
 	) => {
-		try {
-			if (!navigator.clipboard?.writeText) return;
-			await navigator.clipboard.writeText(text);
+		const result = await copyToClipboard(text);
+		if (result.success) {
 			setState(true);
+			setCopyError(null);
 			setTimeout(() => setState(false), 2000);
-		} catch {
-			return;
+		} else {
+			setCopyError(
+				result.error ??
+					"Gagal menyalin otomatis. Silakan salin teks secara manual.",
+			);
+			setTimeout(() => setCopyError(null), 3500);
 		}
 	};
 
@@ -213,6 +222,8 @@ export function useWorkspaceChatControls({
 		copiedCmd,
 		copiedExport,
 		setCopiedExport,
+		copyError,
+		setCopyError,
 		exportCmd,
 		handoffPrompt,
 		handleCopyCmd,
