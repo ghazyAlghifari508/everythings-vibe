@@ -10,6 +10,7 @@ import { codebaseSyncSessions, codebases } from "@/db/schema";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { requireUser } from "@/lib/session";
 import { checkPreSyncCredit } from "./analysis-credit-preflight.server";
+import { serializeAnalysisError } from "./analysis-diagnostics";
 import { resolvePlan } from "./analysis-route-scope.server";
 import {
 	buildSyncCommand,
@@ -186,7 +187,12 @@ export async function handleCodebaseSessionCreate({
 			userId: user.id,
 			codebaseId,
 			syncSessionId,
-			operation: parsed.data.action === "retry" ? "replaced" : "recovered",
+			operation:
+				parsed.data.action === "retry"
+					? "replaced"
+					: parsed.data.action === "resync"
+						? "resync"
+						: "recovered",
 			result,
 			durationMs: Date.now() - startedAt,
 			safeErrorCode,
@@ -235,16 +241,20 @@ export async function handleCodebaseSessionCreate({
 			"CODEBASE_SESSION_REPLACEMENT_FAILED",
 			parsed.data.sessionId ?? null,
 		);
-		console.error(
-			"[codebase/session] preparation failed",
-			error instanceof Error ? error.name : "UnknownError",
-		);
+		console.error("[codebase/session] preparation failed", {
+			...serializeAnalysisError(error),
+			userId: user.id,
+			codebaseId,
+			action: parsed.data.action ?? "initial",
+			requestId: parsed.data.requestId ?? null,
+			sessionId: parsed.data.sessionId ?? null,
+		});
 		return Response.json(
 			{
 				error: "Sesi sync gagal dibuat. Coba lagi.",
 				code: "CODEBASE_SESSION_REPLACEMENT_FAILED",
 			},
-			{ status: 503 },
+			{ status: 503, headers: { "Cache-Control": "no-store" } },
 		);
 	}
 	if (parsed.data.action === "resync" && !result.token) {
@@ -284,7 +294,7 @@ export async function handleCodebaseSessionCreate({
 		return Response.json(
 			{
 				code,
-				sessionId: result.session.id,
+				...toSessionMetadata({ ...result.session, projectId: codebaseId }),
 				// Safe, non-technical descriptions only. The UI models these as
 				// recoverable states (or live progress), never as failures; the raw
 				// credential is never described or returned.

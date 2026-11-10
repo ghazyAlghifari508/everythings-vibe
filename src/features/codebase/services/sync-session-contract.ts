@@ -7,7 +7,8 @@ export const codebaseSessionRequestSchema = z
 		sessionId: z.string().min(1).optional(),
 		requestId: z.uuid().optional(),
 	})
-	.refine((body) => body.action !== "resync" || Boolean(body.requestId));
+	.refine((body) => body.action !== "resync" || Boolean(body.requestId))
+	.refine((body) => body.action !== "retry" || Boolean(body.sessionId));
 
 export const restoredSyncSessionSchema = z.object({
 	projectId: z.string().min(1),

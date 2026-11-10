@@ -14,7 +14,10 @@ import {
 } from "../types/codebase-constants";
 import { selectWorkspaceAnalysis } from "./analysis-selection";
 import { generateSyncToken, hashSyncToken } from "./sync.server";
-import type { PreparedSyncSession } from "./sync-session-prepare.server";
+import {
+	expireUnusedSyncSession,
+	type PreparedSyncSession,
+} from "./sync-session-prepare.server";
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -51,7 +54,11 @@ export async function prepareResyncSession(
 			),
 		)
 		.limit(1);
-	if (replay) return { session: replay.session, token: null };
+	if (replay)
+		return {
+			session: await expireUnusedSyncSession(tx, replay.session),
+			token: null,
+		};
 
 	let [latest] = await tx
 		.select()
@@ -80,6 +87,7 @@ export async function prepareResyncSession(
 				),
 			)
 			.limit(1);
+		if (latest) latest = await expireUnusedSyncSession(tx, latest);
 	}
 	let finished =
 		!latest || ["ready", "failed", "expired"].includes(latest.status);
