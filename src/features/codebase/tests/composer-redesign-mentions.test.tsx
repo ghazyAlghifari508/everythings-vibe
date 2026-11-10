@@ -119,9 +119,8 @@ describe("FIX 06 — @ references only real planning documents", () => {
 		// An explicit click still explains the empty state without a fake list.
 		fireEvent.click(screen.getByTestId("composer-mention-trigger"));
 		expect(screen.getByTestId("composer-mention-popover")).toBeTruthy();
-		expect(
-			screen.getByText("Belum ada dokumen planning pada fitur ini."),
-		).toBeTruthy();
+		expect(screen.getByText("Belum ada dokumen planning")).toBeTruthy();
+		expect(screen.getByText(/Dokumen akan tersedia setelah/)).toBeTruthy();
 		expect(screen.queryAllByRole("option")).toHaveLength(0);
 	});
 
@@ -145,9 +144,8 @@ describe("FIX 06 — @ references only real planning documents", () => {
 		fireEvent.click(screen.getByTestId("composer-mention-trigger"));
 
 		expect(screen.queryAllByRole("option")).toHaveLength(0);
-		expect(
-			screen.getByText("Belum ada dokumen planning pada fitur ini."),
-		).toBeTruthy();
+		expect(screen.getByText("Belum ada dokumen planning")).toBeTruthy();
+		expect(screen.getByText(/Dokumen akan tersedia setelah/)).toBeTruthy();
 	});
 
 	it("filters by search and shows only matching documents", () => {
