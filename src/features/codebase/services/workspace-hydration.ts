@@ -143,3 +143,14 @@ export function resolveWorkspaceView(
 
 	return { kind: "active", failedArtifacts: failedArtifactKinds(artifacts) };
 }
+
+export function resolveWorkspaceHistoryView(
+	view: WorkspaceView,
+	status: "pending" | "ready" | "failed",
+): WorkspaceView {
+	if (view.kind !== "pristine") return view;
+	if (status === "pending") return { kind: "loading" };
+	if (status === "failed")
+		return { kind: "plan_unavailable", reason: "load_failed" };
+	return view;
+}

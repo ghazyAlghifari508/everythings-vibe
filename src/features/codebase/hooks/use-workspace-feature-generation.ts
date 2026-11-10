@@ -9,7 +9,6 @@ import {
 import type { ProjectFeatureTree } from "@/db/schema";
 import {
 	type AdaptiveQuestion,
-	buildFeatureMessage,
 	type CodebasePipelineStage,
 	type CodebaseRunState,
 	observeOperation,
@@ -38,9 +37,8 @@ export function useWorkspaceFeatureGeneration({
 	aiQuestions,
 	lastFeaturePrompt,
 	featureName,
-	codebaseName,
 	refreshFeatureTree,
-	pushAssistantMessage,
+	refreshTimeline,
 	openArtifactPreview,
 	setPipelineStage,
 	setStageError,
@@ -53,9 +51,8 @@ export function useWorkspaceFeatureGeneration({
 	aiQuestions: AdaptiveQuestion[];
 	lastFeaturePrompt: string;
 	featureName: string | undefined;
-	codebaseName: string;
 	refreshFeatureTree: (id: string | null) => Promise<ProjectFeatureTree | null>;
-	pushAssistantMessage: (content: string) => void;
+	refreshTimeline: () => Promise<void>;
 	openArtifactPreview: (kind: "feature" | "prd" | "ac" | "tasks") => void;
 	setPipelineStage: Dispatch<SetStateAction<CodebasePipelineStage>>;
 	setStageError: Dispatch<SetStateAction<string | null>>;
@@ -247,20 +244,12 @@ export function useWorkspaceFeatureGeneration({
 						if (tree && activeProjectIdRef.current === effectiveFeatureId) {
 							setPipelineStage("feature");
 							settleRequest("done", settleAt());
-							const specMessage = buildFeatureMessage(
-								featureName ?? codebaseName,
-								chatAnswers,
-							);
-							pushAssistantMessage(
-								`Pohon fitur ${featureName ?? "fitur"} berhasil disusun dari jawaban Anda: ${specMessage}`,
-							);
+							void refreshTimeline();
 							openArtifactPreview("feature");
 							return;
 						}
 					}
-					pushAssistantMessage(
-						`Pohon fitur ${featureName ?? "fitur"} sedang disusun. Tunggu sebentar lalu klik Buat Spesifikasi Fitur lagi untuk memuat hasilnya.`,
-					);
+					void refreshTimeline();
 					settleRequest(
 						"failed",
 						settleAt(),
@@ -277,13 +266,7 @@ export function useWorkspaceFeatureGeneration({
 				}
 				setPipelineStage("feature");
 				settleRequest("done", settleAt());
-				const specMessage = buildFeatureMessage(
-					featureName ?? codebaseName,
-					chatAnswers,
-				);
-				pushAssistantMessage(
-					`Pohon fitur ${featureName ?? "fitur"} berhasil disusun dari jawaban Anda: ${specMessage}`,
-				);
+				void refreshTimeline();
 				openArtifactPreview("feature");
 			} finally {
 				confirmingInFlight.current = false;
@@ -300,9 +283,8 @@ export function useWorkspaceFeatureGeneration({
 			aiQuestions,
 			lastFeaturePrompt,
 			featureName,
-			codebaseName,
 			refreshFeatureTree,
-			pushAssistantMessage,
+			refreshTimeline,
 			openArtifactPreview,
 			setPipelineStage,
 			setStageError,

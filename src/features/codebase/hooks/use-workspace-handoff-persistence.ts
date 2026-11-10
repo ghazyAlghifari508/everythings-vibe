@@ -185,11 +185,15 @@ export function useWorkspaceHandoffPersistence({
 
 	useEffect(() => {
 		const projectId = effectiveFeatureId;
+		if (handoffRestoredFor.current === projectId) return;
+		restoreSettled.current = false;
+		lastPersistedUpdatedAt.current = null;
+		setSaveStatus("idle");
+		setSaveError(null);
 		if (!projectId) {
 			handoffRestoredFor.current = null;
 			return;
 		}
-		if (handoffRestoredFor.current === projectId) return;
 		const epoch = requestEpochRef.current;
 		handoffRestoredFor.current = projectId;
 		void (async () => {
@@ -199,17 +203,17 @@ export function useWorkspaceHandoffPersistence({
 					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify({ projectId, action: "get-handoff" }),
 				});
+				if (
+					requestEpochRef.current !== epoch ||
+					activeProjectRef.current !== projectId
+				)
+					return;
 				if (!response.ok) {
 					restoreSettled.current = true;
 					return;
 				}
 				const body: unknown = await response.json().catch(() => null);
-				if (
-					requestEpochRef.current !== epoch ||
-					activeProjectRef.current !== projectId ||
-					typeof body !== "object" ||
-					body === null
-				) {
+				if (typeof body !== "object" || body === null) {
 					restoreSettled.current = true;
 					return;
 				}
@@ -230,6 +234,11 @@ export function useWorkspaceHandoffPersistence({
 				if (typeof record.updatedAt === "string") {
 					lastPersistedUpdatedAt.current = record.updatedAt;
 				}
+				const storedPrompt =
+					typeof record.state?.prompt === "string"
+						? record.state.prompt.trim()
+						: "";
+				if (storedPrompt) setLastFeaturePrompt(storedPrompt);
 				if (hasLocalAnswersRef.current) {
 					restoreSettled.current = true;
 					return;
@@ -272,15 +281,13 @@ export function useWorkspaceHandoffPersistence({
 					...restored.answers,
 					...current,
 				}));
-				const restoredPrompt =
-					(typeof record.state?.prompt === "string" &&
-						record.state.prompt.trim()) ||
-					(typeof record.compiledPrompt === "string" &&
-						record.compiledPrompt.trim()) ||
-					"";
-				if (restoredPrompt) setLastFeaturePrompt(restoredPrompt);
 				restoreSettled.current = true;
 			} catch {
+				if (
+					requestEpochRef.current !== epoch ||
+					activeProjectRef.current !== projectId
+				)
+					return;
 				restoreSettled.current = true;
 			}
 		})();

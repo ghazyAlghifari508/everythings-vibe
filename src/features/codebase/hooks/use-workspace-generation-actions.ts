@@ -24,7 +24,7 @@ export function useWorkspaceGenerationActions({
 	refetchKanban,
 	setStageError,
 	setPipelineStage,
-	pushAssistantMessage,
+	refreshTimeline,
 	openArtifactPreview,
 	pipelineStage,
 	handleConfirmGenerate,
@@ -41,7 +41,7 @@ export function useWorkspaceGenerationActions({
 	refetchKanban: () => Promise<void>;
 	setStageError: Dispatch<SetStateAction<string | null>>;
 	setPipelineStage: Dispatch<SetStateAction<CodebasePipelineStage>>;
-	pushAssistantMessage: (content: string) => void;
+	refreshTimeline: () => Promise<void>;
 	openArtifactPreview: (kind: "feature" | "prd" | "ac" | "tasks") => void;
 	pipelineStage: CodebasePipelineStage;
 	handleConfirmGenerate: (retry?: boolean) => Promise<void>;
@@ -75,9 +75,7 @@ export function useWorkspaceGenerationActions({
 						return false;
 					}
 					setPipelineStage("prd");
-					pushAssistantMessage(
-						`PRD 8 seksi untuk ${featureName ?? "fitur"} siap.`,
-					);
+					void refreshTimeline();
 					openArtifactPreview("prd");
 					return true;
 				},
@@ -94,7 +92,7 @@ export function useWorkspaceGenerationActions({
 			activeProjectIdRef,
 			setStageError,
 			setPipelineStage,
-			pushAssistantMessage,
+			refreshTimeline,
 			openArtifactPreview,
 		],
 	);
@@ -119,9 +117,7 @@ export function useWorkspaceGenerationActions({
 						return false;
 					}
 					setPipelineStage("ac");
-					pushAssistantMessage(
-						`Acceptance Criteria untuk ${featureName ?? "fitur"} siap.`,
-					);
+					void refreshTimeline();
 					openArtifactPreview("ac");
 					return true;
 				},
@@ -130,13 +126,12 @@ export function useWorkspaceGenerationActions({
 		},
 		[
 			effectiveFeatureId,
-			featureName,
 			runPipelineStage,
 			loadAc,
 			activeProjectIdRef,
 			setStageError,
 			setPipelineStage,
-			pushAssistantMessage,
+			refreshTimeline,
 			openArtifactPreview,
 		],
 	);
@@ -163,9 +158,7 @@ export function useWorkspaceGenerationActions({
 						return false;
 					}
 					setPipelineStage("handoff");
-					pushAssistantMessage(
-						`Task untuk ${featureName ?? "fitur"} sudah tersimpan dan papan Kanban aktif.`,
-					);
+					void refreshTimeline();
 					openArtifactPreview("tasks");
 					return true;
 				},
@@ -174,14 +167,13 @@ export function useWorkspaceGenerationActions({
 		},
 		[
 			effectiveFeatureId,
-			featureName,
 			runPipelineStage,
 			refetchKanban,
 			refreshTaskTree,
 			activeProjectIdRef,
 			setStageError,
 			setPipelineStage,
-			pushAssistantMessage,
+			refreshTimeline,
 			openArtifactPreview,
 		],
 	);

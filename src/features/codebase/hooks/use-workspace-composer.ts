@@ -1,5 +1,4 @@
 import { type Dispatch, type SetStateAction, useCallback, useRef } from "react";
-import type { ChatStreamMessage } from "@/features/codebase/components/chat/codebase-chat-workspace";
 import type { CodebasePipelineStage } from "@/features/codebase/services/chat-flow";
 import type {
 	ComposerOperationMode,
@@ -11,6 +10,7 @@ import {
 	normalizeComposerMode,
 } from "@/features/codebase/services/revision-intent";
 import type { ComposerReferenceBinding } from "../types/revision";
+import type { WorkspaceMessageInput } from "../types/workspace-timeline";
 import type { useWorkspaceArtifacts } from "./use-workspace-artifacts";
 import type { useWorkspacePlan } from "./use-workspace-plan";
 
@@ -30,7 +30,7 @@ export function useWorkspaceComposer({
 	setPrdContent,
 	setAcContent,
 	setChatAnswers,
-	setChatMessages,
+	persistMessage,
 	effectiveFeatureId,
 	onboardingFeatureId,
 	artifactCount,
@@ -57,7 +57,7 @@ export function useWorkspaceComposer({
 	setPrdContent: ReturnType<typeof useWorkspaceArtifacts>["setPrdContent"];
 	setAcContent: ReturnType<typeof useWorkspaceArtifacts>["setAcContent"];
 	setChatAnswers: Dispatch<SetStateAction<Record<string, string>>>;
-	setChatMessages: Dispatch<SetStateAction<ChatStreamMessage[]>>;
+	persistMessage: (input: WorkspaceMessageInput) => Promise<unknown>;
 	effectiveFeatureId: string | null;
 	onboardingFeatureId: string | null;
 	artifactCount: number;
@@ -69,6 +69,7 @@ export function useWorkspaceComposer({
 		instruction: string,
 		options?: {
 			targetKind?: RevisionTargetKind;
+			requestId?: string;
 			optionalReferences?: readonly string[];
 			referenceBindings?: readonly ComposerReferenceBinding[];
 		},
@@ -79,6 +80,56 @@ export function useWorkspaceComposer({
 	const creationInFlight = useRef(false);
 	const creationId = useRef<string | null>(null);
 	const workspaceEpoch = useRef(0);
+	const pendingMessage = useRef<{
+		content: string;
+		projectId: string;
+		type: WorkspaceMessageInput["type"];
+		stage: WorkspaceMessageInput["stage"];
+		id: string;
+	} | null>(null);
+	const sending = useRef(false);
+	const activeKey = `${codebase.id}:${effectiveFeatureId ?? "new"}:${isCreatingNew}`;
+	const activeScope = useRef(activeKey);
+	activeScope.current = activeKey;
+	const persist = useCallback(
+		async (
+			projectId: string,
+			content: string,
+			type: WorkspaceMessageInput["type"],
+			target?: RevisionTargetKind,
+		) => {
+			const stage =
+				type === "user_message"
+					? "questions"
+					: target === "tasks"
+						? "task"
+						: (target ?? "prd");
+			if (
+				pendingMessage.current?.content !== content ||
+				pendingMessage.current.projectId !== projectId ||
+				pendingMessage.current.type !== type ||
+				pendingMessage.current.stage !== stage
+			)
+				pendingMessage.current = {
+					content,
+					projectId,
+					type,
+					stage,
+					id: crypto.randomUUID(),
+				};
+			const id = pendingMessage.current.id;
+			await persistMessage({
+				codebaseId: codebase.id,
+				projectId,
+				id,
+				content,
+				type,
+				stage,
+			});
+			return id;
+		},
+		[codebase.id, persistMessage],
+	);
 	const ensureFeatureInWorkspace = useCallback(
 		async (message: string): Promise<string | null> => {
 			const trimmed = message.trim();
@@ -186,60 +237,73 @@ export function useWorkspaceComposer({
 			const effectiveMode = normalizeComposerMode(
 				submission?.mode ?? composerMode,
 			);
-			const canRunExplicitCompletedRevision =
+			const explicitRevision =
 				effectiveMode === "revise" && submission?.mode === "revise";
 			if (
-				(!composerAvailable && !canRunExplicitCompletedRevision) ||
-				!trimmed ||
+				(!composerAvailable && !explicitRevision) ||
 				trimmed.length < 3 ||
 				creationInFlight.current ||
+				sending.current ||
 				isWorking
 			)
 				return false;
-
-			if (effectiveMode === "revise") {
-				if (!effectiveFeatureId || artifactCount === 0) {
-					setError("Belum ada dokumen yang bisa direvisi pada fitur ini.");
-					return false;
+			const key = activeKey;
+			const epoch = workspaceEpoch.current;
+			const isCurrent = () =>
+				activeScope.current === key && workspaceEpoch.current === epoch;
+			sending.current = true;
+			try {
+				if (effectiveMode === "revise") {
+					if (!effectiveFeatureId || artifactCount === 0) {
+						setError("Belum ada dokumen yang bisa direvisi pada fitur ini.");
+						return false;
+					}
+					const requestId = await persist(
+						effectiveFeatureId,
+						trimmed,
+						"revision_requested",
+						submission?.targetKind,
+					);
+					if (!isCurrent()) return false;
+					await runRevision(trimmed, {
+						targetKind: submission?.targetKind,
+						requestId,
+						optionalReferences: submission?.optionalReferences,
+						referenceBindings: submission?.referenceBindings,
+					});
+					pendingMessage.current = null;
+					return isCurrent();
 				}
-				setChatMessages((current) => [
-					...current,
-					{ id: `user-${Date.now()}`, role: "user", content: trimmed },
-				]);
-				await runRevision(trimmed, {
-					targetKind: submission?.targetKind,
-					optionalReferences: submission?.optionalReferences,
-					referenceBindings: submission?.referenceBindings,
-				});
-				return true;
-			}
-
-			setChatMessages((current) => [
-				...current,
-				{ id: `user-${Date.now()}`, role: "user", content: trimmed },
-			]);
-			const activeIsAnchor =
-				effectiveFeatureId != null &&
-				effectiveFeatureId === onboardingFeatureId;
-			const activeHasPlanning = artifactCount > 0;
-			if (
-				isCreatingNew ||
-				!effectiveFeatureId ||
-				(activeIsAnchor && !activeHasPlanning)
-			) {
-				setLastFeaturePrompt(trimmed);
-				const projectId = await ensureFeatureInWorkspace(trimmed);
-				if (projectId) {
+				const activeIsAnchor =
+					effectiveFeatureId != null &&
+					effectiveFeatureId === onboardingFeatureId;
+				if (
+					isCreatingNew ||
+					!effectiveFeatureId ||
+					(activeIsAnchor && artifactCount === 0)
+				) {
+					setLastFeaturePrompt(trimmed);
+					const projectId = await ensureFeatureInWorkspace(trimmed);
+					if (!projectId) return false;
 					setIsCreatingNew(false);
 					void fetchAiQuestions(projectId, trimmed);
+					return true;
 				}
-				return projectId !== null;
+				await persist(effectiveFeatureId, trimmed, "user_message");
+				if (!isCurrent()) return false;
+				pendingMessage.current = null;
+				setLastFeaturePrompt(trimmed);
+				void fetchAiQuestions(effectiveFeatureId, trimmed);
+				return true;
+			} catch {
+				if (isCurrent()) setError("Pesan belum tersimpan. Coba kirim ulang.");
+				return false;
+			} finally {
+				sending.current = false;
 			}
-			setLastFeaturePrompt(trimmed);
-			void fetchAiQuestions(effectiveFeatureId, trimmed);
-			return true;
 		},
 		[
+			activeKey,
 			artifactCount,
 			composerAvailable,
 			composerMode,
@@ -249,11 +313,11 @@ export function useWorkspaceComposer({
 			isCreatingNew,
 			isWorking,
 			onboardingFeatureId,
+			persist,
 			runRevision,
 			setError,
 			setLastFeaturePrompt,
 			setIsCreatingNew,
-			setChatMessages,
 		],
 	);
 	const handleSubmitComposer = useCallback(

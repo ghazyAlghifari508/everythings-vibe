@@ -12,6 +12,7 @@ import type {
 import type { CodebaseComposerMode } from "@/features/codebase/services/revision-intent";
 import type { WorkspaceView } from "@/features/codebase/services/workspace-hydration";
 import type { ComposerReferenceBinding } from "@/features/codebase/types/revision";
+import type { WorkspaceEvent } from "../../types/workspace-timeline";
 import type { CodebaseArtifactRef } from "../explorer/codebase-file-card";
 import type { RevisionHistoryEntry } from "../revision/codebase-revision-history";
 import type { RevisionProposalView } from "../revision/codebase-revision-review-dialog";
@@ -38,6 +39,9 @@ export interface CodebaseChatWorkspaceProps {
 	fileCount?: number;
 	kanbanProgress?: { done: number; total: number; pct: number } | null;
 	messages: ChatStreamMessage[];
+	timelineEvents?: WorkspaceEvent[];
+	timelineStatus?: "pending" | "ready" | "failed";
+	onRetryTimeline?: () => void;
 	questions: AdaptiveQuestion[];
 	answers: Record<string, string>;
 	/**

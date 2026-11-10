@@ -45,6 +45,9 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 		contextFiles,
 		kanbanProgress,
 		chatMessages,
+		timelineEvents,
+		timelineStatus,
+		refreshTimeline,
 		aiQuestions,
 		chatAnswers,
 		run,
@@ -198,6 +201,9 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 								fileCount={status?.fileCount ?? manifestFileCount ?? undefined}
 								kanbanProgress={kanbanProgress}
 								messages={chatMessages}
+								timelineEvents={timelineEvents}
+								timelineStatus={timelineStatus}
+								onRetryTimeline={refreshTimeline}
 								questions={aiQuestions}
 								answers={chatAnswers}
 								run={run}

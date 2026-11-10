@@ -9,11 +9,14 @@ import {
 	CODEBASE_STAGE_DONE_LABEL,
 	type CodebaseRunState,
 } from "@/features/codebase/services/chat-flow";
+import type { WorkspaceEvent } from "../../types/workspace-timeline";
 import { resolveCodebaseErrorDetails } from "./codebase-chat-workspace-error-rows";
 export interface ChatStreamMessage {
 	id: string;
 	role: "user" | "assistant";
 	content: string;
+	stage?: WorkspaceEvent["stage"];
+	createdAt?: string;
 }
 
 /** Human label per run stage, used in the Thinking headline. */
