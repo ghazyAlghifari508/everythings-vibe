@@ -157,6 +157,14 @@ export async function getOrCreateGenerationOperation(
 					"Hasil dan kredit perlu diperiksa sebelum mencoba kembali.",
 					"ACCOUNTING_RECONCILIATION_REQUIRED",
 				);
+			// Retry: the SAME operation is re-queued, so no duplicate job and no new
+			// credit identity (the billing key is project:stage:operationId). The
+			// attempt counter stays cumulative, and the attempt window is cleared:
+			// `status = 'queued'` therefore never reports a finished attempt's clock.
+			// The previous failure stays in the diagnostics log, not on the row.
+			console.info(
+				`[DurableGeneration] Re-queuing operation ${existing.id} (stage: ${existing.stage}, attempt: ${existing.attempt}/${existing.maxAttempts}, previous error: ${existing.errorCode ?? "none"} - ${existing.error ?? "none"})`,
+			);
 			const [retried] = await tx
 				.update(codebaseGenerationOperations)
 				.set({
