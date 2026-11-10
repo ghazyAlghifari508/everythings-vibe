@@ -39,6 +39,7 @@ export interface CodebaseChatWorkspaceProps {
 	repositoryFiles?: ReadonlyArray<{ path: string } | string>;
 	fileCount?: number;
 	kanbanProgress?: { done: number; total: number; pct: number } | null;
+	onOpenTaskProgress?: () => void;
 	messages: ChatStreamMessage[];
 	timelineEvents?: WorkspaceEvent[];
 	timelineStatus?: "pending" | "ready" | "failed";
@@ -109,7 +110,6 @@ export interface CodebaseChatWorkspaceProps {
 	 */
 	planningSnapshotId?: string | null;
 	currentSnapshotId?: string | null;
-	onReviewPlan?: () => void;
 	onConfirmGenerate?: () => void;
 	onRetryQuestions?: () => void;
 	onRetryGenerate?: () => void;

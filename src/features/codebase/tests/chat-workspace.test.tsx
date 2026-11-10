@@ -986,15 +986,24 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 		expect(container.querySelector("canvas")).toBeNull();
 	});
 
-	it("shows the kanban badge only when live progress exists", () => {
+	it("shows the task progress button only when live progress exists and triggers onOpenTaskProgress on click", () => {
+		const onOpenTaskProgress = vi.fn();
 		renderWorkspace({
 			kanbanProgress: { done: 2, total: 5, pct: 40 },
+			onOpenTaskProgress,
 		});
 
 		const badge = container.querySelector(
 			"[data-testid='codebase-kanban-badge']",
-		);
-		expect(badge?.textContent).toContain("Kanban Live: 2/5 Selesai (40%)");
+		) as HTMLButtonElement | null;
+		expect(badge).not.toBeNull();
+		expect(badge?.tagName.toLowerCase()).toBe("button");
+		expect(badge?.textContent).toContain("Progress task · 2/5 selesai");
+
+		act(() => {
+			badge?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+		expect(onOpenTaskProgress).toHaveBeenCalledTimes(1);
 	});
 
 	it("renders user messages in the stream", () => {

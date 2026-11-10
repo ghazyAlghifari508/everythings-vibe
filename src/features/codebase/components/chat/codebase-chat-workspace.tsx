@@ -47,6 +47,7 @@ export function CodebaseChatWorkspace(props: CodebaseChatWorkspaceProps) {
 		contextFiles = [],
 		repositoryFiles,
 		kanbanProgress = null,
+		onOpenTaskProgress,
 		messages,
 		questions,
 		run = null,
@@ -68,9 +69,7 @@ export function CodebaseChatWorkspace(props: CodebaseChatWorkspaceProps) {
 		starterRefresh,
 		newerAttemptFailure,
 		onRefreshStarterSuggestions,
-		planningSnapshotId = null,
 		currentSnapshotId = null,
-		onReviewPlan,
 		pendingProposal,
 		isReviewOpen = false,
 		isApplyingRevision = false,
@@ -136,12 +135,6 @@ export function CodebaseChatWorkspace(props: CodebaseChatWorkspaceProps) {
 	const failedArtifacts =
 		effectiveView.kind === "active" ? effectiveView.failedArtifacts : [];
 
-	const planningMovedOn = Boolean(
-		planningSnapshotId &&
-			currentSnapshotId &&
-			planningSnapshotId !== currentSnapshotId,
-	);
-
 	const composerPlaceholder =
 		controls.activeMode === "revise"
 			? "Jelaskan perubahan yang kamu inginkan..."
@@ -199,8 +192,17 @@ export function CodebaseChatWorkspace(props: CodebaseChatWorkspaceProps) {
 				featureName={featureName}
 				planSwitcher={planSwitcher}
 				kanbanProgress={kanbanProgress}
-				planningMovedOn={planningMovedOn}
-				onReviewPlan={onReviewPlan}
+				onOpenTaskProgress={
+					onOpenTaskProgress ??
+					(() => {
+						const tasksArtifact = artifacts.find((item) =>
+							item.id.startsWith("tasks-"),
+						);
+						if (tasksArtifact && props.onOpenArtifact) {
+							props.onOpenArtifact(tasksArtifact);
+						}
+					})
+				}
 			/>
 			{showLoading ? (
 				<CodebaseChatWorkspaceLoading />
