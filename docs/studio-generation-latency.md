@@ -103,3 +103,251 @@ Build completed successfully with existing browser-externalization warnings for 
 - The report commit that adds this section.
 
 TASK 01/02 work already on this branch (`1b735eda`, `e548c286`, `2c1ee248`, `3da44c9e`) added the structured validation diagnostics and stage-aware skill context this report builds on and does not undo.
+
+---
+
+## P2: Studio generation concurrency, job dependencies, and race conditions (2026-11-11)
+
+Backend job guarantees only. No chat panel, no canvas redesign, no browser QA.
+
+### Confirmed root causes (reproduced before the fix)
+
+1. **Provisional-slot race in `persistStudioPlannedFrames`.** Planning read every
+   frame of the project and classified the set with `existing.some((frame) =>
+   !isTemporarySlot(frame))`. An `add_screen` committed while planning was still
+   running therefore added one real frame, and planning then concluded the
+   initial slots were already planned: the provisional `Layar 1..N` rows were
+   never named, and the initial job generated frames it owned no longer
+   described.
+   `src/features/studio/tests/studio-planning-race.integration.test.ts`
+   reproduced it (slot ids kept the provisional names; the added frame was
+   generated twice).
+2. **Ordering without ownership.** Frame writes were scoped by
+   `(frame.id, projectId)` only. A recovery worker and a live worker, or two
+   operations on the same frame, could both write the same row, and a stale
+   writer could overwrite a newer revision with no version check.
+3. **No dependency model.** An accepted `add`/`revise` job depended implicitly on
+   the shared blueprint, but nothing recorded that dependency, so a job could be
+   claimed before planning committed anything, and a revision of a `generating`
+   frame was rejected outright (`STUDIO_INVALID_INPUT`) instead of being queued
+   against the version that would be produced.
+4. **Batch-per-poll throughput.** Dispatch selected three jobs, awaited all of
+   them (each initial job serialises its frames internally), and only then looked
+   for more work. Work queued mid-batch waited for the whole batch to drain.
+
+Suspected, not confirmed: nothing in this task remains "suspected" beyond the
+items listed under Unknowns.
+
+### Final queue and dependency policy
+
+Deterministic order: `status = queued AND claimed_by IS NULL` ordered by
+`created_at, id`. A queued job is dispatched only when its dependency state is
+`ready`; a non-ready job that cannot progress is failed with an explicit code
+instead of hanging.
+
+| Case | Dependency recorded | Claim requires |
+| --- | --- | --- |
+| initial | none | — |
+| `add` | `blueprint_job_id` (the project's single initial job) | blueprint job reached `planning_completed_at` |
+| `revise` on a `ready` frame | none, `base_revision = frame.revision` | frame revision unchanged |
+| `revise` on a `queued`/`generating` frame | `depends_on_job_id` = current tail job, `base_revision` = tail output revision | tail job completed and its version persisted |
+| `revise` after a failed operation on the same frame | tail job | failed tail is terminal → `STUDIO_DEPENDENCY_FAILED` |
+
+Batch selection (`selectStudioWorkerBatch`) is unchanged for the initial case: a
+first queued initial job takes the batch alone, an initial job that is already
+running reserves capacity by holding slots (not the whole batch), and non-initial
+jobs share the remaining slots up to `STUDIO_FRAME_CONCURRENCY` (3). Jobs queued
+before an initial job are admitted first; a *running* initial job does not block
+dependent work from filling spare slots.
+
+A job is offered to the dispatcher only when it is claimable right now:
+`status = queued`, `claimed_by IS NULL`, and its lease is null or already
+expired. A job whose previous worker still holds a live lease waits for that
+lease instead of being re-dispatched into a claim that must fail, and a job that
+exhausted `STUDIO_JOB_MAX_ATTEMPTS` becomes terminal at that point.
+
+Aggregate model concurrency is capped by **one dispatcher process holding the
+session advisory lock for its lifetime** plus a shared 3-slot semaphore
+(`studio-worker-scheduler.ts`) that every planning, naming, initial-frame and
+revision model call enters. The advisory lock was kept; it now guards a drain
+loop instead of one batch. Only one dispatcher runs per cluster, which also
+removes the per-frame race between two workers rather than relying on leases to
+resolve it.
+
+### Schema and migration
+
+Additive migration `drizzle/0046_studio_operation_dependencies.sql`
+(no destructive statement; all columns nullable except `studio_frames.revision`,
+which defaults to `0`):
+
+- `studio_jobs`: `request_id`, `request_hash`, `operation_intent`,
+  `operation_index`, `blueprint_job_id`, `depends_on_job_id`, `base_revision`,
+  `planning_completed_at`, `error_code`; unique
+  `(project_id, user_id, request_id, operation_index)`; index on
+  `depends_on_job_id`.
+- `studio_frames`: `origin_job_id`, `initial_slot`, `revision`, `last_job_id`;
+  index on `origin_job_id`; unique `(origin_job_id, initial_slot)`.
+- `studio_revisions`: `frame_id`, `frame_revision`, `job_id`, so history is
+  attributable to a frame version instead of a project-wide counter.
+- Backfill derives origin from persisted relationships only: `add` jobs' own
+  `target_frame_id`, then remaining frames ordered by `order, id` attached to the
+  project's single initial job. Frames with saved HTML start at `revision = 1`.
+  Legacy non-initial jobs still active are failed with
+  `STUDIO_DEPENDENCY_FAILED` and a resend instruction, because their target
+  version was never recorded and guessing it would be the overwrite this task
+  removes.
+- Safety: the migration must run before new workers start; old writers do not
+  check `revision`. Rollback is a plain `DROP COLUMN`/`DROP INDEX` set; no row is
+  deleted or rewritten except the version/ownership backfill above.
+
+### API and state
+
+`GET /api/studio/project` and the detail loader now return `jobs` (live jobs
+first, then terminal history, capped at 100) in addition to `activeJob`. An
+accepted operation answers `202` with its jobs; `clarify` stays `200`.
+`POST /api/studio/frame` accepts an optional `baseRevisions` map and rejects a
+stale base with `STUDIO_STALE_REVISION` (409) before writing anything.
+New public codes: `STUDIO_STALE_REVISION`, `STUDIO_DEPENDENCY_FAILED`
+(category `planning-required`), `STUDIO_IDEMPOTENCY_CONFLICT`. Frame status never
+lies: an accepted add is a `queued` frame row, so the canvas shows the queue
+state from the same poll it already uses.
+
+A rejected request leaves the draft in the composer: the existing composer only
+clears its text on `accepted`, so a `409` (duplicate, stale base, dependency)
+keeps the user's words on screen. This task does not add the chat panel that a
+future draft banner would live in.
+
+### Before / after job sequences
+
+```mermaid
+sequenceDiagram
+  participant U as User
+  participant A as API
+  participant W as Worker
+  Before: U->>A: generate 4 screens
+  A->>W: initial job (3 frames in flight)
+  U->>A: "Add Profile"
+  A->>A: insert real frame
+  W->>W: planning sees a non-provisional frame
+  W->>W: keeps "Layar 1..4", skips the plan
+  Note over W: initial frames unnamed, Profile generated twice
+```
+
+```mermaid
+sequenceDiagram
+  participant U as User
+  participant A as API
+  participant D as Dispatcher
+  participant M as Model slots (3)
+  After: U->>A: generate 4 screens
+  A->>D: initial job owns slots 0..3 via origin_job_id
+  U->>A: "Add Profile"
+  A->>A: add job + blueprint_job_id, frame is queued
+  D->>D: dependency state = waiting (no planning_completed_at)
+  D->>M: initial frames keep running
+  D->>M: Profile starts as soon as a slot frees and planning is committed
+  Note over M: never more than 3 concurrent model calls; siblings untouched
+```
+
+### Impacted files
+
+- Schema/migration: `src/db/schema/studio.ts`, `drizzle/0046_*.sql`,
+  `src/features/studio/types/studio-status.ts`.
+- Shared constant: `STUDIO_JOB_MAX_ATTEMPTS` moved to
+  `types/studio-constants.ts` (re-exported from `services/studio-job-lease.ts`)
+  so the dependency module can use it without importing the lease module back.
+- Queue and ownership: `studio-job-dependencies.ts` (new),
+  `studio-job-lease.ts`, `studio-worker-dispatch.ts`,
+  `studio-worker-scheduler.ts` (new), `studio-job-pipeline.ts`,
+  `studio-planning.ts`, `studio-project-enqueue.ts`.
+- Operations and writes: `studio-operation-enqueue.ts`,
+  `studio-operation-request.ts` (new), `studio-frame-write.ts` (new),
+  `studio-frame-operation.ts`, `studio-initial-frame.ts`,
+  `studio-retry-service.ts`, `studio-frame-errors.ts`.
+- API/state: `studio-project-detail.ts`, `studio-project-http.ts`,
+  `studio-frame-http.ts`, `studio-detail-loader.functions.ts`,
+  `types/studio-service.ts`, `types/studio.ts`, `utils/studio-lifecycle.ts`,
+  `hooks/use-studio-status.ts`.
+- Tests: `studio-planning-race.integration.test.ts` and
+  `studio-operation-dependencies.integration.test.ts` (new),
+  `studio-worker-dependencies.integration.test.ts` (new),
+  `studio-worker-dispatch-runtime.test.ts` (fixture follows the new queue),
+  plus shared row fixtures in `studio-canvas*`, `studio-frame*`,
+  `studio-export`, `studio-frame-route`, `studio-p9-polish`,
+  `studio-planning-lifecycle`, `studio-status` widened with the new columns.
+- Helper: `scripts/studio-p2-check.ts` runs any command against a throwaway
+  schema created from the current database, applies the new migration there and
+  drops it afterwards, so verification never writes to the workspace database.
+
+### Test results
+
+Deterministic Vitest/integration tests, provider mocked, no browser:
+
+- `add_screen` during pending planning, add during three generating frames,
+  duplicate submissions with one identity, distinct similar requests, two queued
+  add-screen operations, credits unchanged for rejected duplicates.
+- Revision of a pending target (queued, claimed only after the writer persists),
+  revision of a ready frame while siblings generate, two revisions of one target
+  serialised, stale base rejected at enqueue and at claim, partial multi-target
+  failure isolated, retry of a failed frame while another request is queued.
+- Lease loss and recovery (single reclaim, stale writer fenced, attempts
+  bounded), partial failure followed by retry, reload after the operations,
+  cross-project capacity, and cross-tenant isolation with a shared request id.
+- The queue only ever offers claimable work: a job whose previous worker still
+  holds a live lease is not offered until the lease expires, and a job that
+  exhausted its attempts becomes terminal instead of spinning. Both cases are
+  asserted directly, because a drain loop that re-dispatches an unclaimable job
+  would livelock the worker.
+- The shared slot semaphore is asserted in `studio-worker-scheduler.test.ts`:
+  aggregate model concurrency never exceeds 3, and a call still waiting for a
+  slot leaves the queue when the worker aborts, so shutdown cannot hang on a
+  slot that no one will release.
+- No lost, replaced, or duplicated initial frames: slot ids and names after the
+  race equal the planned blueprint, and approved sibling rows stay byte-identical.
+
+Observed results at this checkout (2026-11-10/11, isolated schema):
+
+- Full Studio suite (Chromium test excluded, serial): **131 files / 1225 tests,
+  127 files passed, 4 failed, 1220 tests passed, 5 failed**, 1092 s. The five
+  failures are the pre-existing ones listed below; every test this task added or
+  touched passes.
+- P2 focus set (`planning-race`, `operation-dependencies`,
+  `worker-dependencies`, `worker-scheduler`, `add-screen`, `operations`,
+  `blueprint-navigation`, `p3-pipeline`, `planning-lifecycle`, `status`):
+  **10 files / 98 tests, all passed**.
+- `pnpm exec tsc --noEmit`: 0 errors.
+- `pnpm biome check` over touched files: clean. One pre-existing unformatted file
+  (`studio-css-ownership-p2.test.ts`) is untouched and left alone.
+- `pnpm studio:worker:smoke`: readiness plus graceful SIGINT and SIGTERM.
+- `pnpm studio:assets:check`: 22 pinned assets verified.
+
+`studio-visual.test.ts` still launches Chromium and stays excluded. Live-provider
+latency is not part of this verification; nothing here measures it.
+
+The five remaining failures are pre-existing and unrelated to this task.
+Baseline evidence: with every change of this task stashed, these four files fail
+with the same assertions (5 failed / 38 passed):
+`studio-design-skill-fidelity` (asserts a frame system prompt without the base
+quality-rules block), `studio-frame-capture` twice (pins the logged `elapsedMs`
+to a value the mocked clock does not produce), `studio-index` (asserts landing
+copy), and `studio-p3-defects` (asserts an inspector warning string). They are
+not touched here and are not claimed as fixed.
+
+### Unknowns
+
+- Live-provider latency, rate limits and gateway fallback behaviour remain
+  unmeasured: no controlled live run was authorized, so "faster" is not claimed.
+- The dispatcher drain loop assumes one worker process per cluster (the advisory
+  lock). Multi-replica throughput fair *scheduling* is still first-come by
+  `created_at`; weighted fairness across tenants is not implemented.
+- `revision` is a monotonic per-frame counter, not a hash of the HTML bytes, so
+  two writers cannot be distinguished by content alone. A content digest would
+  strengthen comparison but nothing in this task requires it.
+- If a heartbeat is starved for a whole lease window while a provider call is
+  still in flight, recovery requeues that job. In-process dispatch skips jobs
+  that are still active and every write is fenced by `claimed_by` + `revision`,
+  so no duplicate row can be written; the cost is one repeated provider request,
+  not a corrupt frame. Measured heartbeat starvation has not been observed in
+  this environment.
+- The add/revise prompt still sends the whole sibling screen-name list; scoping
+  that prompt is a UI/quality concern outside this task.
