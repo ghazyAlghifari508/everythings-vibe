@@ -1,11 +1,15 @@
 "use client";
 
+import { Alert02Icon } from "@hugeicons/core-free-icons";
 import { AgentThinking } from "@/components/ui/agent-thinking";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
 import {
 	CODEBASE_STAGE_DONE_LABEL,
 	type CodebaseRunState,
 } from "@/features/codebase/services/chat-flow";
-
+import { resolveCodebaseErrorDetails } from "./codebase-chat-workspace-error-rows";
 export interface ChatStreamMessage {
 	id: string;
 	role: "user" | "assistant";
@@ -81,23 +85,52 @@ export function CodebaseChatWorkspaceMessages({
 					/>
 				</div>
 			) : null}
-			{showRunError && run?.error ? (
-				<div
-					data-testid="codebase-questions-error"
-					className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-crimson/30 bg-crimson/10 p-2.5 text-xs text-crimson"
-				>
-					<span role="alert">{run.error}</span>
-					{retryAction ? (
-						<button
-							type="button"
-							onClick={retryAction}
-							className="inline-flex min-h-7 items-center rounded border border-crimson/40 px-2 text-[11px] font-medium text-crimson hover:bg-crimson/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo"
-						>
-							Coba lagi
-						</button>
-					) : null}
-				</div>
-			) : null}
+			{showRunError && run?.error
+				? (() => {
+						const resolved = resolveCodebaseErrorDetails(
+							run.error,
+							`Generasi ${STAGE_LABEL[run.stage]} belum berhasil`,
+							"Coba lagi",
+						);
+						return (
+							<Alert
+								variant="default"
+								data-testid="codebase-questions-error"
+								className="rounded-xl border border-graphite/80 bg-charcoal p-3.5 text-xs text-snow shadow-none"
+							>
+								<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+									<div className="flex items-start gap-2.5 min-w-0">
+										<Icon
+											icon={Alert02Icon}
+											size={16}
+											aria-hidden="true"
+											className="mt-0.5 shrink-0 text-crimson"
+										/>
+										<div className="flex flex-col gap-0.5 min-w-0">
+											<AlertTitle className="text-xs font-semibold text-snow">
+												{resolved.title}
+											</AlertTitle>
+											<AlertDescription className="mt-0 text-xs text-fog leading-relaxed">
+												<span>{resolved.description}</span>
+											</AlertDescription>
+										</div>
+									</div>
+									{retryAction ? (
+										<Button
+											type="button"
+											variant="outline"
+											size="sm"
+											onClick={retryAction}
+											className="shrink-0 h-8 gap-1.5 border-graphite bg-obsidian px-3 font-mono text-[11px] text-snow hover:bg-graphite/30 disabled:opacity-50"
+										>
+											{resolved.actionLabel}
+										</Button>
+									) : null}
+								</div>
+							</Alert>
+						);
+					})()
+				: null}
 		</>
 	);
 }

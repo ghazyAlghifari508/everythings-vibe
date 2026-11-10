@@ -7,10 +7,11 @@ import {
 	Tick01Icon,
 } from "@hugeicons/core-free-icons";
 import { useEffect, useId, useRef, useState } from "react";
+import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { Orb } from "@/components/ui/orb";
 import { cn } from "@/lib/utils";
 import { Icon } from "./icon";
-
 export type AgentOperationStatus =
 	| "idle"
 	| "queued"
@@ -268,18 +269,37 @@ export function AgentThinking({
 
 			{/* Failure Message & Inline Retry */}
 			{isFailed && error ? (
-				<div className="mt-1 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-crimson/30 bg-crimson/10 p-2.5 text-xs text-crimson">
-					<span role="alert">{error}</span>
-					{onRetry ? (
-						<button
-							type="button"
-							onClick={onRetry}
-							className="inline-flex min-h-7 items-center rounded border border-crimson/40 px-2 text-[11px] font-medium text-crimson hover:bg-crimson/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo"
-						>
-							Coba lagi
-						</button>
-					) : null}
-				</div>
+				<Alert
+					variant="default"
+					className="mt-2 rounded-xl border border-graphite/80 bg-charcoal p-3 text-xs text-snow shadow-none"
+				>
+					<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
+						<div className="flex items-start gap-2 min-w-0">
+							<Icon
+								icon={AlertCircleIcon}
+								size={15}
+								aria-hidden="true"
+								className="mt-0.5 shrink-0 text-crimson"
+							/>
+							<div className="flex flex-col gap-0.5 min-w-0">
+								<span className="text-xs text-fog leading-relaxed">
+									{error}
+								</span>
+							</div>
+						</div>
+						{onRetry ? (
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								onClick={onRetry}
+								className="shrink-0 h-7 border-graphite bg-obsidian px-2.5 font-mono text-[11px] text-snow hover:bg-graphite/30"
+							>
+								Coba lagi
+							</Button>
+						) : null}
+					</div>
+				</Alert>
 			) : null}
 		</div>
 	);

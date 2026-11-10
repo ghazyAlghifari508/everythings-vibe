@@ -1,5 +1,8 @@
 "use client";
 
+import { Alert02Icon } from "@hugeicons/core-free-icons";
+import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
 import { CodebaseChatWorkspace } from "@/features/codebase/components/chat/codebase-chat-workspace";
 import { CodebaseArtifactCanvas } from "@/features/codebase/components/explorer/codebase-artifact-canvas";
 import { CodebaseExplorerSidebar } from "@/features/codebase/components/explorer/codebase-explorer-sidebar";
@@ -10,35 +13,9 @@ import { codebaseStarterSuggestionsSchema } from "@/features/codebase/services/a
 import { canReadExistingPlans } from "@/features/codebase/services/workspace-readiness";
 import { useCodebaseWorkspace } from "../../hooks/use-codebase-workspace";
 import type { CodebaseWorkspaceData } from "../../services/workspace-loader.functions";
-import { WorkspaceConnectionScreen } from "./workspace-connection-screen";
+import { WorkspaceConnectionScreenWrapper as ConnectionScreen } from "./workspace-connection-screen";
 import { WorkspaceHeader } from "./workspace-header";
 import { WorkspaceScreenResolver } from "./workspace-screen-resolver";
-
-function ConnectionScreen({
-	name,
-	ws,
-}: {
-	name: string;
-	ws: ReturnType<typeof useCodebaseWorkspace>;
-}) {
-	return (
-		<WorkspaceConnectionScreen
-			name={name}
-			error={ws.error}
-			status={ws.status}
-			payload={ws.payload}
-			isStarting={ws.isStarting}
-			triggerAnalysis={ws.triggerAnalysis}
-			startSession={ws.startSession}
-			readStatus={ws.readStatus}
-			readiness={ws.readiness}
-			analysis={ws.analysis}
-			isWorking={ws.isWorking}
-			activeWorkspaceSnapshotId={ws.activeWorkspaceSnapshotId}
-			manifestFileCount={ws.manifestFileCount ?? undefined}
-		/>
-	);
-}
 
 export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 	const { codebase, planningSnapshotByProject, canOpenFullBoard } = data;
@@ -158,16 +135,31 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 				{error && !ws.isResyncDrawerOpen && (
 					<div
 						role="alert"
-						className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-crimson/40 bg-crimson/10 px-4 py-2 text-xs text-crimson"
+						className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-graphite/80 bg-charcoal px-4 py-2.5 text-xs text-snow"
 					>
-						<span>{error}</span>
-						<button
+						<div className="flex items-center gap-2 min-w-0">
+							<Icon
+								icon={Alert02Icon}
+								size={14}
+								aria-hidden="true"
+								className="shrink-0 text-crimson"
+							/>
+							<div className="flex flex-col sm:flex-row sm:items-center gap-1 min-w-0">
+								<span className="font-semibold text-snow">
+									Koneksi ke server terputus:
+								</span>
+								<span className="text-fog truncate">{error}</span>
+							</div>
+						</div>
+						<Button
 							type="button"
+							variant="outline"
+							size="sm"
 							onClick={() => void readStatus()}
-							className="min-h-9 rounded-md border border-crimson/50 px-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+							className="h-7 border-graphite bg-obsidian px-2.5 font-mono text-[11px] text-snow hover:bg-graphite/30"
 						>
-							Coba lagi
-						</button>
+							Periksa status
+						</Button>
 					</div>
 				)}
 				<CodebaseWorkspaceResync projectName={codebase.name} ws={ws} />

@@ -28,6 +28,7 @@ export function CodebaseReviewEnvironmentPanel({
 				<div className="border-b border-graphite p-4 sm:p-5">
 					<h3 className="font-inter text-sm font-[600] text-snow">
 						Teknologi repository
+						<span className="sr-only">Detected environment</span>
 					</h3>
 				</div>
 				<div className="flex flex-col divide-y divide-graphite/60 p-0">
