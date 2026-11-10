@@ -79,7 +79,7 @@ it("removes the composer at persisted Task completion even when no task is done"
 	expect(screen.queryByRole("textbox", { name: /Jelaskan/ })).toBeNull();
 	expect(screen.queryByText(/Fitur aktif:/)).toBeNull();
 	expect(
-		screen.getByRole("button", { name: "Salin prompt handoff" }),
+		screen.getByRole("button", { name: "Salin instruksi untuk agent" }),
 	).toBeTruthy();
 });
 
@@ -126,7 +126,11 @@ it("opens the persisted Task artifact as Kanban without enabling regeneration", 
 			onGenerateAc={generate}
 		/>,
 	);
-	fireEvent.click(screen.getByRole("button", { name: "Buka Kanban" }));
+	fireEvent.click(
+		screen.getByRole("button", {
+			name: /Buka preview tasks\.json|Buka Kanban/,
+		}),
+	);
 	expect(open).toHaveBeenCalledWith(task);
 	expect(
 		screen.queryByRole("button", { name: /Buat (Task|PRD|AC)/ }),

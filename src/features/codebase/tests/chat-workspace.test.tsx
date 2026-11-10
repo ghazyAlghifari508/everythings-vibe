@@ -1888,7 +1888,7 @@ describe("CodebaseChatWorkspace pipeline stages", () => {
 		expect(card?.textContent).not.toContain("export rules");
 		expect(card?.textContent).toContain("docs/vibeplan/");
 		expect(card?.textContent).toContain("Project ID: proj-123");
-		expect(card?.textContent).toContain("polling");
+		expect(card?.textContent).not.toContain("polling");
 	});
 
 	it("offers no handoff before tasks exist", () => {
