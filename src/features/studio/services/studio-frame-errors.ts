@@ -18,6 +18,9 @@ export type StudioFrameErrorCode =
 	| "STUDIO_DUPLICATE_SCREEN"
 	| "STUDIO_SCREEN_LIMIT"
 	| "STUDIO_NOT_FOUND"
+	| "STUDIO_STALE_REVISION"
+	| "STUDIO_DEPENDENCY_FAILED"
+	| "STUDIO_IDEMPOTENCY_CONFLICT"
 	| "STUDIO_UNAUTHORIZED";
 
 interface StudioFrameErrorDescriptor {
@@ -106,6 +109,20 @@ export const STUDIO_FRAME_ERRORS: Record<
 		status: 401,
 		message: "Silakan masuk kembali untuk membuka Studio.",
 	},
+	STUDIO_STALE_REVISION: {
+		status: 409,
+		message:
+			"Versi layar telah berubah. Kirim ulang revisi terhadap versi terbaru.",
+	},
+	STUDIO_DEPENDENCY_FAILED: {
+		status: 409,
+		message:
+			"Dependensi desain gagal. Pulihkan perencanaan atau layar sumber, lalu coba lagi.",
+	},
+	STUDIO_IDEMPOTENCY_CONFLICT: {
+		status: 409,
+		message: "Identitas permintaan sudah dipakai untuk operasi lain.",
+	},
 };
 
 /**
@@ -154,6 +171,9 @@ const FAILURE_CATEGORY_BY_CODE: Record<
 	STUDIO_DUPLICATE_SCREEN: "unknown",
 	STUDIO_SCREEN_LIMIT: "unknown",
 	STUDIO_UNAUTHORIZED: "unknown",
+	STUDIO_STALE_REVISION: "unknown",
+	STUDIO_DEPENDENCY_FAILED: "planning-required",
+	STUDIO_IDEMPOTENCY_CONFLICT: "unknown",
 };
 
 const RECOVERY_BY_CATEGORY: Record<

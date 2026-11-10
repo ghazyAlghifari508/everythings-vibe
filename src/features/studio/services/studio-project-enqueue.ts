@@ -203,6 +203,8 @@ export async function createStudioProjectWithJob(
 					(_, index) =>
 						({
 							projectId: newProject.id,
+							originJobId: newJob.id,
+							initialSlot: index,
 							name: `Layar ${index + 1}`,
 							description: "",
 							viewport: designMode,

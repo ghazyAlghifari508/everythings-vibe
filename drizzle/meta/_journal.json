@@ -323,6 +323,13 @@
       "when": 1794077466611,
       "tag": "0045_codebase_onboarding_idempotency",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1794346397655,
+      "tag": "0046_studio_operation_dependencies",
+      "breakpoints": true
     }
   ]
 }

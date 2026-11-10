@@ -1,12 +1,10 @@
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
-	type InsertStudioRevisionRow,
 	type StudioJobRow,
 	studioFrames,
 	studioJobs,
 	studioProjects,
-	studioRevisions,
 } from "@/db/schema";
 import { ScrapeError } from "@/lib/design-errors";
 import {
@@ -16,12 +14,18 @@ import {
 import {
 	classifyStudioScreenRole,
 	extendStudioBlueprintWithScreen,
-	type StudioScreenClassification,
 } from "./studio-blueprint-navigation";
 import { STUDIO_ADD_FRAME_PLACEHOLDER_NAME } from "./studio-composer-intent";
+import type { StudioDesignBlueprint } from "./studio-design-blueprint";
 import { extractDesignSystemTokens } from "./studio-design-tokens";
+import { StudioFrameError } from "./studio-frame-errors";
 import { generateValidatedFrameHtml } from "./studio-frame-generation";
-import { type StudioJobClaim, withStudioJobWrite } from "./studio-job-lease";
+import { persistStudioFrameVersion } from "./studio-frame-write";
+import {
+	type StudioJobClaim,
+	StudioLeaseLostError,
+	withStudioJobWrite,
+} from "./studio-job-lease";
 import { studioJobTiming } from "./studio-job-runtime";
 import { buildStudioAssetUrl } from "./studio-logo-service";
 import { validateStudioDesignMode } from "./studio-prompt-validation";
@@ -53,12 +57,15 @@ export async function runStudioFrameOperation(
 	if (!frame) {
 		throw new ScrapeError("WEBSITE_BLOCKED", "Frame tidak ditemukan.");
 	}
+	const baseRevision = job.baseRevision ?? frame.revision;
+	if (frame.revision !== baseRevision)
+		throw new StudioFrameError("STUDIO_STALE_REVISION");
 	await withStudioJobWrite(claim, async (tx) => {
 		await tx
 			.update(studioJobs)
 			.set({ status: "generating", updatedAt: new Date() })
 			.where(eq(studioJobs.id, job.id));
-		await tx
+		const [started] = await tx
 			.update(studioFrames)
 			.set({
 				status: "generating",
@@ -69,8 +76,11 @@ export async function runStudioFrameOperation(
 				and(
 					eq(studioFrames.id, frame.id),
 					eq(studioFrames.projectId, project.id),
+					eq(studioFrames.revision, baseRevision),
 				),
-			);
+			)
+			.returning();
+		if (!started) throw new StudioFrameError("STUDIO_STALE_REVISION");
 	});
 	const [original] = await db
 		.select()
@@ -147,24 +157,31 @@ export async function runStudioFrameOperation(
 		? buildStudioAssetUrl(project.logoAssetId, job.userId)
 		: null;
 
-	let activeBlueprint = project.designBlueprint;
-	let screenRoleClassification: StudioScreenClassification | null = null;
-	if (job.jobType === "add" && activeBlueprint) {
-		screenRoleClassification = classifyStudioScreenRole({
+	// The prompt needs the project's shared blueprint with this screen merged in,
+	// but a failed generation must leave the stored blueprint untouched: the
+	// extension is therefore persisted only inside the success transaction.
+	const mergeBlueprint = (
+		blueprint: StudioDesignBlueprint,
+	): StudioDesignBlueprint => {
+		if (job.jobType !== "add") return blueprint;
+		const classification = classifyStudioScreenRole({
 			screenName: name,
 			screenDescription: frame.description,
 			prompt: job.prompt,
-			blueprint: activeBlueprint,
+			blueprint,
 			existingFrames: frames.filter((entry) => entry.id !== frame.id),
 			designMode: validateStudioDesignMode(project.designMode),
 		});
-		activeBlueprint = extendStudioBlueprintWithScreen({
-			blueprint: activeBlueprint,
+		return extendStudioBlueprintWithScreen({
+			blueprint,
 			screenName: name,
-			screenRole: screenRoleClassification,
+			screenRole: classification,
 			screenDescription: frame.description,
 		});
-	}
+	};
+	const activeBlueprint = project.designBlueprint
+		? mergeBlueprint(project.designBlueprint)
+		: null;
 
 	const prompt = buildStudioFramePrompt({
 		screenName: name,
@@ -205,42 +222,44 @@ export async function runStudioFrameOperation(
 	signal.throwIfAborted();
 	const persistenceStartedAt = Date.now();
 	await withStudioJobWrite(claim, async (tx) => {
-		await tx
-			.update(studioFrames)
-			.set({
-				name,
-				htmlCode,
-				status: "ready",
-				error: null,
-				updatedAt: new Date(),
-			})
-			.where(
-				and(
-					eq(studioFrames.id, frame.id),
-					eq(studioFrames.projectId, project.id),
-				),
-			);
-		if (activeBlueprint && activeBlueprint !== project.designBlueprint) {
-			await tx
-				.update(studioProjects)
-				.set({
-					designBlueprint: activeBlueprint,
-					updatedAt: new Date(),
-				})
-				.where(eq(studioProjects.id, project.id));
+		if (job.jobType === "add") {
+			// Merge against the blueprint as it is now, so two accepted screens that
+			// finish concurrently both land instead of overwriting one another.
+			const [current] = await tx
+				.select({ blueprint: studioProjects.designBlueprint })
+				.from(studioProjects)
+				.where(
+					and(
+						eq(studioProjects.id, project.id),
+						eq(studioProjects.userId, job.userId),
+					),
+				);
+			const merged = current?.blueprint
+				? mergeBlueprint(current.blueprint)
+				: activeBlueprint;
+			if (merged && merged !== current?.blueprint)
+				await tx
+					.update(studioProjects)
+					.set({
+						designBlueprint: merged,
+						designBlueprintVersion: sql`${studioProjects.designBlueprintVersion} + 1`,
+						updatedAt: new Date(),
+					})
+					.where(
+						and(
+							eq(studioProjects.id, project.id),
+							eq(studioProjects.userId, job.userId),
+						),
+					);
 		}
-		const [latest] = await tx
-			.select()
-			.from(studioRevisions)
-			.where(eq(studioRevisions.projectId, project.id))
-			.orderBy(desc(studioRevisions.version))
-			.limit(1);
-		await tx.insert(studioRevisions).values({
-			projectId: project.id,
-			prompt: job.prompt,
+		await persistStudioFrameVersion(tx, {
+			claim,
+			frameId: frame.id,
+			baseRevision,
+			name,
 			htmlCode,
-			version: (latest?.version ?? 0) + 1,
-		} satisfies InsertStudioRevisionRow);
+			prompt: job.prompt,
+		});
 		await tx
 			.update(studioJobs)
 			.set({

@@ -6,6 +6,7 @@ import {
 	text,
 	timestamp,
 	unique,
+	uniqueIndex,
 } from "drizzle-orm/pg-core";
 import type { StudioTitleSource } from "@/features/studio/services/studio-project-title";
 import type { StudioDesignBlueprint } from "@/lib/studio-design-blueprint";
@@ -97,6 +98,9 @@ export const studioRevisions = pgTable(
 			.references(() => studioProjects.id, { onDelete: "cascade" }),
 		prompt: text("prompt").notNull(),
 		htmlCode: text("html_code").notNull(),
+		frameId: text("frame_id"),
+		frameRevision: integer("frame_revision"),
+		jobId: text("job_id"),
 		version: integer("version").notNull().default(1),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.defaultNow()
@@ -123,6 +127,18 @@ export const studioJobs = pgTable(
 		status: text("status").notNull().default("queued"),
 		error: text("error"),
 		claimedBy: text("claimed_by"),
+		/** One composer request may create several independently recoverable jobs. */
+		requestId: text("request_id"),
+		requestHash: text("request_hash"),
+		operationIntent: text("operation_intent"),
+		operationIndex: integer("operation_index"),
+		blueprintJobId: text("blueprint_job_id"),
+		dependsOnJobId: text("depends_on_job_id"),
+		baseRevision: integer("base_revision"),
+		planningCompletedAt: timestamp("planning_completed_at", {
+			withTimezone: true,
+		}),
+		errorCode: text("error_code"),
 		attempts: integer("attempts").notNull().default(0),
 		claimedAt: timestamp("claimed_at", { withTimezone: true }),
 		leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
@@ -139,6 +155,13 @@ export const studioJobs = pgTable(
 		index("studio_jobs_project_id_idx").on(t.projectId),
 		index("studio_jobs_user_id_idx").on(t.userId),
 		index("studio_jobs_status_idx").on(t.status),
+		uniqueIndex("studio_jobs_request_part_idx").on(
+			t.projectId,
+			t.userId,
+			t.requestId,
+			t.operationIndex,
+		),
+		index("studio_jobs_dependency_idx").on(t.dependsOnJobId),
 	],
 );
 
@@ -161,6 +184,19 @@ export const studioFrames = pgTable(
 		attempts: integer("attempts").notNull().default(0),
 		visualHash: text("visual_hash"),
 		promptHash: text("prompt_hash"),
+		/**
+		 * Frame provenance and write ownership. `originJobId` is the job that
+		 * created the row ("initial" for a planned slot, "add" for a screen the
+		 * composer requested), `initialSlot` is the planned position inside that
+		 * job, `revision` counts persisted HTML versions and `lastJobId` names the
+		 * job that wrote the current revision. Provisional, planned, added,
+		 * revised, failed and ready frames are therefore distinguishable from
+		 * persisted relationships instead of from names or display order.
+		 */
+		originJobId: text("origin_job_id"),
+		initialSlot: integer("initial_slot"),
+		revision: integer("revision").notNull().default(0),
+		lastJobId: text("last_job_id"),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.defaultNow()
 			.notNull(),
@@ -173,6 +209,11 @@ export const studioFrames = pgTable(
 		index("studio_frames_order_idx").on(t.order),
 		index("studio_frames_project_status_idx").on(t.projectId, t.status),
 		unique("studio_frames_project_order_unique").on(t.projectId, t.order),
+		index("studio_frames_origin_idx").on(t.originJobId),
+		uniqueIndex("studio_frames_initial_slot_idx").on(
+			t.originJobId,
+			t.initialSlot,
+		),
 	],
 );
 

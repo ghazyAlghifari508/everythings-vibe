@@ -53,6 +53,10 @@ const frameSchema = z.object({
 	attempts: z.int().nonnegative(),
 	visualHash: nullableText,
 	promptHash: nullableText,
+	originJobId: nullableText.default(null),
+	initialSlot: z.int().nullable().default(null),
+	revision: z.int().nonnegative().default(0),
+	lastJobId: nullableText.default(null),
 	...timestamps,
 }) satisfies z.ZodType<StudioFrameRow>;
 
@@ -78,6 +82,15 @@ const jobSchema = z.object({
 	leaseExpiresAt: date.nullable(),
 	startedAt: date.nullable(),
 	finishedAt: date.nullable(),
+	requestId: nullableText.default(null),
+	requestHash: nullableText.default(null),
+	operationIntent: nullableText.default(null),
+	operationIndex: z.int().nullable().default(null),
+	blueprintJobId: nullableText.default(null),
+	dependsOnJobId: nullableText.default(null),
+	baseRevision: z.int().nullable().default(null),
+	planningCompletedAt: date.nullable().default(null),
+	errorCode: nullableText.default(null),
 	...timestamps,
 }) satisfies z.ZodType<StudioJobRow>;
 
@@ -86,6 +99,7 @@ export const studioStatusSchema = z
 		project: projectSchema,
 		frames: z.array(frameSchema),
 		activeJob: jobSchema.nullable(),
+		jobs: z.array(jobSchema).optional(),
 	})
 	.refine(
 		({ project, frames, activeJob }) =>
@@ -99,6 +113,7 @@ export const studioStatusSchema = z
 export interface StudioStatus {
 	project: StudioProjectRow;
 	frames: StudioFrameRow[];
+	jobs?: StudioJobRow[];
 	activeJob: StudioJobRow | null;
 }
 

@@ -43,6 +43,7 @@ export interface StudioDetailLoaderData {
 	project: StudioProjectRow;
 	frames: StudioFrameRow[];
 	activeJob: StudioJobRow | null;
+	jobs?: StudioJobRow[];
 	logoUrl: string | null;
 	revisions: StudioRevisionRow[];
 	latest: StudioRevisionRow | null;

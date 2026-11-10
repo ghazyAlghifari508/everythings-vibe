@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
 	type StudioFrameRow,
@@ -8,11 +8,9 @@ import {
 	studioProjects,
 } from "@/db/schema";
 import type { StudioFrameRetryOutcome } from "../types/studio";
-import {
-	deriveStudioLifecycle,
-	isTemporarySlot,
-} from "../utils/studio-lifecycle";
+import { isTemporarySlot } from "../utils/studio-lifecycle";
 import { StudioFrameError } from "./studio-frame-errors";
+import { findStudioInitialJob } from "./studio-job-dependencies";
 
 export interface StudioFrameRetryResult {
 	frame: StudioFrameRow;
@@ -22,6 +20,7 @@ export interface StudioFrameRetryResult {
 const resetClaim = {
 	status: "queued",
 	error: null,
+	errorCode: null,
 	claimedBy: null,
 	claimedAt: null,
 	leaseExpiresAt: null,
@@ -81,19 +80,10 @@ export async function retryStudioFrame(
 		// provisional planning slots, retrying one slot alone would rebuild it with
 		// no shared navigation contract, and repeating that per slot is the failure
 		// loop this guard exists to stop: the plan is the unit of recovery.
-		const slots = await tx
-			.select({
-				name: studioFrames.name,
-				description: studioFrames.description,
-				htmlCode: studioFrames.htmlCode,
-			})
-			.from(studioFrames)
-			.where(eq(studioFrames.projectId, projectId));
-		if (
-			!project.designBlueprint &&
-			slots.length > 0 &&
-			slots.every(isTemporarySlot)
-		)
+		const initial = await findStudioInitialJob(tx, projectId, userId);
+		// Only a slot the planner has not named yet needs the whole plan first; a
+		// frame with real content is retried on its own, with or without a blueprint.
+		if (!project.designBlueprint && isTemporarySlot(frame))
 			throw new StudioFrameError("STUDIO_PLANNING_REQUIRED");
 		const [operation] = await tx
 			.select()
@@ -108,32 +98,33 @@ export async function retryStudioFrame(
 			)
 			.orderBy(desc(studioJobs.createdAt))
 			.limit(1);
+		if (
+			operation?.errorCode === "STUDIO_STALE_REVISION" ||
+			operation?.errorCode === "STUDIO_IDEMPOTENCY_CONFLICT"
+		)
+			throw new StudioFrameError("STUDIO_STALE_REVISION");
+		if (operation?.errorCode === "STUDIO_DEPENDENCY_FAILED")
+			throw new StudioFrameError("STUDIO_DEPENDENCY_FAILED");
 		if (operation) {
 			await tx
 				.update(studioJobs)
-				.set({ ...resetClaim, updatedAt: new Date() })
+				.set({
+					...resetClaim,
+					baseRevision: operation.baseRevision ?? frame.revision,
+					updatedAt: new Date(),
+				})
 				.where(
 					and(eq(studioJobs.id, operation.id), eq(studioJobs.userId, userId)),
 				);
 		} else {
-			const [initial] = await tx
-				.select()
-				.from(studioJobs)
-				.where(
-					and(
-						eq(studioJobs.projectId, projectId),
-						eq(studioJobs.userId, userId),
-						eq(studioJobs.jobType, "initial"),
-					),
-				)
-				.orderBy(asc(studioJobs.createdAt))
-				.limit(1);
 			await tx.insert(studioJobs).values({
 				projectId,
 				userId,
 				jobType: "retry",
 				targetFrameId: frameId,
 				prompt: initial?.prompt ?? frame.description ?? frame.name,
+				baseRevision: frame.revision,
+				blueprintJobId: initial?.id ?? null,
 			});
 		}
 		// Only the failed state is reset; the frame keeps its last HTML so a
@@ -198,17 +189,22 @@ export async function retryStudioPlanning(
 					eq(studioJobs.projectId, projectId),
 					eq(studioJobs.userId, userId),
 					inArray(studioJobs.status, ["queued", "planning", "generating"]),
+					sql`(${studioJobs.blueprintJobId} is distinct from ${job.id} or ${studioJobs.claimedBy} is not null)`,
 				),
 			);
 		if (active) throw new StudioFrameError("STUDIO_RETRY_RUNNING");
-		const frames = await tx
-			.select()
+		const initialFrames = await tx
+			.select({ htmlCode: studioFrames.htmlCode })
 			.from(studioFrames)
-			.where(eq(studioFrames.projectId, projectId));
-		if (
-			!deriveStudioLifecycle({ project, frames, activeJob: job })
-				.canRetryPlanning
-		)
+			.where(
+				and(
+					eq(studioFrames.projectId, projectId),
+					sql`(${studioFrames.originJobId} = ${job.id} or ${studioFrames.originJobId} is null)`,
+				),
+			);
+		if (initialFrames.some((frame) => frame.htmlCode))
+			throw new StudioFrameError("STUDIO_INVALID_INPUT");
+		if (project.designBlueprint || job.planningCompletedAt)
 			throw new StudioFrameError("STUDIO_INVALID_INPUT");
 		const [updated] = await tx
 			.update(studioJobs)

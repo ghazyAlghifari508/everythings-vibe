@@ -1,6 +1,5 @@
 import { and, asc, eq } from "drizzle-orm";
 import {
-	type InsertStudioFrameRow,
 	type StudioFrameRow,
 	type StudioJobRow,
 	type StudioProjectRow,
@@ -13,7 +12,6 @@ import type {
 	StudioDesignMode,
 	StudioScreenPlan,
 } from "../types/studio-prompts";
-import { isTemporarySlot } from "../utils/studio-lifecycle";
 import type { StudioDesignBlueprint } from "./studio-design-blueprint";
 import {
 	resolveStudioPlanningSystemPrompt,
@@ -89,69 +87,75 @@ export async function persistStudioPlannedFrames(
 	projectId: string,
 	userId: string,
 	planned: StudioScreenPlan["screens"],
-	transaction: StudioJobTransaction,
+	tx: StudioJobTransaction,
+	jobId: string,
 ): Promise<StudioFrameRow[]> {
-	const persist = async (tx: StudioJobTransaction) => {
-		const [owned] = await tx
-			.select()
-			.from(studioProjects)
-			.where(
-				and(
-					eq(studioProjects.id, projectId),
-					eq(studioProjects.userId, userId),
-				),
-			)
-			.for("update");
-		if (!owned)
-			throw new ScrapeError("WEBSITE_BLOCKED", "Studio tidak ditemukan.");
-		const existing = await tx
-			.select()
-			.from(studioFrames)
-			.where(eq(studioFrames.projectId, projectId))
-			.orderBy(asc(studioFrames.order));
-		const plannedSet = existing.some((frame) => !isTemporarySlot(frame));
-		if (plannedSet) return existing;
-		if (
-			existing.length === planned.length &&
-			existing.every((frame) => isTemporarySlot(frame))
-		) {
-			const updated: StudioFrameRow[] = [];
-			for (const screen of planned) {
-				const slot = existing[screen.order];
-				if (!slot) continue;
-				const [row] = await tx
-					.update(studioFrames)
-					.set({
-						name: screen.name.slice(0, 100),
-						description: screen.description.slice(0, 500),
-						viewport: screen.viewport,
-						order: screen.order,
-						status: "queued",
-						updatedAt: new Date(),
-					})
-					.where(eq(studioFrames.id, slot.id))
-					.returning();
-				if (row) updated.push(row);
-			}
-			return updated;
+	const [owned] = await tx
+		.select()
+		.from(studioProjects)
+		.where(
+			and(eq(studioProjects.id, projectId), eq(studioProjects.userId, userId)),
+		)
+		.for("update");
+	if (!owned)
+		throw new ScrapeError("WEBSITE_BLOCKED", "Studio tidak ditemukan.");
+	const existing = await tx
+		.select()
+		.from(studioFrames)
+		.where(
+			and(
+				eq(studioFrames.projectId, projectId),
+				eq(studioFrames.originJobId, jobId),
+			),
+		)
+		.orderBy(asc(studioFrames.initialSlot));
+	if (existing.length !== 0 && existing.length !== planned.length)
+		throw new ScrapeError(
+			"STORAGE_FAILED",
+			"Slot perencanaan tidak konsisten.",
+		);
+	const updated: StudioFrameRow[] = [];
+	for (const screen of planned) {
+		const slot = existing.find((frame) => frame.initialSlot === screen.order);
+		if (slot?.htmlCode) {
+			updated.push(slot);
+			continue;
 		}
-		await tx.delete(studioFrames).where(eq(studioFrames.projectId, projectId));
-		return tx
-			.insert(studioFrames)
-			.values(
-				planned.map(
-					(screen) =>
-						({
-							projectId,
-							name: screen.name.slice(0, 100),
-							description: screen.description.slice(0, 500),
-							viewport: screen.viewport,
-							order: screen.order,
-							status: "queued",
-						}) satisfies InsertStudioFrameRow,
-				),
-			)
-			.returning();
-	};
-	return persist(transaction);
+		const values = {
+			name: screen.name.slice(0, 100),
+			description: screen.description.slice(0, 500),
+			viewport: screen.viewport,
+			status: "queued",
+			updatedAt: new Date(),
+		};
+		const [row] = slot
+			? await tx
+					.update(studioFrames)
+					.set(values)
+					.where(
+						and(
+							eq(studioFrames.id, slot.id),
+							eq(studioFrames.projectId, projectId),
+							eq(studioFrames.originJobId, jobId),
+						),
+					)
+					.returning()
+			: await tx
+					.insert(studioFrames)
+					.values({
+						...values,
+						projectId,
+						originJobId: jobId,
+						initialSlot: screen.order,
+						order: screen.order,
+					})
+					.returning();
+		if (!row) throw new ScrapeError("STORAGE_FAILED");
+		updated.push(row);
+	}
+	await tx
+		.update(studioJobs)
+		.set({ planningCompletedAt: new Date(), updatedAt: new Date() })
+		.where(and(eq(studioJobs.id, jobId), eq(studioJobs.userId, userId)));
+	return updated;
 }

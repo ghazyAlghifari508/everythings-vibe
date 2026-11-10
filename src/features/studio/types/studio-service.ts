@@ -10,6 +10,7 @@ import type {
 	StudioDesignReference,
 	StudioDesignSkillId,
 } from "@/features/studio/services/studio-generation-options";
+import type { StudioJobClaim } from "../services/studio-job-lease";
 import type { StudioDesignMode } from "./studio-prompts";
 
 export interface InitialFrameContext {
@@ -22,7 +23,7 @@ export interface InitialFrameContext {
 	dsTokens: ReturnType<typeof extractDesignSystemTokens>;
 	blueprint: StudioDesignBlueprint | null;
 	prdContent?: string | null;
-	lease: import("../services/studio-job-lease").StudioJobClaim;
+	lease: StudioJobClaim;
 	signal: AbortSignal;
 }
 
@@ -50,6 +51,7 @@ export interface StudioProjectFullDetail {
 	project: StudioProjectRow;
 	frames: StudioFrameRow[];
 	activeJob: StudioJobRow | null;
+	jobs: StudioJobRow[];
 	logoUrl: string | null;
 	revisions: StudioRevisionRow[];
 	latest: StudioRevisionRow | null;

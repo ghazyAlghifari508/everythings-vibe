@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
 	studioFrames,
@@ -60,6 +60,10 @@ export async function getStudioProjectDetail(
 						attempts: 0,
 						visualHash: null,
 						promptHash: null,
+						originJobId: null,
+						initialSlot: null,
+						revision: 1,
+						lastJobId: null,
 						createdAt: latest.createdAt,
 						updatedAt: latest.createdAt,
 					},
@@ -75,9 +79,17 @@ export async function getStudioProjectDetail(
 						eq(studioJobs.userId, userId),
 					),
 				)
-				.orderBy(desc(studioJobs.createdAt), desc(studioJobs.id))
-				.limit(1);
+				.orderBy(
+					sql`case when ${studioJobs.status} in ('planning', 'generating') then 0 when ${studioJobs.status} = 'queued' then 1 else 2 end`,
+					desc(studioJobs.createdAt),
+					desc(studioJobs.id),
+				)
+				// Live jobs sort first, so the cap only trims old terminal history.
+				.limit(100);
 
+			// Live jobs sort first, so `activeJob` is the job the canvas must follow;
+			// once everything is terminal it is the newest finished job, which is
+			// what the planning-failure and partial-result states read.
 			const activeJob = jobs[0] ?? null;
 
 			const logoUrl = project.logoAssetId
@@ -88,6 +100,7 @@ export async function getStudioProjectDetail(
 				project,
 				frames,
 				activeJob,
+				jobs,
 				logoUrl,
 				revisions,
 				latest,

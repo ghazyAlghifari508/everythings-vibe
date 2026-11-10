@@ -6,9 +6,17 @@ import {
 	studioJobs,
 	studioProjects,
 } from "@/db/schema";
-import { STUDIO_JOB_CLAIM_TTL_MS } from "../types/studio-constants";
+import {
+	STUDIO_JOB_CLAIM_TTL_MS,
+	STUDIO_JOB_MAX_ATTEMPTS,
+} from "../types/studio-constants";
+import {
+	ensureStudioInitialOwnership,
+	failStudioDependency,
+	studioJobDependencyState,
+} from "./studio-job-dependencies";
 
-export const STUDIO_JOB_MAX_ATTEMPTS = 3;
+export { STUDIO_JOB_MAX_ATTEMPTS };
 export const STUDIO_JOB_HEARTBEAT_MS = 15_000;
 export const STUDIO_JOB_TIMEOUT_MS = 30 * 60_000;
 export const STUDIO_WORKER_POLL_MS = 2_000;
@@ -135,31 +143,62 @@ export async function claimStudioJob(
 	workerId: string,
 	ttlMs = STUDIO_JOB_CLAIM_TTL_MS,
 ): Promise<StudioJobRow | null> {
-	const [claimed] = await db
-		.update(studioJobs)
-		.set({
-			claimedBy: workerId,
-			claimedAt: sql`clock_timestamp()`,
-			leaseExpiresAt: sql`clock_timestamp() + ${ttlMs} * interval '1 millisecond'`,
-			attempts: sql`${studioJobs.attempts} + 1`,
-			startedAt: sql`coalesce(${studioJobs.startedAt}, clock_timestamp())`,
-			finishedAt: null,
-			updatedAt: sql`clock_timestamp()`,
-		})
-		.where(
-			and(
-				eq(studioJobs.id, jobId),
-				eq(studioJobs.userId, userId),
-				inArray(studioJobs.status, activeStatuses),
-				lt(studioJobs.attempts, STUDIO_JOB_MAX_ATTEMPTS),
-				or(
-					isNull(studioJobs.leaseExpiresAt),
-					sql`${studioJobs.leaseExpiresAt} <= clock_timestamp()`,
+	return db.transaction(async (tx) => {
+		const [candidate] = await tx
+			.select()
+			.from(studioJobs)
+			.where(and(eq(studioJobs.id, jobId), eq(studioJobs.userId, userId)))
+			.limit(1);
+		if (!candidate) return null;
+		const [project] = await tx
+			.select({ id: studioProjects.id })
+			.from(studioProjects)
+			.where(
+				and(
+					eq(studioProjects.id, candidate.projectId),
+					eq(studioProjects.userId, userId),
 				),
-			),
-		)
-		.returning();
-	return claimed ?? null;
+			)
+			.for("update");
+		if (!project) return null;
+		const [job] = await tx
+			.select()
+			.from(studioJobs)
+			.where(
+				and(
+					eq(studioJobs.id, jobId),
+					eq(studioJobs.userId, userId),
+					inArray(studioJobs.status, activeStatuses),
+					lt(studioJobs.attempts, STUDIO_JOB_MAX_ATTEMPTS),
+					or(
+						isNull(studioJobs.leaseExpiresAt),
+						sql`${studioJobs.leaseExpiresAt} <= clock_timestamp()`,
+					),
+				),
+			)
+			.for("update");
+		if (!job) return null;
+		const state = await studioJobDependencyState(tx, job);
+		if (state !== "ready") {
+			if (state !== "waiting") await failStudioDependency(tx, job, state);
+			return null;
+		}
+		if (job.jobType === "initial") await ensureStudioInitialOwnership(tx, job);
+		const [claimed] = await tx
+			.update(studioJobs)
+			.set({
+				claimedBy: workerId,
+				claimedAt: sql`clock_timestamp()`,
+				leaseExpiresAt: sql`clock_timestamp() + ${ttlMs} * interval '1 millisecond'`,
+				attempts: sql`${studioJobs.attempts} + 1`,
+				startedAt: sql`coalesce(${studioJobs.startedAt}, clock_timestamp())`,
+				finishedAt: null,
+				updatedAt: sql`clock_timestamp()`,
+			})
+			.where(and(eq(studioJobs.id, jobId), eq(studioJobs.userId, userId)))
+			.returning();
+		return claimed ?? null;
+	});
 }
 
 export async function refreshStudioJobLease(
@@ -308,8 +347,14 @@ export async function recoverStalledStudioJobs(
 							eq(studioFrames.projectId, job.projectId),
 							inArray(studioFrames.status, ["queued", "generating"]),
 							job.targetFrameId
-								? eq(studioFrames.id, job.targetFrameId)
-								: undefined,
+								? and(
+										eq(studioFrames.id, job.targetFrameId),
+										eq(studioFrames.revision, job.baseRevision ?? 0),
+									)
+								: or(
+										eq(studioFrames.originJobId, job.id),
+										isNull(studioFrames.originJobId),
+									),
 						),
 					);
 			recovered++;

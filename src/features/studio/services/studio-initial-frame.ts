@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, or, sql } from "drizzle-orm";
 import { studioFrames } from "@/db/schema";
 import type { InitialFrameContext } from "../types/studio-service";
 import {
@@ -7,6 +7,7 @@ import {
 	studioFrameFailureCategory,
 } from "./studio-frame-errors";
 import { generateValidatedFrameHtml } from "./studio-frame-generation";
+import { persistStudioFrameVersion } from "./studio-frame-write";
 import { StudioLeaseLostError, withStudioJobWrite } from "./studio-job-lease";
 import { studioJobTiming } from "./studio-job-runtime";
 import { validateStudioDesignMode } from "./studio-prompt-validation";
@@ -17,11 +18,11 @@ export async function generateInitialFrame(
 ): Promise<{ ok: true; htmlCode: string } | { ok: false; error: string }> {
 	const { frame } = ctx;
 	ctx.signal.throwIfAborted();
-	if (frame.status === "ready" && frame.htmlCode) {
+	if (frame.htmlCode && (frame.revision > 0 || frame.status === "ready")) {
 		return { ok: true, htmlCode: frame.htmlCode };
 	}
 	await withStudioJobWrite(ctx.lease, async (tx) => {
-		await tx
+		const [started] = await tx
 			.update(studioFrames)
 			.set({
 				status: "generating",
@@ -32,8 +33,17 @@ export async function generateInitialFrame(
 				and(
 					eq(studioFrames.id, frame.id),
 					eq(studioFrames.projectId, ctx.lease.projectId),
+					// A legacy row has no recorded origin yet; it is adopted by the claim,
+					// so an unowned row is still writable by this job exactly once.
+					or(
+						eq(studioFrames.originJobId, ctx.lease.jobId),
+						isNull(studioFrames.originJobId),
+					),
+					eq(studioFrames.revision, frame.revision),
 				),
-			);
+			)
+			.returning();
+		if (!started) throw new StudioLeaseLostError();
 	});
 	const designMode = validateStudioDesignMode(frame.viewport);
 	const basePrompt = buildStudioFramePrompt({
@@ -69,20 +79,13 @@ export async function generateInitialFrame(
 		ctx.signal.throwIfAborted();
 		const persistenceStartedAt = Date.now();
 		await withStudioJobWrite(ctx.lease, async (tx) => {
-			await tx
-				.update(studioFrames)
-				.set({
-					htmlCode,
-					status: "ready",
-					error: null,
-					updatedAt: new Date(),
-				})
-				.where(
-					and(
-						eq(studioFrames.id, frame.id),
-						eq(studioFrames.projectId, ctx.lease.projectId),
-					),
-				);
+			await persistStudioFrameVersion(tx, {
+				claim: ctx.lease,
+				frameId: frame.id,
+				baseRevision: frame.revision,
+				htmlCode,
+				prompt: ctx.jobPrompt,
+			});
 		});
 		studioJobTiming("frame-persistence", persistenceStartedAt, {
 			jobId: ctx.lease.jobId,
@@ -112,6 +115,7 @@ export async function generateInitialFrame(
 					and(
 						eq(studioFrames.id, frame.id),
 						eq(studioFrames.projectId, ctx.lease.projectId),
+						eq(studioFrames.revision, frame.revision),
 					),
 				);
 		});

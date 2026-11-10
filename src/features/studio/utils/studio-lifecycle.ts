@@ -19,15 +19,20 @@ export function deriveStudioLifecycle({
 	project,
 	frames,
 	activeJob,
+	jobs,
 }: StudioStatus) {
-	const isProcessing = activeJob
-		? isStudioJobRunning(activeJob)
-		: frames.some(
-				(frame) => frame.status === "queued" || frame.status === "generating",
-			);
+	const isProcessing =
+		jobs?.some(isStudioJobRunning) ||
+		(activeJob
+			? isStudioJobRunning(activeJob)
+			: frames.some(
+					(frame) => frame.status === "queued" || frame.status === "generating",
+				));
+	const planningJob =
+		jobs?.find((job) => job.jobType === "initial") ?? activeJob;
 	const planningFailed =
-		activeJob?.jobType === "initial" &&
-		activeJob.status === "failed" &&
+		planningJob?.jobType === "initial" &&
+		planningJob.status === "failed" &&
 		!project.designBlueprint &&
 		frames.every(isTemporarySlot);
 	const inconsistent =

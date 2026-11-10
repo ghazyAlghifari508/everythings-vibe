@@ -89,6 +89,9 @@ export const studioFrameBodySchema = z.discriminatedUnion("action", [
 		prompt: z.string().min(10).max(4000),
 		frameIds: z.array(z.string().min(1)).max(100).optional(),
 		requestId: z.string().uuid(),
+		baseRevisions: z
+			.record(z.string().min(1), z.int().nonnegative())
+			.optional(),
 	}),
 	z.object({
 		action: z.literal("retry"),
@@ -125,6 +128,7 @@ export async function POST({
 				prompt: body.prompt,
 				frameIds: body.frameIds,
 				requestId: body.requestId,
+				baseRevisions: body.baseRevisions,
 			});
 			return Response.json(accepted, {
 				status: accepted.intent === "clarify" ? 200 : 202,

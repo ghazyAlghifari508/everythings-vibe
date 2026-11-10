@@ -1,8 +1,6 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
-	type InsertStudioFrameRow,
-	type InsertStudioJobRow,
 	type StudioFrameRow,
 	type StudioJobRow,
 	studioFrames,
@@ -17,16 +15,24 @@ import {
 import { resolveStudioOperationIntent } from "./studio-composer-intent.server";
 import { StudioFrameError } from "./studio-frame-errors";
 import { STUDIO_MAX_PAGE_COUNT } from "./studio-generation-options";
-import type { StudioJobTransaction } from "./studio-job-lease";
+import {
+	ensureStudioInitialOwnership,
+	findStudioInitialJob,
+	studioFrameDependency,
+} from "./studio-job-dependencies";
+import {
+	readStudioOperationRequest,
+	studioOperationHash,
+} from "./studio-operation-request";
 import { validateStudioPrompt } from "./studio-prompt-validation";
 
 export interface EnqueueStudioOperationInput {
 	prompt: string;
-	/** Frames the user actually selected on the canvas, if any. */
 	frameIds?: string[];
 	requestId: string;
+	/** Optional for existing clients; when supplied every target must match. */
+	baseRevisions?: Record<string, number>;
 }
-
 export type EnqueueStudioOperationResult =
 	| { intent: "add_screen"; jobs: StudioJobRow[]; frames: StudioFrameRow[] }
 	| { intent: "revise_selected" | "revise_project"; jobs: StudioJobRow[] }
@@ -34,162 +40,20 @@ export type EnqueueStudioOperationResult =
 
 function assertNewScreenNames(
 	decision: StudioIntentDecision,
-	existingNames: string[],
-): string[] {
-	// An empty name list means one screen whose name the generator still picks.
-	if (decision.screens.length === 0) return [];
+	frames: StudioFrameRow[],
+) {
 	if (decision.screens.length > STUDIO_MAX_PAGE_COUNT)
 		throw new StudioFrameError("STUDIO_SCREEN_LIMIT");
-	const requested = decision.screens.map((name) => name.trim());
-	const lowered = requested.map((name) => name.toLowerCase());
-	if (new Set(lowered).size !== lowered.length)
-		throw new StudioFrameError("STUDIO_DUPLICATE_SCREEN");
-	const existing = new Set(
-		existingNames.map((name) => name.trim().toLowerCase()),
-	);
-	if (lowered.some((name) => existing.has(name)))
-		throw new StudioFrameError("STUDIO_DUPLICATE_SCREEN");
-	return requested;
-}
-
-async function enqueueAddedScreens(
-	tx: StudioJobTransaction,
-	input: {
-		projectId: string;
-		userId: string;
-		prompt: string;
-		requestId: string;
-		viewport: StudioFrameRow["viewport"];
-		existingFrames: StudioFrameRow[];
-		decision: StudioIntentDecision;
-	},
-): Promise<{ jobs: StudioJobRow[]; frames: StudioFrameRow[] }> {
-	const plannedJobIds = (
-		input.decision.screens.length > 0 ? input.decision.screens : [null]
-	).map((_, index) => `${input.requestId}:add:${index}`);
-	// A repeated submit reuses the already-queued jobs instead of creating a
-	// second screen that would then collide with the first one's name.
-	const previous = await tx
-		.select()
-		.from(studioJobs)
-		.where(
-			and(
-				inArray(studioJobs.id, plannedJobIds),
-				eq(studioJobs.userId, input.userId),
-			),
-		);
-	if (previous.length > 0) return { jobs: previous, frames: [] };
-	const names = assertNewScreenNames(
-		input.decision,
-		input.existingFrames.map((frame) => frame.name),
-	);
-	const picks = names.length > 0 ? names : [null];
-	const baseOrder =
-		input.existingFrames.reduce(
-			(max, frame) => Math.max(max, frame.order),
-			-1,
-		) + 1;
-	const jobs: StudioJobRow[] = [];
-	const created: StudioFrameRow[] = [];
-	for (const [index, name] of picks.entries()) {
-		const jobId = plannedJobIds[index] ?? `${input.requestId}:add:${index}`;
-		const [frame] = await tx
-			.insert(studioFrames)
-			.values({
-				projectId: input.projectId,
-				name: name ?? STUDIO_ADD_FRAME_PLACEHOLDER_NAME,
-				description: input.prompt,
-				viewport: input.viewport,
-				order: baseOrder + index,
-				status: "queued",
-			} satisfies InsertStudioFrameRow)
-			.returning();
-		if (!frame) throw new ScrapeError("STORAGE_FAILED");
-		const [job] = await tx
-			.insert(studioJobs)
-			.values({
-				id: jobId,
-				projectId: input.projectId,
-				userId: input.userId,
-				prompt: input.prompt,
-				jobType: "add",
-				targetFrameId: frame.id,
-				status: "queued",
-			} satisfies InsertStudioJobRow)
-			.returning();
-		if (!job) throw new ScrapeError("STORAGE_FAILED");
-		jobs.push(job);
-		created.push(frame);
-	}
-	return { jobs, frames: created };
-}
-
-async function enqueueFrameRevisions(
-	tx: StudioJobTransaction,
-	input: {
-		projectId: string;
-		userId: string;
-		prompt: string;
-		requestId: string;
-		frameIds: string[];
-		existingFrames: StudioFrameRow[];
-	},
-): Promise<StudioJobRow[]> {
-	const ids = [...new Set(input.frameIds)];
+	const names = decision.screens.map((name) => name.trim());
+	const keys = names.map((name) => name.toLowerCase());
 	if (
-		ids.length === 0 ||
-		ids.some((id) => !input.existingFrames.some((frame) => frame.id === id))
+		new Set(keys).size !== keys.length ||
+		frames.some((frame) => keys.includes(frame.name.trim().toLowerCase()))
 	)
-		throw new StudioFrameError("STUDIO_INVALID_INPUT");
-	const targets = input.existingFrames.filter((frame) =>
-		ids.includes(frame.id),
-	);
-	const jobs: StudioJobRow[] = [];
-	for (const frame of targets) {
-		const jobId = `${input.requestId}:${frame.id}`;
-		const [existing] = await tx
-			.select()
-			.from(studioJobs)
-			.where(and(eq(studioJobs.id, jobId), eq(studioJobs.userId, input.userId)))
-			.limit(1);
-		if (existing) {
-			jobs.push(existing);
-			continue;
-		}
-		if (frame.status === "queued" || frame.status === "generating")
-			throw new StudioFrameError("STUDIO_INVALID_INPUT");
-		const [job] = await tx
-			.insert(studioJobs)
-			.values({
-				id: jobId,
-				projectId: input.projectId,
-				userId: input.userId,
-				prompt: input.prompt,
-				jobType: "revise",
-				targetFrameId: frame.id,
-				status: "queued",
-			} satisfies InsertStudioJobRow)
-			.returning();
-		if (!job) throw new ScrapeError("STORAGE_FAILED");
-		await tx
-			.update(studioFrames)
-			.set({ status: "queued", error: null, updatedAt: new Date() })
-			.where(
-				and(
-					eq(studioFrames.id, frame.id),
-					eq(studioFrames.projectId, input.projectId),
-				),
-			);
-		jobs.push(job);
-	}
-	return jobs;
+		throw new StudioFrameError("STUDIO_DUPLICATE_SCREEN");
+	return names.length > 0 ? names : [null];
 }
 
-/**
- * Resolves one composer message into an explicit operation and persists the
- * work. A missing frame selection is only ever a clarification input, never a
- * request to regenerate the whole project.
- */
 export async function enqueueStudioOperation(
 	projectId: string,
 	userId: string,
@@ -197,6 +61,8 @@ export async function enqueueStudioOperation(
 ): Promise<EnqueueStudioOperationResult> {
 	const checked = validateStudioPrompt(input.prompt);
 	if (!checked.ok) throw new ScrapeError("INVALID_URL", checked.error);
+	if (!input.requestId.trim())
+		throw new StudioFrameError("STUDIO_INVALID_INPUT");
 	const [project] = await db
 		.select()
 		.from(studioProjects)
@@ -204,8 +70,15 @@ export async function enqueueStudioOperation(
 			and(eq(studioProjects.id, projectId), eq(studioProjects.userId, userId)),
 		)
 		.limit(1);
-	if (!project)
-		throw new ScrapeError("WEBSITE_BLOCKED", "Studio tidak ditemukan.");
+	if (!project) throw new StudioFrameError("STUDIO_NOT_FOUND");
+	const hash = studioOperationHash(input);
+	const previous = await readStudioOperationRequest(
+		projectId,
+		userId,
+		input.requestId,
+		hash,
+	);
+	if (previous) return previous;
 	const frames = await db
 		.select()
 		.from(studioFrames)
@@ -218,10 +91,7 @@ export async function enqueueStudioOperation(
 		projectTitle: project.title,
 	});
 	if (decision.intent === "clarify")
-		return {
-			intent: "clarify",
-			message: decision.message ?? "",
-		};
+		return { intent: "clarify", message: decision.message ?? "" };
 	const intent = decision.intent;
 	return db.transaction(async (tx) => {
 		const [locked] = await tx
@@ -234,42 +104,118 @@ export async function enqueueStudioOperation(
 				),
 			)
 			.for("update");
-		if (!locked)
-			throw new ScrapeError("WEBSITE_BLOCKED", "Studio tidak ditemukan.");
-		const currentFrames = await tx
+		if (!locked) throw new StudioFrameError("STUDIO_NOT_FOUND");
+		const repeated = await readStudioOperationRequest(
+			projectId,
+			userId,
+			input.requestId,
+			hash,
+			tx,
+		);
+		if (repeated) return repeated;
+		const initial = await findStudioInitialJob(tx, projectId, userId);
+		if (initial) await ensureStudioInitialOwnership(tx, initial);
+		const current = await tx
 			.select()
 			.from(studioFrames)
 			.where(eq(studioFrames.projectId, projectId))
 			.orderBy(asc(studioFrames.order));
-		if (intent === "add_screen") {
-			const added = await enqueueAddedScreens(tx, {
-				projectId,
-				userId,
-				prompt: checked.prompt,
-				requestId: input.requestId,
-				viewport: locked.designMode,
-				existingFrames: currentFrames,
-				decision,
-			});
-			if (added.frames.length > 0)
-				await tx
-					.update(studioProjects)
-					.set({ updatedAt: new Date() })
-					.where(eq(studioProjects.id, projectId));
-			return { intent: "add_screen" as const, ...added };
-		}
-		const targetIds =
-			intent === "revise_project"
-				? currentFrames.map((frame) => frame.id)
-				: (input.frameIds ?? []);
-		const jobs = await enqueueFrameRevisions(tx, {
+		const common = {
 			projectId,
 			userId,
 			prompt: checked.prompt,
 			requestId: input.requestId,
-			frameIds: targetIds,
-			existingFrames: currentFrames,
-		});
+			requestHash: hash,
+			operationIntent: intent,
+			blueprintJobId: initial?.id ?? null,
+			status: "queued",
+		};
+		const jobs: StudioJobRow[] = [];
+		if (intent === "add_screen") {
+			const names = assertNewScreenNames(decision, current);
+			const order = Math.max(-1, ...current.map((frame) => frame.order)) + 1;
+			const created: StudioFrameRow[] = [];
+			for (const [index, name] of names.entries()) {
+				const id = crypto.randomUUID();
+				const [frame] = await tx
+					.insert(studioFrames)
+					.values({
+						projectId,
+						originJobId: id,
+						name: name ?? STUDIO_ADD_FRAME_PLACEHOLDER_NAME,
+						description: checked.prompt,
+						viewport: locked.designMode,
+						order: order + index,
+					})
+					.returning();
+				if (!frame) throw new ScrapeError("STORAGE_FAILED");
+				const [job] = await tx
+					.insert(studioJobs)
+					.values({
+						...common,
+						id,
+						jobType: "add",
+						targetFrameId: frame.id,
+						operationIndex: index,
+						baseRevision: 0,
+					})
+					.returning();
+				if (!job) throw new ScrapeError("STORAGE_FAILED");
+				jobs.push(job);
+				created.push(frame);
+			}
+			await tx
+				.update(studioProjects)
+				.set({ updatedAt: new Date() })
+				.where(
+					and(
+						eq(studioProjects.id, projectId),
+						eq(studioProjects.userId, userId),
+					),
+				);
+			return { intent, jobs, frames: created };
+		}
+		const ids = [
+			...new Set(
+				intent === "revise_project"
+					? current.map((frame) => frame.id)
+					: (input.frameIds ?? []),
+			),
+		];
+		if (
+			!ids.length ||
+			ids.some((id) => !current.some((frame) => frame.id === id))
+		)
+			throw new StudioFrameError("STUDIO_INVALID_INPUT");
+		for (const [index, id] of ids.entries()) {
+			const frame = current.find((entry) => entry.id === id);
+			if (!frame) throw new StudioFrameError("STUDIO_NOT_FOUND");
+			const explicitBase = input.baseRevisions?.[id];
+			if (
+				input.baseRevisions &&
+				(!Number.isInteger(explicitBase) || explicitBase !== frame.revision)
+			)
+				throw new StudioFrameError("STUDIO_STALE_REVISION");
+			const dependency = await studioFrameDependency(tx, frame, userId);
+			if (
+				frame.status === "failed" &&
+				!frame.htmlCode &&
+				!dependency.dependsOnJobId
+			)
+				throw new StudioFrameError("STUDIO_DEPENDENCY_FAILED");
+			const [job] = await tx
+				.insert(studioJobs)
+				.values({
+					...common,
+					jobType: "revise",
+					targetFrameId: id,
+					operationIndex: index,
+					...dependency,
+				})
+				.returning();
+			if (!job) throw new ScrapeError("STORAGE_FAILED");
+			jobs.push(job);
+		}
 		return { intent, jobs };
 	});
 }

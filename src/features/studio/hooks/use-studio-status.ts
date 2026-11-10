@@ -25,10 +25,9 @@ function reconcile(previous: StudioStatus, next: StudioStatus): StudioStatus {
 	if (
 		previous.project.updatedAt > next.project.updatedAt ||
 		(previousJob &&
-			(!nextJob ||
-				(previousJob.id === nextJob.id
-					? previousJob.updatedAt > nextJob.updatedAt
-					: previousJob.createdAt > nextJob.createdAt)))
+			nextJob &&
+			previousJob.id === nextJob.id &&
+			previousJob.updatedAt > nextJob.updatedAt)
 	)
 		return previous;
 	const nextUpdatedAt = Math.max(
@@ -61,16 +60,20 @@ function reconcile(previous: StudioStatus, next: StudioStatus): StudioStatus {
 					? previousJob
 					: nextJob
 			: nextJob;
+	const stableJobs =
+		JSON.stringify(previous.jobs) === JSON.stringify(next.jobs);
 	if (
 		stableFrames &&
 		project === previous.project &&
-		activeJob === previous.activeJob
+		activeJob === previous.activeJob &&
+		stableJobs
 	)
 		return previous;
 	return {
 		project,
 		activeJob,
 		frames: stableFrames ? previous.frames : frames,
+		jobs: stableJobs ? previous.jobs : next.jobs,
 	};
 }
 
