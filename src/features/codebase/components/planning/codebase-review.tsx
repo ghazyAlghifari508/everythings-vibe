@@ -1,5 +1,6 @@
 "use client";
 
+import { PageHeading } from "@/components/ui/page-heading";
 import type { CodebaseAnalysis } from "@/features/codebase/services/analysis";
 import { CodebaseReviewActions } from "./codebase-review-actions";
 import { CodebaseReviewEnvironmentPanel } from "./codebase-review-environment-panel";
@@ -40,22 +41,14 @@ export function CodebaseReview({
 	return (
 		<div className="w-full animate-enter flex flex-col gap-6">
 			{/* Page Head matching existing-codebase-flow.html screen 04 */}
-			<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+			<div className="flex flex-col gap-3">
 				<div>
-					<div className="text-[11px] font-mono tracking-widest uppercase text-fog mb-2">
-						CODEBASE ANALYSIS · REVIEW BEFORE GENERATE
-					</div>
-					<h1 className="font-inter text-2xl sm:text-3xl font-[620] tracking-tight text-snow leading-tight">
-						Kami menemukan konteks aplikasimu.
-					</h1>
+					<PageHeading variant="workspace">Ringkasan repository</PageHeading>
 					<p className="mt-2 text-xs sm:text-sm text-fog max-w-xl leading-relaxed">
-						Review ringkasan ini sebelum everythings-vibe membuat pertanyaan.
-						Kamu bisa mengoreksi hasil deteksi yang tidak sesuai.
+						Berikut gambaran aplikasi dan teknologi dari repository yang sudah
+						disinkronkan. Buka workspace untuk mulai merencanakan fitur.
 					</p>
 				</div>
-				<span className="inline-flex items-center gap-1.5 rounded-md border border-graphite bg-charcoal px-2.5 py-1 text-xs font-[510] text-fog self-start sm:self-auto">
-					Sync selesai
-				</span>
 			</div>
 
 			{/* Application summary: what the app is about, from the validated
@@ -94,15 +87,12 @@ export function CodebaseReview({
 				/>
 			</div>
 
-			{/* Panel 3: Potential Impact Areas from existing-codebase-flow.html */}
+			{/* Panel 3: Bagian aplikasi */}
 			<div className="rounded-xl border border-graphite bg-charcoal overflow-hidden shadow-sm">
-				<div className="flex items-center justify-between border-b border-graphite p-4 sm:p-5">
+				<div className="border-b border-graphite p-4 sm:p-5">
 					<h3 className="font-inter text-sm font-[600] text-snow">
-						Potential impact areas
+						Bagian aplikasi
 					</h3>
-					<span className="rounded border border-graphite bg-obsidian px-2.5 py-0.5 font-mono text-[10px] text-fog">
-						AI generated · review
-					</span>
 				</div>
 
 				<div className="p-4 sm:p-5 flex flex-col gap-5">

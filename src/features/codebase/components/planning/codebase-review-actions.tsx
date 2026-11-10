@@ -3,13 +3,6 @@
 import { ArrowLeft01Icon, ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/ui/icon";
 
-function formatTimestamp(value?: string): string {
-	if (!value) return "Tidak tersedia";
-	const date = new Date(value);
-	if (Number.isNaN(date.getTime())) return "Tidak tersedia";
-	return date.toLocaleString("id-ID");
-}
-
 interface CodebaseReviewActionsProps {
 	snapshotId: string;
 	snapshotCreatedAt?: string;
@@ -71,18 +64,14 @@ export function CodebaseReviewActions({
 			)}
 
 			{/* Screen Nav / Actions */}
-			<div className="flex flex-wrap items-center gap-3 text-fog text-[11px] border-t border-graphite pt-4">
-				<span>
-					ID: <span className="font-mono text-snow">{snapshotId}</span>
-				</span>
-				<span>· {formatTimestamp(snapshotCreatedAt)}</span>
-			</div>
 
 			{/* Prev/next navigation: previous aligns left, primary aligns
 			right on desktop; stacked full-width actions on mobile. */}
 			<div
 				data-testid="review-nav"
-				className="flex flex-col items-stretch gap-3 text-xs sm:flex-row sm:items-center sm:justify-between"
+				data-snapshot-id={snapshotId}
+				data-snapshot-created-at={snapshotCreatedAt}
+				className="flex flex-col items-stretch gap-3 text-xs sm:flex-row sm:items-center sm:justify-between border-t border-graphite pt-4"
 			>
 				{onBackToSync ? (
 					<button
