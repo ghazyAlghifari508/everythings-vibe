@@ -81,10 +81,12 @@ export function ScreenConnectSyncStep({
 }: ScreenConnectSyncStepProps) {
 	return (
 		<div className="flex items-start gap-3.5">
-			<span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-iron font-mono text-xs text-mist">
-				3
-			</span>
-			<div className="flex flex-1 flex-col gap-2">
+			<div className="flex w-6 shrink-0 flex-col items-center">
+				<span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-iron font-mono text-xs text-mist">
+					3
+				</span>
+			</div>
+			<div className="flex w-full min-w-0 flex-1 flex-col gap-2">
 				<div className="text-xs font-semibold text-mist">{heading}</div>
 				{description && (
 					<p className="text-[11px] leading-relaxed text-fog">{description}</p>

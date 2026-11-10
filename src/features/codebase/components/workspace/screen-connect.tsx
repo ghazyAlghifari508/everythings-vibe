@@ -108,7 +108,7 @@ export function ScreenConnect({
 					</p>
 				</div>
 
-				<div className="flex flex-col gap-6 p-5 sm:p-6">
+				<div className="flex flex-col p-5 sm:p-6">
 					<ScreenConnectPromptStep
 						key={payload?.sessionId ?? "no-session"}
 						projectName={projectName}
