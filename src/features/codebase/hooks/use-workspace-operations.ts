@@ -51,6 +51,8 @@ export function useWorkspaceOperations({
 }) {
 	const activePollerCtrl = useRef<AbortController | null>(null);
 	const inFlightStageRef = useRef<CodebaseRunStage | null>(null);
+	const onOperationCompletedRef = useRef(onOperationCompleted);
+	onOperationCompletedRef.current = onOperationCompleted;
 
 	const monitorOperation = useCallback(
 		async (op: DurableGenerationOperation, signal: AbortSignal) => {
@@ -91,7 +93,10 @@ export function useWorkspaceOperations({
 			setStageBusy(null);
 
 			if (settled?.status === "completed") {
-				const persisted = await onOperationCompleted(settled.stage, settled);
+				const persisted = await onOperationCompletedRef.current(
+					settled.stage,
+					settled,
+				);
 				if (signal.aborted || activeProjectIdRef.current !== projectId) return;
 				const finishedAt = operationSettleEpoch(settled);
 				if (persisted) {
@@ -130,13 +135,7 @@ export function useWorkspaceOperations({
 				);
 			}
 		},
-		[
-			activeProjectIdRef,
-			setRun,
-			setStageBusy,
-			setStageError,
-			onOperationCompleted,
-		],
+		[activeProjectIdRef, setRun, setStageBusy, setStageError],
 	);
 
 	// On mount and project change: hydrate operations from server without restarting AI
@@ -186,7 +185,10 @@ export function useWorkspaceOperations({
 				for (const stage of [...RUN_STAGES].reverse()) {
 					const op = ops[stage];
 					if (op?.status === "completed") {
-						const persisted = await onOperationCompleted(op.stage, op);
+						const persisted = await onOperationCompletedRef.current(
+							op.stage,
+							op,
+						);
 						if (ctrl.signal.aborted || activeProjectIdRef.current !== projectId)
 							return;
 						if (persisted) {
@@ -245,7 +247,6 @@ export function useWorkspaceOperations({
 		effectiveFeatureId,
 		activeProjectIdRef,
 		monitorOperation,
-		onOperationCompleted,
 		setRun,
 		setStageError,
 	]);

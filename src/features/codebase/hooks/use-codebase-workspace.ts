@@ -64,6 +64,21 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		setRun,
 		answersReadOnly,
 	);
+	useEffect(() => {
+		const prompt = questions.lastFeaturePrompt.trim();
+		if (!prompt || !effectiveFeatureId) return;
+		setChatMessages((current) => {
+			if (current.some((m) => m.role === "user")) return current;
+			return [
+				{
+					id: `user-prompt-${effectiveFeatureId}`,
+					role: "user",
+					content: prompt,
+				},
+				...current,
+			];
+		});
+	}, [questions.lastFeaturePrompt, effectiveFeatureId]);
 	const [pipelineStage, setPipelineStage] =
 		useState<CodebasePipelineStage>("questions");
 	const [stageBusy, setStageBusy] = useState<CodebasePipelineStage | null>(
@@ -306,6 +321,7 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		resolvedFeatureName: resolvedFeature?.name,
 		codebaseName: codebase.name,
 		setAiQuestions: questions.setAiQuestions,
+		setLastFeaturePrompt: questions.setLastFeaturePrompt,
 		refreshFeatureTree: artifact.refreshFeatureTree,
 		loadPrd: artifact.loadPrd,
 		loadAc: artifact.loadAc,
