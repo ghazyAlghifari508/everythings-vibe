@@ -352,8 +352,10 @@ export async function executeGenerationOperationBounded(
 			claim.operationId,
 			error,
 		);
+		const rawMessage = error instanceof Error ? error.message : String(error);
 		await failGenerationOperation(claim, {
 			message:
+				rawMessage ||
 				"Generasi terhenti. Hasil yang tersimpan tetap tersedia; coba kembali setelah status diperiksa.",
 			code,
 		});

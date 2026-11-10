@@ -25,6 +25,7 @@ export function toWorkspaceGenerationOperation(
 		status: row.status,
 		attempt: row.attempt,
 		result: row.result,
+		input: (row.input as Record<string, unknown> | null) ?? null,
 		error: row.error,
 		errorCode: row.errorCode,
 		baselineArtifactId: row.baselineArtifactId ?? null,
