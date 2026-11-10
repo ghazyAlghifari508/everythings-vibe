@@ -28,6 +28,7 @@ export async function submitRevisionRequest(input: {
 	snapshotId: string | null;
 	targetKind: RevisionTargetKind;
 	instruction: string;
+	requestId?: string;
 	optionalReferences?: readonly string[];
 	referenceBindings?: readonly ComposerReferenceBinding[];
 }): Promise<RevisionSubmitResult> {
@@ -58,6 +59,7 @@ export async function submitRevisionRequest(input: {
 				targetArtifactVersionId: baseVersionId,
 				userInstruction: input.instruction,
 				sourceSnapshotId: input.snapshotId ?? "default",
+				requestId: input.requestId,
 				...(input.optionalReferences && input.optionalReferences.length > 0
 					? { optionalReferences: [...input.optionalReferences] }
 					: {}),

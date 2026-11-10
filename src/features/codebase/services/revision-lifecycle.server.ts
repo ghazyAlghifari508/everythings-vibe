@@ -37,7 +37,7 @@ export async function saveRevisionProposal(
 	input: SaveProposalInput,
 ): Promise<{ ok: true; proposalId: string }> {
 	const [existing] = await db
-		.select({ id: codebaseRevisionProposals.id })
+		.select()
 		.from(codebaseRevisionProposals)
 		.where(
 			and(
@@ -48,27 +48,60 @@ export async function saveRevisionProposal(
 		.limit(1);
 
 	if (existing) {
+		if (
+			existing.projectId !== input.projectId ||
+			existing.codebaseId !== input.codebaseId ||
+			existing.targetKind !== input.targetKind ||
+			existing.instruction !== input.instruction
+		)
+			throw new Error("REVISION_IDENTITY_CONFLICT");
 		return { ok: true, proposalId: existing.id };
 	}
 
 	const proposalId = crypto.randomUUID();
-	await db.insert(codebaseRevisionProposals).values({
-		id: proposalId,
-		userId,
-		projectId: input.projectId,
-		codebaseId: input.codebaseId,
-		snapshotId: input.snapshotId,
-		targetKind: input.targetKind,
-		baseVersionId: input.baseVersionId,
-		instruction: input.instruction,
-		baseContent: input.baseContent,
-		proposedContent: input.proposedContent,
-		impact: input.impact,
-		status: "pending",
-		idempotencyKey: input.idempotencyKey,
-	});
+	await db
+		.insert(codebaseRevisionProposals)
+		.values({
+			id: proposalId,
+			userId,
+			projectId: input.projectId,
+			codebaseId: input.codebaseId,
+			snapshotId: input.snapshotId,
+			targetKind: input.targetKind,
+			baseVersionId: input.baseVersionId,
+			instruction: input.instruction,
+			baseContent: input.baseContent,
+			proposedContent: input.proposedContent,
+			impact: input.impact,
+			status: "pending",
+			idempotencyKey: input.idempotencyKey,
+		})
+		.onConflictDoNothing({
+			target: [
+				codebaseRevisionProposals.userId,
+				codebaseRevisionProposals.idempotencyKey,
+			],
+		});
 
-	return { ok: true, proposalId };
+	const [saved] = await db
+		.select()
+		.from(codebaseRevisionProposals)
+		.where(
+			and(
+				eq(codebaseRevisionProposals.userId, userId),
+				eq(codebaseRevisionProposals.idempotencyKey, input.idempotencyKey),
+			),
+		)
+		.limit(1);
+	if (
+		!saved ||
+		saved.projectId !== input.projectId ||
+		saved.codebaseId !== input.codebaseId ||
+		saved.targetKind !== input.targetKind ||
+		saved.instruction !== input.instruction
+	)
+		throw new Error("REVISION_IDENTITY_CONFLICT");
+	return { ok: true, proposalId: saved.id };
 }
 
 export async function getRevisionProposal(userId: string, proposalId: string) {
@@ -162,8 +195,13 @@ export async function rejectRevisionProposal(
 
 	await db
 		.update(codebaseRevisionProposals)
-		.set({ status: "rejected" })
-		.where(eq(codebaseRevisionProposals.id, proposalId));
+		.set({ status: "rejected", approvedAt: new Date() })
+		.where(
+			and(
+				eq(codebaseRevisionProposals.id, proposalId),
+				eq(codebaseRevisionProposals.userId, userId),
+			),
+		);
 
 	return { ok: true, status: "rejected" };
 }
