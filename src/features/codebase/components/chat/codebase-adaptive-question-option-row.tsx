@@ -28,9 +28,18 @@ interface CodebaseAdaptiveQuestionOptionRowProps {
 const CARD =
 	"rounded-lg border px-3.5 py-3 transition-colors focus-within:ring-2 focus-within:ring-indigo";
 
+/** The shared two-column track: column 1 is the selection control's own width,
+ *  column 2 is the text column. The card, the clickable label, the description,
+ *  and any revealed field all declare the SAME track, so every line of an
+ *  option starts on the text column instead of being positioned with a
+ *  hand-tuned indent. */
+const TRACK = "grid grid-cols-[1rem_minmax(0,1fr)] items-start gap-x-3 gap-y-0";
+const CARD_GRID = cn(CARD, TRACK);
+const CONTENT = cn(TRACK, "group/option col-span-2 cursor-pointer");
+
 function cardClass(isSelected: boolean, isDisabled: boolean): string {
 	return cn(
-		CARD,
+		CARD_GRID,
 		isSelected
 			? "border-indigo bg-indigo/10"
 			: "border-graphite bg-obsidian hover:border-steel hover:bg-obsidian/80",
@@ -39,22 +48,29 @@ function cardClass(isSelected: boolean, isDisabled: boolean): string {
 }
 
 const CONTROL =
-	"mt-[2px] flex size-4 shrink-0 items-center justify-center rounded-full border border-slate group-data-[selected]/option:border-indigo";
+	"mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border border-slate group-data-[selected]/option:border-indigo";
 
 /** Dot inside the control. Only painted on a selected option, so the ring
  *  stays visible and the state does not rely on colour alone. */
 const INDICATOR =
 	"hidden size-1.5 rounded-full bg-indigo group-data-[selected]/option:block";
 
-const HEADING_ROW = "flex flex-wrap items-baseline gap-x-2 gap-y-1";
+/** The heading row is the option's accessible name; the badge rides along in it
+ *  as advice, never as a success signal. */
+const HEADING_ROW =
+	"col-start-2 flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1";
 const HEADING = "text-[13px] font-medium leading-snug text-snow text-pretty";
+/** The description stays OUTSIDE the clickable label so the option's accessible
+ *  name stays the heading. Its place comes from the card's text column. */
 const DESCRIPTION =
-	"mt-1 text-[11.5px] leading-relaxed text-fog text-pretty [padding-inline-start:2.625rem]";
+	"col-start-2 mt-1 text-[11.5px] leading-relaxed text-fog text-pretty";
+/** Row for the revealed free-text field: the option's own text column. */
+const CHILDREN_ROW = "col-start-2 mt-2 min-w-0";
 
 /**
  * One selectable option as a rich choice card: selection control, heading,
  * lower-emphasis description, and an optional recommendation badge. The badge
- * is a neutral solid project Badge — a recommendation is advice, not a success
+ * is a neutral project Badge — a recommendation is advice, not a success
  * signal, so no emerald tint, glow, gradient, or blur.
  */
 export function CodebaseAdaptiveQuestionOptionRow({
@@ -66,20 +82,27 @@ export function CodebaseAdaptiveQuestionOptionRow({
 	recommended = false,
 	children,
 }: CodebaseAdaptiveQuestionOptionRowProps) {
-	const headingBlock = (
-		<span className="min-w-0 flex-1">
-			<span className={HEADING_ROW}>
-				<span className={HEADING}>{heading}</span>
-				{recommended ? (
-					<Badge
-						variant="default"
-						className="shrink-0 rounded px-1.5 py-px text-[10px] font-semibold tracking-wide"
-					>
-						Rekomendasi
-					</Badge>
-				) : null}
-			</span>
+	const headingRow = (
+		<span className={HEADING_ROW}>
+			<span className={HEADING}>{heading}</span>
+			{recommended ? (
+				<Badge
+					variant="subtle"
+					className="shrink-0 rounded px-1.5 py-px text-[10px] font-semibold tracking-wide"
+				>
+					Rekomendasi
+				</Badge>
+			) : null}
 		</span>
+	);
+
+	const rest = (
+		<>
+			{description ? (
+				<Description className={DESCRIPTION}>{description}</Description>
+			) : null}
+			{children ? <div className={CHILDREN_ROW}>{children}</div> : null}
+		</>
 	);
 
 	if (inputType === "checkbox") {
@@ -91,16 +114,13 @@ export function CodebaseAdaptiveQuestionOptionRow({
 					cardClass(Boolean(isSelected), Boolean(isDisabled))
 				}
 			>
-				<Checkbox.Content className="group/option flex w-full cursor-pointer items-start gap-3">
+				<Checkbox.Content className={CONTENT}>
 					<Checkbox.Control className={CONTROL}>
 						<Checkbox.Indicator className={INDICATOR} />
 					</Checkbox.Control>
-					{headingBlock}
+					{headingRow}
 				</Checkbox.Content>
-				{description ? (
-					<Description className={DESCRIPTION}>{description}</Description>
-				) : null}
-				{children}
+				{rest}
 			</Checkbox>
 		);
 	}
@@ -113,16 +133,13 @@ export function CodebaseAdaptiveQuestionOptionRow({
 				cardClass(Boolean(isSelected), Boolean(isDisabled))
 			}
 		>
-			<Radio.Content className="group/option flex w-full cursor-pointer items-start gap-3">
+			<Radio.Content className={CONTENT}>
 				<Radio.Control className={CONTROL}>
 					<Radio.Indicator className={INDICATOR} />
 				</Radio.Control>
-				{headingBlock}
+				{headingRow}
 			</Radio.Content>
-			{description ? (
-				<Description className={DESCRIPTION}>{description}</Description>
-			) : null}
-			{children}
+			{rest}
 		</Radio>
 	);
 }
