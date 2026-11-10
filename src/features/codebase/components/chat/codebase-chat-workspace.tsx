@@ -4,6 +4,7 @@ import { useWorkspaceChatControls } from "@/features/codebase/hooks/use-workspac
 import {
 	areAllQuestionsAnswered,
 	type CodebasePipelineStage,
+	isRunActive,
 	nextQuestionIndex,
 } from "@/features/codebase/services/chat-flow";
 import type { WorkspaceView } from "@/features/codebase/services/workspace-hydration";
@@ -113,7 +114,8 @@ export function CodebaseChatWorkspace({
 	onChangeRevisionTarget,
 }: CodebaseChatWorkspaceProps) {
 	const tasksArtifact = artifacts.find((item) => item.id.startsWith("tasks-"));
-	const isRunWorking = run?.status === "running";
+	// A queued operation is accepted work: the composer stays locked until it settles.
+	const isRunWorking = isRunActive(run);
 
 	const controls = useWorkspaceChatControls({
 		projectId,

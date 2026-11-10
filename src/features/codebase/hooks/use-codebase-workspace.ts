@@ -3,6 +3,7 @@ import type { ChatStreamMessage } from "@/features/codebase/components/chat/code
 import {
 	type CodebasePipelineStage,
 	type CodebaseRunState,
+	isRunActive,
 	reconcilePipelineStage,
 	resolvePersistedStage,
 	shouldAutoRevealArtifact,
@@ -57,7 +58,7 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 	const answersReadOnly =
 		Boolean(effectiveFeatureId) &&
 		(artifact.artifactHydration.feature !== "empty" ||
-			(run?.stage === "feature" && run.status === "running"));
+			(run?.stage === "feature" && isRunActive(run)));
 	const questions = useWorkspaceQuestions(
 		effectiveFeatureId,
 		setRun,

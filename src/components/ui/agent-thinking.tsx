@@ -3,6 +3,7 @@
 import {
 	AlertCircleIcon,
 	ArrowDown01Icon,
+	Clock01Icon,
 	Tick01Icon,
 } from "@hugeicons/core-free-icons";
 import { useEffect, useId, useRef, useState } from "react";
@@ -10,7 +11,12 @@ import { Orb } from "@/components/ui/orb";
 import { cn } from "@/lib/utils";
 import { Icon } from "./icon";
 
-export type AgentOperationStatus = "idle" | "running" | "done" | "failed";
+export type AgentOperationStatus =
+	| "idle"
+	| "queued"
+	| "running"
+	| "done"
+	| "failed";
 
 export interface AgentThinkingProps {
 	/** Current status of the operation */
@@ -21,6 +27,8 @@ export interface AgentThinkingProps {
 	failed?: boolean;
 	/** Label while the operation is in flight */
 	thinkingLabel?: string;
+	/** Label while the operation is accepted but no worker started it yet */
+	queuedLabel?: string;
 	/** Settled label upon success */
 	doneLabel?: string;
 	/** Settled label upon failure */
@@ -36,8 +44,8 @@ export interface AgentThinkingProps {
 	error?: string | null;
 	/** Retry callback if failed */
 	onRetry?: () => void;
-	/** Timestamp when the run actually started */
-	startedAt?: number | string | Date;
+	/** Timestamp when the run actually started; null while it is still queued */
+	startedAt?: number | string | Date | null;
 	/** Timestamp when the run finished, freezes timer */
 	finishedAt?: number | string | Date | null;
 	/** Whether to display the timer */
@@ -71,6 +79,7 @@ export function AgentThinking({
 	working: legacyWorking,
 	failed: legacyFailed = false,
 	thinkingLabel = "Thinking",
+	queuedLabel = "Menunggu proses generasi",
 	doneLabel = "Selesai",
 	failedLabel = "Gagal",
 	thinkingText,
@@ -83,12 +92,17 @@ export function AgentThinking({
 	className,
 }: AgentThinkingProps) {
 	// Reconcile status from either status prop or legacy working/failed props
+	// An accepted-but-unclaimed operation is queued: the worker has not started, so
+	// no reasoning is claimed and no attempt clock is displayed for it.
+	const isQueued = status !== undefined && status === "queued";
 	const isWorking =
 		status !== undefined ? status === "running" : Boolean(legacyWorking);
 	const isFailed =
 		status !== undefined ? status === "failed" : Boolean(legacyFailed);
 	const isDone =
-		status !== undefined ? status === "done" : !isWorking && !isFailed;
+		status !== undefined
+			? status === "done"
+			: !isWorking && !isFailed && !isQueued;
 
 	const startedAtEpoch = resolveEpoch(startedAt, Date.now());
 	const startedAtRef = useRef<number>(startedAtEpoch);
@@ -99,7 +113,7 @@ export function AgentThinking({
 
 	// Keep startedAtRef in sync with prop changes
 	useEffect(() => {
-		if (startedAt === undefined) return;
+		if (startedAt === undefined || startedAt === null) return;
 		const epoch = resolveEpoch(startedAt, startedAtRef.current);
 		startedAtRef.current = epoch;
 		if (isWorking) {
@@ -168,6 +182,13 @@ export function AgentThinking({
 						<span className="shrink-0" data-testid="agent-thinking-indicator">
 							<Orb state="reasoning" size={16} />
 						</span>
+					) : isQueued ? (
+						<Icon
+							icon={Clock01Icon}
+							size={16}
+							className="shrink-0 text-fog"
+							aria-hidden="true"
+						/>
 					) : isFailed ? (
 						<Icon
 							icon={AlertCircleIcon}
@@ -187,17 +208,19 @@ export function AgentThinking({
 						aria-live="polite"
 						className={cn(
 							"truncate font-medium",
-							isFailed ? "text-crimson" : "text-snow",
+							isFailed ? "text-crimson" : isQueued ? "text-fog" : "text-snow",
 						)}
 					>
 						{isWorking
 							? `${thinkingLabel}...`
-							: isFailed
-								? failedLabel
-								: doneLabel}
+							: isQueued
+								? queuedLabel
+								: isFailed
+									? failedLabel
+									: doneLabel}
 					</output>
 				</span>
-				{showTimer ? (
+				{showTimer && !isQueued ? (
 					<span
 						role="timer"
 						aria-label="Waktu proses"

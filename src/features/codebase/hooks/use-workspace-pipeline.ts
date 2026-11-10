@@ -6,13 +6,14 @@ import {
 	useRef,
 } from "react";
 import {
-	anchorRunStart,
 	type CodebasePipelineStage,
 	type CodebaseRunStage,
 	type CodebaseRunState,
+	observeOperation,
 	operationSettleEpoch,
+	queueRun,
+	settleRunForOperation,
 	settleRunIfCurrent,
-	startRun,
 } from "@/features/codebase/services/chat-flow";
 import {
 	pollOperationUntilSettled,
@@ -55,7 +56,7 @@ export function useWorkspacePipeline({
 			stageRunInFlight.current = effectiveFeatureId;
 			setStageBusy(target);
 			setStageError(null);
-			const request = startRun(target, Date.now());
+			const request = queueRun(target);
 			setRun(request);
 			const requestId = request.requestId;
 
@@ -98,15 +99,20 @@ export function useWorkspacePipeline({
 				}
 
 				let operation = submitRes.operation;
-				// The submit ack carries the server's own acceptance time: re-anchor the
-				// running clock so the timer excludes client submit latency.
-				setRun((cur) => anchorRunStart(cur, operation.createdAt, requestId));
+				// The accepted operation carries its own attempt window: the timer starts
+				// when its attempt starts, never from the client's submit time.
+				setRun((cur) => observeOperation(cur, operation));
 				if (operation.status === "queued" || operation.status === "running") {
 					const settled = await pollOperationUntilSettled({
 						projectId: requestedProjectId,
 						stage: target,
 						operationId: operation.id,
 						signal: ctrl.signal,
+						onTick: (tick) => {
+							if (ctrl.signal.aborted) return;
+							if (activeProjectIdRef.current !== requestedProjectId) return;
+							setRun((cur) => observeOperation(cur, tick));
+						},
 					});
 
 					if (
@@ -128,34 +134,38 @@ export function useWorkspacePipeline({
 							"Hasil generasi belum tersimpan di server. Coba generate ulang.";
 						setStageError(notSavedMsg);
 						setRun((current) =>
-							settleRunIfCurrent(
+							settleRunForOperation(
 								current,
-								requestId,
+								operation,
 								"failed",
 								Date.now(),
 								notSavedMsg,
+								requestId,
 							),
 						);
 						return;
 					}
 					setRun((current) =>
-						settleRunIfCurrent(
+						settleRunForOperation(
 							current,
-							requestId,
+							operation,
 							"done",
 							operationSettleEpoch(operation),
+							undefined,
+							requestId,
 						),
 					);
 				} else {
 					const failure = operation.error ?? "Generasi gagal.";
 					setStageError(failure);
 					setRun((current) =>
-						settleRunIfCurrent(
+						settleRunForOperation(
 							current,
-							requestId,
+							operation,
 							"failed",
 							operationSettleEpoch(operation),
 							failure,
+							requestId,
 						),
 					);
 				}

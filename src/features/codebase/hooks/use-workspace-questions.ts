@@ -8,12 +8,13 @@ import {
 } from "react";
 import {
 	type AdaptiveQuestion,
-	anchorRunStart,
 	type CodebaseRunState,
 	mapAskQuestionsToAdaptive,
+	observeOperation,
 	operationSettleEpoch,
+	queueRun,
+	settleRunForOperation,
 	settleRunIfCurrent,
-	startRun,
 } from "@/features/codebase/services/chat-flow";
 import {
 	pollOperationUntilSettled,
@@ -59,9 +60,13 @@ export function useWorkspaceQuestions(
 			if (readOnly) return;
 			activeProject.current = projectId;
 			const epoch = ++requestEpoch.current;
-			const request = startRun("questions", Date.now());
+			// Acceptance starts queued: no worker attempt exists yet, so no timer may
+			// run and the UI must not claim the AI is already thinking.
+			const request = queueRun("questions");
 			setRun(request);
 			const requestId = request.requestId;
+			const stillCurrent = () =>
+				requestEpoch.current === epoch && activeProject.current === projectId;
 
 			try {
 				const submitRes = await submitGenerationOperation({
@@ -71,11 +76,7 @@ export function useWorkspaceQuestions(
 					retry: true,
 				});
 
-				if (
-					requestEpoch.current !== epoch ||
-					activeProject.current !== projectId
-				)
-					return;
+				if (!stillCurrent()) return;
 
 				if (!submitRes.ok || !submitRes.operation) {
 					const errorMsg =
@@ -96,18 +97,20 @@ export function useWorkspaceQuestions(
 				}
 
 				let op = submitRes.operation;
-				setRun((current) => anchorRunStart(current, op.createdAt, requestId));
+				// The accepted operation carries its own attempt window: the clock starts
+				// when its attempt starts, never from the client's submit time.
+				setRun((current) => observeOperation(current, op));
 				if (op.status === "queued" || op.status === "running") {
 					const settled = await pollOperationUntilSettled({
 						projectId,
 						stage: "questions",
 						operationId: op.id,
+						onTick: (tick) => {
+							if (!stillCurrent()) return;
+							setRun((current) => observeOperation(current, tick));
+						},
 					});
-					if (
-						requestEpoch.current !== epoch ||
-						activeProject.current !== projectId
-					)
-						return;
+					if (!stillCurrent()) return;
 					if (settled) {
 						op = settled;
 					}
@@ -121,12 +124,13 @@ export function useWorkspaceQuestions(
 							: null;
 					if (!parsed || parsed.length === 0) {
 						setRun((current) =>
-							settleRunIfCurrent(
+							settleRunForOperation(
 								current,
-								requestId,
+								op,
 								"failed",
 								Date.now(),
 								"AI tidak mengembalikan pertanyaan yang valid. Coba kirim ulang fitur.",
+								requestId,
 							),
 						);
 						return;
@@ -134,31 +138,30 @@ export function useWorkspaceQuestions(
 					setAiQuestions(mapAskQuestionsToAdaptive(parsed));
 					setChatAnswers({});
 					setRun((current) =>
-						settleRunIfCurrent(
+						settleRunForOperation(
 							current,
-							requestId,
+							op,
 							"done",
 							operationSettleEpoch(op),
+							undefined,
+							requestId,
 						),
 					);
 				} else {
 					const failureMsg = op.error ?? "Generasi pertanyaan gagal.";
 					setRun((current) =>
-						settleRunIfCurrent(
+						settleRunForOperation(
 							current,
-							requestId,
+							op,
 							"failed",
 							operationSettleEpoch(op),
 							failureMsg,
+							requestId,
 						),
 					);
 				}
 			} catch {
-				if (
-					requestEpoch.current !== epoch ||
-					activeProject.current !== projectId
-				)
-					return;
+				if (!stillCurrent()) return;
 				setRun((current) =>
 					settleRunIfCurrent(
 						current,
