@@ -224,6 +224,35 @@ describe("codebase analysis schema", () => {
 		});
 		expect(result.success).toBe(false);
 	});
+	it("accepts applicationModules in analysis schema", () => {
+		const result = codebaseAnalysisSchema.safeParse({
+			...validAnalysis,
+			applicationModules: [
+				{
+					name: "Halaman katalog",
+					description: "Menampilkan daftar item dan filter",
+				},
+			],
+		});
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.applicationModules).toHaveLength(1);
+			expect(result.data.applicationModules?.[0]?.name).toBe("Halaman katalog");
+		}
+	});
+
+	it("preserves null database and auth without inventing fallbacks", () => {
+		const result = codebaseAnalysisSchema.safeParse({
+			...validAnalysis,
+			database: null,
+			auth: null,
+		});
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.database).toBeNull();
+			expect(result.data.auth).toBeNull();
+		}
+	});
 });
 
 describe("parseCodebaseAnalysis", () => {
@@ -370,6 +399,32 @@ describe("codebase analysis system prompt", () => {
 	it("keeps the four starter categories repository-grounded and not stack-guessed", () => {
 		expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).toMatch(/tidak menggandakan/i);
 		expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).toMatch(/migrasi stack/i);
+	});
+	it("enforces evidence-based findings and forbids database/auth guesses", () => {
+		expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).toMatch(/fakta yang terbukti/i);
+		expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).toMatch(/fitur yang terlihat/i);
+		expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).toMatch(
+			/JANGAN menyimpulkan.*database/i,
+		);
+		expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).toMatch(
+			/JANGAN mengklaim autentikasi/i,
+		);
+		expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).toMatch(
+			/JANGAN mengarang integrasi API/i,
+		);
+	});
+
+	it("specifies concrete quality rules for finding titles, details, and uncertainty copy", () => {
+		expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).toMatch(
+			/findings\.title.*jelas.*ringkas/i,
+		);
+		expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).toMatch(
+			/tidak terdengar seperti judul laporan AI generik/i,
+		);
+		expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).toMatch(/tanpa promosi kosong/i);
+		expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).toMatch(
+			/spesifik menjelaskan apa yang belum dapat dipastikan/i,
+		);
 	});
 });
 
