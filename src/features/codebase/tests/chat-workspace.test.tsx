@@ -1042,7 +1042,7 @@ describe("CodebaseChatWorkspace one-by-one questions", () => {
 			"[data-testid='adaptive-question-q1']",
 		);
 		const submit = [...(card?.querySelectorAll("button") ?? [])].find((b) =>
-			/Kirim Jawaban/.test(b.textContent ?? ""),
+			/Berikutnya/.test(b.textContent ?? ""),
 		);
 		expect(submit?.disabled).toBe(true);
 
@@ -1141,7 +1141,7 @@ describe("CodebaseChatWorkspace one-by-one questions", () => {
 			}
 		});
 		const submit = [...(card?.querySelectorAll("button") ?? [])].find((b) =>
-			/Kirim Jawaban/.test(b.textContent ?? ""),
+			/Berikutnya/.test(b.textContent ?? ""),
 		);
 		act(() => {
 			submit?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -1166,12 +1166,12 @@ describe("CodebaseChatWorkspace one-by-one questions", () => {
 			customRadio?.click();
 		});
 		const submit = [...(card?.querySelectorAll("button") ?? [])].find((b) =>
-			/Kirim Jawaban/.test(b.textContent ?? ""),
+			/Berikutnya/.test(b.textContent ?? ""),
 		);
 		expect(submit?.disabled).toBe(true);
 	});
 
-	it("advances to the next question after answering and supports Lainnya", () => {
+	it("opens on the first unanswered question and keeps a single card on screen", () => {
 		const onSubmitAnswer = vi.fn();
 		renderWorkspace({
 			questions: sampleQuestions,
@@ -1179,13 +1179,14 @@ describe("CodebaseChatWorkspace one-by-one questions", () => {
 			onSubmitAnswer,
 		});
 
-		const q1 = container.querySelector("[data-testid='adaptive-question-q1']");
-		expect(q1?.textContent).toContain("Jawaban: Database relasional");
+		// The answered question is not re-rendered as a summary row beside the
+		// active one: the wizard shows exactly one card, on the first unanswered.
 		expect(
-			container.querySelector("[data-testid='adaptive-question-q2']"),
-		).not.toBeNull();
-
+			container.querySelectorAll("[data-testid^='adaptive-question-']"),
+		).toHaveLength(1);
 		const q2 = container.querySelector("[data-testid='adaptive-question-q2']");
+		expect(q2).not.toBeNull();
+
 		const customRadio = q2?.querySelector<HTMLInputElement>(
 			"input[type='radio'][value$='-custom']",
 		);
@@ -1206,12 +1207,14 @@ describe("CodebaseChatWorkspace one-by-one questions", () => {
 			}
 		});
 
-		const submit = [...(q2?.querySelectorAll("button") ?? [])].find((b) =>
-			/Kirim Jawaban/.test(b.textContent ?? ""),
+		const submit = q2?.querySelector<HTMLButtonElement>(
+			"[data-testid='codebase-questions-complete']",
 		);
 		act(() => {
 			submit?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 		});
+		// q2 is the last question, so its forward control is the specification
+		// action: it still stores the answer before it hands over to generation.
 		expect(onSubmitAnswer).toHaveBeenCalledWith("q2", "Banner kilat");
 	});
 
@@ -1261,7 +1264,7 @@ describe("CodebaseChatWorkspace one-by-one questions", () => {
 		expect(options[1]?.checked).toBe(true);
 
 		const submit = [...(card?.querySelectorAll("button") ?? [])].find((b) =>
-			/Kirim Jawaban/.test(b.textContent ?? ""),
+			/Berikutnya/.test(b.textContent ?? ""),
 		);
 		act(() => {
 			submit?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -1310,7 +1313,7 @@ describe("CodebaseChatWorkspace one-by-one questions", () => {
 			}
 		});
 		const submit = [...(card?.querySelectorAll("button") ?? [])].find((b) =>
-			/Kirim Jawaban/.test(b.textContent ?? ""),
+			/Berikutnya/.test(b.textContent ?? ""),
 		);
 		act(() => {
 			submit?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -1335,19 +1338,30 @@ describe("CodebaseChatWorkspace one-by-one questions", () => {
 		expect(card?.textContent).not.toContain("Lainnya");
 	});
 
-	it("locks earlier questions so a submitted answer cannot be changed", () => {
+	it("steps back to an earlier question with its stored answer still editable", () => {
 		renderWorkspace({
 			questions: sampleQuestions,
 			answers: { q1: "Database relasional" },
 		});
-		const q1 = container.querySelector("[data-testid='adaptive-question-q1']");
 		const q2 = container.querySelector("[data-testid='adaptive-question-q2']");
-		expect(q1?.querySelector("input[type='radio']")).toBeNull();
-		const q2Radios = q2?.querySelectorAll<HTMLInputElement>(
-			"input[type='radio']",
+		const previous = [...(q2?.querySelectorAll("button") ?? [])].find((b) =>
+			/Sebelumnya/.test(b.textContent ?? ""),
 		);
-		expect(q2Radios?.length).toBeGreaterThan(0);
-		expect([...(q2Radios ?? [])].every((input) => !input.disabled)).toBe(true);
+		expect(previous).toBeDefined();
+
+		act(() => {
+			previous?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+
+		const q1 = container.querySelector("[data-testid='adaptive-question-q1']");
+		expect(q1).not.toBeNull();
+		const saved = q1?.querySelector<HTMLInputElement>(
+			"input[type='radio'][value='q1-opt1']",
+		);
+		expect(saved?.checked).toBe(true);
+		// Reached through wizard navigation, so it is editable rather than a
+		// locked summary of the answer.
+		expect(saved?.disabled).toBe(false);
 	});
 
 	it("shows the progress counter on the active question card", () => {
@@ -1359,7 +1373,7 @@ describe("CodebaseChatWorkspace one-by-one questions", () => {
 		expect(q2?.textContent).toContain("2 dari 2");
 	});
 
-	it("allows editing a previously answered question via the Ubah button", () => {
+	it("edits an earlier answer through Sebelumnya and stores the change", () => {
 		const onSubmitAnswer = vi.fn();
 		renderWorkspace({
 			questions: sampleQuestions,
@@ -1367,22 +1381,17 @@ describe("CodebaseChatWorkspace one-by-one questions", () => {
 			onSubmitAnswer,
 		});
 
-		const q1 = container.querySelector("[data-testid='adaptive-question-q1']");
-		const ubahBtn = [...(q1?.querySelectorAll("button") ?? [])].find((b) =>
-			/Ubah/.test(b.textContent ?? ""),
-		);
-		expect(ubahBtn).toBeDefined();
-
-		// Click Ubah
+		const previous = [
+			...(container.querySelectorAll(
+				"[data-testid^='adaptive-question-'] button",
+			) ?? []),
+		].find((b) => /Sebelumnya/.test(b.textContent ?? ""));
 		act(() => {
-			ubahBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+			previous?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 		});
 
-		// Now q1 is in editing mode with radio buttons revealed
-		const q1Updated = container.querySelector(
-			"[data-testid='adaptive-question-q1']",
-		);
-		const radio2 = q1Updated?.querySelector<HTMLInputElement>(
+		const q1 = container.querySelector("[data-testid='adaptive-question-q1']");
+		const radio2 = q1?.querySelector<HTMLInputElement>(
 			"input[type='radio'][value='q1-opt2']",
 		);
 		expect(radio2).not.toBeNull();
@@ -1391,8 +1400,8 @@ describe("CodebaseChatWorkspace one-by-one questions", () => {
 			radio2?.click();
 		});
 
-		const submit = [...(q1Updated?.querySelectorAll("button") ?? [])].find(
-			(b) => /Kirim Jawaban|Konfirmasi/.test(b.textContent ?? ""),
+		const submit = [...(q1?.querySelectorAll("button") ?? [])].find((b) =>
+			/Berikutnya/.test(b.textContent ?? ""),
 		);
 		act(() => {
 			submit?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -1401,36 +1410,38 @@ describe("CodebaseChatWorkspace one-by-one questions", () => {
 		expect(onSubmitAnswer).toHaveBeenCalledWith("q1", "Penyimpanan lokal");
 	});
 
-	it("allows cancelling an edit without changing the answer", () => {
+	it("leaves an earlier answer untouched when the user only passes through", () => {
+		const onSubmitAnswer = vi.fn();
 		renderWorkspace({
 			questions: sampleQuestions,
 			answers: { q1: "Database relasional" },
+			onSubmitAnswer,
+		});
+
+		const previous = [...(container.querySelectorAll("button") ?? [])].find(
+			(b) => /Sebelumnya/.test(b.textContent ?? ""),
+		);
+		act(() => {
+			previous?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 		});
 
 		const q1 = container.querySelector("[data-testid='adaptive-question-q1']");
-		const ubahBtn = [...(q1?.querySelectorAll("button") ?? [])].find((b) =>
-			/Ubah/.test(b.textContent ?? ""),
+		const submit = [...(q1?.querySelectorAll("button") ?? [])].find((b) =>
+			/Berikutnya/.test(b.textContent ?? ""),
 		);
-
 		act(() => {
-			ubahBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+			submit?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 		});
 
-		const batalBtn = [...(container.querySelectorAll("button") ?? [])].find(
-			(b) => /Batal/.test(b.textContent ?? ""),
-		);
-		expect(batalBtn).toBeDefined();
-
-		act(() => {
-			batalBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-		});
-
-		// Restores to compact completed line
-		const q1Restored = container.querySelector(
-			"[data-testid='adaptive-question-q1']",
-		);
-		expect(q1Restored?.querySelector("input[type='radio']")).toBeNull();
-		expect(q1Restored?.textContent).toContain("Jawaban: Database relasional");
+		// Passing through re-stores the very same answer and returns to the step
+		// the wizard was on: nothing is silently rewritten.
+		expect(onSubmitAnswer).toHaveBeenCalledWith("q1", "Database relasional");
+		expect(
+			container.querySelector("[data-testid='adaptive-question-q2']"),
+		).not.toBeNull();
+		expect(
+			container.querySelector("[data-testid='adaptive-question-q1']"),
+		).toBeNull();
 	});
 });
 
@@ -1450,15 +1461,12 @@ describe("CodebaseChatWorkspace confirmation and spec errors", () => {
 			"[data-testid='codebase-questions-complete']",
 		);
 		expect(complete).not.toBeNull();
-		// The single CTA carries the handoff; no restated stage label or
-		// explanatory paragraph.
+		// The single CTA carries the handoff, inside the question card; no restated
+		// stage label and no second block below the questions.
 		expect(complete?.textContent).toBe("Buat Spesifikasi Fitur");
 
-		const cta = [...(complete?.querySelectorAll("button") ?? [])].find((b) =>
-			/Buat Spesifikasi Fitur/.test(b.textContent ?? ""),
-		);
 		act(() => {
-			cta?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+			complete?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 		});
 		expect(onConfirmGenerate).toHaveBeenCalledTimes(1);
 	});

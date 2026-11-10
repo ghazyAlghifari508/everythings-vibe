@@ -21,6 +21,14 @@ import {
 
 export type QuestionSaveStatus = "idle" | "saving" | "saved" | "error";
 
+/** The answer persistence state as surfacing workspaces consume it: a gated
+ *  action can wait for `status`, and a failed save owns its own retry. */
+export interface AnswersPersistenceState {
+	status: QuestionSaveStatus;
+	error: string | null;
+	onRetry?: () => void;
+}
+
 export function useWorkspaceHandoffPersistence({
 	effectiveFeatureId,
 	readOnly,

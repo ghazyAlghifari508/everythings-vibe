@@ -126,18 +126,27 @@ export function resolveCodebaseErrorDetails(
 	};
 }
 
-export function CodebaseChatWorkspaceSpecError({
+/** Shared row chrome: one alert, one icon, one retry action. Every workspace
+ *  failure row is this markup, so a new failure kind is a testid plus copy. */
+function CodebaseWorkspaceErrorRow({
+	testId,
+	fallbackTitle,
+	fallbackActionLabel = "Coba lagi",
 	message,
 	title,
 	description,
 	actionLabel,
 	isRetrying,
 	onRetry,
-}: CodebaseChatWorkspaceErrorRowProps) {
+}: CodebaseChatWorkspaceErrorRowProps & {
+	testId: string;
+	fallbackTitle: string;
+	fallbackActionLabel?: string;
+}) {
 	const resolved = resolveCodebaseErrorDetails(
 		message,
-		title ?? "Spesifikasi fitur belum berhasil dibuat",
-		actionLabel ?? "Coba lagi",
+		fallbackTitle,
+		fallbackActionLabel,
 	);
 	const finalTitle = title ?? resolved.title;
 	const finalDesc = description ?? resolved.description;
@@ -146,7 +155,7 @@ export function CodebaseChatWorkspaceSpecError({
 	return (
 		<Alert
 			variant="default"
-			data-testid="codebase-spec-error"
+			data-testid={testId}
 			className="rounded-xl border border-graphite/80 bg-charcoal p-3.5 text-xs text-snow shadow-none"
 		>
 			<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -183,59 +192,41 @@ export function CodebaseChatWorkspaceSpecError({
 	);
 }
 
-export function CodebaseChatWorkspaceStageError({
-	message,
-	title,
-	description,
-	actionLabel,
-	isRetrying,
-	onRetry,
-}: CodebaseChatWorkspaceErrorRowProps) {
-	const resolved = resolveCodebaseErrorDetails(
-		message,
-		title ?? "Generasi tahap pipeline belum berhasil",
-		actionLabel ?? "Coba lagi",
-	);
-	const finalTitle = title ?? resolved.title;
-	const finalDesc = description ?? resolved.description;
-	const finalAction = actionLabel ?? resolved.actionLabel;
-
+export function CodebaseChatWorkspaceSpecError(
+	props: CodebaseChatWorkspaceErrorRowProps,
+) {
 	return (
-		<Alert
-			variant="default"
-			data-testid="codebase-stage-error"
-			className="rounded-xl border border-graphite/80 bg-charcoal p-3.5 text-xs text-snow shadow-none"
-		>
-			<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-				<div className="flex items-start gap-2.5 min-w-0">
-					<Icon
-						icon={Alert02Icon}
-						size={16}
-						aria-hidden="true"
-						className="mt-0.5 shrink-0 text-crimson"
-					/>
-					<div className="flex flex-col gap-0.5 min-w-0">
-						<AlertTitle className="text-xs font-semibold text-snow">
-							{finalTitle}
-						</AlertTitle>
-						<AlertDescription className="mt-0 text-xs text-fog leading-relaxed">
-							{finalDesc}
-						</AlertDescription>
-					</div>
-				</div>
-				{onRetry ? (
-					<Button
-						type="button"
-						variant="outline"
-						size="sm"
-						onClick={onRetry}
-						disabled={isRetrying}
-						className="shrink-0 h-8 gap-1.5 border-graphite bg-obsidian px-3 font-mono text-[11px] text-snow hover:bg-graphite/30 disabled:opacity-50"
-					>
-						{finalAction}
-					</Button>
-				) : null}
-			</div>
-		</Alert>
+		<CodebaseWorkspaceErrorRow
+			{...props}
+			testId="codebase-spec-error"
+			fallbackTitle="Spesifikasi fitur belum berhasil dibuat"
+		/>
+	);
+}
+
+export function CodebaseChatWorkspaceStageError(
+	props: CodebaseChatWorkspaceErrorRowProps,
+) {
+	return (
+		<CodebaseWorkspaceErrorRow
+			{...props}
+			testId="codebase-stage-error"
+			fallbackTitle="Generasi tahap pipeline belum berhasil"
+		/>
+	);
+}
+
+/** The answers could not be persisted: the row owns the retry that a wizard
+ *  step needs before it may move on. */
+export function CodebaseChatWorkspaceAnswersSaveError(
+	props: CodebaseChatWorkspaceErrorRowProps,
+) {
+	return (
+		<CodebaseWorkspaceErrorRow
+			{...props}
+			testId="codebase-answers-save-error"
+			fallbackTitle="Jawaban belum berhasil disimpan"
+			fallbackActionLabel="Coba simpan ulang"
+		/>
 	);
 }

@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CodebaseAdaptiveQuestion } from "../components/chat/codebase-adaptive-question";
+import {
+	type AdaptiveQuestionNav,
+	CodebaseAdaptiveQuestion,
+} from "../components/chat/codebase-adaptive-question";
 import { CodebaseChatWorkspace } from "../components/chat/codebase-chat-workspace";
 import type { AdaptiveQuestion } from "../services/chat-flow";
 import { settleRun, startRun } from "../services/chat-flow";
@@ -50,21 +53,30 @@ function textQuestion(): AdaptiveQuestion {
 	};
 }
 
+/** The forward control the wizard supplies; the label follows the step. */
+function cardNav(
+	overrides: Partial<AdaptiveQuestionNav> = {},
+): AdaptiveQuestionNav {
+	return { onNext: vi.fn(), nextLabel: "Berikutnya", ...overrides };
+}
+
 function renderQuestion(
 	overrides: Partial<Parameters<typeof CodebaseAdaptiveQuestion>[0]> = {},
 ) {
 	const onSubmit = vi.fn();
+	const onNext = vi.fn();
 	const props = {
 		question: selectQuestion(),
 		index: 1,
 		totalQuestions: 1,
 		submitted: "",
 		active: true,
+		nav: cardNav({ onNext }),
 		onSubmit,
 		...overrides,
 	};
 	const view = render(<CodebaseAdaptiveQuestion {...props} />);
-	return { ...view, onSubmit, props };
+	return { ...view, onSubmit, onNext, props };
 }
 
 function radio(name: string): HTMLInputElement {
@@ -83,13 +95,13 @@ function checkbox(name: string): HTMLInputElement {
 	return screen.getByRole("checkbox", { name }) as HTMLInputElement;
 }
 
-function confirmButton(): HTMLButtonElement {
+function forwardButton(): HTMLButtonElement {
 	return screen.getByRole("button", {
-		name: /Konfirmasi/,
+		name: /Berikutnya|Buat Spesifikasi Fitur/,
 	}) as HTMLButtonElement;
 }
 
-describe("FIX 05 — adaptive question selection never resets underneath the user", () => {
+describe("adaptive question selection never resets underneath the user", () => {
 	it("1-4. keeps the chosen option across a parent rerender, including reallocated options", () => {
 		const { rerender, props } = renderQuestion();
 
@@ -108,18 +120,19 @@ describe("FIX 05 — adaptive question selection never resets underneath the use
 		expect(radio("Hanya judul").checked).toBe(false);
 	});
 
-	it("5-6. enables Konfirmasi after a valid selection and submits once", () => {
-		const { onSubmit } = renderQuestion();
+	it("5-6. enables the step's forward control after a valid selection and submits once", () => {
+		const { onSubmit, onNext } = renderQuestion();
 
-		expect(confirmButton().disabled).toBe(true);
+		expect(forwardButton().disabled).toBe(true);
 
 		fireEvent.click(radio("Judul, deskripsi, dan tag"));
-		expect(confirmButton().disabled).toBe(false);
+		expect(forwardButton().disabled).toBe(false);
 		expect(onSubmit).not.toHaveBeenCalled();
 
-		fireEvent.click(confirmButton());
+		fireEvent.click(forwardButton());
 		expect(onSubmit).toHaveBeenCalledTimes(1);
 		expect(onSubmit).toHaveBeenCalledWith("scope", "Judul, deskripsi, dan tag");
+		expect(onNext).toHaveBeenCalledTimes(1);
 	});
 
 	it("7-8. a question id change re-initializes from that question's answer", () => {
@@ -143,7 +156,6 @@ describe("FIX 05 — adaptive question selection never resets underneath the use
 				{...props}
 				question={other}
 				submitted="Tidak"
-				isEditing={true}
 			/>,
 		);
 		expect(radio("Tidak").checked).toBe(true);
@@ -171,6 +183,7 @@ describe("FIX 05 — adaptive question selection never resets underneath the use
 			totalQuestions: 1,
 			submitted: "",
 			active: true,
+			nav: cardNav(),
 			onSubmit,
 		};
 		const { rerender } = render(<CodebaseAdaptiveQuestion {...props} />);
@@ -194,7 +207,7 @@ describe("FIX 05 — adaptive question selection never resets underneath the use
 			}),
 		).toBeTruthy();
 
-		fireEvent.click(confirmButton());
+		fireEvent.click(forwardButton());
 		expect(onSubmit).toHaveBeenCalledWith("surfaces", "Artikel, Produk");
 	});
 
@@ -202,11 +215,11 @@ describe("FIX 05 — adaptive question selection never resets underneath the use
 		const { rerender, props } = renderQuestion();
 
 		fireEvent.click(radio("Lainnya"));
-		expect(confirmButton().disabled).toBe(true);
+		expect(forwardButton().disabled).toBe(true);
 
 		const customInput = screen.getByRole("textbox") as HTMLInputElement;
 		fireEvent.change(customInput, { target: { value: "Judul dan slug" } });
-		expect(confirmButton().disabled).toBe(false);
+		expect(forwardButton().disabled).toBe(false);
 
 		rerender(
 			<CodebaseAdaptiveQuestion {...props} question={selectQuestion()} />,
@@ -215,7 +228,7 @@ describe("FIX 05 — adaptive question selection never resets underneath the use
 		expect((screen.getByRole("textbox") as HTMLInputElement).value).toBe(
 			"Judul dan slug",
 		);
-		expect(confirmButton().disabled).toBe(false);
+		expect(forwardButton().disabled).toBe(false);
 	});
 
 	it("14-15. text question drafts persist across rerenders", () => {
@@ -226,6 +239,7 @@ describe("FIX 05 — adaptive question selection never resets underneath the use
 			totalQuestions: 1,
 			submitted: "",
 			active: true,
+			nav: cardNav(),
 			onSubmit,
 		};
 		const { rerender } = render(<CodebaseAdaptiveQuestion {...props} />);
@@ -238,47 +252,43 @@ describe("FIX 05 — adaptive question selection never resets underneath the use
 			"Pakai pencarian full-text",
 		);
 
-		fireEvent.click(confirmButton());
+		fireEvent.click(forwardButton());
 		expect(onSubmit).toHaveBeenCalledWith("notes", "Pakai pencarian full-text");
 	});
 
-	it("16-18. editing starts from the persisted answer; cancel restores it", () => {
+	it("16-18. a step seeded from a stored answer keeps the newer draft", () => {
 		const onSubmit = vi.fn();
-		const onCancelEdit = vi.fn();
 		const { rerender } = render(
 			<CodebaseAdaptiveQuestion
 				question={selectQuestion()}
 				index={1}
-				totalQuestions={1}
+				totalQuestions={3}
 				submitted="Judul dan deskripsi"
 				active={true}
-				isEditing={true}
+				nav={cardNav()}
 				onSubmit={onSubmit}
-				onCancelEdit={onCancelEdit}
 			/>,
 		);
 
+		// The stored answer arrives on its own option.
 		expect(radio("Judul dan deskripsi").checked).toBe(true);
+
 		fireEvent.click(radio("Judul, deskripsi, dan tag"));
-		expect(radio("Judul, deskripsi, dan tag").checked).toBe(true);
 
-		fireEvent.click(screen.getByRole("button", { name: "Batal" }));
-		expect(onCancelEdit).toHaveBeenCalledTimes(1);
-		expect(onSubmit).not.toHaveBeenCalled();
-
+		// A parent that has not stored the newer choice yet must not rewind the
+		// step to the stale answer: the draft the user is looking at wins.
 		rerender(
 			<CodebaseAdaptiveQuestion
 				question={selectQuestion()}
 				index={1}
-				totalQuestions={1}
+				totalQuestions={3}
 				submitted="Judul dan deskripsi"
 				active={true}
-				isEditing={false}
+				nav={cardNav()}
 				onSubmit={onSubmit}
-				onCancelEdit={onCancelEdit}
 			/>,
 		);
-		expect(screen.getByText(/Judul dan deskripsi/)).toBeTruthy();
+		expect(radio("Judul, deskripsi, dan tag").checked).toBe(true);
 	});
 
 	it("19-20. repeated hydration of the same persisted answer keeps the draft", () => {

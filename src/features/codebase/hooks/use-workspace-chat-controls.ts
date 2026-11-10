@@ -76,9 +76,6 @@ export function useWorkspaceChatControls({
 	const [draft, setDraft] = useState("");
 	const [copiedCmd, setCopiedCmd] = useState(false);
 	const [copiedExport, setCopiedExport] = useState(false);
-	const [editingQuestionId, setEditingQuestionId] = useState<string | null>(
-		null,
-	);
 
 	const menus = useComposerMenus({
 		draft,
@@ -202,15 +199,10 @@ export function useWorkspaceChatControls({
 		}
 	};
 
-	const handleEditQuestion = (questionId: string) => {
-		if (!answersReadOnly) setEditingQuestionId(questionId);
-	};
-
-	const handleCancelEditQuestion = () => setEditingQuestionId(null);
-
-	const handleSubmitAnswerControlled = (questionId: string, answer: string) => {
+	/** The wizard owns step navigation; this only records an answer, and only
+	 *  while the clarification stage still accepts edits. */
+	const handleSubmitAnswer = (questionId: string, answer: string) => {
 		if (answersReadOnly) return;
-		setEditingQuestionId(null);
 		onSubmitAnswer?.(questionId, answer);
 	};
 
@@ -221,15 +213,12 @@ export function useWorkspaceChatControls({
 		copiedCmd,
 		copiedExport,
 		setCopiedExport,
-		editingQuestionId,
 		exportCmd,
 		handoffPrompt,
 		handleCopyCmd,
 		handleCopy,
 		handleSend,
 		handlePrefillDraft,
-		handleEditQuestion,
-		handleCancelEditQuestion,
-		handleSubmitAnswer: handleSubmitAnswerControlled,
+		handleSubmitAnswer,
 	};
 }

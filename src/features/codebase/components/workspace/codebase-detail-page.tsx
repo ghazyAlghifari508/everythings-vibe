@@ -55,6 +55,9 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 		setComposerMode,
 		composerAvailable,
 		answersReadOnly,
+		saveStatus,
+		saveError,
+		saveAnswers,
 		artifacts,
 		activeArtifactId,
 		hasTasksInDb,
@@ -211,6 +214,11 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 								onComposerModeChange={setComposerMode}
 								composerAvailable={composerAvailable}
 								answersReadOnly={answersReadOnly}
+								answersPersistence={{
+									status: saveStatus,
+									error: saveError,
+									onRetry: () => void saveAnswers(),
+								}}
 								artifacts={artifacts}
 								activeArtifactId={activeArtifactId}
 								projectIdForHandoff={hasTasksInDb ? effectiveFeatureId : null}

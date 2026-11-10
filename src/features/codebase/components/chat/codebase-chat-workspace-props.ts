@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { AnswersPersistenceState } from "@/features/codebase/hooks/use-workspace-handoff-persistence";
 import type { CodebaseStarterSuggestion } from "@/features/codebase/services/analysis";
 import type {
 	AdaptiveQuestion,
@@ -65,6 +66,12 @@ export interface CodebaseChatWorkspaceProps {
 	 */
 	tasksUnresolved?: boolean;
 	answersReadOnly?: boolean;
+	/**
+	 * Persistence state of the clarification answers. The wizard's final
+	 * specification action waits for a successful save, and a failed save is
+	 * retried from the row it renders instead of being retried silently.
+	 */
+	answersPersistence?: AnswersPersistenceState;
 	composerAvailable?: boolean;
 	codebaseName?: string;
 	starterSuggestions?: CodebaseStarterSuggestion[];
