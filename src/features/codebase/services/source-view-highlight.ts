@@ -57,6 +57,10 @@ function splitHighlightedIntoRows(markup: string): SourceToken[][] | null {
 	let index = 0;
 	while (index < markup.length) {
 		const char = markup[index];
+		if (char === "\r") {
+			index += 1;
+			continue;
+		}
 		if (char === "\n") {
 			flush();
 			rows.push(current);
@@ -90,6 +94,48 @@ function splitHighlightedIntoRows(markup: string): SourceToken[][] | null {
 	return rows;
 }
 
+export interface SplitSourceResult {
+	lines: string[];
+	hasTrailingNewline: boolean;
+	trailingBlankCount: number;
+}
+
+/**
+ * Split source text into logical lines, normalizing line endings (LF vs CRLF),
+ * respecting POSIX line terminators, and accurately counting trailing blank lines.
+ */
+export function splitSourceLines(text: string): SplitSourceResult {
+	if (text.length === 0) {
+		return { lines: [], hasTrailingNewline: false, trailingBlankCount: 0 };
+	}
+
+	let normalized = text;
+	let hasTrailingNewline = false;
+	if (normalized.endsWith("\r\n")) {
+		hasTrailingNewline = true;
+		normalized = normalized.slice(0, -2);
+	} else if (normalized.endsWith("\n")) {
+		hasTrailingNewline = true;
+		normalized = normalized.slice(0, -1);
+	}
+
+	const rawLines = normalized.split(/\r?\n/);
+	const lines = rawLines.map((line) =>
+		line.endsWith("\r") ? line.slice(0, -1) : line,
+	);
+
+	let trailingBlankCount = 0;
+	for (let index = lines.length - 1; index >= 0; index--) {
+		if (lines[index]?.trim() === "") {
+			trailingBlankCount++;
+		} else {
+			break;
+		}
+	}
+
+	return { lines, hasTrailingNewline, trailingBlankCount };
+}
+
 /**
  * Highlight a whole file, then cut it into rows.
  *
@@ -102,29 +148,60 @@ export function buildHighlightedRows(
 	text: string,
 	language: string | null,
 	maxLines: number,
-): { tokens: SourceToken[][]; text: string[]; totalLines: number } {
-	const lines = text.split("\n");
+): {
+	tokens: SourceToken[][];
+	text: string[];
+	totalLines: number;
+	hasTrailingNewline: boolean;
+	trailingBlankCount: number;
+} {
+	const { lines, hasTrailingNewline, trailingBlankCount } =
+		splitSourceLines(text);
 	const totalLines = lines.length;
 	const visibleLines = lines.slice(0, Math.max(maxLines, 0));
 	const visible = visibleLines.join("\n");
-	const plain: SourceToken[][] = visibleLines.map((line) => [
-		{ text: line, className: null },
-	]);
+	const plain: SourceToken[][] = visibleLines.map((line) =>
+		line.length > 0 ? [{ text: line, className: null }] : [],
+	);
 
-	if (!language || !hljs.getLanguage(language)) {
-		return { tokens: plain, text: visibleLines, totalLines };
+	if (!language || !hljs.getLanguage(language) || visibleLines.length === 0) {
+		return {
+			tokens: plain,
+			text: visibleLines,
+			totalLines,
+			hasTrailingNewline,
+			trailingBlankCount,
+		};
 	}
 	let markup: string;
 	try {
 		markup = hljs.highlight(visible, { language, ignoreIllegals: true }).value;
 	} catch {
-		return { tokens: plain, text: visibleLines, totalLines };
+		return {
+			tokens: plain,
+			text: visibleLines,
+			totalLines,
+			hasTrailingNewline,
+			trailingBlankCount,
+		};
 	}
 	const tokens = splitHighlightedIntoRows(markup);
 	// The highlighter must reproduce the source exactly; if it does not, the
 	// line model would no longer correspond to real source lines.
 	if (!tokens || tokens.length !== visibleLines.length) {
-		return { tokens: plain, text: visibleLines, totalLines };
+		return {
+			tokens: plain,
+			text: visibleLines,
+			totalLines,
+			hasTrailingNewline,
+			trailingBlankCount,
+		};
 	}
-	return { tokens, text: visibleLines, totalLines };
+	return {
+		tokens,
+		text: visibleLines,
+		totalLines,
+		hasTrailingNewline,
+		trailingBlankCount,
+	};
 }
