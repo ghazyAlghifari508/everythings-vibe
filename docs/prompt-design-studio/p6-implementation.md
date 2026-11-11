@@ -1,0 +1,80 @@
+# P6: domain-aware generation quality
+
+## Component-first selection matrix
+
+Reviewed official catalogs and license files before changing templates. No browser QA, third-party source blocks, paid snippets, new dependencies or React runtime in generated HTML.
+
+| Need | Candidate library/component | React or standalone HTML | License evidence | Current dependency compatibility | Chosen pattern / why it fits | Where reused |
+| --- | --- | --- | --- | --- | --- | --- |
+| Readable customization, feedback and bounded media | [shadcn Field/Radio Group](https://ui.shadcn.com/docs/components/radix/radio-group), [Alert](https://ui.shadcn.com/docs/components/radix/alert), [Aspect Ratio](https://ui.shadcn.com/docs/components/radix/aspect-ratio), [Scroll Area](https://ui.shadcn.com/docs/components/radix/scroll-area) | React originals; native fieldset/label/input, figure and overflow adaptations | [MIT](https://raw.githubusercontent.com/shadcn-ui/ui/main/LICENSE.md) | Existing React 19/Radix app; component runtime cannot run in standalone artboards | Adopt clickable choice rows, separate label/description/value tracks, neutral title/body feedback and component-owned media fit; no universal success tint | `studio-component-patterns.ts`, canonical media defaults, generated frame guidance |
+| Control/description hierarchy | [HeroUI v3 RadioGroup](https://heroui.com/en/docs/react/components/radio-group) | React Aria originals; native radio adaptation | Current v3 [Apache-2.0](https://raw.githubusercontent.com/heroui-inc/heroui/v3/LICENSE), NOT MIT | `@heroui/react` already installed; no import in HTML | Adopt distinct control, label and description anatomy with explicit description association; native semantics avoid runtime cost | OptionRow guidance and static pattern |
+| Unequal editorial/overview content | [Magic UI Bento Grid](https://magicui.design/docs/components/bento-grid) | React/Tailwind, optional Motion | Free library [MIT](https://raw.githubusercontent.com/magicuidesign/magicui/main/LICENSE.md); Pro separate | No dependency needed | No additional bento template: task-driven layouts already support unequal content; a default mosaic would reinforce the defect | Existing grid composition retained, not injected into every screen |
+| Decorative motion | [React Bits catalog](https://reactbits.dev/) | React/CSS, animation/Canvas variants | [MIT + Commons Clause](https://raw.githubusercontent.com/DavidHDev/react-bits/main/LICENSE.md), component/export redistribution restrictions | React available only in host, not static artboards | Not adopted: no required motion and generator redistribution rights are material | None |
+| AI runtime status | [Thinking Orbs](https://www.thinkingorbs.com/#orbs) | React, dependency-free JS, SwiftUI | [MIT](https://raw.githubusercontent.com/yogesharc/thinking-orbs/main/packages/thinkingorbs/LICENSE) | Host dependency installed; static documents disallow executable status code | Not adopted: animated agent status does not solve product media, hierarchy or controls; no fake live indicator | Existing host usage untouched |
+| Choice/feedback components | [affectUI components](https://www.affectui.com/components), [license](https://www.affectui.com/license) | Self-contained React/TSX | Mixed free MIT and commercial Pro; no blanket permission | Host React-compatible; no static runtime | Not adopted: matching native patterns already available; no Pro source copied | None |
+| Agent choices and approvals | [TUFFUI](https://tuffui.com/) | React/shadcn | [MIT](https://raw.githubusercontent.com/yurigdesigner/tuffui/main/LICENSE) | Host compatible; static output incompatible with React state | Not adopted: agent-specific approvals unrelated to generated product screens | None |
+| Native controls | [CUI](https://yappologistic.github.io/CUI/) | C99/native machine code, not HTML components | [MIT](https://raw.githubusercontent.com/yappologistic/CUI/master/LICENSE) | Incompatible runtime | Not adopted: native runtime cannot be embedded as semantic static HTML | None |
+| Shared design system | [SakaniUI](https://www.sakaniui.com/) | React/TypeScript; glass and liquid-glass variants | [MIT](https://raw.githubusercontent.com/samzydd/Sakaniui/main/LICENSE) | Additional React design-system runtime unnecessary | Not adopted: existing project tokens and components cover the need; no gratuitous glass | None |
+| Existing Studio controls and layout | `src/components/ui/{button,card,alert}.tsx`, `studio-component-patterns.ts`, canonical shell | Host React primitives; existing standalone static patterns | Project-owned implementation, external references above | Already installed and used | Extend existing static pattern layer rather than a second generator. Preserve search, field, stepper, action-area, intrinsic public navigation and nonshrinking tracks | Initial/add/revision/correction through the existing prompt, assembly and validation pipeline |
+
+Context7 confirmed shadcn FieldContent/choice-card composition and HeroUI v3 Radio.Content/Description anatomy. Adaptations implement standard native HTML composition independently; no substantial upstream source was copied. Existing P5 canonical navigation remains authoritative.
+
+## Source-confirmed root causes
+
+- Before P6, planning kept hierarchy, media and responsive intent in a free-form `role` string. The parser checked counts but not name/order correspondence, and legacy layout-family normalization could conceal a missing family in a new plan.
+- Finance/catalog keyword matching could override a public portfolio's job. Every pattern was offered to every screen, including sample discounts and revenue that could become unsupported claims.
+- Frame prompts retained PRD title/headings but dropped body evidence. Correction retained previous output but not brief/PRD evidence; legacy revision also needed the original product brief, not only the latest change instruction.
+- Product-role media defaulted to `cover`. Whole products need `contain` unless an intentional crop is declared. Component CSS must remain authoritative over zero-specificity shell defaults.
+- Structural diagnostics missed block-separated quantities and shrinking carousel children on already-scrollable tracks. A second fixed-width heuristic ignored applied max-width constraints. A legacy test claimed a two-word badge had wrapped without any measured line boxes.
+- Hard/repairable/advisory reporting and one bounded corrective round already exist. They should be reused, not replaced by an aesthetic retry system.
+
+## Existing architecture and scope
+
+P1 reference audit was read: retain independent frame readiness, standalone documents, and clean-room licensing. Its historical roadmap is not the current P6 specification. No Doop/AGPL or proprietary Stitch code is reused.
+
+`studio-planning.ts` builds the shared planning context; `studio-planning-generation.ts` parses bounded provider responses. Initial frames use `studio-initial-frame.ts`; add/revise/retry use `studio-frame-operation.ts`; legacy project generation/revision also share `generateValidatedFrameHtml`. `finalizeStudioFrameHtml` assembles canonical chrome before diagnostics. All generation modes use `resolveStudioFrameSystemPrompt`, independent of optional skills. Themes, custom DESIGN.md and VibeScrape references enter through the same design-reference/token boundary.
+
+## Implemented contracts and adoption
+
+- `studio-design-blueprint.ts` validates `brandTone`, shared media intent, and per-screen `composition` (primary task, layout family, ordered hierarchy, pattern ids, responsive strategy and media role). Existing tokens, density, layout scales and navigation remain the shared identity; no duplicate design-system structure was introduced.
+- New planning requires the quality fields and an explicitly supplied `layoutIntent` before legacy normalization. Screen names/orders must correspond to the planned slots. Persisted legacy blueprints remain readable; deterministic add-screen growth preserves sibling compositions and identity, using the new screen's role/brief and universal component guidance when it has no stored composition.
+- Generation offers only the planned pattern ids when a composition exists. Public website intent wins over incidental finance/catalog keywords. Coffee customization, checkout/tracking, travel itinerary/profile, portfolio narrative and SaaS entry/history receive task-specific composition guidance, not one default card grid. No sample project names occur in generic rules.
+- Actual native patterns: fieldset/legend with clickable radio label, associated description and separate price track; proportional stepper; bounded table; nonshrinking keyboard-focusable horizontal track; in-flow safe-area action region; neutral note; product row with useful missing-media copy. Tables/metrics use explicit sample or empty content, not invented revenue/growth. No React component runtime, new dependencies or proprietary source is shipped in artboards.
+- Product media defaults to `contain`; explicit `data-media-fit="cover"` and authored CSS retain intentional crop behavior. Shared defaults remain zero-specificity. Media ratio/fallback, full labels, atomic values, option tracks and responsive choices are specified at component level rather than by global clipping hacks.
+- Frame generation keeps the sanitized PRD body. Initial/add/revise/retry and legacy generation/revision pass brief/PRD evidence into bounded correction. Visual references remain visual data, not evidence for testimonials, certifications, credentials, satisfaction, metrics or business statuses. Supplied illustrative values must remain visibly identified as examples.
+- Optional design skills do not own the baseline: both planning and every frame/revision/correction system prompt include `STUDIO_BASE_QUALITY_PROMPT`. `studio-skill-capabilities.ts` separates unchanged capability metadata so the modified registry stays below the 400-line ceiling; callers moved without a compatibility re-export.
+
+## Rules consolidated or removed
+
+- Removed the second, contradictory fixed-width rejection; `validateGeneratedHtml` retains the existing viewport/containment-aware contract.
+- Removed the test claiming any two-word badge necessarily wraps. Text length is not geometry. Functional categories/status badges remain valid; repeated same-component statuses remain advisory.
+- Replaced forced single-column mobile composition, default form/table + KPI quotas, universal product cropping, essential-text ellipsis advice and primary-action-per-section guidance with task-owned layout and one focal action per screen.
+- Grounding and purposeful badge/dot/feedback/decoration policy live in the universal quality baseline. Pattern guidance supplies concrete native anatomy rather than a second generator or an aesthetic retry engine. Expressive brand palettes and explicit art direction remain allowed within safety/readability constraints.
+- Updated `docs/studio-component-first-strategy.md` to remove obsolete metric/stripe/dot recipes and the historical HeroUI MIT assumption.
+
+## Severity and correction boundary
+
+| Class | Evidence | Result |
+| --- | --- | --- |
+| Hard | Unsafe/incomplete HTML, invalid stylesheet, missing essential accessible name, invalid nesting, unresolved assets or required document/shell contract | Reject unsafe output; at most the existing bounded correction when model-owned. Deterministic assembly failures fail directly without spending a model repair request. |
+| Repairable structural | Applied essential-label ellipsis, zero-size clipping box on the relevant axis, forced block/line-separated price/quantity, known image/frame conflict, declared shrinking carousel, nonwrapping row with impossible declared minimum widths, duplicate canonical navigation/shell | Mandatory correction only with high-confidence source evidence; revalidate the full document. Hidden responsive alternatives and intentional crops are excluded. |
+| Advisory | Repeated component status, potentially excessive decoration, sparse content, spacing/hierarchy or overlap concerns requiring rendered geometry | Preserve valid output; no model regeneration for taste alone. |
+
+Limits are unchanged: one frame correction, at most three total requests sharing transient retry and correction ceilings; one planning correction. Correction retains the complete prior HTML and bounded product context, failing closed instead of silently truncating when HTML exceeds 60,000 characters or the complete correction exceeds 64,000 characters. JSDOM does not provide pixel geometry: source checks establish declared conflicts, not browser-perfect layout.
+
+## Verification evidence
+
+- Red/green P6 regressions cover validated composition/enums, same-count blueprint identity drift, required new-plan fields, legacy compatibility, contextual extension invariants, forced atomic line tracks, scrolling/shrink behavior, hidden alternatives, axis-specific clipping, duplicate-navigation severity and max-width containment. P6-specific files: 16 planning tests and 10 diagnostic cases.
+- Targeted pipeline batch exercised 18 files: 140 passed, one obsolete badge-wording assertion failed. That assertion was removed, not re-pinned; valid safety, schema, lifecycle and layout boundaries were preserved. The updated defects suite passed in the final targeted batch below.
+- Final targeted compatibility batch: five files / 63 tests passed (`studio-p3-defects`, `studio-quality-p6`, `studio-design-skill-fidelity`, `studio-design-reference-matrix`, `studio-skill-stage-context`). The fidelity test no longer asserts an exact incidental prompt concatenation.
+- Strict planning recheck: two files / 19 tests passed (`studio-planning-quality-p6`, `studio-planning.integration`). Legacy service/component recheck: two files / 18 tests passed (`studio-service`, `studio-component-guidance`). Existing generation/planning-bound tests exercised correction ceilings, cancellation, provider terminal errors and advisory no-retry behavior.
+- Temporary assert-based smoke passed: 12 frame-mode/reference combinations, 24 quality-stage/skill combinations, all 12 native patterns, retained brief/PRD context in correction, public-domain precedence, product fit and filtered pattern guidance. This checks prompt/input contracts, not stochastic model quality or browser visuals; the temporary script is removed before commit.
+- Scoped Biome check passed on 30 touched TypeScript files. TypeScript `--noEmit` passed; no build, browser QA, headless Playwright or visual snapshot tests were run.
+
+## Latency, cost and remaining visual validation
+
+No new model stage or retry loop. Filtering patterns reduces guidance for the smoke fixture from 5,340 to 3,574 characters (1,766 fewer); complete sanitized PRD content adds up to the existing 100,000-character input ceiling to preserve product evidence. Large PRD + HTML combinations can exceed the existing 64,000-character correction budget and are rejected without silent truncation. Stronger planning fields can consume the existing single correction if a provider omits them. Cached computed styles avoid repeated style reads inside structural inspection. No live-provider latency, token billing or quality-improvement percentage was measured.
+
+Final browser phase still needs representative coffee whole-product photos, long translated labels/prices, narrow option rows, horizontal travel cards, keyboard/focus and image-failure behavior, responsive public navbar/hero composition, and sibling typography/spacing/contrast checks. Confirm actual fonts/assets/crops and contextual badge/metric honesty against the brief. Source-only passing checks do not establish polished rendered output or eliminate model hallucination.
+
+P6 sections 1–9 are covered by the research matrix, shared contracts, native pattern adoption, evidence-based classification, mode/reference wiring and targeted checks above. No merge or deployment. Direct user instructions and `AGENTS.md` require atomic commits and push, overriding the embedded P6 no-commit line.
