@@ -14,7 +14,7 @@ import {
 	Search01Icon,
 	SmartPhone01Icon,
 } from "@hugeicons/core-free-icons";
-import { useEffect, useMemo, useState } from "react";
+import { type ComponentProps, useEffect, useMemo, useState } from "react";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -36,6 +36,42 @@ export interface StudioSidebarProps {
 	onRenameProject: (id: string, name: string) => Promise<void>;
 	onDuplicateProject: (id: string) => Promise<void>;
 	className?: string;
+}
+
+interface StudioHistoryEmptyProps {
+	state: "history" | "search";
+	icon: ComponentProps<typeof Icon>["icon"];
+	title: string;
+	description: string;
+}
+
+/**
+ * Empty region for the history list. It starts at the same top edge and left
+ * alignment the first project card would occupy, so an empty sidebar never
+ * reads as a vertically centred placeholder. History and search keep separate
+ * copy because only one of them means "you have no designs yet".
+ */
+function StudioHistoryEmpty({
+	state,
+	icon,
+	title,
+	description,
+}: StudioHistoryEmptyProps) {
+	return (
+		<div
+			data-studio-empty-state={state}
+			className="flex flex-col gap-1.5 px-2.5 pt-2.5"
+		>
+			<div
+				className="mb-1.5 flex h-8 w-8 items-center justify-center rounded-lg border border-graphite/70 bg-onyx text-fog"
+				aria-hidden="true"
+			>
+				<Icon icon={icon} size={16} />
+			</div>
+			<p className="text-xs font-semibold text-snow">{title}</p>
+			<p className="text-[11px] leading-relaxed text-fog">{description}</p>
+		</div>
+	);
 }
 
 export function StudioSidebar({
@@ -137,24 +173,24 @@ export function StudioSidebar({
 			</div>
 
 			{/* Project List */}
-			<div className="flex flex-1 min-h-0 flex-col overflow-y-auto p-2">
+			<div
+				data-studio-history-list
+				className="flex flex-1 min-h-0 flex-col overflow-y-auto p-2"
+			>
 				{history.length === 0 ? (
-					<div className="flex flex-col items-center px-4 py-8 text-center">
-						<div
-							className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg border border-graphite/70 bg-onyx text-fog"
-							aria-hidden="true"
-						>
-							<Icon icon={Folder02Icon} size={18} />
-						</div>
-						<p className="text-xs font-semibold text-snow">Belum ada proyek</p>
-						<p className="mt-1 text-[11px] text-fog leading-relaxed">
-							Desain yang kamu buat akan muncul di sini.
-						</p>
-					</div>
+					<StudioHistoryEmpty
+						state="history"
+						icon={Folder02Icon}
+						title="Belum ada proyek"
+						description="Desain yang kamu buat akan muncul di sini."
+					/>
 				) : filtered.length === 0 ? (
-					<div className="flex flex-col items-center px-4 py-6 text-center">
-						<p className="text-xs text-fog">Tidak ada proyek yang cocok.</p>
-					</div>
+					<StudioHistoryEmpty
+						state="search"
+						icon={Search01Icon}
+						title="Tidak ada proyek yang cocok"
+						description="Coba kata kunci lain."
+					/>
 				) : (
 					<ul className="space-y-1">
 						{filtered.map((item) => {
