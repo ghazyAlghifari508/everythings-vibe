@@ -381,4 +381,115 @@ describe("CodebaseReview", () => {
 		expect(c.textContent).toContain("api/orders");
 		expect(c.textContent).toContain("Pengelolaan pesanan");
 	});
+
+	it("renders evidence disclosure and toggles inspectable file list", () => {
+		const analysisWithEvidence: CodebaseAnalysis = {
+			...analysis,
+			findings: [
+				{
+					title: "Konten dikelola lewat data lokal",
+					detail: "Katalog portofolio dibaca dari berkas JSON terstruktur.",
+					claimType: "verified",
+					evidencePaths: ["src/content/projects.json", "src/content.config.ts"],
+					implication:
+						"Perubahan field proyek harus menjaga kompatibilitas schema.",
+				},
+			],
+		};
+		const c = renderReview({ analysis: analysisWithEvidence });
+		expect(c.textContent).toContain("Konten dikelola lewat data lokal");
+		expect(c.textContent).toContain("Evidence:");
+		expect(c.textContent).toContain("2 berkas relevan");
+		expect(c.textContent).toContain("Impact:");
+		expect(c.textContent).toContain(
+			"Perubahan field proyek harus menjaga kompatibilitas schema.",
+		);
+
+		// Initially, the evidence list is collapsed
+		expect(c.querySelector('[data-testid="finding-evidence-list"]')).toBeNull();
+
+		// Click the disclosure toggle
+		const toggleBtn = [...c.querySelectorAll("button")].find((b) =>
+			/Evidence:.*2 berkas relevan/i.test(b.textContent ?? ""),
+		);
+		expect(toggleBtn).toBeDefined();
+		act(() => {
+			toggleBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+
+		// Evidence list is now expanded and shows the files
+		const list = c.querySelector('[data-testid="finding-evidence-list"]');
+		expect(list).not.toBeNull();
+		expect(list?.textContent).toContain("projects.json");
+		expect(list?.textContent).toContain("content.config.ts");
+	});
+
+	it("routes clicked evidence file to onSelectFile callback", () => {
+		const onSelectFile = vi.fn();
+		const analysisWithEvidence: CodebaseAnalysis = {
+			...analysis,
+			findings: [
+				{
+					title: "Konten dikelola lewat data lokal",
+					detail: "Katalog portofolio dibaca dari berkas JSON.",
+					evidencePaths: ["src/content/projects.json"],
+				},
+			],
+		};
+		const c = renderReview({
+			analysis: analysisWithEvidence,
+			onSelectFile,
+		});
+
+		// Open the disclosure
+		const toggleBtn = [...c.querySelectorAll("button")].find((b) =>
+			/Evidence:.*1 berkas relevan/i.test(b.textContent ?? ""),
+		);
+		act(() => {
+			toggleBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+
+		// Click the "Lihat file" button
+		const fileBtn = [...c.querySelectorAll("button")].find((b) =>
+			/Lihat file/i.test(b.textContent ?? ""),
+		);
+		expect(fileBtn).toBeDefined();
+		act(() => {
+			fileBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+
+		expect(onSelectFile).toHaveBeenCalledWith("src/content/projects.json");
+	});
+
+	it("routes clicked repository panel file to onSelectFile callback", () => {
+		const onSelectFile = vi.fn();
+		const c = renderReview({ onSelectFile });
+
+		// In repository panel, clicking a relevant file should route to onSelectFile
+		const fileBtn = [...c.querySelectorAll("button")].find((b) =>
+			/schema\.ts/i.test(b.textContent ?? ""),
+		);
+		expect(fileBtn).toBeDefined();
+		act(() => {
+			fileBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+
+		expect(onSelectFile).toHaveBeenCalledWith("src/db/schema.ts");
+	});
+
+	it("handles empty optional findings and limitations without crashing UI", () => {
+		const emptyAnalysis: CodebaseAnalysis = {
+			projectId: "proj_empty",
+			snapshotId: "snap_empty",
+			findings: [],
+			limitations: [],
+			applicationModules: [],
+			impactAreas: [],
+		};
+		const c = renderReview({ analysis: emptyAnalysis });
+		expect(c.textContent).toContain("Bagian aplikasi");
+		expect(c.textContent).toContain("Tidak terdeteksi");
+		expect(c.textContent).not.toContain("Temuan arsitektur");
+		expect(c.textContent).not.toContain("Hal yang belum dapat dipastikan");
+	});
 });

@@ -10,15 +10,21 @@ import {
 	type CodebaseAnalysis,
 	type CodebaseStarterSuggestion,
 	canContinueToCodebaseConclusion,
+	codebaseAnalysisFindingSchema,
 	codebaseAnalysisGenerationSchema,
 	codebaseAnalysisSchema,
+	codebaseFindingClaimTypeSchema,
 	codebaseStarterSuggestionsSchema,
 	decideAnalysisRequest,
 	findStarterTechnicalLeaks,
+	getFindingEvidencePaths,
+	getFindingImplication,
 	inferTechAnswersFromCodebase,
 	parseAnalysisOutput,
 	parseCodebaseAnalysis,
 	resolveAnalysisScope,
+	sanitizeAnalysisFindings,
+	sanitizeAnalysisLimitations,
 	selectSourceExcerpts,
 	toSafeAnalysisErrorMessage,
 } from "@/features/codebase/services/analysis";
@@ -630,6 +636,250 @@ describe("parseAnalysisOutput", () => {
 			expect(suggestion.prompt.length).toBeGreaterThan(0);
 			expect(suggestion.title.length).toBeGreaterThan(0);
 		}
+	});
+});
+
+describe("P10: Evidence-based analysis contracts and boundaries", () => {
+	const trustedManifestPaths = new Set([
+		"src/content/projects.json",
+		"src/content.config.ts",
+		"src/routes/index.tsx",
+		"src/routes/api.ts",
+	]);
+
+	describe("output schema validation and claim types", () => {
+		it("validates valid claimType enum values and rejects unknown strings", () => {
+			expect(codebaseFindingClaimTypeSchema.safeParse("verified").success).toBe(
+				true,
+			);
+			expect(
+				codebaseFindingClaimTypeSchema.safeParse("inference").success,
+			).toBe(true);
+			expect(
+				codebaseFindingClaimTypeSchema.safeParse("uncertain").success,
+			).toBe(true);
+			expect(codebaseFindingClaimTypeSchema.safeParse("invalid").success).toBe(
+				false,
+			);
+		});
+
+		it("validates finding with evidencePaths and implication", () => {
+			const finding = {
+				title: "Konten proyek dikelola lewat data lokal",
+				detail: "Data portofolio dibaca dari berkas JSON terstruktur.",
+				claimType: "verified" as const,
+				evidencePaths: ["src/content/projects.json"],
+				implication:
+					"Perubahan field proyek harus menjaga kompatibilitas dengan schema konten.",
+			};
+			const parsed = codebaseAnalysisFindingSchema.safeParse(finding);
+			expect(parsed.success).toBe(true);
+			if (!parsed.success) return;
+			expect(getFindingEvidencePaths(parsed.data)).toEqual([
+				"src/content/projects.json",
+			]);
+			expect(getFindingImplication(parsed.data)).toBe(
+				"Perubahan field proyek harus menjaga kompatibilitas dengan schema konten.",
+			);
+		});
+
+		it("normalizes impact field to implication helper when provided", () => {
+			const finding = {
+				title: "Asset placeholder",
+				detail: "Beberapa gambar statis menggunakan placeholder SVG.",
+				impact: "Perlu aset final sebelum rilis publik.",
+			};
+			expect(getFindingImplication(finding)).toBe(
+				"Perlu aset final sebelum rilis publik.",
+			);
+		});
+	});
+
+	describe("evidence path verification against manifest", () => {
+		it("safely excludes fabricated/untrusted paths from findings", () => {
+			const rawFindings = [
+				{
+					title: "Data lokal",
+					detail: "Menggunakan berkas JSON.",
+					claimType: "verified" as const,
+					evidencePaths: [
+						"src/content/projects.json",
+						"fabricated/file/does-not-exist.ts",
+					],
+				},
+			];
+			const sanitized = sanitizeAnalysisFindings(
+				rawFindings,
+				trustedManifestPaths,
+			);
+			expect(sanitized).toBeDefined();
+			expect(sanitized?.[0].evidencePaths).toEqual([
+				"src/content/projects.json",
+			]);
+			expect(sanitized?.[0].claimType).toBe("verified");
+		});
+
+		it("drops evidencePaths when all paths are untrusted and reclassifies claimType", () => {
+			const rawFindings = [
+				{
+					title: "Klaim tanpa bukti nyata",
+					detail: "Klaim dari file halusinasi.",
+					claimType: "verified" as const,
+					evidencePaths: ["fake/path.ts"],
+				},
+			];
+			const sanitized = sanitizeAnalysisFindings(
+				rawFindings,
+				trustedManifestPaths,
+			);
+			expect(sanitized).toBeDefined();
+			expect(sanitized?.[0].evidencePaths).toBeUndefined();
+			// Without verified evidence paths, reclassified away from verified
+			expect(sanitized?.[0].claimType).toBe("inference");
+		});
+	});
+
+	describe("classification of uncertain findings", () => {
+		it("classifies findings with uncertainty as uncertain", () => {
+			const rawFindings = [
+				{
+					title: "Status asset",
+					detail: "Sebagian aset masih berupa placeholder.",
+					uncertainty:
+						"Belum dapat dipastikan apakah aset asli tersedia di folder luar snapshot.",
+				},
+			];
+			const sanitized = sanitizeAnalysisFindings(
+				rawFindings,
+				trustedManifestPaths,
+			);
+			expect(sanitized?.[0].claimType).toBe("uncertain");
+		});
+
+		it("classifies findings without evidence or uncertainty as inference", () => {
+			const rawFindings = [
+				{
+					title: "Pola navigasi",
+					detail: "Navigasi disimpulkan dari struktur folder routes.",
+				},
+			];
+			const sanitized = sanitizeAnalysisFindings(
+				rawFindings,
+				trustedManifestPaths,
+			);
+			expect(sanitized?.[0].claimType).toBe("inference");
+		});
+	});
+
+	describe("handling of duplicate finding references and duplicated uncertainty", () => {
+		it("deduplicates findings with the same title", () => {
+			const rawFindings = [
+				{
+					title: "Manajemen state",
+					detail: "State lokal di komponen.",
+				},
+				{
+					title: "Manajemen state",
+					detail: "State lokal di komponen duplikat.",
+				},
+			];
+			const sanitized = sanitizeAnalysisFindings(
+				rawFindings,
+				trustedManifestPaths,
+			);
+			expect(sanitized).toHaveLength(1);
+			expect(sanitized?.[0].title).toBe("Manajemen state");
+		});
+
+		it("clears uncertainty that merely repeats title or detail", () => {
+			const rawFindings = [
+				{
+					title: "Asset placeholder",
+					detail: "Beberapa aset berupa placeholder.",
+					uncertainty: "Beberapa aset berupa placeholder.",
+				},
+			];
+			const sanitized = sanitizeAnalysisFindings(
+				rawFindings,
+				trustedManifestPaths,
+			);
+			expect(sanitized?.[0].uncertainty).toBeUndefined();
+		});
+
+		it("filters limitations that duplicate finding uncertainties or titles", () => {
+			const findings = [
+				{
+					title: "Placeholder asset",
+					detail: "Ada placeholder asset.",
+					uncertainty: "Aset asli belum terverifikasi di luar snapshot.",
+				},
+			];
+			const limitations = [
+				"Aset asli belum terverifikasi di luar snapshot.",
+				"Placeholder asset",
+				"Koneksi backend tidak disertakan dalam snapshot.",
+			];
+			const sanitized = sanitizeAnalysisLimitations(limitations, findings);
+			expect(sanitized).toEqual([
+				"Koneksi backend tidak disertakan dalam snapshot.",
+			]);
+		});
+	});
+
+	describe("legacy output compatibility and empty optional data", () => {
+		it("parses legacy analysis lacking P10 fields cleanly", () => {
+			const legacyOutput = {
+				projectId: "proj_legacy",
+				snapshotId: "snap_legacy",
+				findings: [
+					{
+						title: "Temuan lama",
+						detail: "Hanya memiliki title dan detail tanpa field P10.",
+						relevantPaths: ["src/content/projects.json"],
+					},
+				],
+			};
+			const parsed = parseCodebaseAnalysis(legacyOutput);
+			expect(parsed.findings?.[0].title).toBe("Temuan lama");
+			expect(parsed.findings?.[0].claimType).toBeUndefined();
+			expect(parsed.findings?.[0].implication).toBeUndefined();
+			const legacyFinding = parsed.findings?.[0];
+			expect(legacyFinding).toBeDefined();
+			if (!legacyFinding) return;
+			expect(getFindingEvidencePaths(legacyFinding)).toEqual([
+				"src/content/projects.json",
+			]);
+		});
+
+		it("handles completely empty optional data gracefully", () => {
+			const minimal = {
+				projectId: "proj_min",
+				snapshotId: "snap_min",
+			};
+			const parsed = parseCodebaseAnalysis(minimal);
+			expect(parsed.findings).toBeUndefined();
+			expect(parsed.limitations).toBeUndefined();
+			expect(parsed.applicationModules).toBeUndefined();
+			expect(parsed.relevantFiles).toBeUndefined();
+		});
+	});
+
+	describe("truncated snapshot prompt behavior", () => {
+		it("signals truncated context to the model prompt when files exceed budget", () => {
+			const prompt = buildAnalysisUserPrompt({
+				projectId: "proj_trunc",
+				snapshotId: "snap_trunc",
+				featurePrompt: "Fitur baru",
+				manifest: [{ path: "huge.ts", size: 50000 }],
+				files: [{ path: "huge.ts", text: "x".repeat(50000) }],
+				fileCount: 1,
+				excludedCount: 0,
+				maxContextChars: 1000,
+			});
+			expect(prompt).toContain(
+				"Konteks sumber dipotong karena batas ukuran — tandai cakupan yang hilang di limitations",
+			);
+		});
 	});
 });
 
