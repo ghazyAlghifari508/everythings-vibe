@@ -26,12 +26,14 @@ interface CodebaseReviewRepositoryPanelProps {
 	analysis: CodebaseAnalysis;
 	fileCount?: number;
 	excludedCount?: number;
+	onSelectFile?: (path: string) => void;
 }
 
 export function CodebaseReviewRepositoryPanel({
 	analysis,
 	fileCount,
 	excludedCount,
+	onSelectFile,
 }: CodebaseReviewRepositoryPanelProps) {
 	return (
 		<>
@@ -51,11 +53,8 @@ export function CodebaseReviewRepositoryPanel({
 						<div className="rounded-lg border border-graphite/60 bg-onyx/50 divide-y divide-graphite/40 overflow-hidden max-h-64 overflow-y-auto">
 							{analysis.moduleMap.map((entry) => {
 								const parsed = splitPath(entry.path);
-								return (
-									<div
-										key={entry.path}
-										className="group flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between px-3 py-2 text-xs transition-colors hover:bg-steel/10 dark:hover:bg-steel/20"
-									>
+								const rowContent = (
+									<>
 										<div className="flex items-center gap-2 min-w-0 sm:max-w-[52%]">
 											{parsed.isFile ? (
 												<Icon
@@ -92,6 +91,23 @@ export function CodebaseReviewRepositoryPanel({
 										>
 											{entry.summary}
 										</span>
+									</>
+								);
+								return onSelectFile && parsed.isFile ? (
+									<button
+										type="button"
+										key={entry.path}
+										onClick={() => onSelectFile(entry.path)}
+										className="w-full text-left group flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between px-3 py-2 text-xs transition-colors hover:bg-steel/10 dark:hover:bg-steel/20 cursor-pointer"
+									>
+										{rowContent}
+									</button>
+								) : (
+									<div
+										key={entry.path}
+										className="group flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between px-3 py-2 text-xs transition-colors hover:bg-steel/10 dark:hover:bg-steel/20"
+									>
+										{rowContent}
 									</div>
 								);
 							})}
@@ -108,11 +124,8 @@ export function CodebaseReviewRepositoryPanel({
 							<div className="rounded-lg border border-graphite/40 bg-onyx/30 divide-y divide-graphite/30 max-h-40 overflow-y-auto">
 								{analysis.relevantFiles.map((file) => {
 									const parsed = splitPath(file);
-									return (
-										<div
-											key={file}
-											className="flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-steel/10 dark:hover:bg-steel/20 transition-colors"
-										>
+									const fileContent = (
+										<>
 											<Icon
 												icon={FileCodeIcon}
 												size={13}
@@ -132,6 +145,23 @@ export function CodebaseReviewRepositoryPanel({
 													{parsed.name}
 												</strong>
 											</span>
+										</>
+									);
+									return onSelectFile ? (
+										<button
+											type="button"
+											key={file}
+											onClick={() => onSelectFile(file)}
+											className="w-full text-left flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-steel/10 dark:hover:bg-steel/20 transition-colors cursor-pointer"
+										>
+											{fileContent}
+										</button>
+									) : (
+										<div
+											key={file}
+											className="flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-steel/10 dark:hover:bg-steel/20 transition-colors"
+										>
+											{fileContent}
 										</div>
 									);
 								})}

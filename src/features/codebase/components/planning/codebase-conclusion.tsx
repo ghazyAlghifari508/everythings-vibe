@@ -24,6 +24,7 @@ interface CodebaseConclusionProps {
 	onRetrySync?: () => void;
 	onEnterWorkspace: () => void;
 	onBackToSync: () => void;
+	onSelectFile?: (path: string) => void;
 }
 
 /**
@@ -121,6 +122,7 @@ export function CodebaseConclusion({
 	onRetrySync,
 	onEnterWorkspace,
 	onBackToSync,
+	onSelectFile,
 }: CodebaseConclusionProps) {
 	const state = resolveConclusionState({
 		snapshotId: snapshot.snapshotId,
@@ -159,6 +161,7 @@ export function CodebaseConclusion({
 				onRetrySync={onRetrySync}
 				onContinue={onEnterWorkspace}
 				onBackToSync={onBackToSync}
+				onSelectFile={onSelectFile}
 			/>
 		);
 	}

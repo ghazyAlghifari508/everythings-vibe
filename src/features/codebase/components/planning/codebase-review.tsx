@@ -22,6 +22,7 @@ interface CodebaseReviewProps {
 	onRetryAnalysis?: () => void;
 	onContinue: () => void;
 	onBackToSync?: () => void;
+	onSelectFile?: (path: string) => void;
 }
 
 export function CodebaseReview({
@@ -37,6 +38,7 @@ export function CodebaseReview({
 	onRetryAnalysis,
 	onContinue,
 	onBackToSync,
+	onSelectFile,
 }: CodebaseReviewProps) {
 	return (
 		<div className="w-full animate-enter flex flex-col gap-6">
@@ -84,6 +86,7 @@ export function CodebaseReview({
 					analysis={analysis}
 					fileCount={fileCount}
 					excludedCount={excludedCount}
+					onSelectFile={onSelectFile}
 				/>
 			</div>
 
@@ -96,7 +99,10 @@ export function CodebaseReview({
 				</div>
 
 				<div className="p-4 sm:p-5 flex flex-col gap-5">
-					<CodebaseReviewImpactSections analysis={analysis} />
+					<CodebaseReviewImpactSections
+						analysis={analysis}
+						onSelectFile={onSelectFile}
+					/>
 					<CodebaseReviewActions
 						snapshotId={snapshotId}
 						snapshotCreatedAt={snapshotCreatedAt}
