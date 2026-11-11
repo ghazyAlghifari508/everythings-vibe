@@ -100,7 +100,10 @@ export function resolveActivePlan(
 	// that was never fetched is exactly the false empty state this module exists
 	// to prevent.
 	if (input.plans == null) return { kind: "unknown" };
-	const plans = input.plans;
+	// Archived plans are decluttered, not active candidates: they cannot be
+	// resolved as the workspace's active plan. The remaining list is what the
+	// switcher shows and what re-resolves after an archive or delete.
+	const plans = input.plans.filter((plan) => !plan.archivedAt);
 	if (plans.length === 0) return { kind: "empty" };
 
 	const requestedId = cleanId(input.requestedProjectId);
@@ -138,15 +141,33 @@ export function resolveActivePlan(
  *
  * The onboarding anchor is repository analysis context, not a user-facing
  * plan, so it is hidden while it carries no planning of its own. Drafts with
- * a real user prompt stay visible so they can be resumed.
+ * a real user prompt stay visible so they can be resumed. Archived plans are
+ * hidden from the active switcher (that is the point of archiving), but stay
+ * reachable through `selectArchivedPlans` so they can be unarchived or deleted.
  */
 export function selectUserFacingPlans(
 	plans: readonly ActivePlanCandidate[],
 	anchorProjectId: string | null | undefined,
 ): ActivePlanCandidate[] {
 	const anchorId = cleanId(anchorProjectId);
-	if (!anchorId) return [...plans];
-	return plans.filter((plan) => !(plan.id === anchorId && !plan.hasArtifacts));
+	return plans.filter(
+		(plan) =>
+			!plan.archivedAt &&
+			!(anchorId && plan.id === anchorId && !plan.hasArtifacts),
+	);
+}
+
+/**
+ * Archived feature plans, shown in a collapsed "Diarsipkan" section so they
+ * remain recoverable. Excludes the onboarding anchor: it is never archived and
+ * never deletable, so it cannot appear here even if its tombstone were set.
+ */
+export function selectArchivedPlans(
+	plans: readonly ActivePlanCandidate[],
+	anchorProjectId: string | null | undefined,
+): ActivePlanCandidate[] {
+	const anchorId = cleanId(anchorProjectId);
+	return plans.filter((plan) => plan.archivedAt && plan.id !== anchorId);
 }
 
 /**

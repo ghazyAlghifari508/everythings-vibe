@@ -6,7 +6,7 @@ import { Icon } from "@/components/ui/icon";
 import { CodebaseChatWorkspace } from "@/features/codebase/components/chat/codebase-chat-workspace";
 import { CodebaseArtifactCanvas } from "@/features/codebase/components/explorer/codebase-artifact-canvas";
 import { CodebaseExplorerSidebar } from "@/features/codebase/components/explorer/codebase-explorer-sidebar";
-import { CodebasePlanSwitcher } from "@/features/codebase/components/planning/codebase-plan-switcher";
+import { CodebasePlanSwitcherPanel } from "@/features/codebase/components/planning/codebase-plan-switcher-panel";
 import { CodebaseWorkspaceResync } from "@/features/codebase/components/workspace/codebase-workspace-resync";
 import { CodebaseWorkspaceShell } from "@/features/codebase/components/workspace/codebase-workspace-shell";
 import { codebaseStarterSuggestionsSchema } from "@/features/codebase/services/analysis";
@@ -124,9 +124,11 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 								featureName={resolvedFeature?.name ?? codebase.name}
 								view={ws.workspaceView}
 								planSwitcher={
-									ws.userFacingPlans.length > 0 ? (
-										<CodebasePlanSwitcher
-											plans={ws.userFacingPlans}
+									ws.plans.length > 0 ? (
+										<CodebasePlanSwitcherPanel
+											codebaseId={codebase.id}
+											plans={ws.plans}
+											anchorProjectId={data.onboardingFeatureId}
 											activePlanId={effectiveFeatureId}
 											activePlanName={resolvedFeature?.name ?? null}
 											onSelectPlan={ws.selectPlan}

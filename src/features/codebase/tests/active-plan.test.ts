@@ -3,6 +3,7 @@ import {
 	type ActivePlanCandidate,
 	describePlanReadiness,
 	resolveActivePlan,
+	selectArchivedPlans,
 	selectUserFacingPlans,
 } from "@/features/codebase/services/active-plan";
 
@@ -160,6 +161,33 @@ describe("resolveActivePlan", () => {
 		resolveActivePlan({ plans });
 		expect(plans).toEqual(snapshot);
 	});
+
+	it("never resolves an archived plan as the active plan", () => {
+		const archived = plan("archived", {
+			hasArtifacts: true,
+			archivedAt: "2026-03-01T00:00:00.000Z",
+		});
+		const active = plan("active", { hasArtifacts: true });
+		// Even an explicit pointer naming the archived plan is ignored: an
+		// archived feature is decluttered, so resolution falls through to the
+		// one remaining non-archived plan.
+		expect(
+			resolveActivePlan({
+				requestedProjectId: archived.id,
+				plans: [archived, active],
+			}),
+		).toEqual({ kind: "resolved", plan: active, source: "only_plan" });
+	});
+
+	it("reports empty when every plan is archived", () => {
+		const archived = plan("only", {
+			hasArtifacts: true,
+			archivedAt: "2026-03-01T00:00:00.000Z",
+		});
+		expect(resolveActivePlan({ plans: [archived] })).toEqual({
+			kind: "empty",
+		});
+	});
 });
 
 describe("selectUserFacingPlans", () => {
@@ -201,6 +229,46 @@ describe("selectUserFacingPlans", () => {
 		const snapshot = plans.map((item) => ({ ...item }));
 		selectUserFacingPlans(plans, "anchor-plan");
 		expect(plans).toEqual(snapshot);
+	});
+
+	it("hides archived plans from the active switcher", () => {
+		const plans = [
+			plan("watchlist", { hasArtifacts: true }),
+			plan("old-feature", {
+				hasArtifacts: true,
+				archivedAt: "2026-03-01T00:00:00.000Z",
+			}),
+		];
+		const visible = selectUserFacingPlans(plans, null);
+		expect(visible.map((item) => item.id)).toEqual(["watchlist"]);
+	});
+});
+
+describe("selectArchivedPlans", () => {
+	it("returns only archived plans", () => {
+		const plans = [
+			plan("watchlist", { hasArtifacts: true }),
+			plan("old", {
+				hasArtifacts: true,
+				archivedAt: "2026-03-01T00:00:00.000Z",
+			}),
+		];
+		expect(selectArchivedPlans(plans, null).map((item) => item.id)).toEqual([
+			"old",
+		]);
+	});
+
+	it("never returns the onboarding anchor even if its tombstone is set", () => {
+		const plans = [
+			plan("anchor-plan", {
+				archivedAt: "2026-03-01T00:00:00.000Z",
+			}),
+		];
+		expect(selectArchivedPlans(plans, "anchor-plan")).toEqual([]);
+	});
+
+	it("returns an empty list when nothing is archived", () => {
+		expect(selectArchivedPlans([plan("watchlist")], null)).toEqual([]);
 	});
 });
 

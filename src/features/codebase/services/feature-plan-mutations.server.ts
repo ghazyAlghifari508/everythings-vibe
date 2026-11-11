@@ -58,7 +58,10 @@ async function lockOwnedFeature(
 		})
 		.from(codebases)
 		.where(
-			and(eq(codebases.id, input.codebaseId), eq(codebases.userId, input.userId)),
+			and(
+				eq(codebases.id, input.codebaseId),
+				eq(codebases.userId, input.userId),
+			),
 		)
 		.limit(1);
 	if (!codebase) return null;
@@ -214,7 +217,10 @@ export async function handleFeatureArchive({
 	const parsed = archiveSchema.safeParse(body);
 	if (!parsed.success) {
 		return Response.json(
-			{ error: "Permintaan arsip tidak valid", code: "FEATURE_ARCHIVE_INVALID" },
+			{
+				error: "Permintaan arsip tidak valid",
+				code: "FEATURE_ARCHIVE_INVALID",
+			},
 			{ status: 400 },
 		);
 	}

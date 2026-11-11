@@ -103,6 +103,7 @@ import { Route as ApiSettingsApiKeysAutoRouteImport } from './routes/api/setting
 import { Route as ApiSettingsApiKeysCleanupRouteImport } from './routes/api/settings/api-keys/cleanup'
 import { Route as ApiV1ProjectsIdRouteImport } from './routes/api/v1/projects/$id'
 import { Route as CodebasesKanbanCodebaseIdProjectIdRouteImport } from './routes/codebases/kanban/$codebaseId/$projectId'
+import { Route as ApiCodebasesCodebaseIdFeaturesProjectIdRouteImport } from './routes/api/codebases/$codebaseId/features.$projectId'
 import { Route as ApiV1ProjectsIdAcRouteImport } from './routes/api/v1/projects/$id/ac'
 import { Route as ApiV1ProjectsIdKanbanRouteImport } from './routes/api/v1/projects/$id/kanban'
 import { Route as ApiV1ProjectsIdPrdRouteImport } from './routes/api/v1/projects/$id/prd'
@@ -598,6 +599,12 @@ const CodebasesKanbanCodebaseIdProjectIdRoute =
     path: '/kanban/$codebaseId/$projectId',
     getParentRoute: () => CodebasesRoute,
   } as any)
+const ApiCodebasesCodebaseIdFeaturesProjectIdRoute =
+  ApiCodebasesCodebaseIdFeaturesProjectIdRouteImport.update({
+    id: '/$projectId',
+    path: '/$projectId',
+    getParentRoute: () => ApiCodebasesCodebaseIdFeaturesRoute,
+  } as any)
 const ApiV1ProjectsIdAcRoute = ApiV1ProjectsIdAcRouteImport.update({
   id: '/ac',
   path: '/ac',
@@ -775,7 +782,7 @@ export interface FileRoutesByFullPath {
   '/api/codebases/': typeof ApiCodebasesIndexRoute
   '/api/projects/': typeof ApiProjectsIndexRoute
   '/design/scrap/': typeof DesignScrapIndexRoute
-  '/api/codebases/$codebaseId/features': typeof ApiCodebasesCodebaseIdFeaturesRoute
+  '/api/codebases/$codebaseId/features': typeof ApiCodebasesCodebaseIdFeaturesRouteWithChildren
   '/api/codebases/$codebaseId/session': typeof ApiCodebasesCodebaseIdSessionRoute
   '/api/codebases/$codebaseId/status': typeof ApiCodebasesCodebaseIdStatusRoute
   '/api/codebases/$codebaseId/sync-stream': typeof ApiCodebasesCodebaseIdSyncStreamRoute
@@ -790,6 +797,7 @@ export interface FileRoutesByFullPath {
   '/api/v1/projects/$id': typeof ApiV1ProjectsIdRouteWithChildren
   '/codebases/kanban/$codebaseId/$projectId': typeof CodebasesKanbanCodebaseIdProjectIdRoute
   '/api/settings/api-keys/': typeof ApiSettingsApiKeysIndexRoute
+  '/api/codebases/$codebaseId/features/$projectId': typeof ApiCodebasesCodebaseIdFeaturesProjectIdRoute
   '/api/v1/projects/$id/ac': typeof ApiV1ProjectsIdAcRoute
   '/api/v1/projects/$id/kanban': typeof ApiV1ProjectsIdKanbanRoute
   '/api/v1/projects/$id/prd': typeof ApiV1ProjectsIdPrdRoute
@@ -883,7 +891,7 @@ export interface FileRoutesByTo {
   '/api/codebases': typeof ApiCodebasesIndexRoute
   '/api/projects': typeof ApiProjectsIndexRoute
   '/design/scrap': typeof DesignScrapIndexRoute
-  '/api/codebases/$codebaseId/features': typeof ApiCodebasesCodebaseIdFeaturesRoute
+  '/api/codebases/$codebaseId/features': typeof ApiCodebasesCodebaseIdFeaturesRouteWithChildren
   '/api/codebases/$codebaseId/session': typeof ApiCodebasesCodebaseIdSessionRoute
   '/api/codebases/$codebaseId/status': typeof ApiCodebasesCodebaseIdStatusRoute
   '/api/codebases/$codebaseId/sync-stream': typeof ApiCodebasesCodebaseIdSyncStreamRoute
@@ -898,6 +906,7 @@ export interface FileRoutesByTo {
   '/api/v1/projects/$id': typeof ApiV1ProjectsIdRouteWithChildren
   '/codebases/kanban/$codebaseId/$projectId': typeof CodebasesKanbanCodebaseIdProjectIdRoute
   '/api/settings/api-keys': typeof ApiSettingsApiKeysIndexRoute
+  '/api/codebases/$codebaseId/features/$projectId': typeof ApiCodebasesCodebaseIdFeaturesProjectIdRoute
   '/api/v1/projects/$id/ac': typeof ApiV1ProjectsIdAcRoute
   '/api/v1/projects/$id/kanban': typeof ApiV1ProjectsIdKanbanRoute
   '/api/v1/projects/$id/prd': typeof ApiV1ProjectsIdPrdRoute
@@ -997,7 +1006,7 @@ export interface FileRoutesById {
   '/api/codebases/': typeof ApiCodebasesIndexRoute
   '/api/projects/': typeof ApiProjectsIndexRoute
   '/design/scrap/': typeof DesignScrapIndexRoute
-  '/api/codebases/$codebaseId/features': typeof ApiCodebasesCodebaseIdFeaturesRoute
+  '/api/codebases/$codebaseId/features': typeof ApiCodebasesCodebaseIdFeaturesRouteWithChildren
   '/api/codebases/$codebaseId/session': typeof ApiCodebasesCodebaseIdSessionRoute
   '/api/codebases/$codebaseId/status': typeof ApiCodebasesCodebaseIdStatusRoute
   '/api/codebases/$codebaseId/sync-stream': typeof ApiCodebasesCodebaseIdSyncStreamRoute
@@ -1012,6 +1021,7 @@ export interface FileRoutesById {
   '/api/v1/projects/$id': typeof ApiV1ProjectsIdRouteWithChildren
   '/codebases/kanban/$codebaseId/$projectId': typeof CodebasesKanbanCodebaseIdProjectIdRoute
   '/api/settings/api-keys/': typeof ApiSettingsApiKeysIndexRoute
+  '/api/codebases/$codebaseId/features/$projectId': typeof ApiCodebasesCodebaseIdFeaturesProjectIdRoute
   '/api/v1/projects/$id/ac': typeof ApiV1ProjectsIdAcRoute
   '/api/v1/projects/$id/kanban': typeof ApiV1ProjectsIdKanbanRoute
   '/api/v1/projects/$id/prd': typeof ApiV1ProjectsIdPrdRoute
@@ -1127,6 +1137,7 @@ export interface FileRouteTypes {
     | '/api/v1/projects/$id'
     | '/codebases/kanban/$codebaseId/$projectId'
     | '/api/settings/api-keys/'
+    | '/api/codebases/$codebaseId/features/$projectId'
     | '/api/v1/projects/$id/ac'
     | '/api/v1/projects/$id/kanban'
     | '/api/v1/projects/$id/prd'
@@ -1235,6 +1246,7 @@ export interface FileRouteTypes {
     | '/api/v1/projects/$id'
     | '/codebases/kanban/$codebaseId/$projectId'
     | '/api/settings/api-keys'
+    | '/api/codebases/$codebaseId/features/$projectId'
     | '/api/v1/projects/$id/ac'
     | '/api/v1/projects/$id/kanban'
     | '/api/v1/projects/$id/prd'
@@ -1348,6 +1360,7 @@ export interface FileRouteTypes {
     | '/api/v1/projects/$id'
     | '/codebases/kanban/$codebaseId/$projectId'
     | '/api/settings/api-keys/'
+    | '/api/codebases/$codebaseId/features/$projectId'
     | '/api/v1/projects/$id/ac'
     | '/api/v1/projects/$id/kanban'
     | '/api/v1/projects/$id/prd'
@@ -2100,6 +2113,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CodebasesKanbanCodebaseIdProjectIdRouteImport
       parentRoute: typeof CodebasesRoute
     }
+    '/api/codebases/$codebaseId/features/$projectId': {
+      id: '/api/codebases/$codebaseId/features/$projectId'
+      path: '/$projectId'
+      fullPath: '/api/codebases/$codebaseId/features/$projectId'
+      preLoaderRoute: typeof ApiCodebasesCodebaseIdFeaturesProjectIdRouteImport
+      parentRoute: typeof ApiCodebasesCodebaseIdFeaturesRoute
+    }
     '/api/v1/projects/$id/ac': {
       id: '/api/v1/projects/$id/ac'
       path: '/ac'
@@ -2326,8 +2346,23 @@ const DesignScrapRouteWithChildren = DesignScrapRoute._addFileChildren(
   DesignScrapRouteChildren,
 )
 
+interface ApiCodebasesCodebaseIdFeaturesRouteChildren {
+  ApiCodebasesCodebaseIdFeaturesProjectIdRoute: typeof ApiCodebasesCodebaseIdFeaturesProjectIdRoute
+}
+
+const ApiCodebasesCodebaseIdFeaturesRouteChildren: ApiCodebasesCodebaseIdFeaturesRouteChildren =
+  {
+    ApiCodebasesCodebaseIdFeaturesProjectIdRoute:
+      ApiCodebasesCodebaseIdFeaturesProjectIdRoute,
+  }
+
+const ApiCodebasesCodebaseIdFeaturesRouteWithChildren =
+  ApiCodebasesCodebaseIdFeaturesRoute._addFileChildren(
+    ApiCodebasesCodebaseIdFeaturesRouteChildren,
+  )
+
 interface ApiCodebasesCodebaseIdRouteChildren {
-  ApiCodebasesCodebaseIdFeaturesRoute: typeof ApiCodebasesCodebaseIdFeaturesRoute
+  ApiCodebasesCodebaseIdFeaturesRoute: typeof ApiCodebasesCodebaseIdFeaturesRouteWithChildren
   ApiCodebasesCodebaseIdSessionRoute: typeof ApiCodebasesCodebaseIdSessionRoute
   ApiCodebasesCodebaseIdStatusRoute: typeof ApiCodebasesCodebaseIdStatusRoute
   ApiCodebasesCodebaseIdSyncStreamRoute: typeof ApiCodebasesCodebaseIdSyncStreamRoute
@@ -2335,7 +2370,8 @@ interface ApiCodebasesCodebaseIdRouteChildren {
 
 const ApiCodebasesCodebaseIdRouteChildren: ApiCodebasesCodebaseIdRouteChildren =
   {
-    ApiCodebasesCodebaseIdFeaturesRoute: ApiCodebasesCodebaseIdFeaturesRoute,
+    ApiCodebasesCodebaseIdFeaturesRoute:
+      ApiCodebasesCodebaseIdFeaturesRouteWithChildren,
     ApiCodebasesCodebaseIdSessionRoute: ApiCodebasesCodebaseIdSessionRoute,
     ApiCodebasesCodebaseIdStatusRoute: ApiCodebasesCodebaseIdStatusRoute,
     ApiCodebasesCodebaseIdSyncStreamRoute:
@@ -2470,12 +2506,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

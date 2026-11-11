@@ -138,6 +138,10 @@ export function useWorkspacePlan({
 		isCreatingNew,
 		setIsCreatingNew,
 		onboardingFeature,
+		// The full merged plan list (persisted + session-created, active +
+		// archived) so the switcher panel can split it into the active switcher
+		// and the recoverable archived section.
+		plans,
 		userFacingPlans,
 		setActiveFeature,
 		registerCreatedPlan: (plan: { id: string; name: string }) => {

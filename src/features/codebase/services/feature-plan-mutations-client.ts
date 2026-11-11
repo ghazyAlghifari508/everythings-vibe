@@ -1,11 +1,32 @@
-import {
-	CODEBASE_NAME_MAX_ERROR,
-	CODEBASE_NAME_MIN_ERROR,
-} from "./library";
+import { CODEBASE_NAME_MAX_ERROR, CODEBASE_NAME_MIN_ERROR } from "./library";
 
 export interface FeaturePlanMutationResult {
 	ok: boolean;
 	error?: string;
+	/** Server-authoritative renamed name, present after a successful rename. */
+	name?: string;
+	/** Server-authoritative archive tombstone, present after archive/unarchive. */
+	archivedAt?: string | null;
+}
+
+/** Narrow a parsed mutation body to the authoritative fields the server returns. */
+function readAuthoritative(body: unknown): {
+	name?: string;
+	archivedAt?: string | null;
+} {
+	if (typeof body !== "object" || body === null) return {};
+	const out: { name?: string; archivedAt?: string | null } = {};
+	if (
+		"name" in body &&
+		typeof (body as Record<string, unknown>).name === "string"
+	) {
+		out.name = (body as { name: string }).name;
+	}
+	if ("archivedAt" in body) {
+		const value = (body as { archivedAt: unknown }).archivedAt;
+		out.archivedAt = typeof value === "string" ? value : null;
+	}
+	return out;
 }
 
 function hasStringError(body: unknown): body is { error: string } {
@@ -57,7 +78,7 @@ export const featurePlanMutations = {
 					error: readError(body, "Gagal mengganti nama fitur."),
 				};
 			}
-			return { ok: true };
+			return { ok: true, ...readAuthoritative(body) };
 		} catch {
 			return { ok: false, error: "Server tidak dapat dihubungi." };
 		}
@@ -86,7 +107,7 @@ export const featurePlanMutations = {
 					),
 				};
 			}
-			return { ok: true };
+			return { ok: true, ...readAuthoritative(body) };
 		} catch {
 			return { ok: false, error: "Server tidak dapat dihubungi." };
 		}
