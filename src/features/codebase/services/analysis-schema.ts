@@ -11,16 +11,45 @@ import { codebaseAnalysisStatusSchema } from "./sync";
 // The analysis is advisory: uncertain detections must stay labeled as
 // uncertainty/verification items and must never be presented as fact.
 
+export const codebaseFindingClaimTypeSchema = z.enum([
+	"verified",
+	"inference",
+	"uncertain",
+]);
+
+export type CodebaseFindingClaimType = z.infer<
+	typeof codebaseFindingClaimTypeSchema
+>;
+
 export const codebaseAnalysisFindingSchema = z.object({
 	title: z.string().min(1),
 	detail: z.string().min(1),
 	uncertainty: z.string().min(1).optional(),
+	claimType: codebaseFindingClaimTypeSchema.optional(),
+	evidencePaths: z.array(z.string().min(1)).optional(),
 	relevantPaths: z.array(z.string().min(1)).optional(),
+	implication: z.string().min(1).optional(),
+	impact: z.string().min(1).optional(),
 });
 
 export type CodebaseAnalysisFinding = z.infer<
 	typeof codebaseAnalysisFindingSchema
 >;
+
+export function getFindingEvidencePaths(
+	finding: Pick<CodebaseAnalysisFinding, "evidencePaths" | "relevantPaths">,
+): string[] {
+	if (finding.evidencePaths && finding.evidencePaths.length > 0) {
+		return finding.evidencePaths;
+	}
+	return finding.relevantPaths ?? [];
+}
+
+export function getFindingImplication(
+	finding: Pick<CodebaseAnalysisFinding, "implication" | "impact">,
+): string | undefined {
+	return finding.implication ?? finding.impact;
+}
 
 export const codebaseApplicationModuleSchema = z.object({
 	name: z.string().min(1),
