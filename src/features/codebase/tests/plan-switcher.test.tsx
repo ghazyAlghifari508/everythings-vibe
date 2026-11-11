@@ -150,9 +150,7 @@ describe("CodebasePlanSwitcher search", () => {
 			"[data-testid='codebase-plan-search']",
 		);
 		act(() => {
-			input?.dispatchEvent(
-				new Event("input", { bubbles: true }),
-			);
+			input?.dispatchEvent(new Event("input", { bubbles: true }));
 			if (input) {
 				const setter = Object.getOwnPropertyDescriptor(
 					window.HTMLInputElement.prototype,
@@ -187,7 +185,9 @@ describe("CodebasePlanSwitcher search", () => {
 		);
 		expect(empty?.textContent).toContain("Tidak ada fitur yang cocok");
 		expect(
-			document.body.querySelector("[data-testid='codebase-plan-option-plan-ready']"),
+			document.body.querySelector(
+				"[data-testid='codebase-plan-option-plan-ready']",
+			),
 		).toBeNull();
 	});
 
@@ -215,8 +215,9 @@ describe("CodebasePlanSwitcher large list", () => {
 		);
 		// The scroll region hosts all 30 plans; max-h + overflow-y keeps it
 		// bounded rather than pushing the create action off-screen.
-		expect(list?.querySelectorAll("[data-testid^='codebase-plan-option-']"))
-			.toHaveLength(30);
+		expect(
+			list?.querySelectorAll("[data-testid^='codebase-plan-option-']"),
+		).toHaveLength(30);
 		const create = document.body.querySelector(
 			"[data-testid='codebase-plan-create-new']",
 		);
