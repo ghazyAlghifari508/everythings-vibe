@@ -55,11 +55,11 @@ Choose one coherent project-wide designTokens set: primary accent, secondary acc
 	);
 
 	sections.push(
-		`If the user explicitly requests color changes that conflict with the reference, put ONLY the affected token names in blueprint.explicitColorOverrides (primary, background, surface, ink, muted, border) and put the requested accessible values in designTokens. Leave this list empty when the user has not explicitly requested an override. Preserve all other reference rules. Never infer an override from industry or skill advice.`,
+		`If the user explicitly requests color changes that conflict with the reference, put ONLY the affected token names in blueprint.explicitColorOverrides (primary, background, surface, ink, muted, border) and put the requested accessible values in designTokens. Leave this list empty when the user has not explicitly requested an override. Preserve all other reference rules. Never infer an override from industry convention.`,
 	);
 
 	sections.push(
-		`Design precedence, highest to lowest: security and HTML safety > explicit user requirements > valid PRD / product constraints > selected DESIGN.md / theme reference > existing shared project blueprint > selected design skill guidance > default product guidance. A design skill must never override security, HTML safety, explicit user requirements, PRD constraints, or validated design tokens. Resolve conflicts deterministically in that order.`,
+		`Design precedence, highest to lowest: security and HTML safety > explicit user requirements > valid PRD / product constraints > selected DESIGN.md / theme reference > existing shared project blueprint > default product guidance. Nothing may override security, HTML safety, explicit user requirements, PRD constraints, or validated design tokens. Resolve conflicts deterministically in that order.`,
 	);
 
 	return sections.join("\n\n");

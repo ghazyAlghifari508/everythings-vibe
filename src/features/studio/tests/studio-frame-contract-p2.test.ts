@@ -269,7 +269,6 @@ describe("strategi koreksi terbatas", () => {
 			blueprint: null,
 			viewport: "web",
 			expectTokens: false,
-			designSkillId: "none",
 			dsTokens: null,
 			logoUrl: null,
 		});
@@ -289,7 +288,6 @@ describe("strategi koreksi terbatas", () => {
 				blueprint: null,
 				viewport: "web",
 				expectTokens: false,
-				designSkillId: "none",
 				dsTokens: null,
 				logoUrl: null,
 			}),
@@ -368,7 +366,6 @@ describe("klasifikasi error studio", () => {
 			blueprint: null,
 			viewport: "web",
 			expectTokens: false,
-			designSkillId: "none",
 			dsTokens: null,
 			logoUrl: null,
 		}).catch((error: unknown) => error);

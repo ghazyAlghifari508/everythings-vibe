@@ -68,8 +68,6 @@ export function StudioWorkspace({
 					onSubmit={workspace.handleComposerSubmit}
 					loading={workspace.composerLoading}
 					suggestions={workspace.suggestions}
-					designSkillId={workspace.project.designSkillId}
-					onDesignSkillChange={workspace.handleSkillChange}
 					referenceLabel={workspace.storedReferenceLabel}
 					referenceColors={workspace.storedReferenceColors}
 				/>

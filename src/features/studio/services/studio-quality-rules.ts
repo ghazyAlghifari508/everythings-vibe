@@ -2,12 +2,9 @@
  * Universal Studio Quality Rules (Single Source of Truth).
  *
  * These rules define Studio's own non-negotiable baseline quality standard.
- * They are always active across every generation, revision, and repair round,
- * completely independent of which design skill (if any) the user selected.
- *
- * This separates Studio's architectural invariants from upstream skill guidance:
- * No Skill still receives these baseline guarantees without pretending to run
- * upstream Anti-Slop or Impeccable.
+ * They are always active across every generation, revision, and repair round.
+ * Studio composes them into the single mandatory planning and frame system
+ * prompt, so no request path can reason about a design without them.
  */
 
 export const STUDIO_BASE_QUALITY_INVARIANTS = [
@@ -33,6 +30,6 @@ export const STUDIO_BASE_QUALITY_INVARIANTS = [
 ] as const;
 
 export const STUDIO_BASE_QUALITY_PROMPT = `<STUDIO_BASE_QUALITY_RULES>
-Studio universal quality standards (always enforced, independent of selected design skill):
+Studio universal quality standards (always enforced by every planning and frame request):
 ${STUDIO_BASE_QUALITY_INVARIANTS.map((rule, index) => `${index + 1}. ${rule}`).join("\n")}
 </STUDIO_BASE_QUALITY_RULES>`;

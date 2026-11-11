@@ -1,6 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { resolveStudioDesignSkill } from "../services/studio-design-skill-registry.server";
-import { STUDIO_DESIGN_SKILLS } from "../services/studio-design-skills";
 import {
 	studioDesignReferenceSchema,
 	studioGenerationOptionsSchema,
@@ -10,7 +8,6 @@ import {
 describe("Studio generation configuration", () => {
 	it("defaults new configurations without accepting invalid explicit counts", () => {
 		expect(studioGenerationOptionsSchema.parse({})).toEqual({
-			designSkillId: "none",
 			initialPageCount: 3,
 			designMode: "web",
 		});
@@ -19,7 +16,7 @@ describe("Studio generation configuration", () => {
 		for (const value of [0, 6, 1.5, "3", null])
 			expect(studioInitialPageCountSchema.safeParse(value).success).toBe(false);
 	});
-	it("accepts only serializable reference identities and supported skills", () => {
+	it("accepts only serializable reference identities and ignores a retired skill field", () => {
 		expect(
 			studioDesignReferenceSchema.parse({ kind: "theme", id: "workspace" }),
 		).toEqual({ kind: "theme", id: "workspace" });
@@ -28,34 +25,15 @@ describe("Studio generation configuration", () => {
 				.success,
 		).toBe(false);
 		expect(
-			studioGenerationOptionsSchema.safeParse({
-				designSkillId: "https://example.test/skill",
-			}).success,
-		).toBe(false);
-		expect(
 			studioDesignReferenceSchema.safeParse({
 				kind: "custom",
 				filename: "executable.exe",
 			}).success,
 		).toBe(false);
-	});
-	it("resolves every catalog identity to versioned guidance without executing remote content", () => {
-		expect(STUDIO_DESIGN_SKILLS.map((skill) => skill.id)).toEqual([
-			"none",
-			"impeccable",
-			"frontend-design",
-			"ui-ux-pro-max",
-			"anti-slop",
-			"taste",
-		]);
-		expect(resolveStudioDesignSkill("none").guidance).toBe("");
-		for (const skill of STUDIO_DESIGN_SKILLS.slice(1)) {
-			const resolved = resolveStudioDesignSkill(skill.id);
-			expect(resolved.version).toBeGreaterThanOrEqual(2);
-			expect(resolved.guidance.length).toBeGreaterThan(100);
-			expect(resolved.sourceRevision).toMatch(/^[a-f0-9]{40}$/);
-			expect(skill).not.toHaveProperty("guidance");
-		}
-		expect(() => resolveStudioDesignSkill("unrecognized")).toThrow();
+		// A retired client may still send `designSkillId`; the options schema no
+		// longer declares it, so it is stripped instead of rejecting the request.
+		expect(
+			studioGenerationOptionsSchema.parse({ designSkillId: "impeccable" }),
+		).toEqual({ initialPageCount: 3, designMode: "web" });
 	});
 });

@@ -5,7 +5,6 @@ import { studioFrames, studioJobs, studioProjects, users } from "@/db/schema";
 import { tryStreamWithFallback } from "@/lib/services/ai-orchestrator";
 import { repairStudioAccessibleLabels } from "../services/studio-accessible-repair";
 import type { StudioDesignBlueprint } from "../services/studio-design-blueprint";
-import { resolveStudioSkillContext } from "../services/studio-design-skill-registry.server";
 import {
 	generateValidatedFrameHtml,
 	runWithConcurrency,
@@ -15,14 +14,20 @@ import { validateGeneratedHtml } from "../services/studio-generated-html-validat
 import { inspectStudioHtml } from "../services/studio-html-diagnostics";
 import { generateInitialFrame } from "../services/studio-initial-frame";
 import { sanitizeStudioPrd } from "../services/studio-prd-helpers";
+import {
+	STUDIO_FRAME_SYSTEM_PROMPT,
+	STUDIO_PLAN_SYSTEM_PROMPT,
+	STUDIO_PLANNING_SYSTEM_PROMPT,
+	STUDIO_SYSTEM_PROMPT,
+} from "../services/studio-prompt-contracts";
 import { sanitizeStudioDesignMd } from "../services/studio-prompt-validation";
+import { STUDIO_BASE_QUALITY_PROMPT } from "../services/studio-quality-rules";
 import { buildStudioFramePrompt } from "../services/studio-screen-prompts";
 import { summarizeStudioTimings } from "../services/studio-timing-report";
 import {
 	STUDIO_DESIGN_MD_MAX_CHARS,
 	STUDIO_FRAME_CONCURRENCY,
 	STUDIO_PRD_MAX_CHARS,
-	STUDIO_SKILL_STAGE_BUDGET_CHARS,
 } from "../types/studio-constants";
 
 vi.mock("@/lib/services/ai-orchestrator", () => ({
@@ -165,7 +170,6 @@ describe("P3 Mandatory Pipeline & Benchmark Requirements", () => {
 			blueprint: testBlueprint,
 			viewport: "mobile",
 			expectTokens: false,
-			designSkillId: "none",
 			dsTokens: null,
 			logoUrl: null,
 			activeScreen: "Home",
@@ -208,28 +212,14 @@ describe("P3 Mandatory Pipeline & Benchmark Requirements", () => {
 		expect(summary.providerFallbacks).toBe(1);
 	});
 
-	// Requirement 8: Different skill contexts
-	it("8. supports all 6 design skill contexts and bounds their stage delivery budgets", () => {
-		const skills = [
-			"none",
-			"impeccable",
-			"frontend-design",
-			"ui-ux-pro-max",
-			"anti-slop",
-			"taste",
-		] as const;
-		for (const skillId of skills) {
-			const context = resolveStudioSkillContext(skillId, { stage: "planning" });
-			expect(context.plan.characterCount).toBeLessThanOrEqual(
-				STUDIO_SKILL_STAGE_BUDGET_CHARS.planning,
-			);
-			const frameContext = resolveStudioSkillContext(skillId, {
-				stage: "frame",
-			});
-			expect(frameContext.plan.characterCount).toBeLessThanOrEqual(
-				STUDIO_SKILL_STAGE_BUDGET_CHARS.frame,
-			);
-		}
+	// Requirement 8: one mandatory generation standard
+	it("8. composes exactly one internal system prompt for planning and frames", () => {
+		expect(STUDIO_PLANNING_SYSTEM_PROMPT).toContain(STUDIO_PLAN_SYSTEM_PROMPT);
+		expect(STUDIO_PLANNING_SYSTEM_PROMPT).toContain(STUDIO_BASE_QUALITY_PROMPT);
+		expect(STUDIO_FRAME_SYSTEM_PROMPT).toContain(STUDIO_SYSTEM_PROMPT);
+		expect(STUDIO_FRAME_SYSTEM_PROMPT).toContain(STUDIO_BASE_QUALITY_PROMPT);
+		expect(STUDIO_PLANNING_SYSTEM_PROMPT).not.toMatch(/design skill/i);
+		expect(STUDIO_FRAME_SYSTEM_PROMPT).not.toMatch(/design skill/i);
 	});
 
 	// Requirement 9: Large prompt input
@@ -350,7 +340,6 @@ describe("P3 Mandatory Pipeline & Benchmark Requirements", () => {
 			frame,
 			jobPrompt: "Buat app",
 			allScreenNames: ["Layar 1"],
-			designSkillId: "none",
 			designMd: null,
 			logoUrl: null,
 			dsTokens: null,

@@ -3,8 +3,6 @@ import { z } from "zod";
 import { ScrapeError } from "@/lib/design-errors";
 import { requireUser } from "@/lib/session";
 import { STUDIO_PROJECT_TITLE_MAX_CHARS } from "../types/studio-constants";
-import { studioDesignSkillIdSchema } from "./studio-generation-options";
-import { updateStudioPreferences } from "./studio-preferences-service";
 import { getStudioProjectDetail } from "./studio-project-detail";
 import {
 	deleteStudioProject,
@@ -71,11 +69,6 @@ const projectActionSchema = z.discriminatedUnion("action", [
 		projectId: z.string().trim().min(1).max(200),
 	}),
 	z.object({
-		action: z.literal("preferences"),
-		projectId: z.string().trim().min(1).max(200),
-		designSkillId: studioDesignSkillIdSchema,
-	}),
-	z.object({
 		action: z.literal("rename"),
 		projectId: z.string().trim().min(1).max(200),
 		title: z.string().trim().min(1).max(STUDIO_PROJECT_TITLE_MAX_CHARS),
@@ -97,14 +90,6 @@ export async function POST({
 				{ error: "Aksi project tidak valid." },
 				{ status: 400 },
 			);
-		if (parsed.data.action === "preferences") {
-			const project = await updateStudioPreferences(
-				parsed.data.projectId,
-				user.id,
-				parsed.data,
-			);
-			return Response.json({ project });
-		}
 		if (parsed.data.action === "rename") {
 			const project = await renameStudioProject(
 				parsed.data.projectId,

@@ -6,10 +6,7 @@ import type {
 } from "@/db/schema";
 import type { StudioDesignBlueprint } from "@/features/studio/services/studio-design-blueprint";
 import type { extractDesignSystemTokens } from "@/features/studio/services/studio-design-tokens";
-import type {
-	StudioDesignReference,
-	StudioDesignSkillId,
-} from "@/features/studio/services/studio-generation-options";
+import type { StudioDesignReference } from "@/features/studio/services/studio-generation-options";
 import type { StudioJobClaim } from "../services/studio-job-lease";
 import type { StudioDesignMode } from "./studio-prompts";
 
@@ -17,7 +14,6 @@ export interface InitialFrameContext {
 	frame: StudioFrameRow;
 	jobPrompt: string;
 	allScreenNames: string[];
-	designSkillId: StudioDesignSkillId;
 	designMd: string | null;
 	logoUrl: string | null;
 	dsTokens: ReturnType<typeof extractDesignSystemTokens>;
@@ -29,12 +25,10 @@ export interface InitialFrameContext {
 
 export interface ValidatedFrameInput {
 	framePrompt: string;
-	stage?: "frame" | "revision";
 	activeScreen?: string;
 	blueprint: StudioDesignBlueprint | null;
 	viewport: StudioDesignMode;
 	expectTokens: boolean;
-	designSkillId: StudioDesignSkillId;
 	dsTokens: ReturnType<typeof extractDesignSystemTokens>;
 	logoUrl: string | null;
 	signal?: AbortSignal;
@@ -70,12 +64,7 @@ export interface CreateStudioProjectInput {
 	designMode?: StudioDesignMode;
 	designMd?: string | null;
 	logo?: StudioLogoInput | null;
-	designSkillId?: StudioDesignSkillId;
 	initialPageCount?: number;
 	designReference?: StudioDesignReference | null;
 	prdAttachment?: { filename: string; content: string } | null;
-}
-
-export interface StudioPreferencesInput {
-	designSkillId: StudioDesignSkillId;
 }

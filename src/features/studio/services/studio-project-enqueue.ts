@@ -95,7 +95,6 @@ export async function createStudioProjectWithJob(
 				eq(studioJobs.prompt, checked.prompt),
 				eq(studioProjects.userId, userId),
 				eq(studioProjects.designMode, designMode),
-				eq(studioProjects.designSkillId, options.designSkillId),
 				eq(studioProjects.initialPageCount, options.initialPageCount),
 				cleanDesignMd === null
 					? isNull(studioProjects.designMd)
@@ -153,7 +152,6 @@ export async function createStudioProjectWithJob(
 				designMode,
 				designMd: cleanDesignMd,
 				logoAssetId,
-				designSkillId: options.designSkillId,
 				initialPageCount: options.initialPageCount,
 				designReference: resolved.designReference,
 				prdContent: cleanPrdContent,

@@ -40,11 +40,9 @@ export async function reviseStudioProject(
 	const dsTokens = extractDesignSystemTokens(detail.designMd);
 	const htmlCode = await generateValidatedFrameHtml({
 		framePrompt: userPrompt,
-		stage: "revision",
 		blueprint: null,
 		viewport: designMode,
 		expectTokens: dsTokens !== null,
-		designSkillId: detail.designSkillId,
 		dsTokens,
 		logoUrl: detail.logoUrl,
 		contentContext: { brief: revisionRequest, prdContent: detail.prdContent },

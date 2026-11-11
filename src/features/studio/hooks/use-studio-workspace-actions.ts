@@ -7,7 +7,6 @@ import {
 	readStudioApiError,
 	requestStudioFrameRetry,
 } from "@/features/studio/services/studio-frame-retry-client";
-import type { StudioDesignSkillId } from "@/features/studio/services/studio-generation-options";
 import { useUIStore } from "@/store";
 
 /** Reads what one composer request resolved to, so the UI explains clarify. */
@@ -28,7 +27,6 @@ export interface UseStudioWorkspaceActionsOptions {
 	project: StudioProjectRow;
 	frames: StudioFrameRow[];
 	selectedFrameIds: string[];
-	isProcessing: boolean;
 	syncProjectStatus: () => Promise<void>;
 	setError: (error: string) => void;
 }
@@ -37,12 +35,10 @@ export function useStudioWorkspaceActions({
 	project,
 	frames,
 	selectedFrameIds,
-	isProcessing,
 	syncProjectStatus,
 	setError,
 }: UseStudioWorkspaceActionsOptions) {
 	const [composerLoading, setComposerLoading] = useState(false);
-	const [preferenceSaving, setPreferenceSaving] = useState(false);
 	const [exportingZip, setExportingZip] = useState(false);
 	const [deleting, setDeleting] = useState(false);
 	const [renaming, setRenaming] = useState(false);
@@ -208,48 +204,6 @@ export function useStudioWorkspaceActions({
 		[project.id, selectedFrameIds, setError, syncProjectStatus],
 	);
 
-	const handleSkillChange = useCallback(
-		async (skillId: StudioDesignSkillId) => {
-			if (isProcessing || preferenceSaving || project.designSkillId === skillId)
-				return;
-			setPreferenceSaving(true);
-			setError("");
-			try {
-				const response = await fetch("/api/studio/project", {
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({
-						action: "preferences",
-						projectId: project.id,
-						designSkillId: skillId,
-					}),
-				});
-				if (!response.ok) {
-					throw new Error(
-						await readStudioApiError(response, "Gagal menyimpan design skill."),
-					);
-				}
-				await syncProjectStatus();
-			} catch (failure) {
-				setError(
-					failure instanceof Error
-						? failure.message
-						: "Gagal menyimpan design skill.",
-				);
-			} finally {
-				setPreferenceSaving(false);
-			}
-		},
-		[
-			isProcessing,
-			preferenceSaving,
-			project.designSkillId,
-			project.id,
-			setError,
-			syncProjectStatus,
-		],
-	);
-
 	const handleRetryFrame = useCallback(
 		async (frameId: string) => {
 			if (retryingFrames.current.has(frameId)) return;
@@ -304,7 +258,6 @@ export function useStudioWorkspaceActions({
 		handleDelete,
 		handleRename,
 		handleComposerSubmit,
-		handleSkillChange,
 		handleRetryFrame,
 		handleDownloadAllZip,
 	};

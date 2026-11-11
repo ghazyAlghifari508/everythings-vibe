@@ -52,7 +52,7 @@ CONTROLLED ASSEMBLY CONTRACT:
 - Canonical labels ${JSON.stringify(labels)}, destinations ${JSON.stringify(destinations)}, icons ${JSON.stringify(iconMapping)} and active screen ${JSON.stringify(activeScreen)} are supplied by assembly, not independently rendered by you.
 - Use --app-primary, --app-secondary, --app-on-primary, --app-canvas, --app-surface, --app-ink, --app-muted, --app-font, --app-gutter and --app-radius for shared identity. Secondary is an accent; muted is readable text. Never reselect the project palette for this screen. Use data-primary on primary actions and data-card on common surfaces.
 - Respect productIdentity.layoutIntent. Public websites need a purposeful hero/CTA, not a generic dashboard title row; Studio aligns brand and navigation in one responsive navbar. Web applications keep contextual title/controls and task-appropriate density. Mobile nested flows use the canonical back/title bar, never repeat the same title in the body. Use --app-content-width and the project gutter consistently across sibling screens; narrower prose/cards may live inside that shared container. Content-specific grids, horizontal tracks, quantity/price groups and media own their geometry; data-media-fit="contain" preserves a product silhouette, "cover" intentionally crops photography. A data-ui="action-area" is a safe-area-aware in-flow footer: never add fixed/sticky positioning to a static full-page artboard.
-- Preserve the selected skill for content composition, not for redesigning the shared shell. No autofocus, decorative cursor, stray separators after numeric amounts or fixed/sticky decorations.
+- Preserve the shared identity for content composition, not for redesigning the shared shell. No autofocus, decorative cursor, stray separators after numeric amounts or fixed/sticky decorations.
 </SHARED_DESIGN_BLUEPRINT>`,
 		);
 	}
@@ -147,7 +147,7 @@ Return the FULL revised single-file HTML document for "${opts.screenName}".`,
 	}
 
 	sections.push(
-		`Design precedence, highest to lowest: security and HTML safety > explicit user requirements > valid PRD / product constraints > selected DESIGN.md / theme reference > existing shared project blueprint > selected design skill guidance > default product guidance. A design skill must never override security, HTML safety, explicit user requirements, PRD constraints, or validated design tokens. Resolve conflicts deterministically in that order.`,
+		`Design precedence, highest to lowest: security and HTML safety > explicit user requirements > valid PRD / product constraints > selected DESIGN.md / theme reference > existing shared project blueprint > default product guidance. Nothing may override security, HTML safety, explicit user requirements, PRD constraints, or validated design tokens. Resolve conflicts deterministically in that order.`,
 	);
 
 	return sections.join("\n\n");

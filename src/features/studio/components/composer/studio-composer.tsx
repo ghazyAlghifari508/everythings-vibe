@@ -6,7 +6,6 @@ import {
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { Spinner } from "@/components/ui/spinner";
-import type { StudioDesignSkillId } from "@/features/studio/services/studio-generation-options";
 import { STUDIO_DESIGN_PRESETS } from "@/features/studio/services/studio-presets";
 import { STUDIO_MIN_PROMPT_CHARS } from "@/features/studio/services/studio-prompt-validation";
 import type { StudioScreenSuggestion } from "@/features/studio/services/studio-screen-suggestions";
@@ -16,7 +15,6 @@ import {
 	canvasComposerWidthCss,
 } from "@/features/studio/utils/studio-canvas-layout";
 import { filterValidHexColors, StudioPaletteDisk } from "./studio-palette-disk";
-import { StudioSkillSelect } from "./studio-skill-select";
 import { StudioSuggestionRow } from "./studio-suggestion-row";
 
 /**
@@ -37,8 +35,6 @@ export interface StudioComposerProps {
 	className?: string;
 	selectedFrames?: { id: string; name: string }[];
 	onRemoveFrame?: (id: string) => void;
-	designSkillId?: StudioDesignSkillId;
-	onDesignSkillChange?: (skillId: StudioDesignSkillId) => void;
 	referenceLabel?: string | null;
 	referenceColors?: readonly string[] | null;
 	/** Next-screen cards derived from the project's own structure. */
@@ -51,8 +47,6 @@ export function StudioComposer({
 	className = "",
 	selectedFrames = [],
 	onRemoveFrame,
-	designSkillId,
-	onDesignSkillChange,
 	referenceLabel,
 	referenceColors,
 	suggestions = [],
@@ -186,36 +180,27 @@ export function StudioComposer({
 						))}
 					</div>
 				) : null}
-				{onDesignSkillChange || referenceLabel ? (
+				{referenceLabel ? (
 					<div className="flex flex-wrap items-center gap-2">
-						{onDesignSkillChange && designSkillId ? (
-							<StudioSkillSelect
-								value={designSkillId}
-								onChange={onDesignSkillChange}
-								disabled={loading || sending}
-							/>
-						) : null}
-						{referenceLabel ? (
-							<span
-								data-testid="studio-reference-chip"
-								className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-iron px-1.5 py-1 text-xs text-mist"
-							>
-								{resolvedColors && resolvedColors.length > 0 ? (
-									<StudioPaletteDisk
-										colors={resolvedColors}
-										label={referenceLabel}
-									/>
-								) : (
-									<Icon
-										icon={PaintBoardIcon}
-										size={12}
-										className="shrink-0 text-mist"
-										aria-hidden="true"
-									/>
-								)}
-								<span className="truncate">{referenceLabel}</span>
-							</span>
-						) : null}
+						<span
+							data-testid="studio-reference-chip"
+							className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-iron px-1.5 py-1 text-xs text-mist"
+						>
+							{resolvedColors && resolvedColors.length > 0 ? (
+								<StudioPaletteDisk
+									colors={resolvedColors}
+									label={referenceLabel}
+								/>
+							) : (
+								<Icon
+									icon={PaintBoardIcon}
+									size={12}
+									className="shrink-0 text-mist"
+									aria-hidden="true"
+								/>
+							)}
+							<span className="truncate">{referenceLabel}</span>
+						</span>
 					</div>
 				) : null}
 				<div className="flex items-end gap-2">

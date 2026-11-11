@@ -467,8 +467,8 @@ describe("TASK 05 — Shared Navigation Consistency When Adding Screens", () => 
 		expect(hashAfterContextual).toBe(newHash0);
 	});
 
-	// 12. Design reference and skill preserved
-	it("preserves tokens, designSkillId and styling references throughout extension", async () => {
+	// 12. Design reference preserved
+	it("preserves tokens and styling references throughout extension", async () => {
 		const { userId, project } = await seedThreeScreenProject();
 		const add = await enqueueStudioOperation(project.id, userId, {
 			prompt: "Tambahkan halaman Catat Transaksi",
@@ -478,7 +478,6 @@ describe("TASK 05 — Shared Navigation Consistency When Adding Screens", () => 
 		await runStudioJobPipeline(add.jobs[0].id, project.id, userId);
 
 		const detail = await getStudioProjectDetail(project.id, userId);
-		expect(detail.project.designSkillId).toBe("impeccable");
 		expect(detail.project.designBlueprint?.designTokens).toEqual(
 			INITIAL_BLUEPRINT.designTokens,
 		);

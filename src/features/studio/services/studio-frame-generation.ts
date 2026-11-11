@@ -50,9 +50,6 @@ export async function generateValidatedFrameHtml(
 		signal: input.signal ? AbortSignal.any([input.signal, deadline]) : deadline,
 	};
 	let framePrompt = input.framePrompt;
-	// The failed contract from the previous round picks the correction-stage
-	// source rules, so a repair only resends upstream sections that can fix it.
-	let correctionFocus: string[] | undefined;
 	for (
 		let request = 0, round = 0, retries = 0;
 		request < STUDIO_FRAME_REQUEST_MAX;
@@ -65,13 +62,8 @@ export async function generateValidatedFrameHtml(
 			rawHtml = await generateStudioHtml(
 				framePrompt,
 				STUDIO_FRAME_MAX_TOKENS,
-				input.designSkillId,
 				input.signal,
 				input.timing,
-				{
-					stage: round === 0 ? (input.stage ?? "frame") : "correction",
-					focus: correctionFocus,
-				},
 			);
 		} catch (error) {
 			input.signal?.throwIfAborted();
@@ -101,7 +93,6 @@ export async function generateValidatedFrameHtml(
 				const incompleteIssues = [
 					`Output provider ${error.completion}: kirim dokumen lengkap yang tertutup rapi.`,
 				];
-				correctionFocus = incompleteIssues;
 				framePrompt = buildStudioFrameCorrection(
 					input,
 					incompleteIssues,
@@ -251,7 +242,6 @@ export async function generateValidatedFrameHtml(
 		if (issues.length === 0) return htmlCode;
 		if (round < STUDIO_FRAME_CORRECTION_MAX) {
 			const messages = issues.map((issue) => issue.message);
-			correctionFocus = messages;
 			framePrompt = buildStudioFrameCorrection(input, messages, htmlCode);
 			round++;
 			continue;

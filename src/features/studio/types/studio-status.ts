@@ -5,10 +5,7 @@ import type {
 	StudioProjectRow,
 } from "@/db/schema";
 import { studioDesignBlueprintSchema } from "../services/studio-design-blueprint";
-import {
-	studioDesignReferenceMetadataSchema,
-	studioDesignSkillIdSchema,
-} from "../services/studio-generation-options";
+import { studioDesignReferenceMetadataSchema } from "../services/studio-generation-options";
 import { studioTitleSourceSchema } from "../services/studio-project-title";
 import { deriveStudioLifecycle } from "../utils/studio-lifecycle";
 import { STUDIO_JOB_QUEUE_HEALTH_MS } from "./studio-constants";
@@ -27,7 +24,9 @@ const projectSchema = z.object({
 	titleSource: studioTitleSourceSchema,
 	designMode: z.enum(["web", "mobile"]),
 	designMd: nullableText,
-	designSkillId: studioDesignSkillIdSchema,
+	// Legacy column: retained only so a historic project row validates. Current
+	// code neither reads nor writes it beyond that passthrough.
+	designSkillId: z.string(),
 	initialPageCount: z.int().nullable(),
 	designReference: studioDesignReferenceMetadataSchema.nullable(),
 	designBlueprint: studioDesignBlueprintSchema.nullable(),

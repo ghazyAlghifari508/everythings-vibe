@@ -82,7 +82,6 @@ export async function runStudioJobPipeline(
 				studioJobTiming("project-context", Date.now(), {
 					jobId,
 					projectId,
-					skillId: project.designSkillId,
 					referenceChars: project.designMd?.length ?? 0,
 					prdChars: project.prdContent?.length ?? 0,
 				});
@@ -176,7 +175,6 @@ export async function runStudioJobPipeline(
 								frame,
 								jobPrompt: job.prompt,
 								allScreenNames,
-								designSkillId: project.designSkillId,
 								designMd: project.designMd,
 								logoUrl,
 								dsTokens,

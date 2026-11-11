@@ -14,10 +14,6 @@ import type {
 } from "../types/studio-prompts";
 import type { StudioDesignBlueprint } from "./studio-design-blueprint";
 import {
-	resolveStudioPlanningSystemPrompt,
-	resolveStudioSkillContext,
-} from "./studio-design-skill-registry.server";
-import {
 	type StudioJobClaim,
 	type StudioJobTransaction,
 	withStudioJobWrite,
@@ -25,6 +21,7 @@ import {
 import { studioJobTiming } from "./studio-job-runtime";
 import { generateStudioPlan } from "./studio-planning-generation";
 import { buildStudioPlanningPrompt } from "./studio-planning-prompt";
+import { STUDIO_PLANNING_SYSTEM_PROMPT } from "./studio-prompt-contracts";
 
 export async function planStudioScreens(
 	job: StudioJobRow,
@@ -51,24 +48,10 @@ export async function planStudioScreens(
 		project.prdContent,
 	);
 
-	const systemPrompt = resolveStudioPlanningSystemPrompt(
-		project.designSkillId ?? "none",
-		job.prompt,
-		designMode,
-	);
-	const skillPlan = resolveStudioSkillContext(project.designSkillId ?? "none", {
-		stage: "planning",
-		focus: [job.prompt],
-	}).plan;
+	const systemPrompt = STUDIO_PLANNING_SYSTEM_PROMPT;
 	studioJobTiming("planning-context", Date.now(), {
 		jobId: job.id,
 		projectId: project.id,
-		skillId: project.designSkillId,
-		skillStage: "planning",
-		skillChars: skillPlan.characterCount,
-		selectedSectionCount: skillPlan.selectedSections.length,
-		omittedSectionCount: skillPlan.omittedSections.length,
-		estimatedTokens: skillPlan.estimatedTokens,
 		systemChars: systemPrompt.length,
 		promptChars: planPrompt.length,
 	});

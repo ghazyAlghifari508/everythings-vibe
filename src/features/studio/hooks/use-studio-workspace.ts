@@ -10,7 +10,6 @@ import { useStudioScreenSuggestions } from "@/features/studio/hooks/use-studio-s
 import { useStudioStatus } from "@/features/studio/hooks/use-studio-status";
 import { useStudioWorkspaceActions } from "@/features/studio/hooks/use-studio-workspace-actions";
 import { extractDesignSystemTokens } from "@/features/studio/services/studio-design-tokens";
-import type { StudioDesignSkillId } from "@/features/studio/services/studio-generation-options";
 import { STUDIO_DESIGN_PRESETS } from "@/features/studio/services/studio-presets";
 import type { StudioScreenSuggestion } from "@/features/studio/services/studio-screen-suggestions";
 import type { StudioDetailLoaderData } from "@/features/studio/types/studio";
@@ -52,7 +51,6 @@ export interface StudioWorkspaceState {
 	handleComposerSubmit: (
 		promptText: string,
 	) => Promise<StudioComposerSubmitResult>;
-	handleSkillChange: (skillId: StudioDesignSkillId) => Promise<void>;
 	handleRetryFrame: (frameId: string) => Promise<void>;
 	handleRetryPlanning: () => Promise<void>;
 	handleDownloadAllZip: () => Promise<void>;
@@ -141,7 +139,6 @@ export function useStudioWorkspace(
 		project,
 		frames,
 		selectedFrameIds,
-		isProcessing,
 		syncProjectStatus,
 		setError,
 	});
@@ -226,7 +223,6 @@ export function useStudioWorkspace(
 		handleDelete: actions.handleDelete,
 		handleRename: actions.handleRename,
 		handleComposerSubmit: actions.handleComposerSubmit,
-		handleSkillChange: actions.handleSkillChange,
 		handleRetryFrame: actions.handleRetryFrame,
 		handleRetryPlanning: planningRetry.handleRetryPlanning,
 		handleDownloadAllZip: actions.handleDownloadAllZip,

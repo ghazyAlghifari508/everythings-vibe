@@ -155,17 +155,9 @@ it("repairs count mismatch with retained options and persists the exact accepted
 			storedProject.designBlueprint?.navigationContract.labels,
 		).toHaveLength(3);
 		for (const attempt of provider.messages.slice(0, 2)) {
-			expect(attempt[0].content).toContain("Selected design skill: taste");
 			expect(attempt[1].content).toContain("exactly 3");
 			expect(attempt[1].content).toContain("Font: Arial");
 		}
-		expect(
-			provider.messages
-				.slice(2)
-				.every((messages) =>
-					messages[0].content.includes("Selected design skill: taste"),
-				),
-		).toBe(true);
 	} finally {
 		await db.delete(users).where(eq(users.id, userId));
 	}
@@ -221,7 +213,6 @@ it("does not deduplicate different requested configuration", async () => {
 		const different = await createStudioProjectWithJob(userId, {
 			...input,
 			initialPageCount: 5,
-			designSkillId: "taste",
 		});
 		expect(different.project.id).not.toBe(first.project.id);
 	} finally {

@@ -66,7 +66,6 @@ export async function generateInitialFrame(
 			blueprint: ctx.blueprint,
 			viewport: designMode,
 			expectTokens: ctx.dsTokens !== null,
-			designSkillId: ctx.designSkillId,
 			dsTokens: ctx.dsTokens,
 			logoUrl: ctx.logoUrl,
 			contentContext: { brief: ctx.jobPrompt, prdContent: ctx.prdContent },

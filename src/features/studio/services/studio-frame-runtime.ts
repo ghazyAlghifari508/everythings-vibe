@@ -6,13 +6,9 @@ import {
 	tryStreamWithFallback,
 } from "@/lib/services/ai-orchestrator";
 import type { ValidatedFrameInput } from "../types/studio-service";
-import {
-	resolveStudioFrameSystemPrompt,
-	resolveStudioSkillContext,
-} from "./studio-design-skill-registry.server";
 import { StudioFrameError } from "./studio-frame-errors";
-import type { StudioDesignSkillId } from "./studio-generation-options";
 import { studioJobTiming } from "./studio-job-runtime";
+import { STUDIO_FRAME_SYSTEM_PROMPT } from "./studio-prompt-contracts";
 import { studioStreamMetrics } from "./studio-stream-metrics";
 
 // Started tasks are never cancelled by another task's failure.
@@ -140,44 +136,22 @@ export class StudioIncompleteOutputError extends Error {
 	}
 }
 
-export type StudioFrameGenerationStage = "frame" | "correction" | "revision";
-
 export async function generateStudioHtml(
 	prompt: string,
 	maxTokens = STUDIO_FRAME_MAX_TOKENS,
-	designSkillId: StudioDesignSkillId = "none",
 	signal?: AbortSignal,
 	timing?: ValidatedFrameInput["timing"],
-	context: { stage?: StudioFrameGenerationStage; focus?: string[] } = {},
 ): Promise<string> {
 	signal?.throwIfAborted();
 	const startedAt = Date.now();
-	const stage = context.stage ?? "frame";
-	const promptAssemblyStartedAt = Date.now();
-	const system = resolveStudioFrameSystemPrompt(designSkillId, {
-		stage,
-		focus: context.focus,
-	});
+	const system = STUDIO_FRAME_SYSTEM_PROMPT;
 	if (timing) {
-		// frame-context is the per-frame skill/context measurement the timing
-		// report keys on for skill attribution; keep its name and fields stable.
-		const plan = resolveStudioSkillContext(designSkillId, {
-			stage,
-			focus: context.focus,
-		}).plan;
+		// frame-context reports the exact sizes of the two strings sent to the
+		// provider, so a prompt-volume change is measurable without a provider call.
 		studioJobTiming("frame-context", startedAt, {
 			...timing,
-			skillId: designSkillId,
-			skillStage: stage,
-			skillChars: plan.characterCount,
-			selectedSectionCount: plan.selectedSections.length,
-			omittedSectionCount: plan.omittedSections.length,
-			estimatedTokens: plan.estimatedTokens,
 			systemChars: system.length,
 			promptChars: prompt.length,
-			// Prompt assembly (skill selection + system prompt build) is a pure
-			// CPU cost worth separating from provider latency in the timing report.
-			promptAssemblyMs: Date.now() - promptAssemblyStartedAt,
 		});
 	}
 	const { generator, firstChunk, outcome } = await tryStreamWithFallback(

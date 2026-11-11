@@ -1,17 +1,14 @@
 import { afterEach, expect, it, vi } from "vitest";
 import {
-	resolveStudioDesignSkill,
-	resolveStudioFrameSystemPrompt,
-	resolveStudioPlanningSystemPrompt,
-} from "../services/studio-design-skill-registry.server";
-import {
 	generateValidatedFrameHtml,
 	runWithConcurrency,
 } from "../services/studio-frame-generation";
-import type { StudioDesignSkillId } from "../services/studio-generation-options";
 import { buildStudioPlanningPrompt } from "../services/studio-planning-prompt";
+import {
+	STUDIO_FRAME_SYSTEM_PROMPT,
+	STUDIO_PLANNING_SYSTEM_PROMPT,
+} from "../services/studio-prompt-contracts";
 import { buildStudioFramePrompt } from "../services/studio-screen-prompts";
-import { buildStudioSkillContext } from "../services/studio-skill-context.server";
 import { STUDIO_FRAME_CONCURRENCY } from "../types/studio-constants";
 
 vi.mock("@/lib/services/ai-orchestrator", () => ({
@@ -76,29 +73,15 @@ it("measures real prompt sizes for the fixture matrix without invoking a provide
 		name: string;
 		mode: "web" | "mobile";
 		count: number;
-		skill: StudioDesignSkillId;
 		design?: string;
 		prd?: string;
 	}> = [
-		{ name: "web-3-none", mode: "web", count: 3, skill: "none" },
-		{ name: "mobile-4-none", mode: "mobile", count: 4, skill: "none" },
-		{
-			name: "mobile-4-impeccable",
-			mode: "mobile",
-			count: 4,
-			skill: "impeccable",
-		},
-		{
-			name: "mobile-4-ui-ux-pro-max",
-			mode: "mobile",
-			count: 4,
-			skill: "ui-ux-pro-max",
-		},
+		{ name: "web-3", mode: "web", count: 3 },
+		{ name: "mobile-4", mode: "mobile", count: 4 },
 		{
 			name: "web-design-reference",
 			mode: "web",
 			count: 3,
-			skill: "none",
 			design:
 				"# Design\nPrimary: #123456\nFont: system-ui\nUse clear focus states.",
 		},
@@ -106,20 +89,12 @@ it("measures real prompt sizes for the fixture matrix without invoking a provide
 			name: "web-prd",
 			mode: "web",
 			count: 3,
-			skill: "none",
 			prd: "# Booking\n## Reservations\nMembers can create and cancel reservations.\n## Account\nMembers manage their profile.",
 		},
 	];
 	const rows = scenarios.map((scenario) => {
-		const skill = resolveStudioDesignSkill(scenario.skill);
-		const planContext = buildStudioSkillContext(scenario.skill, {
-			stage: "planning",
-		});
-		const frameContext = buildStudioSkillContext(scenario.skill, {
-			stage: "frame",
-		});
 		const planning =
-			resolveStudioPlanningSystemPrompt(scenario.skill, brief, scenario.mode) +
+			STUDIO_PLANNING_SYSTEM_PROMPT +
 			buildStudioPlanningPrompt(
 				brief,
 				scenario.mode,
@@ -128,7 +103,7 @@ it("measures real prompt sizes for the fixture matrix without invoking a provide
 				scenario.prd,
 			);
 		const frame =
-			resolveStudioFrameSystemPrompt(scenario.skill) +
+			STUDIO_FRAME_SYSTEM_PROMPT +
 			buildStudioFramePrompt({
 				screenName: "Reservations",
 				projectPrompt: brief,
@@ -137,15 +112,13 @@ it("measures real prompt sizes for the fixture matrix without invoking a provide
 				prdContent: scenario.prd,
 			});
 		expect(planning.length).toBeGreaterThan(0);
-		expect(frame.length).toBeGreaterThan(frameContext.guidance.length);
+		expect(frame.length).toBeGreaterThan(STUDIO_FRAME_SYSTEM_PROMPT.length);
 		return {
 			name: scenario.name,
-			legacySkillChars: skill.guidance.length,
-			planningSkillChars: planContext.plan.characterCount,
-			frameSkillChars: frameContext.plan.characterCount,
+			planningSystemChars: STUDIO_PLANNING_SYSTEM_PROMPT.length,
+			frameSystemChars: STUDIO_FRAME_SYSTEM_PROMPT.length,
 			planningChars: planning.length,
 			frameChars: frame.length,
-			omittedDocuments: skill.omittedDocuments,
 			providerLatency: null,
 		};
 	});
@@ -166,7 +139,6 @@ it("measures mocked stream TTFT and output duration through the production gener
 			blueprint: null,
 			viewport: "web",
 			expectTokens: false,
-			designSkillId: "none",
 			dsTokens: null,
 			logoUrl: null,
 			timing: {

@@ -148,7 +148,6 @@ describe("Export PDF removal", () => {
 		// Windows and POSIX alike.
 		const allowlist = new Set([
 			// Pinned upstream documents mention PDF as design guidance, not an app export feature.
-			"src/features/studio/services/studio-skill-assets.generated.ts",
 			"src/features/templates/data/gallery-templates.ts",
 			"src/features/templates/data/vibe-templates.ts",
 			"src/features/studio/tests/studio-launch-composer.test.tsx",

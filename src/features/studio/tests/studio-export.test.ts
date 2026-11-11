@@ -91,6 +91,33 @@ describe("studio-export", () => {
 			global.URL.revokeObjectURL = vi.fn();
 		});
 
+		it("exports a historic project whose row still carries a retired design skill", async () => {
+			vi.stubGlobal(
+				"fetch",
+				vi.fn(async (url: string) =>
+					Response.json({
+						html: url.includes("f-1")
+							? "<html><body>Dashboard Content</body></html>"
+							: "<html><body>Transactions Content</body></html>",
+					}),
+				),
+			);
+			// `designSkillId` is retained legacy metadata on the project row; the
+			// exporter reads the persisted frames, so a historic project exports
+			// exactly like a current one.
+			const legacyProject = {
+				id: "p-legacy",
+				title: "Legacy App",
+				designSkillId: "impeccable",
+			};
+			await exportProjectAsZip(legacyProject.title, legacyProject.id, [
+				mockFrames[0],
+				mockFrames[1],
+			]);
+			expect(global.URL.createObjectURL).toHaveBeenCalledTimes(1);
+			vi.unstubAllGlobals();
+		});
+
 		it("rejects empty output rather than acknowledging a nonexistent download", async () => {
 			await expect(
 				exportProjectAsZip("Empty App", "p-1", []),

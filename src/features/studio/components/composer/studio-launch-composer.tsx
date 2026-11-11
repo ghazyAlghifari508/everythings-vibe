@@ -18,7 +18,6 @@ import {
 import { Icon } from "@/components/ui/icon";
 import { Spinner } from "@/components/ui/spinner";
 import { useTypewriterPlaceholder } from "@/features/studio/hooks/use-typewriter-placeholder";
-import type { StudioDesignSkillId } from "@/features/studio/services/studio-generation-options";
 import {
 	validateStudioPrdFilename,
 	validateStudioPrdText,
@@ -27,11 +26,9 @@ import { STUDIO_PRD_FILE_MAX_BYTES } from "@/features/studio/types/studio-consta
 import type { StudioDesignMode } from "@/features/studio/types/studio-prompts";
 import { shouldSubmitComposerEvent } from "@/features/studio/utils/composer-keyboard";
 import { StudioPageCountSelect } from "./studio-page-count-select";
-import { StudioSkillSelect } from "./studio-skill-select";
 
 export interface LaunchComposerConfig {
 	designMode: StudioDesignMode;
-	designSkillId: StudioDesignSkillId;
 	initialPageCount: number;
 }
 
@@ -347,11 +344,6 @@ export function StudioLaunchComposer({
 							className={reference ? "text-indigo" : undefined}
 						/>
 					</button>
-					<StudioSkillSelect
-						value={config.designSkillId}
-						onChange={(designSkillId) => onConfigChange({ designSkillId })}
-						disabled={loading}
-					/>
 					<button
 						type="submit"
 						disabled={!canSubmit}

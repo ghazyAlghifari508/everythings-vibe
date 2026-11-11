@@ -4,6 +4,7 @@ import {
 	generateStudioHtml,
 	generateValidatedFrameHtml,
 } from "../services/studio-frame-generation";
+import { STUDIO_FRAME_SYSTEM_PROMPT } from "../services/studio-prompt-contracts";
 
 vi.mock("@/lib/services/ai-orchestrator", () => ({
 	selectModels: () => [],
@@ -49,7 +50,7 @@ describe("generateValidatedFrameHtml recovery", () => {
 		const log = vi.spyOn(console, "info").mockImplementation(() => {});
 		try {
 			await expect(
-				generateStudioHtml("Sample", undefined, "none", undefined, {
+				generateStudioHtml("Sample", undefined, undefined, {
 					jobId: "job",
 					projectId: "project",
 					frameId: "frame",
@@ -74,7 +75,7 @@ describe("generateValidatedFrameHtml recovery", () => {
 		await mockRawSequence(["<html><body>Sample</body></html>"]);
 		const log = vi.spyOn(console, "info").mockImplementation(() => {});
 		try {
-			await generateStudioHtml("private brief", undefined, "none", undefined, {
+			await generateStudioHtml("private brief", undefined, undefined, {
 				jobId: "job",
 				projectId: "project",
 				frameId: "frame",
@@ -85,8 +86,7 @@ describe("generateValidatedFrameHtml recovery", () => {
 					expect.objectContaining({
 						stage: "frame-context",
 						promptChars: 13,
-						skillId: "none",
-						skillChars: 0,
+						systemChars: STUDIO_FRAME_SYSTEM_PROMPT.length,
 					}),
 					expect.objectContaining({
 						stage: "frame-output",
@@ -110,7 +110,6 @@ describe("generateValidatedFrameHtml recovery", () => {
 			blueprint: null,
 			viewport: "web",
 			expectTokens: false,
-			designSkillId: "none",
 			dsTokens: null,
 			logoUrl: null,
 		});
@@ -129,7 +128,6 @@ describe("generateValidatedFrameHtml recovery", () => {
 			blueprint: null,
 			viewport: "web",
 			expectTokens: false,
-			designSkillId: "none",
 			dsTokens: null,
 			logoUrl: null,
 		});
@@ -152,7 +150,6 @@ describe("generateValidatedFrameHtml recovery", () => {
 				blueprint: null,
 				viewport: "web",
 				expectTokens: false,
-				designSkillId: "none",
 				dsTokens: null,
 				logoUrl: null,
 				timing: { jobId: "job", projectId: "project", frameId: "frame" },
@@ -179,7 +176,6 @@ describe("generateValidatedFrameHtml recovery", () => {
 				blueprint: null,
 				viewport: "web",
 				expectTokens: false,
-				designSkillId: "none",
 				dsTokens: null,
 				logoUrl: null,
 			}),

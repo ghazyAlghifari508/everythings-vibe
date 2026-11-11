@@ -202,20 +202,15 @@ describe("StudioComposer", () => {
 		);
 	});
 
-	it("shows the stored skill and reference without a page count control", () => {
+	it("shows the stored reference without a page count control", () => {
 		render(
 			<StudioComposer
 				onSubmit={vi.fn()}
 				loading={false}
-				designSkillId="impeccable"
-				onDesignSkillChange={vi.fn()}
 				referenceLabel="Workspace"
 			/>,
 		);
 
-		expect(
-			screen.getByRole("button", { name: /Design skill: Impeccable/i }),
-		).toBeDefined();
 		expect(screen.getByText("Workspace")).toBeDefined();
 		expect(screen.queryByText(/halaman awal/i)).toBeNull();
 	});

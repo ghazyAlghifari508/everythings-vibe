@@ -68,7 +68,6 @@ function renderActions(
 			project: mockProject,
 			frames: [],
 			selectedFrameIds,
-			isProcessing: false,
 			syncProjectStatus,
 			setError,
 		}),

@@ -8,12 +8,9 @@ import {
 	unique,
 	uniqueIndex,
 } from "drizzle-orm/pg-core";
+import type { StudioDesignReferenceMetadata } from "@/features/studio/services/studio-generation-options";
 import type { StudioTitleSource } from "@/features/studio/services/studio-project-title";
 import type { StudioDesignBlueprint } from "@/lib/studio-design-blueprint";
-import type {
-	StudioDesignReferenceMetadata,
-	StudioDesignSkillId,
-} from "@/lib/studio-generation-options";
 import { users } from "./auth";
 
 export const studioProjects = pgTable(
@@ -37,10 +34,14 @@ export const studioProjects = pgTable(
 			.default("user"),
 		designMode: text("design_mode").notNull().default("web"),
 		designMd: text("design_md"),
-		designSkillId: text("design_skill_id")
-			.$type<StudioDesignSkillId>()
-			.notNull()
-			.default("none"),
+		/**
+		 * Legacy: the retired user-selectable design skill. Studio no longer
+		 * offers, reads or writes a skill, so this column is inert metadata kept
+		 * so historic projects load and export unchanged. Every new row takes the
+		 * "none" default. Dropping it would destroy history for no functional
+		 * gain; see docs/prompt-design-studio/p7-implementation.md.
+		 */
+		designSkillId: text("design_skill_id").notNull().default("none"),
 		initialPageCount: integer("initial_page_count"),
 		designReference:
 			jsonb("design_reference").$type<StudioDesignReferenceMetadata>(),
@@ -48,6 +49,7 @@ export const studioProjects = pgTable(
 		designBlueprintVersion: integer("design_blueprint_version")
 			.notNull()
 			.default(1),
+		/** Legacy companion of `designSkillId`; never written by current code. */
 		designSkillVersion: integer("design_skill_version"),
 		logoAssetId: text("logo_asset_id"),
 		prdContent: text("prd_content"),

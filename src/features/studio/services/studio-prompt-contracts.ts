@@ -1,4 +1,5 @@
 import { STUDIO_VISUAL_WIDTH } from "@/features/studio/types/studio-constants";
+import { STUDIO_BASE_QUALITY_PROMPT } from "./studio-quality-rules";
 
 /**
  * Shared platform contracts. Both the initial user prompt and the per-screen
@@ -160,3 +161,9 @@ OUTPUT CONTRACT (NON-NEGOTIABLE):
 - projectTitle is a product name, not the brief. Keep it 2-4 words and under 60 characters. Never return a sentence, a paragraph, a copy of the user's request, or a description of the work to be done.
 - Use the brand or product name the user wrote, spelled exactly as they wrote it. If the user named no brand, name the product after its domain, audience, and main purpose, for example "Analytics Dashboard" or "Inventory Console". Never invent a brand that contradicts the user.
 - Never fall back to a generic placeholder such as "My Project", "Untitled App", "New Design", or "Aplikasi Prototipe". No marketing superlatives, and no technical requirements: those belong in the blueprint, not in the title.`;
+
+// Studio has exactly one internal generation standard. The base quality contract
+// is composed into every planning and frame system prompt here instead of being
+// assembled per request, so no request path can plan or build without it.
+export const STUDIO_PLANNING_SYSTEM_PROMPT = `${STUDIO_PLAN_SYSTEM_PROMPT}\n${STUDIO_BASE_QUALITY_PROMPT}`;
+export const STUDIO_FRAME_SYSTEM_PROMPT = `${STUDIO_SYSTEM_PROMPT}\n${STUDIO_BASE_QUALITY_PROMPT}`;

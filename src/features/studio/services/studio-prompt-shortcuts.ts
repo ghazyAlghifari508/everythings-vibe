@@ -5,8 +5,8 @@ import {
 } from "./studio-generation-options";
 
 // A shortcut populates the composer with a full editable brief. It never
-// submits on its own and never overrides an explicitly selected skill or
-// design reference.
+// submits on its own and never overrides an explicitly selected design
+// reference.
 export const studioPromptShortcutSchema = z.object({
 	id: z.string().min(1).max(100),
 	title: z.string().min(1).max(120),

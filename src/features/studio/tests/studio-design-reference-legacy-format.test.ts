@@ -41,15 +41,6 @@ const LEGACY_MINIMAL = renderEvidenceDesignMd({
 	elements: FIXTURE.elements.filter((element) => element.role === "canvas"),
 });
 
-const SKILLS = [
-	"none",
-	"impeccable",
-	"frontend-design",
-	"ui-ux-pro-max",
-	"anti-slop",
-	"taste",
-] as const;
-
 describe("archived VibeScrape reference", () => {
 	it("extracts the measured palette, typeface and radii without inventing the rest", () => {
 		expect(extractDesignSystemTokens(LEGACY)?.colors).toEqual({
@@ -84,61 +75,58 @@ describe("archived VibeScrape reference", () => {
 		});
 	});
 
-	for (const skill of SKILLS) {
-		it(`creates a project and drives planning and every frame with ${skill}`, async () => {
-			const userId = await createStudioUser();
-			const scrapeId = await insertCompletedScrape(userId, LEGACY);
+	it("creates a project and drives planning and every frame from the archived reference", async () => {
+		const userId = await createStudioUser();
+		const scrapeId = await insertCompletedScrape(userId, LEGACY);
 
-			const { project, job } = await createStudioProjectWithJob(userId, {
-				prompt: "Sample application brief",
-				initialPageCount: 2,
-				designSkillId: skill,
-				designReference: { kind: "scrape", id: scrapeId },
-			});
-
-			expect(project.designMd).toBe(LEGACY);
-			expect(project.designReference).toMatchObject({
-				kind: "scrape",
-				id: scrapeId,
-				source: "vibescrape",
-			});
-
-			await runStudioJobPipeline(job.id, project.id, userId);
-
-			const planning = aiCalls("planning");
-			expect(planning).toHaveLength(1);
-			const planningUser = planning[0]?.[1]?.content ?? "";
-			expect(planningUser).toContain(documentHead(LEGACY));
-
-			const frames = aiCalls("frame");
-			expect(frames).toHaveLength(2);
-			for (const messages of frames) {
-				expect(messages[1]?.content).toContain(documentHead(LEGACY));
-				expect(messages[1]?.content).toContain("rgb(21, 94, 239)");
-				expect(messages[1]?.content).toContain("border-radius | 8px");
-			}
-
-			// The frame keeps the reference tokens in its delivered document.
-			const stored = await db
-				.select()
-				.from(studioFrames)
-				.where(eq(studioFrames.projectId, project.id));
-			expect(stored).toHaveLength(2);
-			for (const frame of stored) {
-				expect(frame.status).toBe("ready");
-				expect(frame.htmlCode).toContain("--color-primary: #155eef");
-				expect(frame.htmlCode).toContain("--radius-card: 24px");
-			}
-
-			// The reference survives a reload, so a reopened project keeps it.
-			const reloaded = await getStudioProject(project.id, userId);
-			expect(reloaded.designMd).toBe(LEGACY);
-			expect(reloaded.designReference).toMatchObject({
-				kind: "scrape",
-				id: scrapeId,
-			});
+		const { project, job } = await createStudioProjectWithJob(userId, {
+			prompt: "Sample application brief",
+			initialPageCount: 2,
+			designReference: { kind: "scrape", id: scrapeId },
 		});
-	}
+
+		expect(project.designMd).toBe(LEGACY);
+		expect(project.designReference).toMatchObject({
+			kind: "scrape",
+			id: scrapeId,
+			source: "vibescrape",
+		});
+
+		await runStudioJobPipeline(job.id, project.id, userId);
+
+		const planning = aiCalls("planning");
+		expect(planning).toHaveLength(1);
+		const planningUser = planning[0]?.[1]?.content ?? "";
+		expect(planningUser).toContain(documentHead(LEGACY));
+
+		const frames = aiCalls("frame");
+		expect(frames).toHaveLength(2);
+		for (const messages of frames) {
+			expect(messages[1]?.content).toContain(documentHead(LEGACY));
+			expect(messages[1]?.content).toContain("rgb(21, 94, 239)");
+			expect(messages[1]?.content).toContain("border-radius | 8px");
+		}
+
+		// The frame keeps the reference tokens in its delivered document.
+		const stored = await db
+			.select()
+			.from(studioFrames)
+			.where(eq(studioFrames.projectId, project.id));
+		expect(stored).toHaveLength(2);
+		for (const frame of stored) {
+			expect(frame.status).toBe("ready");
+			expect(frame.htmlCode).toContain("--color-primary: #155eef");
+			expect(frame.htmlCode).toContain("--radius-card: 24px");
+		}
+
+		// The reference survives a reload, so a reopened project keeps it.
+		const reloaded = await getStudioProject(project.id, userId);
+		expect(reloaded.designMd).toBe(LEGACY);
+		expect(reloaded.designReference).toMatchObject({
+			kind: "scrape",
+			id: scrapeId,
+		});
+	});
 
 	it("creates a project for a document that measures only a canvas", async () => {
 		const userId = await createStudioUser();

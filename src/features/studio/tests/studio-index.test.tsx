@@ -100,9 +100,6 @@ describe("StudioPage UI & Workflow", () => {
 		).toBeDefined();
 		expect(screen.getByRole("button", { name: "Kirim prompt" })).toBeDefined();
 		expect(
-			screen.getByRole("button", { name: /Design skill: No Skill/i }),
-		).toBeDefined();
-		expect(
 			screen.getByRole("button", { name: /Jumlah halaman awal: 3/i }),
 		).toBeDefined();
 		expect(screen.getByText("Mulai dari brief siap pakai")).toBeDefined();
@@ -181,7 +178,6 @@ describe("StudioPage UI & Workflow", () => {
 					body: JSON.stringify({
 						prompt: "Aplikasi mobile fitness tracking dengan kalender",
 						designMode: "mobile",
-						designSkillId: "none",
 						initialPageCount: 3,
 						designReference: null,
 						designMd: null,
