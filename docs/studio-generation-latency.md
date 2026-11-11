@@ -351,3 +351,173 @@ not touched here and are not claimed as fixed.
   this environment.
 - The add/revise prompt still sends the whole sibling screen-name list; scoping
   that prompt is a UI/quality concern outside this task.
+
+---
+
+## P4: Time to first usable frame — baseline re-measurement (2026-11-11)
+
+Scope: measurement and option evaluation only. No production code changed in
+this phase, because source inspection confirmed every previously implemented
+optimization is still present and no live-provider evidence justifies raising
+concurrency or adding progressive preview. No browser QA and no live provider
+run were authorized, so all numbers below are mock-based or code-derived.
+
+### Existing optimizations re-confirmed in source (not regressed)
+
+Each item in the P4 prompt's "already implemented" list was checked against the
+current modules rather than trusted from the report:
+
+| Claim | Source evidence | Status |
+| --- | --- | --- |
+| Initial-frame concurrency is 3 | `runWithConcurrency(..., STUDIO_FRAME_CONCURRENCY)` in `studio-job-pipeline.ts`; shared slot semaphore `createStudioWorkerExecution` caps aggregate model calls at `STUDIO_FRAME_CONCURRENCY` | retained |
+| Frame-ready results persist independently | `frame-persistence` emitted inside `generateInitialFrame` (`studio-initial-frame.ts`) per frame; `frame-ready` emitted in the per-frame callback before the batch `frames` stage | retained |
+| 2-second inter-batch worker delay removed | `studio-worker.ts` loop re-dispatches immediately after a nonempty batch and sleeps only when `processed === 0` (`STUDIO_WORKER_POLL_MS`) | retained |
+| Shared planning persisted and reusable | planning runs once, `planningCompletedAt` set, frames persisted via `persistStudioPlannedFrames`; recovery skips ready HTML | retained |
+| Correction does not repeat the full original prompt | `correction-context` stage sends contract failures + previous HTML as untrusted data | retained |
+| Bounded retry/correction | one transient retry + one correction (≤3 requests) per frame; one JSON correction (≤3 requests) for planning; shared 600,000 ms deadline | retained |
+| Status polling ~1,500 ms | frontend polling interval unchanged | retained |
+| Preview capture lazy and separate | `getStudioFrameVisual` is triggered from `studio-frame-http.ts` / `studio-frame.tsx` on preview request, never awaited in the job pipeline; `preview-capture` stage lives in `studio-frame-visual.ts` | retained |
+| Timing events incl. planning/first-token/output/frame-ready/frame-visible | 33 distinct `studioJobTiming` stages present, incl. `planning-context`, `planning-first-token`, `planning-output`, `frame-context`, `first-token`, `frame-output`, `frame-ready`, `preview-capture`, `preview-persistence`, `project-completion` | retained |
+
+### Evidence-based latency breakdown (mock + code-derived)
+
+Provider-free measurements captured this phase
+(`pnpm vitest run src/features/studio/tests/studio-latency.test.ts
+src/features/studio/tests/studio-timing-report.test.ts
+src/features/studio/tests/studio-worker-loop.test.ts
+src/features/studio/tests/studio-worker-scheduler.test.ts` — 4 files / 13
+tests, all passed):
+
+- Synthetic scheduler fixture (durations `[100, 300, 200, 300]` ms,
+  concurrency 3, virtual time): starts `[0, 0, 0, 100]`, first completion
+  **100 ms**, total **400 ms**, peak in-flight **3**. This proves frame 1 does
+  not wait for slower siblings and that aggregate concurrency never exceeds 3.
+- Mocked production generation stream: TTFT **10 ms**, output **20 ms**,
+  generation **30 ms**. These are configured mock delays, not provider
+  observations.
+- Current fixture prompt sizes (characters, not tokens; frame figures include
+  the system prompt and exclude a generated blueprint):
+
+| Scenario | Planning input incl. system | Frame input incl. system |
+| --- | ---: | ---: |
+| Web, 3, none | 7,745 | 17,996 |
+| Mobile, 4, none | 7,731 | 18,029 |
+| Mobile, 4, Impeccable | 23,806 | 34,101 |
+| Mobile, 4, UI UX Pro Max | 28,308 | 37,589 |
+| Web, 3, DESIGN.md reference | 6,906 | 18,697 |
+| Web, 3, PRD | 8,226 | 18,336 |
+
+Observed drift vs the superseded table earlier in this document (e.g. Web/3/none
+frame input 17,996 vs 12,711 characters): current fixtures produce larger
+assembled prompts. This is an `OBSERVED` size difference at this checkout, not a
+measured latency regression — the prompt assembly is CPU work measured in
+milliseconds (`promptAssemblyMs`), and the dominant cost is provider output
+time, which these fixtures do not exercise. Cause of the drift is not attributed
+here.
+
+### Actual bottleneck ranking
+
+1. **Provider frame generation (dominant, provider-bound).** Wall clock is
+   governed by per-frame model output time. Historically rejected frame requests
+   ran 90–200 s; the same route is what a correction round re-issues. Every
+   deterministic stage around it is orders of magnitude smaller.
+2. **Correction round (provider round trip).** One contract-driven round re-enters
+   the provider; removing a correction removes one round trip, not the duration
+   of a single round.
+3. **Queue wait (scheduler-bound, not model-bound).** The fourth frame waits for
+   a slot; the fixture shows it starts as soon as one frees (100 ms mark).
+4. **Deterministic overhead (small).** Prompt assembly, validation,
+   deterministic repair, canonical assembly and persistence are all measured in
+   milliseconds and are already off the provider path.
+5. **Preview visibility (separate denominator).** `frame-ready` is server-side;
+   `preview-available` measures validated response availability, not image
+   paint. First-visible is client wall clock and subject to clock skew.
+
+Not measurable this phase: live TTFT, output-token throughput, correction
+percentage, per-skill provider latency, queue-wait distribution, and true
+first-paint. These remain **unmeasured**, not zero.
+
+### Comparable implementations (via P1 findings)
+
+- Stitch renders each screen in an independent iframe as soon as it is
+  available (`OBSERVED`, P1); EvVibe already persists and exposes frames
+  independently, so the structural prerequisite for early first-frame
+  availability exists.
+- Doop/Onlook render live HTML client-side rather than waiting on a server
+  capture; EvVibe still gates the canvas image on a lazy Playwright capture. That
+  is a preview-latency concern, not a generation-latency one, and is out of scope
+  for the 60-second generation target.
+- No reference product was measured under a comparable scenario, so no
+  "reference X is faster" claim is made.
+
+### Options A–J evaluated
+
+| Option | Decision | Rationale |
+| --- | --- | --- |
+| A. Reuse shared blueprint efficiently | Keep (already done) | Planning runs once per project and is reused for every frame and recovery; re-planning ready frames would add provider calls. |
+| B. Reduce redundant prompt context | Keep (already done) | Duplicated token summaries and HTML-only quality instructions removed; DESIGN.md/PRD stay once in planning. Further shrinking risks shallow output. |
+| C. Bounded provider/model configuration | Keep (already done) | Gateway is a configured combo; no routing/cache change without support evidence. |
+| D. Frame 1 independent of siblings | Keep (verified) | Scheduler fixture proves first completion at 100 ms with concurrency 3. |
+| E. Improve first-frame scheduling | Reject (no change) | First frame already contends fairly; raising priority would delay siblings without reducing provider time. |
+| F. Reduce validation/correction overhead | Keep (already done) | Deterministic repair runs before any model correction; advisory warnings no longer trigger regeneration. |
+| G. Avoid recapturing identical previews | Keep (already done) | Preview cache hits avoid capture. |
+| H. Progressive draft preview | **Reject** | No measured speed improvement without a live cohort; would add a draft/final distinction, risk counting unfinished UI as success, and must not save drafts as revisions. Complexity not justified by evidence. |
+| I. Reduce asset/font waits | Keep (already done) | Capture waits for remote fonts/images, but this is lazy and off the frame-ready path; incomplete assets are never shown as complete. |
+| J. Prepare first screen while others queue | Reject (no change) | Already the effective behavior — frames start under concurrency 3 as slots free; shared design-system consistency is guaranteed by the shared blueprint, so no extra pre-work is needed. |
+
+Not done, deliberately: raising concurrency above 3 or removing the advisory
+lock. Neither has throughput or gateway rate-limit evidence, and both would
+remove the aggregate cap without an alternate policy.
+
+### Before/after and environment
+
+There is no same-checkout live before/after, because no live provider run was
+authorized. The only before/after comparisons that hold at this checkout are
+mock/code-derived: the worker-loop comparison (optimized module dispatches two at
+**100 ms** vs the `9c632eae` baseline **2,100 ms** by code-derived calculation
+under the same fixture) and the synthetic scheduler fixture above. Environment:
+Windows x64, provider mocked, virtual timers, no network, no Chromium.
+
+### Quality and cost tradeoff
+
+Content was not shortened to hit the clock. DESIGN.md, PRD and the system JSON
+schema/identity/screen-count/token/navigation contract remain required. Retry
+and correction stay bounded (≤3 requests per stage), so credits per attempt are
+unchanged, and rejected duplicate submissions burn no credits. Advisory
+aesthetics still do not trigger regeneration.
+
+### Was &lt;60 seconds achieved?
+
+**Not achieved and not yet measurable.** The only stage that dominates wall
+clock is provider-bound frame generation, and no controlled live-provider cohort
+was run. Server-side `frame-ready` is not a substitute for a verified compositor
+paint, so even a fast `frame-ready` would not prove the target. The honest
+status: provider-independent overhead is already bounded and instrumented; the
+provider-bound remainder is unmeasured.
+
+### Remaining blockers and next actions
+
+1. Authorize a controlled live-provider cohort (web portfolio, web dashboard,
+   mobile commerce, mobile travel; with/without theme; with/without DESIGN.md)
+   to record model config, token budget, usage, corrections, latency and
+   credits per attempt. Only then can p50/p95 be reported with meaningful
+   sample counts.
+2. Measure the gateway's rate/token limits before any change to the
+   concurrency-3 cap or the advisory-lock aggregate policy.
+3. Add a verified client paint signal (distinct from `img.onload`) if
+   first-visible latency is to be claimed; keep clock-skew caveats explicit.
+4. Re-evaluate progressive preview (option H) only if a live cohort shows a
+   meaningful first-usable improvement and a safe draft/final boundary can be
+   guaranteed.
+
+### Verification this phase
+
+```sh
+pnpm vitest run src/features/studio/tests/studio-latency.test.ts \
+  src/features/studio/tests/studio-timing-report.test.ts \
+  src/features/studio/tests/studio-worker-loop.test.ts \
+  src/features/studio/tests/studio-worker-scheduler.test.ts
+```
+
+4 files / 13 tests passed. No Chromium test was run, per the phase boundary. No
+production files were modified; this section is the deliverable.
