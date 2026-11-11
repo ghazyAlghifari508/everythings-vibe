@@ -330,6 +330,13 @@
       "when": 1794346397655,
       "tag": "0046_studio_operation_dependencies",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1794405183009,
+      "tag": "0047_studio_conversation",
+      "breakpoints": true
     }
   ]
 }

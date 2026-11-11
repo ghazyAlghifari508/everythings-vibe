@@ -10,6 +10,11 @@ import {
 } from "drizzle-orm/pg-core";
 import type { StudioDesignReferenceMetadata } from "@/features/studio/services/studio-generation-options";
 import type { StudioTitleSource } from "@/features/studio/services/studio-project-title";
+import type {
+	StudioMessageAttachment,
+	StudioMessageProgress,
+	StudioMessageStatus,
+} from "@/features/studio/types/studio-conversation";
 import type { StudioDesignBlueprint } from "@/lib/studio-design-blueprint";
 import { users } from "./auth";
 
@@ -218,6 +223,53 @@ export const studioFrames = pgTable(
 		),
 	],
 );
+
+/** One project is one conversation; each accepted operation owns a user/assistant pair. */
+export const studioMessages = pgTable(
+	"studio_messages",
+	{
+		id: text("id")
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		projectId: text("project_id")
+			.notNull()
+			.references(() => studioProjects.id, { onDelete: "cascade" }),
+		userId: text("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		/** Request ID for multi-job operations, otherwise the initial/retry job ID. */
+		operationId: text("operation_id").notNull(),
+		jobIds: jsonb("job_ids").$type<string[]>().notNull(),
+		role: text("role").$type<"user" | "assistant">().notNull(),
+		content: text("content").notNull(),
+		order: integer("order").notNull(),
+		status: text("status").$type<StudioMessageStatus>().notNull(),
+		attachments: jsonb("attachments")
+			.$type<StudioMessageAttachment[]>()
+			.notNull()
+			.default([]),
+		/** Public mechanical summary only, never provider errors or reasoning. */
+		progress: jsonb("progress").$type<StudioMessageProgress>(),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(t) => [
+		uniqueIndex("studio_messages_operation_role_idx").on(
+			t.projectId,
+			t.userId,
+			t.operationId,
+			t.role,
+		),
+		uniqueIndex("studio_messages_project_order_idx").on(t.projectId, t.order),
+		index("studio_messages_owner_idx").on(t.userId, t.projectId),
+	],
+);
+
+export type StudioMessageRow = typeof studioMessages.$inferSelect;
 
 export type StudioProjectRow = typeof studioProjects.$inferSelect;
 export type InsertStudioProjectRow = typeof studioProjects.$inferInsert;
