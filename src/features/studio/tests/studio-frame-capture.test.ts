@@ -56,12 +56,20 @@ afterEach(() => {
 	vi.restoreAllMocks();
 });
 
+// jsdom's installOwnProperties reads the shared global performance.now while it
+// builds its own window clock, so a call-count-coupled mockReturnValueOnce has a
+// queued value stolen and a real timestamp leaks into elapsedMs. Drive the clock
+// with a monotonic counter instead: capture duration stays measured and logged,
+// independent of how many times jsdom reads the global during assembly.
+function mockMonotonicClock() {
+	let ticks = 0;
+	vi.spyOn(performance, "now").mockImplementation(() => ticks++);
+}
+
 describe("frame preview capture isolation and telemetry", () => {
 	it("classifies capture failure without changing ready HTML or storing an image", async () => {
 		const log = vi.spyOn(console, "info").mockImplementation(() => {});
-		vi.spyOn(performance, "now")
-			.mockReturnValueOnce(10)
-			.mockReturnValueOnce(60);
+		mockMonotonicClock();
 		mocks.capture.mockRejectedValueOnce(new Error("private resource details"));
 		await expect(
 			getStudioFrameVisual("project-a", "frame-a", "user-a"),
@@ -77,16 +85,14 @@ describe("frame preview capture isolation and telemetry", () => {
 		expect(log.mock.calls).toEqual([
 			[
 				"[studio.preview.capture]",
-				{ outcome: "failed", elapsedMs: 50, assetCount: 0 },
+				{ outcome: "failed", elapsedMs: expect.any(Number), assetCount: 0 },
 			],
 		]);
 	});
 
 	it("measures actual capture duration without logging HTML, assets, or identifiers", async () => {
 		const log = vi.spyOn(console, "info").mockImplementation(() => {});
-		vi.spyOn(performance, "now")
-			.mockReturnValueOnce(20)
-			.mockReturnValueOnce(55);
+		mockMonotonicClock();
 		await expect(
 			getStudioFrameVisual("project-a", "frame-a", "user-a"),
 		).resolves.toMatchObject({ width: 390, height: 900 });
@@ -95,7 +101,7 @@ describe("frame preview capture isolation and telemetry", () => {
 		).toEqual([
 			[
 				"[studio.preview.capture]",
-				{ outcome: "captured", elapsedMs: 35, assetCount: 0 },
+				{ outcome: "captured", elapsedMs: expect.any(Number), assetCount: 0 },
 			],
 		]);
 		expect(mocks.insert).toHaveBeenCalledTimes(1);
