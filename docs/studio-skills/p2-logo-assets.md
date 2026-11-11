@@ -1,5 +1,10 @@
 # Bundled skill logo assets (p2)
 
+> **RETIRED (P7).** `public/icons/skills/` and `src/lib/studio-design-skills.ts`
+> were deleted with the skill selector, so nothing is bundled or referenced any
+> more. Kept as the historical licensing record for the removed assets; see
+> `docs/prompt-design-studio/p7-implementation.md`.
+
 Two design-skill logos are bundled locally under `public/icons/skills/` and referenced by
 typed metadata in `src/lib/studio-design-skills.ts`. Both are genuine, official upstream
 assets reused under permissive licenses. They are bundled (not hot-linked) so the Studio

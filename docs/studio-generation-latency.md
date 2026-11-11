@@ -6,11 +6,16 @@
 pnpm vitest run src/features/studio/tests/studio-latency.test.ts --disableConsoleIntercept --silent=false
 pnpm vitest run src/features/studio/tests/studio-timing-report.test.ts
 pnpm studio:worker:smoke
-pnpm studio:assets:check
 pnpm exec tsx src/features/studio/services/studio-timing-report-cli.ts <studio-jsonl-log>
 ```
 
 The worker smoke holds the dispatch advisory lock so its child cannot claim live jobs or spend provider credits. Do not run `studio-visual.test.ts` for browser-free verification: it launches Chromium. Production capture dependencies remain installed.
+
+P7 retired the design skills, so `pnpm studio:assets` / `pnpm studio:assets:check` no longer exist. Every measurement recorded below was taken while the skill
+contexts were still delivered; the numbers describe that checkout, not the current
+one. `studio-timing-report.ts` no longer groups latency per skill, and
+`frame-context` now reports the system-prompt size of the single mandatory standard
+instead of skill characters.
 
 ## Findings and decisions
 

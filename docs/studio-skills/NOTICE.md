@@ -1,5 +1,15 @@
 # Studio design skill adapters (version 3)
 
+> **RETIRED (P7).** The user-selectable design skills were removed from the
+> product. `src/features/studio/skills/`, the skill manifest/registry/context
+> modules, the skill selector UI and the bundled logos no longer exist, and
+> `pnpm studio:assets` was deleted. This file is retained as the historical
+> attribution record for the deleted assets; nothing below is a live reference.
+> Studio now composes one mandatory internal standard. Historic projects keep
+> loading unchanged, and the two persisted columns (`studio_projects.design_skill_id`
+> and `design_skill_version`) are inert legacy metadata. See
+> `docs/prompt-design-studio/p7-implementation.md`.
+
 The selectable design skills in VibeDesign Studio are integrated from the pinned upstream definitions below. Verbatim copies of the upstream skill documents and relevant reference files are bundled locally under `src/features/studio/skills/<id>/`.
 
 Upstream skill instructions refine visual hierarchy, typography, composition, and accessibility. However, **every adapter remains subordinate to Studio's safety, platform validity, user-specified brief, active design reference (`DESIGN.md`), and clean HTML output contracts**. No arbitrary remote scripts are executed and no remote network requests are made during frame generation.
