@@ -337,6 +337,13 @@
       "when": 1794405183009,
       "tag": "0047_studio_conversation",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1794415832904,
+      "tag": "0048_studio_element_revisions",
+      "breakpoints": true
     }
   ]
 }

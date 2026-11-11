@@ -6,3 +6,4 @@ export * from "./feedback";
 export * from "./projects";
 export * from "./scrape";
 export * from "./studio";
+export * from "./studio-element-revisions";
