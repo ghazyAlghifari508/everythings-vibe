@@ -625,7 +625,7 @@ describe("Step 1 recovery affordances", () => {
 			onRequestNewToken,
 		});
 		const button = [...container.querySelectorAll("button")].find((b) =>
-			/Buat prompt baru|Buat sesi baru|Dapatkan token baru/i.test(
+			/Buat prompt baru|Buat sesi baru|Dapatkan token baru|Buat instruksi baru/i.test(
 				b.textContent ?? "",
 			),
 		);

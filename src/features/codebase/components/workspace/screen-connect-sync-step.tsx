@@ -8,6 +8,7 @@ import type {
 	SyncStageView,
 	SyncStatusResponse,
 } from "@/features/codebase/services/sync";
+import { ScreenConnectStepItem } from "./screen-connect-step-item";
 import { SyncStageList } from "./sync-stage-list";
 
 interface ScreenConnectSyncStepProps {
@@ -80,19 +81,16 @@ export function ScreenConnectSyncStep({
 	idleLabel,
 }: ScreenConnectSyncStepProps) {
 	return (
-		<div className="flex items-start gap-3.5">
-			<div className="flex w-6 shrink-0 flex-col items-center">
-				<span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-iron font-mono text-xs text-mist">
-					3
-				</span>
-			</div>
-			<div className="flex w-full min-w-0 flex-1 flex-col gap-2">
-				<div className="text-xs font-semibold text-mist">{heading}</div>
+		<ScreenConnectStepItem stepNumber={3} hasConnector={false}>
+			<div className="flex flex-col gap-0.5">
+				<div className="text-xs font-semibold text-mist leading-none">
+					{heading}
+				</div>
 				{description && (
 					<p className="text-[11px] leading-relaxed text-fog">{description}</p>
 				)}
-
-				{/* The browser has not heard from the server yet, so no stage can
+			</div>
+			{/* The browser has not heard from the server yet, so no stage can
 				honestly be claimed. Loading is rendered for one thing only: the
 				server request that is genuinely in flight while this frame's session
 				and prompt are being prepared. A validated session that is merely
@@ -100,141 +98,138 @@ export function ScreenConnectSyncStep({
 				the prompt — and with nothing in flight (blocked credits) the line
 				says the sync has not started. Polling is not connection activity, so
 				it never spins. */}
-				{!stageView.hasStatus && !stageView.failed && (
-					<p className="flex items-center gap-2 text-[11px] leading-relaxed text-fog">
-						{isStarting && <Spinner size={12} className="text-blue-400" />}
-						<span>
-							{isStarting
-								? "Menyiapkan sesi sync..."
-								: (idleLabel ??
-									(hasSession ? "Menunggu agent" : "Belum dimulai"))}
-						</span>
-					</p>
-				)}
+			{!stageView.hasStatus && !stageView.failed && (
+				<p className="flex items-center gap-2 text-[11px] leading-relaxed text-fog">
+					{isStarting && <Spinner size={12} className="text-blue-400" />}
+					<span>
+						{isStarting
+							? "Menyiapkan sesi sync..."
+							: (idleLabel ??
+								(hasSession ? "Menunggu agent" : "Belum dimulai"))}
+					</span>
+				</p>
+			)}
 
-				{/* The one live sync presentation for this flow: agent, source
+			{/* The one live sync presentation for this flow: agent, source
 				preparation, upload, the analysis state, and the neutral
 				sync summary — all mapped from the same polled server
 				status. A failed analysis expands inside its own row;
 				no second alert is rendered below it. */}
-				<SyncStageList
-					status={status}
-					isAnalysisReady={canContinueToSummary}
-					analysisBlocked={analysisBlocked}
-					isLegacyAnalysisMissingSuggestions={
-						isLegacyAnalysisMissingSuggestions
-					}
-					showAnalysisFailure={
-						!isLegacyAnalysisMissingSuggestions &&
-						!isRetrying &&
-						!isAnalyzing &&
-						status?.analysisAttemptStatus !== "pending" &&
-						(Boolean(analysisError) ||
-							status?.analysisAttemptStatus === "failed" ||
-							status?.analysisStatus === "failed" ||
-							analysis?.status === "failed") &&
-						Boolean(onRetryAnalysis)
-					}
-					analysisError={analysisError}
-					onRetryAnalysis={onRetryAnalysis}
-					isAnalyzing={isAnalyzing}
-					isRetrying={isRetrying}
-				/>
+			<SyncStageList
+				status={status}
+				isAnalysisReady={canContinueToSummary}
+				analysisBlocked={analysisBlocked}
+				isLegacyAnalysisMissingSuggestions={isLegacyAnalysisMissingSuggestions}
+				showAnalysisFailure={
+					!isLegacyAnalysisMissingSuggestions &&
+					!isRetrying &&
+					!isAnalyzing &&
+					status?.analysisAttemptStatus !== "pending" &&
+					(Boolean(analysisError) ||
+						status?.analysisAttemptStatus === "failed" ||
+						status?.analysisStatus === "failed" ||
+						analysis?.status === "failed") &&
+					Boolean(onRetryAnalysis)
+				}
+				analysisError={analysisError}
+				onRetryAnalysis={onRetryAnalysis}
+				isAnalyzing={isAnalyzing}
+				isRetrying={isRetrying}
+			/>
 
-				{streamNotice && (
-					<output className="block text-[11px] leading-relaxed text-fog">
-						{streamNotice}
-					</output>
-				)}
+			{streamNotice && (
+				<output className="block text-[11px] leading-relaxed text-fog">
+					{streamNotice}
+				</output>
+			)}
 
-				{statusError && (
-					<p
-						role="alert"
-						className="rounded-md border border-crimson/30 bg-crimson/10 p-3 text-[11px] text-crimson"
-					>
-						{statusError}
-					</p>
-				)}
+			{statusError && (
+				<p
+					role="alert"
+					className="rounded-md border border-crimson/30 bg-crimson/10 p-3 text-[11px] text-crimson"
+				>
+					{statusError}
+				</p>
+			)}
 
-				{/* Retry belongs here, contextually, instead of on a screen the
+			{/* Retry belongs here, contextually, instead of on a screen the
 				user has to navigate to in order to find it. */}
-				{canRetry && (
+			{canRetry && (
+				<div
+					role="alert"
+					className="rounded-md border border-crimson/30 bg-crimson/10 p-3 text-[11px]"
+				>
+					<div className="flex items-start gap-2.5">
+						<Icon
+							icon={AlertCircleIcon}
+							size={14}
+							className="mt-0.5 shrink-0 text-crimson"
+							aria-hidden="true"
+						/>
+						<span className="flex flex-1 flex-col gap-1">
+							<span className="font-semibold text-snow">
+								Sinkronisasi belum berhasil
+							</span>
+							{stageView.errorMessage && (
+								<span className="leading-relaxed text-fog">
+									{stageView.errorMessage}
+								</span>
+							)}
+							<span className="leading-relaxed text-fog">
+								{stageView.retryHint}
+							</span>
+							<button
+								type="button"
+								onClick={onRetrySync}
+								disabled={isStarting}
+								className="mt-1 inline-flex min-h-8 w-fit items-center rounded border border-iron bg-obsidian px-3 font-sans text-[11px] font-medium text-mist transition hover:bg-steel hover:text-snow disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+							>
+								Coba lagi
+							</button>
+						</span>
+					</div>
+				</div>
+			)}
+			{isLegacyAnalysisMissingSuggestions &&
+				Boolean(onRefreshLegacySuggestions) && (
 					<div
 						role="alert"
-						className="rounded-md border border-crimson/30 bg-crimson/10 p-3 text-[11px]"
+						data-testid="legacy-analysis-warning"
+						className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-[11px]"
 					>
 						<div className="flex items-start gap-2.5">
 							<Icon
 								icon={AlertCircleIcon}
 								size={14}
-								className="mt-0.5 shrink-0 text-crimson"
+								className="mt-0.5 shrink-0 text-amber-400"
 								aria-hidden="true"
 							/>
 							<span className="flex flex-1 flex-col gap-1">
 								<span className="font-semibold text-snow">
-									Sinkronisasi belum berhasil
+									Rekomendasi task awal belum tersedia
 								</span>
-								{stageView.errorMessage && (
-									<span className="leading-relaxed text-fog">
-										{stageView.errorMessage}
+								<span className="leading-relaxed text-fog">
+									Analisis codebase telah selesai tetapi memerlukan pembaruan
+									rekomendasi task awal sebelum dapat dilanjutkan.
+								</span>
+								{analysisError && (
+									<span className="leading-relaxed text-crimson">
+										{analysisError}
 									</span>
 								)}
-								<span className="leading-relaxed text-fog">
-									{stageView.retryHint}
-								</span>
 								<button
 									type="button"
-									onClick={onRetrySync}
-									disabled={isStarting}
+									data-testid="refresh-legacy-suggestions-button"
+									onClick={onRefreshLegacySuggestions}
+									disabled={isStarting || isAnalyzing}
 									className="mt-1 inline-flex min-h-8 w-fit items-center rounded border border-iron bg-obsidian px-3 font-sans text-[11px] font-medium text-mist transition hover:bg-steel hover:text-snow disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 								>
-									Coba lagi
+									Perbarui rekomendasi
 								</button>
 							</span>
 						</div>
 					</div>
 				)}
-				{isLegacyAnalysisMissingSuggestions &&
-					Boolean(onRefreshLegacySuggestions) && (
-						<div
-							role="alert"
-							data-testid="legacy-analysis-warning"
-							className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-[11px]"
-						>
-							<div className="flex items-start gap-2.5">
-								<Icon
-									icon={AlertCircleIcon}
-									size={14}
-									className="mt-0.5 shrink-0 text-amber-400"
-									aria-hidden="true"
-								/>
-								<span className="flex flex-1 flex-col gap-1">
-									<span className="font-semibold text-snow">
-										Rekomendasi task awal belum tersedia
-									</span>
-									<span className="leading-relaxed text-fog">
-										Analisis codebase telah selesai tetapi memerlukan pembaruan
-										rekomendasi task awal sebelum dapat dilanjutkan.
-									</span>
-									{analysisError && (
-										<span className="leading-relaxed text-crimson">
-											{analysisError}
-										</span>
-									)}
-									<button
-										type="button"
-										data-testid="refresh-legacy-suggestions-button"
-										onClick={onRefreshLegacySuggestions}
-										disabled={isStarting || isAnalyzing}
-										className="mt-1 inline-flex min-h-8 w-fit items-center rounded border border-iron bg-obsidian px-3 font-sans text-[11px] font-medium text-mist transition hover:bg-steel hover:text-snow disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-									>
-										Perbarui rekomendasi
-									</button>
-								</span>
-							</div>
-						</div>
-					)}
-			</div>
-		</div>
+		</ScreenConnectStepItem>
 	);
 }

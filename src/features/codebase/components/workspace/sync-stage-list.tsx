@@ -229,7 +229,7 @@ export function SyncStageList({
 				<div
 					data-testid={ANALYSIS_TEST_ID}
 					data-stage-state="failed"
-					className="flex items-start gap-2.5 py-1.5 px-0.5 text-[11px]"
+					className="flex items-start gap-2.5 py-1.5 text-[11px]"
 				>
 					<span className="mt-0.5 shrink-0">
 						<StageIcon state="failed" />
