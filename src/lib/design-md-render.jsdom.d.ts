@@ -1,6 +1,4 @@
-// Minimal ambient types for the jsdom devDependency, which ships no
-// declarations of its own. Only the surface the render suite uses is
-// modelled; the DOM types come from the compiler DOM library.
+// Minimal ambient types for the jsdom devDependency; DOM objects use lib.dom.
 declare module "jsdom" {
 	export interface JSDOMOptions {
 		includeNodeLocations?: boolean;
@@ -10,6 +8,11 @@ declare module "jsdom" {
 	export class JSDOM {
 		constructor(html?: string, options?: JSDOMOptions);
 		readonly window: Window;
-		nodeLocation(node: Node): { startTag?: { endOffset: number } } | null;
+		nodeLocation(node: Node): {
+			startOffset: number;
+			endOffset: number;
+			startTag?: { startOffset: number; endOffset: number };
+			endTag?: { startOffset: number; endOffset: number };
+		} | null;
 	}
 }
