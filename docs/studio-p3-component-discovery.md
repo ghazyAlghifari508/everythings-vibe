@@ -22,7 +22,7 @@ Verified by reading the actual files.
 | `getCanvasDotStyle` | `src/components/task/whiteboard-canvas.tsx` | Dotted canvas surface shared by Studio |
 | `StudioFrameShimmer` | `src/components/design/studio-frame-shimmer.tsx` | The one full-surface pending shimmer; reused unchanged |
 | `shouldSubmitComposerEvent` | `src/components/design/composer-keyboard.ts` | Enter / Shift+Enter / IME contract, shared with the landing composer |
-| `StudioSkillSelect` | `src/components/design/studio-skill-select.tsx` | Skill control reused by the canvas composer and the landing composer |
+| `StudioSkillSelect` | `src/features/studio/components/composer/studio-skill-select.tsx` | Retired in P7 with the whole skill feature; both composers now render only the design reference chip |
 | `STUDIO_*` constants | `src/lib/constants.ts` | Canonical capture width, viewport height, scale factor, zoom bounds, overlay geometry |
 
 ## 2. Third-party libraries evaluated (Step B/C)
