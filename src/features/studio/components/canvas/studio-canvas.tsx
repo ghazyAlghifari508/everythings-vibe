@@ -24,6 +24,7 @@ import {
 import { isCanvasControlTarget } from "@/features/studio/utils/studio-canvas-gesture";
 import { deriveStudioLifecycle } from "@/features/studio/utils/studio-lifecycle";
 import { useCanvasZoom } from "@/hooks/use-canvas-zoom";
+import type { StudioElementTarget } from "../../types/studio-element";
 
 export type {
 	StudioCanvasFitInput,
@@ -50,6 +51,8 @@ export interface StudioCanvasProps {
 	onRefreshStatus?: () => void;
 	retryingFrameIds?: string[];
 	frameRetryErrors?: Record<string, string>;
+	elementTarget?: StudioElementTarget | null;
+	onSelectElement?: (target: StudioElementTarget | null) => void;
 	className?: string;
 }
 
@@ -67,6 +70,8 @@ export const StudioCanvas = memo(function StudioCanvas({
 	onRefreshStatus,
 	retryingFrameIds = [],
 	frameRetryErrors,
+	elementTarget,
+	onSelectElement,
 	className = "",
 }: StudioCanvasProps) {
 	const canvasRef = useRef<HTMLElement>(null);
@@ -106,6 +111,14 @@ export const StudioCanvas = memo(function StudioCanvas({
 	const [spacePan, setSpacePan] = useState(false);
 	const [isPanning, setIsPanning] = useState(false);
 	const panMode = tool === "hand" || spacePan;
+	const inspectFrame = frames.find(
+		(frame) =>
+			frame.id ===
+				(selectedFrameId ??
+					(selectedFrameIds.length === 1 ? selectedFrameIds[0] : null)) &&
+			frame.htmlCode &&
+			frame.status === "ready",
+	);
 
 	const { measureFrame, fitAll } = useStudioCanvasView({
 		projectId: project.id,
@@ -252,6 +265,13 @@ export const StudioCanvas = memo(function StudioCanvas({
 							isRetryPending={retryingFrameIds.includes(frame.id)}
 							retryError={frameRetryErrors?.[frame.id]}
 							isCanvasPanning={panMode}
+							inspectElement={
+								tool === "element" && frame.id === inspectFrame?.id
+							}
+							elementTarget={
+								elementTarget?.frameId === frame.id ? elementTarget : null
+							}
+							onSelectElement={onSelectElement}
 						/>
 					))
 				) : lifecycle.planningFailed ? (
@@ -298,7 +318,11 @@ export const StudioCanvas = memo(function StudioCanvas({
 				className="pointer-events-none absolute z-10 rounded-sm border border-blue-600/70 bg-blue-600/10"
 			/>
 
-			<StudioCanvasToolPalette tool={tool} onSelectTool={selectTool} />
+			<StudioCanvasToolPalette
+				tool={tool}
+				onSelectTool={selectTool}
+				canSelectElement={Boolean(inspectFrame && onSelectElement)}
+			/>
 
 			<StudioCanvasZoomCorner
 				zoom={zoom}

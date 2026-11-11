@@ -9,6 +9,8 @@ import { useStudioChatDraft } from "@/features/studio/hooks/use-studio-chat-draf
 import { useStudioChatPanel } from "@/features/studio/hooks/use-studio-chat-panel";
 import { useStudioWorkspace } from "@/features/studio/hooks/use-studio-workspace";
 import type { StudioDetailLoaderData } from "@/features/studio/types/studio";
+import { useStudioElementEditing } from "../../hooks/use-studio-element-editing";
+import { StudioElementPreview } from "./studio-element-preview";
 
 export function StudioWorkspace({
 	initialData,
@@ -17,6 +19,14 @@ export function StudioWorkspace({
 }) {
 	const workspace = useStudioWorkspace(initialData);
 	const chat = useStudioChatPanel();
+	const elementEditing = useStudioElementEditing({
+		projectId: workspace.project.id,
+		userId: workspace.project.userId,
+		frames: workspace.frames,
+		selectedFrameIds: workspace.selectedFrameIds,
+		setError: workspace.setError,
+		syncProjectStatus: workspace.syncProjectStatus,
+	});
 	const draft = useStudioChatDraft(
 		`studio-chat-draft:${workspace.project.userId}:${workspace.project.id}`,
 	);
@@ -43,6 +53,7 @@ export function StudioWorkspace({
 					desktop={chat.desktop}
 					open={chat.open}
 					onOpenChange={chat.setOpen}
+					elementEditing={elementEditing}
 					draft={draft}
 				/>
 				<div className="relative min-w-0 flex-1 overflow-hidden">
@@ -51,6 +62,13 @@ export function StudioWorkspace({
 						frames={workspace.frames}
 						activeJob={workspace.activeJob}
 						selectedFrameId={workspace.selectedFrameId}
+						elementTarget={elementEditing.target}
+						onSelectElement={(target) => {
+							if (target) {
+								elementEditing.selectTarget(target);
+								chat.setOpen(true);
+							} else elementEditing.clearTarget();
+						}}
 						selectedFrameIds={workspace.selectedFrameIds}
 						onSelectFrame={workspace.selectFrame}
 						onSelectFrames={workspace.selectFrames}
@@ -68,6 +86,15 @@ export function StudioWorkspace({
 					/>
 				</div>
 			</div>
+			<StudioElementPreview
+				editing={elementEditing}
+				projectId={workspace.project.id}
+				viewport={
+					workspace.frames.find(
+						(frame) => frame.id === elementEditing.preview?.frameId,
+					)?.viewport ?? workspace.project.designMode
+				}
+			/>
 
 			{workspace.error && !chat.open && (
 				<div

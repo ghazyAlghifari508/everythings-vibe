@@ -64,6 +64,7 @@ export interface StudioWorkspaceState {
 	handleRetryFrame: (frameId: string) => Promise<void>;
 	handleRetryPlanning: () => Promise<void>;
 	handleDownloadAllZip: () => Promise<void>;
+	syncProjectStatus: () => Promise<void>;
 }
 
 export function useStudioWorkspace(
@@ -288,5 +289,6 @@ export function useStudioWorkspace(
 		handleRetryFrame: actions.handleRetryFrame,
 		handleRetryPlanning: planningRetry.handleRetryPlanning,
 		handleDownloadAllZip: actions.handleDownloadAllZip,
+		syncProjectStatus,
 	};
 }

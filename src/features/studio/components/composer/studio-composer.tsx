@@ -18,6 +18,7 @@ import { STUDIO_DESIGN_PRESETS } from "@/features/studio/services/studio-presets
 import { STUDIO_MIN_PROMPT_CHARS } from "@/features/studio/services/studio-prompt-validation";
 import type { StudioScreenSuggestion } from "@/features/studio/services/studio-screen-suggestions";
 import { shouldSubmitComposerEvent } from "@/features/studio/utils/composer-keyboard";
+import type { StudioElementTarget } from "../../types/studio-element";
 import { filterValidHexColors, StudioPaletteDisk } from "./studio-palette-disk";
 import { StudioSuggestionRow } from "./studio-suggestion-row";
 
@@ -47,6 +48,8 @@ export interface StudioComposerProps {
 	referenceColors?: readonly string[] | null;
 	/** Next-screen cards derived from the project's own structure. */
 	suggestions?: readonly StudioScreenSuggestion[];
+	elementTarget?: StudioElementTarget | null;
+	onRemoveElement?: () => void;
 }
 
 export function StudioComposer({
@@ -61,6 +64,8 @@ export function StudioComposer({
 	referenceLabel,
 	referenceColors,
 	suggestions = [],
+	elementTarget,
+	onRemoveElement,
 }: StudioComposerProps) {
 	const [localPrompt, setLocalPrompt] = useState("");
 	const prompt = value ?? localPrompt;
@@ -71,6 +76,17 @@ export function StudioComposer({
 	const inputRef = useRef<HTMLTextAreaElement>(null);
 	const pending = useRef(false);
 	const singleFrame = selectedFrames.length === 1 ? selectedFrames[0] : null;
+	const targetFrame = selectedFrames.find(
+		(frame) => frame.id === elementTarget?.frameId,
+	);
+	const composerTargets = elementTarget
+		? [
+				{
+					id: elementTarget.frameId,
+					name: `${targetFrame?.name ?? "Layar"} / ${elementTarget.label}`,
+				},
+			]
+		: selectedFrames;
 
 	const resolvedColors = useMemo(() => {
 		if (referenceColors && referenceColors.length > 0) {
@@ -144,7 +160,7 @@ export function StudioComposer({
 			onPointerDown={(event) => event.stopPropagation()}
 			onWheel={(event) => event.stopPropagation()}
 		>
-			{suggestions.length > 0 ? (
+			{!elementTarget && suggestions.length > 0 ? (
 				<StudioSuggestionRow
 					suggestions={suggestions}
 					disabled={loading || sending}
@@ -155,18 +171,20 @@ export function StudioComposer({
 				onSubmit={handleSubmit}
 				className="flex flex-col gap-3 rounded-xl border border-iron bg-obsidian p-3 text-snow focus-within:border-snow"
 			>
-				{selectedFrames.length > 0 ? (
+				{composerTargets.length > 0 ? (
 					<div className="flex flex-wrap items-center gap-2">
 						<span className="text-xs text-fog">
-							{singleFrame
-								? `Editing: ${singleFrame.name}`
-								: `Merevisi ${selectedFrames.length} layar terpilih`}
+							{elementTarget
+								? "Elemen terpilih"
+								: singleFrame
+									? `Editing: ${singleFrame.name}`
+									: `Merevisi ${selectedFrames.length} layar terpilih`}
 						</span>
 						<ul
 							aria-label="Target revisi"
 							className="flex max-h-24 min-w-0 flex-wrap items-center gap-1.5 overflow-y-auto"
 						>
-							{selectedFrames.map((frame) => (
+							{composerTargets.map((frame) => (
 								<li
 									key={frame.id}
 									className="inline-flex max-w-full items-center gap-1 rounded-md border border-iron py-0.5 pr-0.5 pl-2 text-xs text-snow"
@@ -178,8 +196,12 @@ export function StudioComposer({
 										<Tooltip.Trigger<"button">
 											render={(props) => <button {...props} type="button" />}
 											aria-label={`Lepas ${frame.name}`}
-											onClick={() => onRemoveFrame?.(frame.id)}
-											className="flex size-9 shrink-0 items-center justify-center rounded text-mist hover:bg-steel hover:text-snow focus-visible:outline-2 focus-visible:outline-snow lg:size-8"
+											onClick={() =>
+												elementTarget
+													? onRemoveElement?.()
+													: onRemoveFrame?.(frame.id)
+											}
+											className="flex size-11 shrink-0 items-center justify-center rounded text-mist hover:bg-steel hover:text-snow focus-visible:outline-2 focus-visible:outline-snow"
 										>
 											<Icon icon={Cancel01Icon} size={14} aria-hidden="true" />
 										</Tooltip.Trigger>
@@ -190,7 +212,7 @@ export function StudioComposer({
 								</li>
 							))}
 						</ul>
-						{selectedFrames.length > 1 && onClearFrames ? (
+						{!elementTarget && selectedFrames.length > 1 && onClearFrames ? (
 							<button
 								type="button"
 								onClick={onClearFrames}
@@ -240,11 +262,13 @@ export function StudioComposer({
 							}
 						}}
 						placeholder={
-							singleFrame
-								? `Minta perubahan khusus untuk layar ${singleFrame.name}...`
-								: selectedFrames.length > 1
-									? `Minta perubahan untuk ${selectedFrames.length} layar terpilih...`
-									: "Minta revisi, atau sebutkan halaman baru yang ingin dibuat..."
+							elementTarget
+								? `Minta perubahan hanya pada ${elementTarget.label}...`
+								: singleFrame
+									? `Minta perubahan khusus untuk layar ${singleFrame.name}...`
+									: selectedFrames.length > 1
+										? `Minta perubahan untuk ${selectedFrames.length} layar terpilih...`
+										: "Minta revisi, atau sebutkan halaman baru yang ingin dibuat..."
 						}
 						className="field-sizing-content max-h-40 min-h-12 min-w-0 flex-1 resize-none rounded-md border-0 bg-transparent px-1 text-sm leading-6 text-snow placeholder:text-fog focus-visible:outline-2 focus-visible:outline-snow"
 					/>

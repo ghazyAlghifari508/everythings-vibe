@@ -2,6 +2,7 @@ import {
 	AlertCircleIcon,
 	Cursor01Icon,
 	HandIcon,
+	Search01Icon,
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/ui/icon";
 import { ZoomControls } from "@/components/ui/zoom-controls";
@@ -10,11 +11,12 @@ import { StudioFrameRetryButton } from "@/features/studio/components/canvas/stud
 import { resolveStudioQueueHealth } from "@/features/studio/types/studio-status";
 import { canvasZoomRowBottomCss } from "@/features/studio/utils/studio-canvas-layout";
 
-export type StudioCanvasTool = "select" | "hand";
+export type StudioCanvasTool = "select" | "hand" | "element";
 
 interface StudioCanvasToolPaletteProps {
 	tool: StudioCanvasTool;
 	onSelectTool: (tool: StudioCanvasTool) => void;
+	canSelectElement?: boolean;
 }
 
 /**
@@ -25,6 +27,7 @@ interface StudioCanvasToolPaletteProps {
 export function StudioCanvasToolPalette({
 	tool,
 	onSelectTool,
+	canSelectElement = false,
 }: StudioCanvasToolPaletteProps) {
 	return (
 		<div
@@ -50,6 +53,17 @@ export function StudioCanvasToolPalette({
 				className={`flex size-10 items-center justify-center rounded-md text-snow focus-visible:outline-2 focus-visible:outline-snow ${tool === "hand" ? "bg-steel" : "hover:bg-steel"}`}
 			>
 				<Icon icon={HandIcon} size={18} />
+			</button>
+			<button
+				type="button"
+				title="Pilih elemen pada satu frame"
+				aria-label="Pilih elemen"
+				aria-pressed={tool === "element"}
+				disabled={!canSelectElement}
+				onClick={() => onSelectTool("element")}
+				className={`flex size-11 items-center justify-center rounded-md text-snow focus-visible:outline-2 focus-visible:outline-snow disabled:opacity-40 ${tool === "element" ? "bg-steel" : "hover:bg-steel"}`}
+			>
+				<Icon icon={Search01Icon} size={18} />
 			</button>
 		</div>
 	);

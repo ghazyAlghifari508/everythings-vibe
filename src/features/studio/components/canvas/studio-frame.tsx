@@ -17,6 +17,8 @@ import { STUDIO_VISUAL_WIDTH } from "@/features/studio/types/studio-constants";
 import { extractCleanHtml } from "@/features/studio/utils/clean-html";
 import { resolveFrameArtboardMode } from "@/features/studio/utils/studio-frame-artboard";
 import { resolveStudioFrameStatus } from "@/features/studio/utils/studio-lifecycle";
+import type { StudioElementTarget } from "../../types/studio-element";
+import { StudioElementSurface } from "./studio-element-surface";
 
 export type { StudioFrameArtboardMode } from "@/features/studio/utils/studio-frame-artboard";
 export {
@@ -39,6 +41,9 @@ export interface StudioFrameProps {
 	isCanvasPanning?: boolean;
 	className?: string;
 	onMeasure?: (id: string, width: number, height: number) => void;
+	inspectElement?: boolean;
+	elementTarget?: StudioElementTarget | null;
+	onSelectElement?: (target: StudioElementTarget | null) => void;
 }
 
 function frameStatusMessage(status: string, retryError?: string): string {
@@ -75,6 +80,9 @@ export const StudioFrame = memo(function StudioFrame({
 	isCanvasPanning = false,
 	className = "",
 	onMeasure,
+	inspectElement = false,
+	elementTarget,
+	onSelectElement,
 }: StudioFrameProps) {
 	const visibleUrl = useRef<string | null>(null);
 	const status = resolveStudioFrameStatus(frame, job);
@@ -163,7 +171,17 @@ export const StudioFrame = memo(function StudioFrame({
 				} bg-obsidian`}
 				style={{ width: visual?.width ?? frameWidth, height: frameHeight }}
 			>
-				{showsPreview && visual ? (
+				{inspectElement ? (
+					<StudioElementSurface
+						projectId={frame.projectId}
+						frameId={frame.id}
+						baseRevision={frame.revision}
+						name={frame.name}
+						target={elementTarget}
+						onSelect={onSelectElement}
+						suspended={isCanvasPanning}
+					/>
+				) : showsPreview && visual ? (
 					<button
 						type="button"
 						data-canvas-gesture-surface=""
