@@ -4,335 +4,191 @@ interface StudioThemeDashboardPreviewProps {
 	tokens: StudioThemeTokens;
 }
 
+const SKELETON_LINES = ["w-1/2", "w-3/4", "w-2/3"] as const;
+const RAIL_ITEMS = ["w-2/3", "w-3/4", "w-1/2"] as const;
+
 /**
- * Unified abstract UI silhouette: identical geometry and content hierarchy across all presets.
- * Only semantic tokens (colors, font, border radius) vary between themes.
- * Eliminates fake dashboard copy, micro-text, and simulated metrics.
+ * Abstract layout silhouette shared by every preset: header, rail and a
+ * two-column content region. Only semantic tokens (surface, ink, border,
+ * accent, radius) change per theme, so the cards stay comparable and carry no
+ * fake dashboard copy, metrics or micro-text.
  */
 export function StudioThemeDashboardPreview({
 	tokens,
 }: StudioThemeDashboardPreviewProps) {
-	const radiusNum = Number.parseInt(tokens.radius, 10) || 8;
-	const scaledRadius = `${Math.max(2, Math.round(radiusNum * 0.4))}px`;
-	const miniRadius = `${Math.max(1, Math.round(radiusNum * 0.25))}px`;
+	const radius = Number.parseInt(tokens.radius, 10) || 8;
+	const cardRadius = `${Math.max(2, Math.round(radius * 0.5))}px`;
+	const barRadius = `${Math.max(1, Math.round(radius * 0.3))}px`;
 
 	return (
 		<div
-			className="relative aspect-[16/10] w-full overflow-hidden select-none border flex flex-col text-left"
+			className="flex aspect-[16/10] w-full flex-col overflow-hidden border text-left select-none"
 			style={{
 				backgroundColor: tokens.canvas,
 				borderColor: tokens.border,
 				fontFamily: tokens.fontFamily,
-				borderRadius: scaledRadius,
+				borderRadius: cardRadius,
 			}}
 			aria-hidden="true"
 		>
-			{/* Top Header silhouette: [■] [=========] ... [===] [○] */}
 			<div
-				className="flex h-6 sm:h-7 items-center justify-between border-b px-2 shrink-0"
-				style={{
-					backgroundColor: tokens.surface,
-					borderColor: tokens.border,
-				}}
+				className="flex h-1/5 shrink-0 items-center gap-1.5 border-b px-2"
+				style={{ backgroundColor: tokens.surface, borderColor: tokens.border }}
 			>
-				<div className="flex items-center gap-1.5">
-					{/* Logo block [■] */}
-					<span
-						className="size-3 sm:size-3.5 shrink-0 block"
-						style={{
-							backgroundColor: tokens.primary,
-							borderRadius: miniRadius,
-						}}
-					/>
-					{/* Header bar silhouette [=========] */}
-					<span
-						className="h-2 w-16 sm:w-20 block opacity-85"
-						style={{
-							backgroundColor: tokens.ink,
-							borderRadius: miniRadius,
-						}}
-					/>
-				</div>
-
-				<div className="flex items-center gap-1.5">
-					{/* Search/input silhouette */}
-					<span
-						className="h-3 sm:h-3.5 w-12 sm:w-16 border block"
-						style={{
-							backgroundColor: tokens.inputBg,
-							borderColor: tokens.border,
-							borderRadius: miniRadius,
-						}}
-					/>
-					{/* Avatar silhouette [○] */}
-					<span
-						className="size-3.5 sm:size-4 rounded-full border shrink-0 block"
-						style={{
-							backgroundColor: tokens.secondary,
-							borderColor: tokens.border,
-						}}
-					/>
-				</div>
+				<span
+					className="size-2 shrink-0"
+					style={{ backgroundColor: tokens.primary, borderRadius: barRadius }}
+				/>
+				<span
+					className="h-1.5 w-1/3"
+					style={{ backgroundColor: tokens.ink, borderRadius: barRadius }}
+				/>
+				<span
+					className="ml-auto h-2 w-1/5 border"
+					style={{
+						backgroundColor: tokens.inputBg,
+						borderColor: tokens.border,
+						borderRadius: barRadius,
+					}}
+				/>
 			</div>
 
-			{/* Main body: Sidebar + Content Region */}
-			<div className="flex flex-1 min-h-0 overflow-hidden">
-				{/* Sidebar silhouette */}
+			<div className="flex min-h-0 flex-1">
 				<div
-					className="w-14 sm:w-16 border-r flex flex-col justify-between p-1.5 shrink-0"
+					className="flex w-1/5 shrink-0 flex-col gap-1.5 border-r p-1.5"
 					style={{
 						backgroundColor: tokens.surface,
 						borderColor: tokens.border,
 					}}
 				>
-					{/* Navigation items silhouette */}
-					<div className="flex flex-col gap-1">
-						{/* Active item */}
-						<div
-							className="flex items-center gap-1 px-1 py-1 border"
-							style={{
-								backgroundColor: tokens.active,
-								borderColor: tokens.border,
-								borderRadius: miniRadius,
-							}}
-						>
-							<span
-								className="size-1 rounded-full shrink-0"
-								style={{ backgroundColor: tokens.primary }}
-							/>
-							<span
-								className="h-1.5 w-7 sm:w-8 block"
-								style={{
-									backgroundColor: tokens.primary,
-									borderRadius: miniRadius,
-								}}
-							/>
-						</div>
-						{/* Inactive item 1 */}
-						<div className="flex items-center gap-1 px-1 py-0.5">
-							<span
-								className="size-1 rounded-full shrink-0 opacity-40"
-								style={{ backgroundColor: tokens.muted }}
-							/>
-							<span
-								className="h-1.5 w-8 sm:w-9 block opacity-40"
-								style={{
-									backgroundColor: tokens.muted,
-									borderRadius: miniRadius,
-								}}
-							/>
-						</div>
-						{/* Inactive item 2 */}
-						<div className="flex items-center gap-1 px-1 py-0.5">
-							<span
-								className="size-1 rounded-full shrink-0 opacity-40"
-								style={{ backgroundColor: tokens.muted }}
-							/>
-							<span
-								className="h-1.5 w-6 sm:w-7 block opacity-40"
-								style={{
-									backgroundColor: tokens.muted,
-									borderRadius: miniRadius,
-								}}
-							/>
-						</div>
-					</div>
-
-					{/* Bottom sidebar item */}
-					<div className="flex items-center gap-1 px-1 py-0.5">
+					{RAIL_ITEMS.map((width, index) => (
 						<span
-							className="size-1 rounded-full shrink-0 opacity-30"
-							style={{ backgroundColor: tokens.muted }}
-						/>
-						<span
-							className="h-1.5 w-5 sm:w-6 block opacity-30"
+							key={width}
+							className={`h-1.5 ${width}`}
 							style={{
-								backgroundColor: tokens.muted,
-								borderRadius: miniRadius,
+								backgroundColor: index === 0 ? tokens.primary : tokens.muted,
+								borderRadius: barRadius,
+								opacity: index === 0 ? 1 : 0.5,
 							}}
 						/>
-					</div>
+					))}
+					<span
+						className="mt-auto h-1.5 w-1/2"
+						style={{
+							backgroundColor: tokens.muted,
+							borderRadius: barRadius,
+							opacity: 0.35,
+						}}
+					/>
 				</div>
 
-				{/* Content region */}
 				<div
-					className="flex flex-1 flex-col justify-between p-1.5 sm:p-2 overflow-hidden gap-1.5"
+					className="flex min-w-0 flex-1 flex-col gap-1.5 p-2"
 					style={{ backgroundColor: tokens.canvas }}
 				>
-					{/* Top row: 2 panel silhouettes */}
-					<div className="grid grid-cols-2 gap-1.5 shrink-0">
-						{/* Panel 1 */}
+					<div className="flex flex-col gap-1">
+						{SKELETON_LINES.map((width, index) => (
+							<span
+								key={width}
+								className={`h-1.5 ${width}`}
+								style={{
+									backgroundColor: index === 0 ? tokens.ink : tokens.muted,
+									borderRadius: barRadius,
+									opacity: index === 0 ? 1 : 0.45,
+								}}
+							/>
+						))}
+					</div>
+
+					<div className="grid min-h-0 flex-1 grid-cols-2 gap-1.5">
 						<div
-							className="flex flex-col justify-between p-1.5 border"
+							className="flex flex-col justify-between border p-1.5"
 							style={{
 								backgroundColor: tokens.surface,
 								borderColor: tokens.border,
-								borderRadius: scaledRadius,
+								borderRadius: cardRadius,
 							}}
 						>
 							<span
-								className="h-1.5 w-10 block opacity-50"
+								className="h-1.5 w-2/3"
 								style={{
 									backgroundColor: tokens.muted,
-									borderRadius: miniRadius,
+									borderRadius: barRadius,
+									opacity: 0.5,
 								}}
 							/>
-							<div className="flex items-center justify-between mt-1">
-								<span
-									className="h-2.5 sm:h-3 w-12 sm:w-14 block"
-									style={{
-										backgroundColor: tokens.ink,
-										borderRadius: miniRadius,
-									}}
-								/>
-								<span
-									className="h-2 w-5 sm:w-6 block"
-									style={{
-										backgroundColor: tokens.active,
-										borderRadius: miniRadius,
-									}}
-								/>
-							</div>
+							<span
+								className="h-2.5 w-1/2"
+								style={{
+									backgroundColor: tokens.ink,
+									borderRadius: barRadius,
+								}}
+							/>
 						</div>
-
-						{/* Panel 2 */}
 						<div
-							className="flex flex-col justify-between p-1.5 border"
+							className="flex flex-col justify-between border p-1.5"
 							style={{
 								backgroundColor: tokens.surface,
 								borderColor: tokens.border,
-								borderRadius: scaledRadius,
+								borderRadius: cardRadius,
 							}}
 						>
 							<span
-								className="h-1.5 w-9 block opacity-50"
+								className="h-1.5 w-1/2"
 								style={{
 									backgroundColor: tokens.muted,
-									borderRadius: miniRadius,
+									borderRadius: barRadius,
+									opacity: 0.5,
 								}}
 							/>
-							<div className="flex items-center justify-between mt-1">
-								<span
-									className="h-2.5 sm:h-3 w-10 sm:w-12 block"
-									style={{
-										backgroundColor: tokens.ink,
-										borderRadius: miniRadius,
-									}}
-								/>
-								<span
-									className="h-2 w-4 sm:w-5 block"
-									style={{
-										backgroundColor: tokens.secondary,
-										borderRadius: miniRadius,
-									}}
-								/>
-							</div>
+							<span
+								className="h-2.5 w-2/3"
+								style={{
+									backgroundColor: tokens.secondary,
+									borderRadius: barRadius,
+								}}
+							/>
 						</div>
 					</div>
 
-					{/* Middle row: Chart / graphic placeholder panel */}
 					<div
-						className="flex flex-col p-1.5 border min-h-0 flex-1 justify-between"
+						className="flex h-1/4 shrink-0 items-end gap-1.5 border p-1.5"
 						style={{
 							backgroundColor: tokens.surface,
 							borderColor: tokens.border,
-							borderRadius: scaledRadius,
+							borderRadius: cardRadius,
 						}}
 					>
-						<div className="flex items-center justify-between pb-1">
-							<span
-								className="h-1.5 w-14 sm:w-16 block opacity-60"
-								style={{
-									backgroundColor: tokens.muted,
-									borderRadius: miniRadius,
-								}}
-							/>
-							<span
-								className="size-1 rounded-full shrink-0"
-								style={{ backgroundColor: tokens.primary }}
-							/>
-						</div>
-						<div className="h-5 sm:h-6 w-full flex items-end">
-							<svg
-								viewBox="0 0 100 24"
-								className="w-full h-full overflow-visible"
-								preserveAspectRatio="none"
-								aria-hidden="true"
-							>
-								<title>Placeholder grafik siluet</title>
-								<path
-									d="M0,20 L12,15 L25,18 L38,10 L52,13 L66,6 L80,9 L92,3 L100,2 L100,24 L0,24 Z"
-									fill={tokens.primary}
-									fillOpacity="0.12"
-								/>
-								<path
-									d="M0,20 L12,15 L25,18 L38,10 L52,13 L66,6 L80,9 L92,3 L100,2"
-									fill="none"
-									stroke={tokens.primary}
-									strokeWidth="1.75"
-									strokeLinecap="round"
-									strokeLinejoin="round"
-								/>
-							</svg>
-						</div>
-					</div>
-
-					{/* Bottom row: Abstract data rows */}
-					<div
-						className="flex flex-col p-1.5 border shrink-0 gap-1"
-						style={{
-							backgroundColor: tokens.surface,
-							borderColor: tokens.border,
-							borderRadius: scaledRadius,
-						}}
-					>
-						{/* Data row 1 */}
-						<div className="flex items-center justify-between gap-1.5">
-							<div className="flex items-center gap-1.5 flex-1 min-w-0">
-								<span
-									className="size-1 rounded-full shrink-0"
-									style={{ backgroundColor: tokens.primary }}
-								/>
-								<span
-									className="h-1.5 flex-1 max-w-24 block opacity-75"
-									style={{
-										backgroundColor: tokens.ink,
-										borderRadius: miniRadius,
-									}}
-								/>
-							</div>
-							<span
-								className="h-1.5 w-6 sm:w-8 block"
-								style={{
-									backgroundColor: tokens.active,
-									borderRadius: miniRadius,
-								}}
-							/>
-						</div>
-
-						{/* Data row 2 */}
-						<div className="flex items-center justify-between gap-1.5">
-							<div className="flex items-center gap-1.5 flex-1 min-w-0">
-								<span
-									className="size-1 rounded-full shrink-0 opacity-40"
-									style={{ backgroundColor: tokens.muted }}
-								/>
-								<span
-									className="h-1.5 flex-1 max-w-20 block opacity-40"
-									style={{
-										backgroundColor: tokens.muted,
-										borderRadius: miniRadius,
-									}}
-								/>
-							</div>
-							<span
-								className="h-1.5 w-4 sm:w-5 block opacity-40"
-								style={{
-									backgroundColor: tokens.muted,
-									borderRadius: miniRadius,
-								}}
-							/>
-						</div>
+						<span
+							className="h-1/2 w-1/4"
+							style={{
+								backgroundColor: tokens.primary,
+								borderRadius: barRadius,
+							}}
+						/>
+						<span
+							className="h-3/4 w-1/4"
+							style={{
+								backgroundColor: tokens.primary,
+								borderRadius: barRadius,
+								opacity: 0.7,
+							}}
+						/>
+						<span
+							className="h-full w-1/4"
+							style={{
+								backgroundColor: tokens.active,
+								borderRadius: barRadius,
+							}}
+						/>
+						<span
+							className="h-1/3 w-1/4"
+							style={{
+								backgroundColor: tokens.muted,
+								borderRadius: barRadius,
+								opacity: 0.4,
+							}}
+						/>
 					</div>
 				</div>
 			</div>

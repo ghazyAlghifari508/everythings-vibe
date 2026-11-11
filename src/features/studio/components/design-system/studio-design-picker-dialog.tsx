@@ -100,6 +100,17 @@ export function StudioDesignPickerDialog({
 	const customTokens = custom.mdText
 		? extractDesignSystemTokens(custom.mdText)
 		: null;
+	// Applied reference vs. draft: apply only makes sense when the draft names
+	// a theme that is not already applied.
+	const draftIntent = draftThemeState.status;
+	const canApply =
+		tab === "tema" &&
+		activeThemeId !== null &&
+		activeThemeId !== selectedThemeId;
+	const canCancel =
+		tab === "tema" &&
+		(draftIntent === "selected" ||
+			(draftIntent === "cleared" && selectedThemeId !== null));
 	const customValid =
 		custom.mdName !== null &&
 		custom.mdError === null &&
@@ -149,7 +160,7 @@ export function StudioDesignPickerDialog({
 	}
 
 	function handleApplyTheme() {
-		if (!activeThemeId) return;
+		if (!activeThemeId || activeThemeId === selectedThemeId) return;
 		const md = getStudioPresetDesignMd(activeThemeId);
 		if (!md) return;
 		onSelectTheme(activeThemeId);
@@ -283,30 +294,20 @@ export function StudioDesignPickerDialog({
 							</div>
 							<div className="flex items-center justify-end gap-2">
 								{tab === "tema" ? (
-									!selectedThemeId && !activeThemeId ? (
+									<>
 										<Button
 											type="button"
 											variant="secondary"
 											onClick={handleCancel}
 										>
-											Tutup
+											{canCancel ? "Batal" : "Tutup"}
 										</Button>
-									) : (
-										<>
-											<Button
-												type="button"
-												variant="secondary"
-												onClick={handleCancel}
-											>
-												Batal
+										{canApply ? (
+											<Button type="button" onClick={handleApplyTheme}>
+												Terapkan Tema
 											</Button>
-											{activeThemeId ? (
-												<Button type="button" onClick={handleApplyTheme}>
-													Terapkan Tema
-												</Button>
-											) : null}
-										</>
-									)
+										) : null}
+									</>
 								) : null}
 								{tab === "template" ? (
 									<Button

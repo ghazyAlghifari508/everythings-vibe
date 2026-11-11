@@ -24,6 +24,14 @@ export function StudioDesignThemePanel({
 			null)
 		: null;
 
+	const statusCopy = !activePreset
+		? activeThemeId === null
+			? "Tidak ada tema terpilih."
+			: null
+		: activePreset.id !== appliedPreset?.id
+			? `${activePreset.name} dipilih`
+			: null;
+
 	return (
 		<div role="tabpanel" aria-label="Tema" className="flex flex-col gap-3">
 			{appliedPreset ? (
@@ -48,15 +56,6 @@ export function StudioDesignThemePanel({
 						>
 							<StudioThemeDashboardPreview tokens={preset.tokens} />
 							<span className="flex items-center gap-1.5">
-								<span className="flex gap-1" aria-hidden>
-									{preset.colors.map((color) => (
-										<span
-											key={color}
-											className="size-3.5 rounded-full border border-white/20"
-											style={{ backgroundColor: color }}
-										/>
-									))}
-								</span>
 								<span className="text-sm font-semibold text-snow">
 									{preset.name}
 								</span>
@@ -76,13 +75,7 @@ export function StudioDesignThemePanel({
 					);
 				})}
 			</div>
-			<p className="text-xs text-fog">
-				{activePreset
-					? activePreset.id !== appliedPreset?.id
-						? `${activePreset.name} dipilih`
-						: null
-					: "Tidak ada tema terpilih."}
-			</p>
+			{statusCopy ? <p className="text-xs text-fog">{statusCopy}</p> : null}
 		</div>
 	);
 }
