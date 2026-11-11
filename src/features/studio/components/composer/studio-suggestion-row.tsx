@@ -126,7 +126,7 @@ export function StudioSuggestionRow({
 	if (suggestions.length === 0) return null;
 
 	const arrowClass =
-		"inline-flex size-6 shrink-0 items-center justify-center rounded-full border border-iron bg-obsidian text-fog transition-colors hover:border-snow hover:text-snow focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-snow disabled:cursor-not-allowed disabled:opacity-30";
+		"inline-flex size-11 shrink-0 items-center justify-center rounded-md border border-iron bg-obsidian text-fog transition-colors hover:border-snow hover:text-snow focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-snow disabled:cursor-not-allowed disabled:opacity-30 lg:size-6";
 	const scrollable = canPrev || canNext;
 
 	return (
@@ -169,7 +169,7 @@ export function StudioSuggestionRow({
 									onKeyDown={moveFocus}
 									title={suggestion.prompt}
 									aria-label={suggestion.title}
-									className="group inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-iron bg-obsidian px-3 text-xs text-mist transition-all duration-150 hover:border-snow hover:bg-steel/30 hover:text-snow focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-snow active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+									className="group inline-flex h-11 shrink-0 items-center gap-1.5 rounded-md border border-iron bg-obsidian px-3 text-xs text-mist transition-colors hover:border-snow hover:bg-steel/30 hover:text-snow focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-snow disabled:cursor-not-allowed disabled:opacity-40 lg:h-8"
 								>
 									<Icon
 										icon={Add01Icon}

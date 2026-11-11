@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { z } from "zod";
 import type {
 	StudioFrameRow,
 	StudioJobRow,
+	StudioMessageRow,
 	StudioProjectRow,
 } from "@/db/schema";
 import type { StudioComposerSubmitResult } from "@/features/studio/components/composer/studio-composer";
@@ -9,6 +11,10 @@ import { useStudioPlanningRetry } from "@/features/studio/hooks/use-studio-plann
 import { useStudioScreenSuggestions } from "@/features/studio/hooks/use-studio-screen-suggestions";
 import { useStudioStatus } from "@/features/studio/hooks/use-studio-status";
 import { useStudioWorkspaceActions } from "@/features/studio/hooks/use-studio-workspace-actions";
+import {
+	readStudioChatStorage,
+	writeStudioChatStorage,
+} from "@/features/studio/services/studio-chat-storage";
 import { extractDesignSystemTokens } from "@/features/studio/services/studio-design-tokens";
 import { STUDIO_DESIGN_PRESETS } from "@/features/studio/services/studio-presets";
 import type { StudioScreenSuggestion } from "@/features/studio/services/studio-screen-suggestions";
@@ -16,11 +22,13 @@ import type { StudioDetailLoaderData } from "@/features/studio/types/studio";
 import { deriveStudioLifecycle } from "@/features/studio/utils/studio-lifecycle";
 
 const NO_SUGGESTIONS: readonly StudioScreenSuggestion[] = [];
+const selectedFrameIdsSchema = z.array(z.string().min(1));
 
 export interface StudioWorkspaceState {
 	project: StudioProjectRow;
 	frames: StudioFrameRow[];
 	activeJob: StudioJobRow | null;
+	messages: StudioMessageRow[];
 	selectedFrameId: string | null;
 	selectedFrameIds: string[];
 	selectedFrames: StudioFrameRow[];
@@ -63,6 +71,7 @@ export function useStudioWorkspace(
 		project,
 		frames,
 		activeJob,
+		messages,
 		isProcessing,
 		syncProjectStatus,
 		error: syncError,
@@ -89,6 +98,26 @@ export function useStudioWorkspace(
 		loader.current = initialData;
 		setActionError("");
 	}, [initialData]);
+
+	const selectionKey = `studio-chat-selection:${project.userId}:${project.id}`;
+	const [loadedSelectionKey, setLoadedSelectionKey] = useState("");
+	useEffect(() => {
+		let stored: unknown = [];
+		try {
+			stored = JSON.parse(readStudioChatStorage(selectionKey) ?? "[]");
+		} catch {
+			stored = [];
+		}
+		const parsed = selectedFrameIdsSchema.safeParse(stored);
+		const ids = parsed.success ? [...new Set(parsed.data)] : [];
+		setSelectedFrameIds(ids);
+		setSelectedFrameId(ids.length === 1 ? ids[0] : null);
+		setLoadedSelectionKey(selectionKey);
+	}, [selectionKey]);
+	useEffect(() => {
+		if (loadedSelectionKey === selectionKey)
+			writeStudioChatStorage(selectionKey, JSON.stringify(selectedFrameIds));
+	}, [loadedSelectionKey, selectionKey, selectedFrameIds]);
 
 	const selectFrame = useCallback((id: string | null, additive = false) => {
 		setSelectedFrameIds((previous) =>
@@ -198,6 +227,7 @@ export function useStudioWorkspace(
 		project,
 		frames,
 		activeJob,
+		messages: messages ?? [],
 		selectedFrameId,
 		selectedFrameIds,
 		selectedFrames,

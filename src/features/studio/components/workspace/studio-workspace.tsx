@@ -3,30 +3,29 @@
 import { AlertCircleIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/ui/icon";
 import { StudioCanvas } from "@/features/studio/components/canvas/studio-canvas";
-import { StudioComposer } from "@/features/studio/components/composer/studio-composer";
+import { StudioChatPanel } from "@/features/studio/components/workspace/studio-chat-panel";
 import { StudioHeader } from "@/features/studio/components/workspace/studio-header";
+import { useStudioChatDraft } from "@/features/studio/hooks/use-studio-chat-draft";
+import { useStudioChatPanel } from "@/features/studio/hooks/use-studio-chat-panel";
 import { useStudioWorkspace } from "@/features/studio/hooks/use-studio-workspace";
 import type { StudioDetailLoaderData } from "@/features/studio/types/studio";
 
-/**
- * Full-screen Studio workspace: a floating header over a full-bleed canvas with
- * a floating composer.
- *
- * The header is a sibling of the canvas section, never a descendant: header
- * clicks therefore cannot start a canvas pan or change the selection.
- */
 export function StudioWorkspace({
 	initialData,
 }: {
 	initialData: StudioDetailLoaderData;
 }) {
 	const workspace = useStudioWorkspace(initialData);
+	const chat = useStudioChatPanel();
+	const draft = useStudioChatDraft(
+		`studio-chat-draft:${workspace.project.userId}:${workspace.project.id}`,
+	);
 
 	return (
 		<main className="relative flex h-dvh min-h-0 w-full flex-col overflow-hidden bg-charcoal text-snow">
-			{/* The header floats above the dotted canvas instead of occupying a
-			    full-width navbar band, so the canvas extends behind it. */}
 			<StudioHeader
+				chatOpen={chat.open}
+				onToggleChat={() => chat.setOpen(!chat.open)}
 				title={workspace.project.title}
 				duplicating={workspace.duplicating}
 				exporting={workspace.exportingZip}
@@ -38,44 +37,39 @@ export function StudioWorkspace({
 				onDelete={workspace.handleDelete}
 			/>
 
-			{/* Main Fullscreen Canvas Workspace */}
-			<div className="relative flex-1 w-full overflow-hidden">
-				<StudioCanvas
-					project={workspace.project}
-					frames={workspace.frames}
-					activeJob={workspace.activeJob}
-					selectedFrameId={workspace.selectedFrameId}
-					selectedFrameIds={workspace.selectedFrameIds}
-					onSelectFrame={workspace.selectFrame}
-					onSelectFrames={workspace.selectFrames}
-					onRetryFrame={workspace.handleRetryFrame}
-					onRetryPlanning={
-						workspace.canRetryPlanning
-							? workspace.handleRetryPlanning
-							: undefined
-					}
-					retryingPlanning={workspace.retryingPlanning}
-					onRefreshStatus={() => window.location.reload()}
-					retryingFrameIds={workspace.retryingFrameIds}
-					frameRetryErrors={workspace.frameRetryErrors}
-					className="size-full"
+			<div className="relative flex min-h-0 flex-1 pt-[calc(3.5rem+env(safe-area-inset-top))]">
+				<StudioChatPanel
+					workspace={workspace}
+					desktop={chat.desktop}
+					open={chat.open}
+					onOpenChange={chat.setOpen}
+					draft={draft}
 				/>
-
-				{/* Floating AI Prompt Composer */}
-				<StudioComposer
-					selectedFrames={workspace.selectedFrames}
-					onRemoveFrame={workspace.removeSelectedFrame}
-					onSubmit={workspace.handleComposerSubmit}
-					loading={workspace.composerLoading}
-					suggestions={workspace.suggestions}
-					referenceLabel={workspace.storedReferenceLabel}
-					referenceColors={workspace.storedReferenceColors}
-				/>
+				<div className="relative min-w-0 flex-1 overflow-hidden">
+					<StudioCanvas
+						project={workspace.project}
+						frames={workspace.frames}
+						activeJob={workspace.activeJob}
+						selectedFrameId={workspace.selectedFrameId}
+						selectedFrameIds={workspace.selectedFrameIds}
+						onSelectFrame={workspace.selectFrame}
+						onSelectFrames={workspace.selectFrames}
+						onRetryFrame={workspace.handleRetryFrame}
+						onRetryPlanning={
+							workspace.canRetryPlanning
+								? workspace.handleRetryPlanning
+								: undefined
+						}
+						retryingPlanning={workspace.retryingPlanning}
+						onRefreshStatus={() => window.location.reload()}
+						retryingFrameIds={workspace.retryingFrameIds}
+						frameRetryErrors={workspace.frameRetryErrors}
+						className="size-full"
+					/>
+				</div>
 			</div>
 
-			{/* Error banner sits below the floating header band so it never
-			    collides with the header controls. */}
-			{workspace.error && (
+			{workspace.error && !chat.open && (
 				<div
 					role="alert"
 					className="absolute left-1/2 z-40 flex w-[calc(100%-24px)] max-w-xl -translate-x-1/2 items-center gap-2 rounded-xl border border-crimson bg-obsidian px-4 py-2.5 text-sm text-crimson"
@@ -87,7 +81,7 @@ export function StudioWorkspace({
 						type="button"
 						onClick={() => workspace.setError("")}
 						aria-label="Tutup pesan error"
-						className="ml-2 rounded px-1.5 py-0.5 text-xs font-medium text-crimson hover:bg-crimson/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-snow"
+						className="ml-2 min-h-11 shrink-0 rounded px-2 text-xs font-medium text-crimson hover:bg-crimson/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-snow"
 					>
 						Tutup
 					</button>

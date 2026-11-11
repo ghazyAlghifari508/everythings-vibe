@@ -1,27 +1,13 @@
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { useCallback, useRef, useState } from "react";
 import type { StudioFrameRow, StudioProjectRow } from "@/db/schema";
-import type { StudioComposerSubmitResult } from "@/features/studio/components/composer/studio-composer";
 import { exportProjectAsZip } from "@/features/studio/services/studio-export";
 import {
 	readStudioApiError,
 	requestStudioFrameRetry,
 } from "@/features/studio/services/studio-frame-retry-client";
 import { useUIStore } from "@/store";
-
-/** Reads what one composer request resolved to, so the UI explains clarify. */
-function readComposerOutcome(body: unknown): {
-	intent: string | null;
-	message: string | null;
-} {
-	if (typeof body !== "object" || body === null)
-		return { intent: null, message: null };
-	const intent =
-		"intent" in body && typeof body.intent === "string" ? body.intent : null;
-	const message =
-		"message" in body && typeof body.message === "string" ? body.message : null;
-	return { intent, message };
-}
+import { useStudioComposerRequest } from "./use-studio-composer-request";
 
 export interface UseStudioWorkspaceActionsOptions {
 	project: StudioProjectRow;
@@ -38,7 +24,13 @@ export function useStudioWorkspaceActions({
 	syncProjectStatus,
 	setError,
 }: UseStudioWorkspaceActionsOptions) {
-	const [composerLoading, setComposerLoading] = useState(false);
+	const { composerLoading, handleComposerSubmit } = useStudioComposerRequest({
+		projectId: project.id,
+		userId: project.userId,
+		selectedFrameIds,
+		syncProjectStatus,
+		setError,
+	});
 	const [exportingZip, setExportingZip] = useState(false);
 	const [deleting, setDeleting] = useState(false);
 	const [renaming, setRenaming] = useState(false);
@@ -51,7 +43,6 @@ export function useStudioWorkspaceActions({
 	const navigate = useNavigate();
 	const router = useRouter();
 	const showToast = useUIStore((state) => state.showToast);
-	const pendingRequest = useRef<{ signature: string; id: string } | null>(null);
 	// The in-flight guard is a ref: two clicks in one tick both read the rendered
 	// state before React commits it, and only the ref sees the first request.
 	const retryingFrames = useRef(new Set<string>());
@@ -163,46 +154,6 @@ export function useStudioWorkspaceActions({
 			setDeleting(false);
 		}
 	}, [deleting, navigate, project.id, router, setError, showToast]);
-
-	const handleComposerSubmit = useCallback(
-		async (promptText: string): Promise<StudioComposerSubmitResult> => {
-			setComposerLoading(true);
-			setError("");
-			const signature = JSON.stringify({ promptText, selectedFrameIds });
-			if (pendingRequest.current?.signature !== signature)
-				pendingRequest.current = { signature, id: crypto.randomUUID() };
-			try {
-				const res = await fetch("/api/studio/frame", {
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({
-						action: "operation",
-						projectId: project.id,
-						prompt: promptText,
-						frameIds: selectedFrameIds,
-						requestId: pendingRequest.current.id,
-					}),
-				});
-				if (!res.ok) {
-					setError(await readStudioApiError(res, "Permintaan desain ditolak."));
-					return { accepted: false };
-				}
-				const outcome = readComposerOutcome(await res.json().catch(() => null));
-				await syncProjectStatus();
-				pendingRequest.current = null;
-				if (outcome.intent === "clarify")
-					return { accepted: false, clarify: outcome.message ?? undefined };
-				// ponytail: add_screen success toasts intentionally removed; progress is communicated via canvas frame shimmer states.
-				return { accepted: true };
-			} catch {
-				setError("Jaringan bermasalah. Coba lagi.");
-				return { accepted: false };
-			} finally {
-				setComposerLoading(false);
-			}
-		},
-		[project.id, selectedFrameIds, setError, syncProjectStatus],
-	);
 
 	const handleRetryFrame = useCallback(
 		async (frameId: string) => {

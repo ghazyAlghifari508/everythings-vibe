@@ -170,7 +170,7 @@ export function StudioLandingPage({
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
-					prompt: prompt.trim(),
+					prompt,
 					designMode: config.designMode,
 					initialPageCount: config.initialPageCount,
 					designReference: stagedReference

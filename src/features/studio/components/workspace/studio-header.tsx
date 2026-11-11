@@ -1,6 +1,7 @@
 import {
 	ArrowDown01Icon,
 	ArrowLeft01Icon,
+	BubbleChatIcon,
 	Copy01Icon,
 	Delete02Icon,
 	Download01Icon,
@@ -35,6 +36,8 @@ export function StudioHeader({
 	onRename,
 	onExport,
 	onDelete,
+	chatOpen,
+	onToggleChat,
 }: {
 	title: string;
 	duplicating: boolean;
@@ -45,26 +48,33 @@ export function StudioHeader({
 	onRename: (name: string) => Promise<void>;
 	onExport: () => void;
 	onDelete?: () => Promise<void>;
+	chatOpen?: boolean;
+	onToggleChat?: () => void;
 }) {
 	const session = useHydratedSession();
 	const [isDeleteOpen, setDeleteOpen] = useState(false);
 	const [isRenameOpen, setRenameOpen] = useState(false);
-	// Each floating control carries its own restrained surface so it stays
-	// legible over the dotted canvas without a full-width navbar background.
-	const surface =
-		"border border-iron/70 bg-charcoal/85 backdrop-blur-sm supports-[backdrop-filter]:bg-charcoal/70";
-	const control = `inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg px-3 text-sm text-snow hover:bg-steel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-snow disabled:opacity-50 ${surface}`;
+	const surface = "border border-iron/70 bg-charcoal";
+	const control = `inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg px-3 text-sm text-snow hover:bg-steel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-snow disabled:opacity-50 ${surface}`;
 	const item = "gap-2 focus:bg-steel";
 	return (
-		// Floating canvas header: the dotted canvas shows through behind it, so
-		// there is no full-width navbar surface and no divider line. Only the
-		// individual controls carry a surface, and the empty middle band is
-		// pointer-transparent so it never swallows canvas pan/selection.
 		<header
-			className="pointer-events-none absolute inset-x-0 top-0 z-30 flex h-[calc(3.5rem+env(safe-area-inset-top))] items-center justify-between gap-3 px-2 pt-[env(safe-area-inset-top)] sm:px-4"
+			className="absolute inset-x-0 top-0 z-30 flex h-[calc(3.5rem+env(safe-area-inset-top))] items-center justify-between gap-3 border-b border-iron bg-charcoal px-2 pt-[env(safe-area-inset-top)] sm:px-4"
 			data-testid="studio-header"
 		>
 			<div className="pointer-events-auto flex min-w-0 items-center gap-2">
+				{onToggleChat ? (
+					<button
+						id="studio-chat-toggle"
+						type="button"
+						className={control}
+						onClick={onToggleChat}
+						aria-label={chatOpen ? "Tutup panel chat" : "Buka panel chat"}
+						aria-expanded={chatOpen}
+					>
+						<Icon icon={BubbleChatIcon} size={18} />
+					</button>
+				) : null}
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
 						<button

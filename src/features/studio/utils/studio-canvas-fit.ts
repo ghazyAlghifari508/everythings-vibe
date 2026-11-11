@@ -1,5 +1,5 @@
 import {
-	STUDIO_CANVAS_COMPOSER_INSET_PX,
+	STUDIO_CANVAS_BOTTOM_INSET_PX,
 	STUDIO_CANVAS_FIT_PADDING_PX,
 	STUDIO_CANVAS_FRAME_GAP_PX,
 	STUDIO_CANVAS_FRAME_HEADER_PX,
@@ -59,10 +59,7 @@ export function computeCanvasTrack(bounds: StudioCanvasFrameBounds[]): {
 	};
 }
 
-/**
- * The band of the canvas the floating overlays leave free: the header sits
- * above it, the composer below it, and the right-centre toolbar narrows it.
- */
+/** Keeps frame bounds clear of the canvas edge and floating controls. */
 export function computeCanvasUsableBand(available: StudioCanvasAvailable): {
 	width: number;
 	height: number;
@@ -76,7 +73,7 @@ export function computeCanvasUsableBand(available: StudioCanvasAvailable): {
 			STUDIO_CANVAS_MIN_VISIBLE_PX,
 			available.height -
 				STUDIO_CANVAS_HEADER_INSET_PX -
-				STUDIO_CANVAS_COMPOSER_INSET_PX,
+				STUDIO_CANVAS_BOTTOM_INSET_PX,
 		),
 	};
 }

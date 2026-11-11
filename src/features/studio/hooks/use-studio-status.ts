@@ -62,11 +62,24 @@ function reconcile(previous: StudioStatus, next: StudioStatus): StudioStatus {
 			: nextJob;
 	const stableJobs =
 		JSON.stringify(previous.jobs) === JSON.stringify(next.jobs);
+	const previousMessages = previous.messages ?? [];
+	const messageById = new Map(
+		previousMessages.map((message) => [message.id, message]),
+	);
+	const incomingMessages = next.messages ?? previousMessages;
+	const messages = incomingMessages.map((message) => {
+		const stored = messageById.get(message.id);
+		return stored ? retainRow(stored, message) : message;
+	});
+	const stableMessages =
+		messages.length === previousMessages.length &&
+		messages.every((message, index) => message === previousMessages[index]);
 	if (
 		stableFrames &&
 		project === previous.project &&
 		activeJob === previous.activeJob &&
-		stableJobs
+		stableJobs &&
+		stableMessages
 	)
 		return previous;
 	return {
@@ -74,6 +87,7 @@ function reconcile(previous: StudioStatus, next: StudioStatus): StudioStatus {
 		activeJob,
 		frames: stableFrames ? previous.frames : frames,
 		jobs: stableJobs ? previous.jobs : next.jobs,
+		messages: stableMessages ? previous.messages : messages,
 	};
 }
 

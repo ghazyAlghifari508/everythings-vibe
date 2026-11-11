@@ -1,19 +1,23 @@
+import { TextArea } from "@heroui/react";
 import {
 	ArrowUp01Icon,
 	Cancel01Icon,
 	PaintBoardIcon,
 } from "@hugeicons/core-free-icons";
-import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+	type Dispatch,
+	type FormEvent,
+	type SetStateAction,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { Icon } from "@/components/ui/icon";
 import { Spinner } from "@/components/ui/spinner";
 import { STUDIO_DESIGN_PRESETS } from "@/features/studio/services/studio-presets";
 import { STUDIO_MIN_PROMPT_CHARS } from "@/features/studio/services/studio-prompt-validation";
 import type { StudioScreenSuggestion } from "@/features/studio/services/studio-screen-suggestions";
 import { shouldSubmitComposerEvent } from "@/features/studio/utils/composer-keyboard";
-import {
-	canvasComposerBottomCss,
-	canvasComposerWidthCss,
-} from "@/features/studio/utils/studio-canvas-layout";
 import { filterValidHexColors, StudioPaletteDisk } from "./studio-palette-disk";
 import { StudioSuggestionRow } from "./studio-suggestion-row";
 
@@ -32,6 +36,8 @@ export interface StudioComposerProps {
 		prompt: string,
 	) => Promise<StudioComposerSubmitResult> | StudioComposerSubmitResult;
 	loading?: boolean;
+	value?: string;
+	onValueChange?: Dispatch<SetStateAction<string>>;
 	className?: string;
 	selectedFrames?: { id: string; name: string }[];
 	onRemoveFrame?: (id: string) => void;
@@ -44,6 +50,8 @@ export interface StudioComposerProps {
 export function StudioComposer({
 	onSubmit,
 	loading = false,
+	value,
+	onValueChange,
 	className = "",
 	selectedFrames = [],
 	onRemoveFrame,
@@ -51,7 +59,9 @@ export function StudioComposer({
 	referenceColors,
 	suggestions = [],
 }: StudioComposerProps) {
-	const [prompt, setPrompt] = useState("");
+	const [localPrompt, setLocalPrompt] = useState("");
+	const prompt = value ?? localPrompt;
+	const setPrompt = onValueChange ?? setLocalPrompt;
 	const [sending, setSending] = useState(false);
 	const [error, setError] = useState("");
 	const [clarify, setClarify] = useState("");
@@ -86,14 +96,8 @@ export function StudioComposer({
 	const canSubmit =
 		trimmedPrompt.length >= STUDIO_MIN_PROMPT_CHARS && !loading && !sending;
 
-	useEffect(() => {
-		const input = inputRef.current;
-		if (!input) return;
-		input.style.height = prompt ? "auto" : "";
-		input.style.height = `${input.scrollHeight}px`;
-	}, [prompt]);
-
 	async function submit() {
+		const submitted = prompt;
 		const trimmed = prompt.trim();
 		if (trimmed.length < STUDIO_MIN_PROMPT_CHARS || loading || pending.current)
 			return;
@@ -103,7 +107,8 @@ export function StudioComposer({
 		setClarify("");
 		try {
 			const result = await onSubmit(trimmed);
-			if (result.accepted) setPrompt("");
+			if (result.accepted)
+				setPrompt((current) => (current === submitted ? "" : current));
 			else if (result.clarify) setClarify(result.clarify);
 		} catch (failure) {
 			setError(
@@ -132,15 +137,7 @@ export function StudioComposer({
 	return (
 		<div
 			data-testid="studio-composer"
-			className={`absolute left-1/2 z-30 -translate-x-1/2 ${className}`}
-			// The zoom controls own the bottom-right corner, so the composer is
-			// inset from both sides and its width is capped by the same
-			// clearance fit-to-content reserves. It therefore narrows on small
-			// viewports instead of overlapping the zoom row.
-			style={{
-				bottom: canvasComposerBottomCss(),
-				width: canvasComposerWidthCss(),
-			}}
+			className={`min-w-0 ${className}`}
 			onPointerDown={(event) => event.stopPropagation()}
 			onWheel={(event) => event.stopPropagation()}
 		>
@@ -172,7 +169,7 @@ export function StudioComposer({
 									type="button"
 									aria-label={`Lepas ${frame.name}`}
 									onClick={() => onRemoveFrame?.(frame.id)}
-									className="rounded p-0.5 hover:bg-steel focus-visible:outline-2 focus-visible:outline-snow"
+									className="flex size-11 items-center justify-center rounded text-fog hover:bg-steel hover:text-snow focus-visible:outline-2 focus-visible:outline-snow lg:size-6"
 								>
 									<Icon icon={Cancel01Icon} size={12} />
 								</button>
@@ -204,7 +201,7 @@ export function StudioComposer({
 					</div>
 				) : null}
 				<div className="flex items-end gap-2">
-					<textarea
+					<TextArea
 						ref={inputRef}
 						value={prompt}
 						rows={2}
@@ -224,8 +221,7 @@ export function StudioComposer({
 									? `Minta perubahan untuk ${selectedFrames.length} layar terpilih...`
 									: "Minta revisi, atau sebutkan halaman baru yang ingin dibuat..."
 						}
-						disabled={loading || sending}
-						className="max-h-40 min-h-12 min-w-0 flex-1 resize-none bg-transparent px-1 text-sm leading-6 text-snow placeholder:text-fog focus:outline-none disabled:opacity-60"
+						className="field-sizing-content max-h-40 min-h-12 min-w-0 flex-1 resize-none rounded-md border-0 bg-transparent px-1 text-sm leading-6 text-snow placeholder:text-fog focus-visible:outline-2 focus-visible:outline-snow"
 					/>
 					<button
 						type="submit"
@@ -234,7 +230,7 @@ export function StudioComposer({
 						aria-busy={loading || sending ? "true" : undefined}
 						title="Kirim prompt (Enter)"
 						style={{ background: "var(--btn-bg)", color: "var(--btn-text)" }}
-						className="flex size-10 shrink-0 items-center justify-center rounded-lg hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-snow disabled:cursor-not-allowed disabled:opacity-40"
+						className="flex size-11 shrink-0 items-center justify-center rounded-lg hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-snow disabled:cursor-not-allowed disabled:opacity-40"
 					>
 						{loading || sending ? (
 							<Spinner size={18} className="text-current" />
