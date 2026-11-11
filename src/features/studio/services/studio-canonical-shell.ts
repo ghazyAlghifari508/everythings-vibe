@@ -125,6 +125,18 @@ export function assembleCanonicalShell(
 		}
 	}
 
+	if (blueprint.productIdentity.platform === "mobile") {
+		for (const heading of content.querySelectorAll("h1")) {
+			if (
+				heading.textContent?.trim().toLowerCase() ===
+				screen.trim().toLowerCase()
+			)
+				heading.remove();
+		}
+	}
+	// Styles outside <main> would otherwise disappear when the old shell is replaced.
+	for (const style of document.body.querySelectorAll("style"))
+		document.head.appendChild(style);
 	for (const element of document.querySelectorAll("[autofocus]"))
 		element.removeAttribute("autofocus");
 
@@ -181,17 +193,25 @@ export function assembleCanonicalShell(
 		}
 	}
 
-	document.querySelector("#studio-canonical-style")?.remove();
-	document.querySelector("#studio-component-patterns")?.remove();
+	for (const style of document.querySelectorAll(
+		"#studio-canonical-style, #studio-component-patterns",
+	))
+		style.remove();
 	const oldShell = document.querySelector("[data-studio-shell]");
 	const wrapper = document.createElement("div");
 	wrapper.setAttribute("data-studio-shell", "1");
+	wrapper.setAttribute(
+		"data-studio-layout",
+		blueprint.productIdentity.layoutIntent ?? "web-application",
+	);
 	const header = studioCanonicalHeader(blueprint, screen, logoUrl);
 	const nav = studioCanonicalNavigation(blueprint, screen);
 	wrapper.innerHTML =
-		blueprint.canonicalShell?.navigation === "bottom"
-			? `${header}${content.outerHTML}${nav}`
-			: `${header}${nav}${content.outerHTML}`;
+		blueprint.productIdentity.layoutIntent === "public-website"
+			? `${header}${content.outerHTML}`
+			: blueprint.canonicalShell?.navigation === "bottom"
+				? `${header}${content.outerHTML}${nav}`
+				: `${header}${nav}${content.outerHTML}`;
 
 	if (oldShell) {
 		oldShell.replaceWith(wrapper);

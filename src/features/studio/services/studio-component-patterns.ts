@@ -47,7 +47,11 @@ export const STUDIO_COMPONENT_PATTERNS = [
 	},
 	{
 		name: "ProductRow / MediaCard",
-		html: '<article data-ui="product-row" data-card><figure data-media="product"><figcaption>Foto produk</figcaption></figure><div><h3>Nama produk</h3><p>Deskripsi produk</p><div data-ui="actions"><span data-ui="value">Rp27.000</span><button aria-label="Tambah produk">+</button></div></div></article>',
+		html: '<article data-ui="product-row" data-card><figure data-media="product" data-media-fit="contain"><figcaption>Foto produk</figcaption></figure><div><h3>Nama produk</h3><p>Deskripsi produk</p><div data-ui="actions"><span data-ui="value">Rp27.000</span><button aria-label="Tambah produk">+</button></div></div></article>',
+	},
+	{
+		name: "Mobile ActionArea",
+		html: '<footer data-ui="action-area"><span data-ui="value">Rp27.000</span><button type="button" data-primary>Ke Keranjang</button></footer>',
 	},
 ];
 
@@ -68,6 +72,7 @@ export const STUDIO_COMPONENT_STYLE = `<style id="studio-component-patterns">
 :where([data-ui="stepper"]>output){flex:0 0 auto;min-width:40px;padding:0 4px;text-align:center;font-variant-numeric:tabular-nums}
 :where([data-ui="carousel"]){display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;max-width:100%;padding-bottom:4px}
 :where([data-ui="carousel"]>*){flex:0 0 auto;scroll-snap-align:start}
+:where([data-ui="action-area"]){display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:16px var(--app-gutter);padding-bottom:max(16px,env(safe-area-inset-bottom));background:var(--app-surface);border-top:var(--app-border)}
 :where([data-ui="options"]){display:grid;gap:8px;min-width:0;border:0;padding:0}
 :where([data-ui="option"]){display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;min-height:44px;padding:12px;border:var(--app-border);border-radius:var(--app-radius)}
 :where([data-ui="option"]:has(input:checked)){outline:2px solid var(--app-primary);outline-offset:-2px}

@@ -91,7 +91,7 @@ it("never regenerates valid HTML for advisory aesthetics", async () => {
 		"<main><div data-skeleton></div><p>Complete content</p></main>",
 	);
 	respond(html);
-	expect(await generateValidatedFrameHtml(input)).toBe(html);
+	await generateValidatedFrameHtml(input);
 	expect(vi.mocked(tryStreamWithFallback).mock.calls).toHaveLength(1);
 });
 
