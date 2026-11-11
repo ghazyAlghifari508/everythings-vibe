@@ -70,6 +70,12 @@ export const projects = pgTable(
 		// purged. A non-null value means "deleted": the project is hidden from
 		// History and all normal project APIs and routes.
 		deletedAt: timestamp("deleted_at"),
+		// Non-destructive archive tombstone. Unlike `deletedAt` (which purges
+		// every product artifact and keeps only an accounting tombstone), an
+		// archived feature keeps all of its planning intact and can be
+		// unarchived. A non-null value hides the feature from the active
+		// workspace plan switcher without destroying any work.
+		archivedAt: timestamp("archived_at"),
 		createdAt: timestamp("created_at").defaultNow(),
 		updatedAt: timestamp("updated_at").defaultNow(),
 	},
@@ -77,6 +83,8 @@ export const projects = pgTable(
 		index("projects_user_id_idx").on(t.userId),
 		// Active-project listing (History, admin, lookups) filters on both.
 		index("projects_user_id_deleted_at_idx").on(t.userId, t.deletedAt),
+		// Workspace plan listing excludes archived features per owner.
+		index("projects_user_id_archived_at_idx").on(t.userId, t.archivedAt),
 		index("projects_codebase_id_idx").on(t.codebaseId),
 		unique("projects_user_id_id_unique").on(t.id, t.userId),
 	],
