@@ -31,6 +31,8 @@ export function CodebasePlanSwitcherPanel({
 	activePlanName,
 	onSelectPlan,
 	onCreateFeature,
+	applyPlanMutation,
+	removePlan,
 }: {
 	codebaseId: string;
 	/** Every non-deleted feature plan (active + archived). */
@@ -40,9 +42,18 @@ export function CodebasePlanSwitcherPanel({
 	activePlanName: string | null;
 	onSelectPlan: (projectId: string) => void;
 	onCreateFeature: () => void;
+	/** Apply one authoritative rename/archive result to the workspace plan list. */
+	applyPlanMutation: (
+		projectId: string,
+		patch: Partial<ActivePlanCandidate>,
+	) => void;
+	/** Remove one deleted feature from the workspace plan list. */
+	removePlan: (projectId: string) => void;
 }) {
 	const lifecycle = useFeaturePlanLifecycle({
 		codebaseId,
+		applyPlanMutation,
+		removePlan,
 		onDeleted: (deletedId) => {
 			if (deletedId !== activePlanId) return;
 			// The active plan is gone. Steer to a surviving active feature, or the

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+	type ActivePlanCandidate,
 	resolveActivePlan,
 	selectUserFacingPlans,
 } from "@/features/codebase/services/active-plan";
@@ -27,14 +28,71 @@ export function useWorkspacePlan({
 		createdPlansState.codebaseId === codebase.id
 			? createdPlansState.plans
 			: NO_CREATED_PLANS;
-	const plans = useMemo(
-		() => [
+	// Server-authoritative mutation overlay: rename/archive results and deleted
+	// ids applied from lifecycle mutations without a full page refetch. Scoped
+	// to the repository the mutation ran in, mirroring `createdPlansState`.
+	const [planMutations, setPlanMutations] = useState<{
+		codebaseId: string;
+		byId: Record<string, Partial<ActivePlanCandidate>>;
+		removedIds: string[];
+	}>({ codebaseId: codebase.id, byId: {}, removedIds: [] });
+	const localMutations =
+		planMutations.codebaseId === codebase.id ? planMutations : null;
+	const plans = useMemo(() => {
+		const base = [
 			...persistedPlans,
 			...createdPlans.filter(
 				(created) => !persistedPlans.some((plan) => plan.id === created.id),
 			),
-		],
-		[persistedPlans, createdPlans],
+		];
+		if (!localMutations) return base;
+		const removed = new Set(localMutations.removedIds);
+		const byId = localMutations.byId;
+		return base
+			.filter((plan) => !removed.has(plan.id))
+			.map((plan) => (byId[plan.id] ? { ...plan, ...byId[plan.id] } : plan));
+	}, [persistedPlans, createdPlans, localMutations]);
+	/**
+	 * Apply one authoritative mutation result to the plan list. The caller only
+	 * calls this with fields the server returned, so the local list never
+	 * invents state — it mirrors what the backend accepted.
+	 */
+	const applyPlanMutation = useCallback(
+		(projectId: string, patch: Partial<ActivePlanCandidate>) => {
+			setPlanMutations((current) => {
+				const scoped =
+					current.codebaseId === codebase.id
+						? current
+						: { codebaseId: codebase.id, byId: {}, removedIds: [] };
+				return {
+					codebaseId: codebase.id,
+					byId: {
+						...scoped.byId,
+						[projectId]: { ...scoped.byId[projectId], ...patch },
+					},
+					removedIds: scoped.removedIds,
+				};
+			});
+		},
+		[codebase.id],
+	);
+	const removePlan = useCallback(
+		(projectId: string) => {
+			setPlanMutations((current) => {
+				const scoped =
+					current.codebaseId === codebase.id
+						? current
+						: { codebaseId: codebase.id, byId: {}, removedIds: [] };
+				return {
+					codebaseId: codebase.id,
+					byId: scoped.byId,
+					removedIds: scoped.removedIds.includes(projectId)
+						? scoped.removedIds
+						: [...scoped.removedIds, projectId],
+				};
+			});
+		},
+		[codebase.id],
 	);
 	// The selection is scoped to the repository it was made in. A workspace
 	// that navigates to another repository must resolve that repository's plan
@@ -143,6 +201,12 @@ export function useWorkspacePlan({
 		// and the recoverable archived section.
 		plans,
 		userFacingPlans,
+		// Authoritative mutation overlay: the switcher panel applies the
+		// server's rename/archive result here and removes deleted features, so
+		// the plan list, active resolution and switcher sections all reflect the
+		// mutation without a full page refetch.
+		applyPlanMutation,
+		removePlan,
 		setActiveFeature,
 		registerCreatedPlan: (plan: { id: string; name: string }) => {
 			setCreatedPlansState((current) => {

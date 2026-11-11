@@ -133,6 +133,8 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 											activePlanName={resolvedFeature?.name ?? null}
 											onSelectPlan={ws.selectPlan}
 											onCreateFeature={ws.handleCreateFeature}
+											applyPlanMutation={ws.applyPlanMutation}
+											removePlan={ws.removePlan}
 										/>
 									) : null
 								}
