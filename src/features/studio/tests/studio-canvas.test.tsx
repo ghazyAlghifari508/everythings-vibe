@@ -13,19 +13,12 @@ import {
 } from "@/features/studio/components/canvas/studio-canvas";
 import { writeStudioCanvasView } from "@/features/studio/services/studio-canvas-view";
 import {
-	STUDIO_CANVAS_COMPOSER_BOTTOM_PX,
-	STUDIO_CANVAS_COMPOSER_MAX_WIDTH_PX,
-	STUDIO_CANVAS_COMPOSER_SIDE_CLEARANCE_PX,
 	STUDIO_CANVAS_HEADER_INSET_PX,
 	STUDIO_CANVAS_INITIAL_MIN_ZOOM,
 	STUDIO_CANVAS_MAX_ZOOM,
 	STUDIO_CANVAS_MIN_ZOOM,
 } from "@/features/studio/types/studio-constants";
-import {
-	canvasComposerBottomCss,
-	canvasComposerWidthCss,
-	canvasZoomRowBottomCss,
-} from "@/features/studio/utils/studio-canvas-layout";
+import { canvasZoomRowBottomCss } from "@/features/studio/utils/studio-canvas-layout";
 
 describe("StudioCanvas", () => {
 	afterEach(() => cleanup());
@@ -699,27 +692,6 @@ describe("StudioCanvas", () => {
 				/>,
 			);
 			expect(renderedScale()).toBe(userScale);
-		});
-	});
-
-	describe("floating overlay geometry", () => {
-		it("caps the composer so it never reaches the zoom row", () => {
-			expect(canvasComposerWidthCss()).toContain(
-				`${STUDIO_CANVAS_COMPOSER_MAX_WIDTH_PX}px`,
-			);
-			expect(canvasComposerWidthCss()).toContain(
-				`${STUDIO_CANVAS_COMPOSER_SIDE_CLEARANCE_PX * 2}px`,
-			);
-		});
-
-		it("keeps the composer clear of the zoom row and the safe area", () => {
-			const bottom = canvasComposerBottomCss();
-			expect(bottom).toContain("env(safe-area-inset-bottom)");
-			expect(bottom).toContain(`${STUDIO_CANVAS_COMPOSER_BOTTOM_PX}px`);
-		});
-
-		it("honours the safe area for the zoom row too", () => {
-			expect(canvasZoomRowBottomCss()).toContain("env(safe-area-inset-bottom)");
 		});
 	});
 

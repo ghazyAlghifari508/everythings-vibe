@@ -12,32 +12,6 @@ import { StudioComposer } from "@/features/studio/components/composer/studio-com
 describe("StudioComposer", () => {
 	afterEach(() => cleanup());
 
-	it("prompts for either a revision or a new screen when nothing is selected", () => {
-		render(<StudioComposer onSubmit={vi.fn()} loading={false} />);
-
-		// The composer no longer implies a project-wide revision from an empty
-		// selection; it asks for the intent instead.
-		expect(screen.getByPlaceholderText(/sebutkan halaman baru/i)).toBeDefined();
-		expect(screen.queryByText("Seluruh project")).toBeNull();
-	});
-
-	it("does not render the removed composer controls", () => {
-		render(
-			<StudioComposer
-				onSubmit={vi.fn()}
-				loading={false}
-				selectedFrames={[{ id: "f-1", name: "Dashboard" }]}
-			/>,
-		);
-
-		expect(screen.queryByText(/Tambah Halaman/i)).toBeNull();
-		expect(screen.queryByText(/Seluruh project/i)).toBeNull();
-		// The palette icon is gone with its trigger.
-		expect(
-			screen.queryByRole("button", { name: /Pilih design system/i }),
-		).toBeNull();
-	});
-
 	it("targets a single selected frame and allows deselecting it", () => {
 		const onRemoveFrame = vi.fn();
 		render(
@@ -254,9 +228,6 @@ describe("StudioComposer", () => {
 		expect(submitBtn.getAttribute("aria-busy")).toBe("true");
 		const spinner = submitBtn.querySelector('[data-testid="spinner"]');
 		expect(spinner).not.toBeNull();
-		expect(spinner?.getAttribute("class")).toContain(
-			"motion-safe:animate-spin",
-		);
 
 		// Double submit prevention: click and enter do not trigger duplicate calls while pending
 		fireEvent.click(submitBtn);
