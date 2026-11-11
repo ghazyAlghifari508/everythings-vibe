@@ -44,6 +44,7 @@ export const loadCodebase = createServerFn({ method: "GET" })
 				featuresStatus: projects.featuresStatus,
 				featureTree: projects.featureTree,
 				updatedAt: projects.updatedAt,
+				archivedAt: projects.archivedAt,
 			})
 			.from(projects)
 			.where(
@@ -70,13 +71,30 @@ export const loadCodebase = createServerFn({ method: "GET" })
 							.from(acVersions)
 							.where(inArray(acVersions.projectId, projectIds)),
 						db
-							.select({ projectId: tasks.projectId })
+							.select({
+								projectId: tasks.projectId,
+								completedAt: tasks.completedAt,
+							})
 							.from(tasks)
 							.where(inArray(tasks.projectId, projectIds)),
 					]);
 		const withPrd = new Set(prdRows.map((row) => row.projectId));
 		const withAc = new Set(acRows.map((row) => row.projectId));
 		const withTasks = new Set(taskRows.map((row) => row.projectId));
+		// Task progress backs the switcher's "N task · M selesai" line. A task
+		// counts as done only when it carries a real completion timestamp, so a
+		// merely-moved card never inflates the finished count.
+		const taskTotals = new Map<string, number>();
+		const taskCompleted = new Map<string, number>();
+		for (const row of taskRows) {
+			taskTotals.set(row.projectId, (taskTotals.get(row.projectId) ?? 0) + 1);
+			if (row.completedAt != null) {
+				taskCompleted.set(
+					row.projectId,
+					(taskCompleted.get(row.projectId) ?? 0) + 1,
+				);
+			}
+		}
 		const plans: ActivePlanCandidate[] = projectRows.map((row) => {
 			const hasFeature = row.featureTree != null;
 			const hasPrd = withPrd.has(row.id);
@@ -91,6 +109,9 @@ export const loadCodebase = createServerFn({ method: "GET" })
 				hasPrd,
 				hasAc,
 				hasTasks,
+				archivedAt: row.archivedAt?.toISOString() ?? null,
+				taskTotal: taskTotals.get(row.id) ?? 0,
+				taskCompleted: taskCompleted.get(row.id) ?? 0,
 			};
 		});
 		const onboardingFeature = resolveOnboardingAnchorProject({

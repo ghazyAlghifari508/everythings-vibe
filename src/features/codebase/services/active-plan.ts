@@ -32,6 +32,16 @@ export interface ActivePlanCandidate {
 	hasPrd?: boolean;
 	hasAc?: boolean;
 	hasTasks?: boolean;
+	/**
+	 * Non-destructive archive tombstone. A non-null value hides the feature
+	 * from the active switcher list without destroying its planning; it can be
+	 * unarchived. Distinct from deletion, which purges artifacts.
+	 */
+	archivedAt?: string | null;
+	/** Total persisted tasks, for the switcher's progress line. */
+	taskTotal?: number;
+	/** Persisted tasks carrying a real completion timestamp. */
+	taskCompleted?: number;
 }
 
 export type ActivePlanSource =
