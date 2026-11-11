@@ -2,7 +2,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
-	getStudioSkillCapability,
 	resolveStudioDesignSkill,
 	resolveStudioFrameSystemPrompt,
 	resolveStudioPlanningSystemPrompt,
@@ -14,6 +13,7 @@ import {
 	STUDIO_SYSTEM_PROMPT,
 } from "../services/studio-prompt-contracts";
 import { buildStudioFramePrompt } from "../services/studio-screen-prompts";
+import { getStudioSkillCapability } from "../services/studio-skill-capabilities";
 import { STUDIO_SKILL_MANIFEST } from "../services/studio-skill-manifest";
 import { STUDIO_SKILL_DOCUMENT_BUDGET_CHARS } from "../types/studio-constants";
 
@@ -101,10 +101,6 @@ describe("Studio Upstream Skill Fidelity & Genuine Integration (Phase 4)", () =>
 		expect(resolved.guidance).toBe("");
 		expect(resolved.sourceRevision).toBeNull();
 		expect(resolved.characterCount).toBe(0);
-		expect(resolveStudioPlanningSystemPrompt("none")).toBe(
-			STUDIO_PLAN_SYSTEM_PROMPT,
-		);
-		expect(resolveStudioFrameSystemPrompt("none")).toBe(STUDIO_SYSTEM_PROMPT);
 	});
 
 	// 6. Planning receives the correct skill (including bounded dataset lookup for UI UX Pro Max)

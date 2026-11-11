@@ -113,6 +113,7 @@ export async function createStudioProject(
 		designSkillId: options.designSkillId,
 		dsTokens,
 		logoUrl,
+		contentContext: { brief: checked.prompt, prdContent: cleanPrdContent },
 	});
 
 	const [project] = await db

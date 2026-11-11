@@ -38,6 +38,7 @@ export interface ValidatedFrameInput {
 	dsTokens: ReturnType<typeof extractDesignSystemTokens>;
 	logoUrl: string | null;
 	signal?: AbortSignal;
+	contentContext?: { brief: string; prdContent?: string | null };
 	timing?: { jobId: string; projectId: string; frameId: string };
 }
 

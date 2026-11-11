@@ -21,11 +21,7 @@ import { extractDesignSystemTokens } from "./studio-design-tokens";
 import { StudioFrameError } from "./studio-frame-errors";
 import { generateValidatedFrameHtml } from "./studio-frame-generation";
 import { persistStudioFrameVersion } from "./studio-frame-write";
-import {
-	type StudioJobClaim,
-	StudioLeaseLostError,
-	withStudioJobWrite,
-} from "./studio-job-lease";
+import { type StudioJobClaim, withStudioJobWrite } from "./studio-job-lease";
 import { studioJobTiming } from "./studio-job-runtime";
 import { buildStudioAssetUrl } from "./studio-logo-service";
 import { validateStudioDesignMode } from "./studio-prompt-validation";
@@ -216,6 +212,10 @@ export async function runStudioFrameOperation(
 		designSkillId: project.designSkillId,
 		dsTokens,
 		logoUrl,
+		contentContext: {
+			brief: `${original?.prompt ?? project.title}\n${changeInstruction}`,
+			prdContent: project.prdContent,
+		},
 		signal,
 		timing: { jobId: job.id, projectId: project.id, frameId: frame.id },
 	});

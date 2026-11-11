@@ -69,6 +69,7 @@ export async function generateInitialFrame(
 			designSkillId: ctx.designSkillId,
 			dsTokens: ctx.dsTokens,
 			logoUrl: ctx.logoUrl,
+			contentContext: { brief: ctx.jobPrompt, prdContent: ctx.prdContent },
 			signal: ctx.signal,
 			timing: {
 				jobId: ctx.lease.jobId,
