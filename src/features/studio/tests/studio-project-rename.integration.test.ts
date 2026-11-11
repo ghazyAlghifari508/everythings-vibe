@@ -61,6 +61,15 @@ vi.mock("@/lib/services/ai-orchestrator", () => ({
 			name: screen.name,
 			role: screen.description,
 			order: screen.order,
+			navigationRole: "primary",
+			composition: {
+				primaryTask: screen.description,
+				layout: "workspace",
+				hierarchy: ["Task content"],
+				patterns: [],
+				responsive: "reflow",
+				media: "none",
+			},
 		}));
 		return {
 			firstChunk: JSON.stringify({
@@ -72,6 +81,8 @@ vi.mock("@/lib/services/ai-orchestrator", () => ({
 						targetAudience: "General",
 						platform: "web",
 						visualDirection: "Clean",
+						brandTone: "Precise",
+						layoutIntent: "web-application",
 					},
 					designTokens: {
 						primary: "#0f0f0f",
@@ -86,6 +97,12 @@ vi.mock("@/lib/services/ai-orchestrator", () => ({
 						border: "1px solid #d3d3d3",
 						elevation: "none",
 					},
+					layout: {
+						gutter: 24,
+						contentMaxWidth: 1120,
+						spacing: [4, 8, 16, 24],
+						typography: [14, 16, 24, 32],
+					},
 					sharedComponents: {
 						header: "Bar",
 						navigation: "Tabs",
@@ -94,6 +111,7 @@ vi.mock("@/lib/services/ai-orchestrator", () => ({
 						cards: "12px",
 						tabs: "Seg",
 						icons: "Lucide",
+						media: "No media needed",
 					},
 					navigationContract: {
 						destinations,

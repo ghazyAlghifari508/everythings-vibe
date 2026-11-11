@@ -97,6 +97,7 @@ export async function generateStudioPlan(input: {
 							input.designMode,
 							input.count,
 							input.requireVisualDirection,
+							true,
 						);
 			studioJobTiming("planning-validation", startedAt, {
 				...input.timing,

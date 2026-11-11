@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { STUDIO_COMPONENT_PATTERNS } from "./studio-component-patterns";
 
 const canonicalIconIds = new Set([
 	"home",
@@ -73,6 +74,31 @@ const orderedScale = (minimum: number, maximum: number) =>
 			values.every((value, index) => index === 0 || value > values[index - 1]),
 		);
 
+const screenCompositionSchema = z.object({
+	primaryTask: z.string().trim().min(1).max(200),
+	layout: z.enum([
+		"editorial",
+		"discovery",
+		"detail",
+		"form",
+		"summary",
+		"timeline",
+		"workspace",
+	]),
+	hierarchy: z.array(z.string().trim().min(1).max(100)).min(1).max(6),
+	patterns: z
+		.array(z.enum(STUDIO_COMPONENT_PATTERNS.map(({ id }) => id)))
+		.max(8),
+	responsive: z.enum([
+		"reflow",
+		"stack",
+		"grid",
+		"horizontal-scroll",
+		"expand",
+	]),
+	media: z.enum(["none", "whole-product", "photography", "project-work"]),
+});
+
 export const studioDesignBlueprintSchema = z.object({
 	explicitColorOverrides: z
 		.array(
@@ -88,6 +114,7 @@ export const studioDesignBlueprintSchema = z.object({
 			.enum(["public-website", "web-application", "mobile-application"])
 			.optional(),
 		visualDirection: z.string().min(1).max(500),
+		brandTone: z.string().trim().min(1).max(200).optional(),
 	}),
 	designTokens: z
 		.object({
@@ -127,6 +154,7 @@ export const studioDesignBlueprintSchema = z.object({
 		cards: z.string().min(1).max(500),
 		tabs: z.string().min(1).max(500),
 		icons: z.string().min(1).max(300),
+		media: z.string().trim().min(1).max(300).optional(),
 	}),
 	navigationContract: studioNavigationContractSchema,
 	canonicalShell: studioCanonicalShellSchema.optional(),
@@ -146,6 +174,8 @@ export const studioDesignBlueprintSchema = z.object({
 				name: z.string().min(1).max(100),
 				role: z.string().min(1).max(500),
 				navigationRole: z.enum(["primary", "contextual"]).optional(),
+				// Persisted legacy screens and deterministic additions can retain role-only intent.
+				composition: screenCompositionSchema.optional(),
 				order: z.number().int().nonnegative(),
 			}),
 		)

@@ -41,13 +41,13 @@ export const WEB_PLATFORM_CONTRACT = `Target platform: Responsive Website or Web
   * Avoid both extremes: neither an empty sparse wireframe nor a cramped unreadable wall of tiny inputs.
 - Typography & Visual Hierarchy:
   * Clear typographic scale: Screen title (24px-28px font-bold), section titles (18px-22px font-semibold), card headers (15px-16px font-semibold), body (14px-16px), metadata (12px-13px font-medium).
-  * Keep one solid, primary action button per main section; secondary actions use subtle borders or ghost variants.
+  * Keep one clear primary focal action per screen; secondary/contextual actions stay quiet rather than giving every section a competing primary CTA.
   * Hairline structural borders (border border-[var(--app-border)]) instead of large dark drop-shadows.
 - Form & Data Polish:
   * Group related fields with visible <label for="..."> pairs and accessible names.
   * Format large currency values with digit separators (e.g. Rp 125.500.000) using font-mono and whitespace-nowrap.
   * Give long Indonesian labels adequate line-height and width so they never overlap controls.
-  * Truncate or wrap long customer names and descriptions gracefully (truncate with title attribute or break-words).
+  * Wrap essential titles, option names and descriptions naturally. Truncate only optional secondary content with a usable expansion path, never essential information.
   * Keep atomic values together: a currency prefix and amount ("Rp 125.500.000") and short badges such as "Private Trip" never break across lines; give them one non-wrapping group or enough room, then let paragraphs wrap normally.
   * Give photos component-specific bounded media geometry; choose contain/cover and object-position by subject, preserve the declared ratio, and keep content meaningful if an external image fails.
   * Provide a dedicated empty state box when tables or lists have no records.
@@ -62,7 +62,7 @@ Output contract (non-negotiable):
 - Return ONE complete standalone HTML document. No explanations, no markdown fences, no commentary outside the HTML.
 - Open with <!DOCTYPE html>/<html> and close with </body></html>; never leave fence markers, markdown artifacts, or explanatory prose inside or outside the document. When demonstrating code, use <pre><code> blocks.
 - Use complete inline CSS in a <style> block, with semantic design tokens as CSS variables. No build step is needed. Legacy Tailwind CSS via cdn.tailwindcss.com can be exported, but new visual screens must not require a script to become visible.
-- Use modern typography (system font stack or Google Fonts link), semantic sections, cards, grids, and realistic Indonesian copy (Bahasa Indonesia) with believable dummy data.
+- Use typography suited to the brand, semantic sections and realistic Indonesian copy (Bahasa Indonesia). Illustrative records must be visibly identified as sample content, never verified claims.
 - Icons must be inline SVG. No emojis in the UI.
 - Build a static visual artboard. Show tabs, filters, buttons and forms in their intended visual state, without JavaScript, event handlers or automatic navigation. All visible content must exist in the HTML rather than being inserted by scripts.
 - Responsive by default: mobile-first layout that expands cleanly to desktop widths.
@@ -90,7 +90,8 @@ OUTPUT CONTRACT (NON-NEGOTIABLE):
       "targetAudience": "Primary audience",
       "platform": "web" | "mobile",
       "layoutIntent": "public-website" | "web-application" | "mobile-application",
-      "visualDirection": "Concise visual direction"
+      "visualDirection": "Concise visual direction",
+      "brandTone": "Specific brand voice and mood shared across screens"
     },
     "designTokens": {
       "primary": "Primary color hex",
@@ -118,7 +119,8 @@ OUTPUT CONTRACT (NON-NEGOTIABLE):
       "inputs": "Input styling",
       "cards": "Card geometry",
       "tabs": "Tab styling",
-      "icons": "Icon family and stroke"
+      "icons": "Icon family and stroke",
+      "media": "Shared subject treatment, whole-product fit, photography crop and readable fallback"
     },
     "canonicalShell": {
       "version": 1,
@@ -136,12 +138,22 @@ OUTPUT CONTRACT (NON-NEGOTIABLE):
       "activeItemRule": "Highlight the item matching the active screen"
     },
     "screenPlan": [
-      { "name": "Screen Name", "role": "Task-specific composition, hierarchy, component roles, media fit and narrow-width behavior", "navigationRole": "primary or contextual", "order": 0 }
+      { "name": "Screen Name", "role": "Screen purpose", "navigationRole": "primary or contextual", "order": 0,
+        "composition": {
+          "primaryTask": "The decision or action this screen serves",
+          "layout": "editorial | discovery | detail | form | summary | timeline | workspace",
+          "hierarchy": ["Most important content first", "Supporting content", "Primary action"],
+          "patterns": ["choose only relevant ids: search, segments, field, table, metric, alert, actions, stepper, carousel, options, product-row, action-area"],
+          "responsive": "reflow | stack | grid | horizontal-scroll | expand",
+          "media": "none | whole-product | photography | project-work"
+        }
+      }
     ]
   }
 }
 - The screens array and blueprint.screenPlan must each contain exactly the requested count, ordered 0..N, using the requested viewport platform.
 - The navigation contract (destinations, labels, ordering, icons) is shared by every screen; only the active item changes per screen.
+- Every new plan must include brandTone, layout, sharedComponents.media and a composition plus navigationRole for each screen. Use actual enum values, not the pipe-separated examples. Choose zero patterns if none fit. Distinct screen tasks require distinct hierarchy/composition, not a repeated card grid. Shared identity is not identical page structure.
 - canonicalShell uses literal enum values: navigation bottom on mobile, sidebar or top for web; density compact or comfortable; statusBar none. layout contains one project-wide numeric gutter, contentMaxWidth, ascending spacing and typography scales in px chosen for this brief (examples are not universal defaults). Reuse colors/radius/navigation from their existing fields; never duplicate them in layout. Map EVERY screen name to its active destination id (or null only for contextual screens). Icon ids: home, plus, search, user, wallet, chart, analytics, calendar, location, plane, settings, circle. Studio renders these components deterministically.
 - Set productIdentity.layoutIntent from the product purpose: public-website for public marketing, portfolios, editorial and storefront websites; web-application for task-oriented dashboards and workspaces; mobile-application only for mobile apps. Never infer a portfolio from web alone. Public websites require top navigation with aligned brand, intrinsic-width links, optional CTA and a responsive menu; web applications choose sidebar or top by information architecture, not a landing navbar. Mobile bottom navigation contains genuine top-level destinations only. Mark each screen navigationRole primary or contextual; contextual flows retain their parent active destination and get a back affordance even when the title has no detail/edit keyword. Choose a web contentMaxWidth suitable for desktop, not a 390-440px phone shell.
 - Names must be standard, clean UI titles matching the user domain.

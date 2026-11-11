@@ -121,6 +121,7 @@ export function parseStudioPlanningWithBlueprint(
 	fallbackViewport: StudioDesignMode = "web",
 	expectedCount?: number | null,
 	requireVisualDirection = false,
+	requireQualityContract = false,
 ):
 	| { ok: true; plan: StudioScreenPlan; blueprint: StudioDesignBlueprint }
 	| { ok: false; error: string } {
@@ -159,8 +160,28 @@ export function parseStudioPlanningWithBlueprint(
 			ok: false,
 			error: "Blueprint desain bersama tidak ditemukan pada output perencana.",
 		};
+	// New plans must choose their family; legacy normalization must not silently choose it for them.
+	const hasPlannedLayoutIntent = z
+		.object({ productIdentity: z.object({ layoutIntent: z.string() }) })
+		.safeParse(record.data.blueprint).success;
 	const validated = validateBlueprint(record.data.blueprint);
 	if (!validated.ok) return validated;
+	const blueprint = validated.blueprint;
+	if (
+		requireQualityContract &&
+		(!blueprint.productIdentity.brandTone ||
+			!hasPlannedLayoutIntent ||
+			!blueprint.layout ||
+			!blueprint.sharedComponents.media ||
+			blueprint.screenPlan.some(
+				(screen) => !screen.composition || !screen.navigationRole,
+			))
+	)
+		return {
+			ok: false,
+			error:
+				"Planning requires brand tone, shared layout/media and task-specific screen composition/navigation roles.",
+		};
 	const tokens = validated.blueprint.designTokens;
 	if (
 		requireVisualDirection &&
@@ -180,6 +201,16 @@ export function parseStudioPlanningWithBlueprint(
 		return {
 			ok: false,
 			error: "Jumlah screen pada blueprint harus sama dengan rencana layar.",
+		};
+	if (
+		planParsed.plan.screens.some((screen, index) => {
+			const shared = validated.blueprint.screenPlan[index];
+			return shared.name !== screen.name || shared.order !== screen.order;
+		})
+	)
+		return {
+			ok: false,
+			error: "Nama dan urutan layar harus sama dengan blueprint bersama.",
 		};
 	return {
 		ok: true,

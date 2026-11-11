@@ -6,54 +6,66 @@
 // 14px` blanket did.
 export const STUDIO_COMPONENT_PATTERNS = [
 	{
+		id: "search",
 		name: "SearchInput",
 		html: '<div data-ui="search"><input type="search" aria-label="Cari" value="Contoh"><button type="button" aria-label="Hapus pencarian">×</button></div>',
 	},
 	{
+		id: "segments",
 		name: "SegmentedControl / Tabs",
 		html: '<div data-ui="segments" role="group" aria-label="Filter status"><button aria-pressed="true">Semua</button><button aria-pressed="false">Aktif</button><button aria-pressed="false">Draft</button><button aria-pressed="false">Arsip</button></div>',
 	},
 	{
+		id: "field",
 		name: "Select / Dropdown / FormField",
 		html: '<div data-ui="field"><label for="package">Paket</label><select id="package"><option>Semua paket</option></select></div>',
 	},
 	{
+		id: "table",
 		name: "DataTable",
-		html: '<div data-table-container tabindex="0" role="region" aria-label="Data transaksi"><table><caption>Transaksi</caption><thead><tr><th scope="col">Referensi</th><th scope="col">Jumlah</th></tr></thead><tbody><tr><td>INV-001</td><td>Rp1.250.000</td></tr></tbody></table></div>',
+		html: '<div data-table-container tabindex="0" role="region" aria-label="Data transaksi"><table><caption>Transaksi contoh</caption><thead><tr><th scope="col">Referensi</th><th scope="col">Jumlah</th></tr></thead><tbody><tr><td>Referensi contoh</td><td>Jumlah contoh</td></tr></tbody></table></div>',
 	},
 	{
+		id: "metric",
 		name: "MetricCard",
-		html: '<article data-card><h2>Pendapatan</h2><p data-ui="value">Rp12.500.000</p></article>',
+		html: '<article data-card><h2>Ringkasan contoh</h2><p data-ui="value">Belum ada data</p></article>',
 	},
 	{
+		id: "alert",
 		name: "Alert",
-		html: '<div data-ui="alert" role="note"><strong>Periksa rincian</strong><p>Pastikan nilai sesuai sebelum melanjutkan.</p></div>',
+		html: '<aside data-ui="alert" role="note"><strong>Periksa rincian</strong><p>Pastikan pilihan sesuai sebelum melanjutkan.</p></aside>',
 	},
 	{
+		id: "actions",
 		name: "Responsive ActionGroup",
 		html: '<div data-ui="actions"><button type="button">Bandingkan</button><button type="button" data-primary>Ekspor CSV</button></div>',
 	},
 	{
+		id: "stepper",
 		name: "QuantityStepper",
 		html: '<div data-ui="stepper" role="group" aria-label="Jumlah"><button type="button" aria-label="Kurangi jumlah">−</button><output aria-label="Jumlah saat ini">1</output><button type="button" aria-label="Tambah jumlah">+</button></div>',
 	},
 	{
+		id: "carousel",
 		name: "HorizontalCarousel",
-		html: '<div data-ui="carousel" role="region" aria-label="Promo pilihan" tabindex="0"><article data-card><h3>Promo 1</h3><p>Diskon 20%</p></article><article data-card><h3>Promo 2</h3><p>Gratis ongkir</p></article></div>',
+		html: '<div data-ui="carousel" role="region" aria-label="Pilihan terkait" tabindex="0"><article data-card><h3>Pilihan A</h3><p>Rincian pilihan</p></article><article data-card><h3>Pilihan B</h3><p>Rincian pilihan</p></article></div>',
 	},
 	{
+		id: "options",
 		name: "OptionRow / RadioGroup / Checkbox",
-		html: '<fieldset data-ui="options"><legend>Pilihan</legend><label data-ui="option"><input type="radio" name="option" checked><span><strong>Pilihan utama</strong><small>Deskripsi pilihan</small></span><span data-ui="value">+Rp8.000</span></label></fieldset>',
+		html: '<fieldset data-ui="options"><legend>Pilihan</legend><label data-ui="option"><input type="radio" name="option" value="main" checked aria-describedby="option-description"><span><strong>Pilihan utama</strong><small id="option-description">Deskripsi pilihan</small></span><span data-ui="value">Harga contoh</span></label></fieldset>',
 	},
 	{
+		id: "product-row",
 		name: "ProductRow / MediaCard",
-		html: '<article data-ui="product-row" data-card><figure data-media="product" data-media-fit="contain"><figcaption>Foto produk</figcaption></figure><div><h3>Nama produk</h3><p>Deskripsi produk</p><div data-ui="actions"><span data-ui="value">Rp27.000</span><button aria-label="Tambah produk">+</button></div></div></article>',
+		html: '<article data-ui="product-row" data-card><figure data-media-fit="contain"><figcaption>Media belum tersedia</figcaption></figure><div><h3>Nama produk</h3><p>Deskripsi produk</p><div data-ui="actions"><span data-ui="value">Harga contoh</span><button type="button" aria-label="Tambah produk">+</button></div></div></article>',
 	},
 	{
+		id: "action-area",
 		name: "Mobile ActionArea",
-		html: '<footer data-ui="action-area"><span data-ui="value">Rp27.000</span><button type="button" data-primary>Ke Keranjang</button></footer>',
+		html: '<footer data-ui="action-area"><span data-ui="value">Total contoh</span><button type="button" data-primary>Ke Keranjang</button></footer>',
 	},
-];
+] as const;
 
 export const STUDIO_COMPONENT_STYLE = `<style id="studio-component-patterns">
 :where([data-ui="search"]){display:flex;align-items:center;gap:4px;min-width:0;width:100%;border:var(--app-border);border-radius:var(--app-radius);background:var(--app-surface)}
@@ -70,15 +82,19 @@ export const STUDIO_COMPONENT_STYLE = `<style id="studio-component-patterns">
 :where([data-ui="stepper"]){display:inline-flex;align-items:center;border:var(--app-border);border-radius:var(--app-radius);background:var(--app-surface)}
 :where([data-ui="stepper"]>button){flex:0 0 36px;width:36px;height:36px;min-height:36px;padding:0;border:0;border-radius:0;background:transparent;font-size:18px;line-height:1}
 :where([data-ui="stepper"]>output){flex:0 0 auto;min-width:40px;padding:0 4px;text-align:center;font-variant-numeric:tabular-nums}
-:where([data-ui="carousel"]){display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;max-width:100%;padding-bottom:4px}
-:where([data-ui="carousel"]>*){flex:0 0 auto;scroll-snap-align:start}
+:where([data-ui="carousel"]){display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x proximity;max-width:100%;min-width:0;padding-bottom:4px}
+:where([data-ui="carousel"]>*){flex:0 0 auto;width:min(18rem,85vw);scroll-snap-align:start}
 :where([data-ui="action-area"]){display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:16px var(--app-gutter);padding-bottom:max(16px,env(safe-area-inset-bottom));background:var(--app-surface);border-top:var(--app-border)}
 :where([data-ui="options"]){display:grid;gap:8px;min-width:0;border:0;padding:0}
 :where([data-ui="option"]){display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;min-height:44px;padding:12px;border:var(--app-border);border-radius:var(--app-radius)}
 :where([data-ui="option"]:has(input:checked)){outline:2px solid var(--app-primary);outline-offset:-2px}
+:where([data-ui="option"]>span){min-width:0;white-space:normal;overflow-wrap:break-word}
+:where([data-ui="option"]>input){margin:0;flex:none}
+:where([data-ui="option"]>span[data-ui="value"]){white-space:nowrap;justify-self:end}
 :where([data-ui="option"] small){display:block;white-space:normal}
 :where([data-ui="product-row"]){display:grid;grid-template-columns:minmax(72px,30%) minmax(0,1fr);gap:12px;align-items:start}
 :where([data-ui="product-row"] figure){margin:0;overflow:hidden}
 :where([data-ui="value"], [data-ui="stepper"]>output){white-space:nowrap;font-variant-numeric:tabular-nums;flex-shrink:0}
 @media(max-width:640px){:where([data-ui="actions"]){justify-content:flex-start}:where([data-ui="actions"]>button){flex:1 0 auto}}
+@media(max-width:360px){:where([data-ui="option"]){grid-template-columns:auto minmax(0,1fr)}:where([data-ui="option"]>[data-ui="value"]){grid-column:2;justify-self:start}}
 </style>`;

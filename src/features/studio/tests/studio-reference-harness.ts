@@ -60,6 +60,8 @@ export const studioProviderMock = {
 							targetAudience: "General",
 							platform: viewport,
 							visualDirection: "Clean",
+							brandTone: "Precise",
+							layoutIntent: "web-application",
 						},
 						designTokens: {
 							primary: "#0f0f0f",
@@ -74,6 +76,12 @@ export const studioProviderMock = {
 							border: "1px solid #d3d3d3",
 							elevation: "none",
 						},
+						layout: {
+							gutter: 24,
+							contentMaxWidth: 1120,
+							spacing: [4, 8, 16, 24],
+							typography: [14, 16, 24, 32],
+						},
 						sharedComponents: {
 							header: "Bar",
 							navigation: "Tabs",
@@ -82,6 +90,7 @@ export const studioProviderMock = {
 							cards: "12px",
 							tabs: "Seg",
 							icons: "Lucide",
+							media: "No media needed",
 						},
 						navigationContract: {
 							destinations,
@@ -94,6 +103,15 @@ export const studioProviderMock = {
 							name: screen.name,
 							role: screen.description,
 							order: screen.order,
+							navigationRole: "primary",
+							composition: {
+								primaryTask: screen.description,
+								layout: "workspace",
+								hierarchy: ["Task content"],
+								patterns: [],
+								responsive: "reflow",
+								media: "none",
+							},
 						})),
 					},
 				}),
