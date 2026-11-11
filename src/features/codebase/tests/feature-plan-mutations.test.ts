@@ -5,7 +5,9 @@ import { db } from "@/db";
 import {
 	deleteOwnedFeature,
 	type FeaturePlanMutationParams,
+	handleFeatureArchive,
 	handleFeatureDelete,
+	handleFeatureRename,
 } from "@/features/codebase/services/feature-plan-mutations.server";
 
 const storage = vi.hoisted(() => ({
@@ -19,6 +21,7 @@ const storage = vi.hoisted(() => ({
 		userId: string;
 		codebaseId: string | null;
 		deletedAt: Date | null;
+		archivedAt: Date | null;
 		name: string;
 	}>,
 	updatedProjects: [] as string[],
@@ -37,6 +40,49 @@ vi.mock("@/lib/session", () => ({
 }));
 
 vi.mock("@/db", () => {
+	const updateImpl = (_table: { [key: symbol]: unknown }) => ({
+		set: (values: Record<string, unknown>) => ({
+			where: (condition: SQL) => {
+				const dialect = new PgDialect();
+				const compiled = dialect.sqlToQuery(condition);
+				const params = compiled.params as string[];
+				const id = params[0] as string;
+				// Ownership guard: the row must belong to the caller. Rename/archive
+				// bind [projectId, userId, codebaseId]; the tombstone binds only
+				// [projectId, userId], so the repository check applies only when a
+				// codebase param is present.
+				const owned = storage.projects.find(
+					(p) => p.id === id && p.userId === params[1],
+				);
+				const codebaseParam = params[2];
+				if (
+					!owned ||
+					owned.deletedAt !== null ||
+					(typeof codebaseParam === "string" &&
+						owned.codebaseId !== codebaseParam)
+				) {
+					return { returning: () => Promise.resolve([]) };
+				}
+				storage.updatedProjects.push(id);
+				// `.where()` must expose `.returning()` for the tombstone update.
+				return {
+					returning: () =>
+						Promise.resolve([
+							{
+								id: owned.id,
+								name:
+									typeof values.name === "string" ? values.name : owned.name,
+								archivedAt:
+									typeof values.archivedAt === "undefined"
+										? (owned.archivedAt ?? null)
+										: values.archivedAt,
+							},
+						]),
+				};
+			},
+		}),
+	});
+
 	const createTx = () => ({
 		select: (_fields: Record<string, unknown>) => ({
 			from: (_table: { [key: symbol]: unknown }) => ({
@@ -78,24 +124,12 @@ vi.mock("@/db", () => {
 		delete: (_table: { [key: symbol]: unknown }) => ({
 			where: () => Promise.resolve(),
 		}),
-		update: (_table: { [key: symbol]: unknown }) => ({
-			set: () => ({
-				where: (condition: SQL) => {
-					const dialect = new PgDialect();
-					const compiled = dialect.sqlToQuery(condition);
-					const id = compiled.params[0] as string;
-					storage.updatedProjects.push(id);
-					// `.where()` must expose `.returning()` for the tombstone update.
-					return {
-						returning: () => Promise.resolve([{ id }]),
-					};
-				},
-			}),
-		}),
+		update: updateImpl,
 	});
 
 	return {
 		db: {
+			update: updateImpl,
 			transaction: async <T>(
 				callback: (tx: ReturnType<typeof createTx>) => Promise<T>,
 			): Promise<T> => callback(createTx()),
@@ -122,6 +156,7 @@ function seedProject(overrides: Partial<{ deletedAt: Date }> = {}) {
 		userId: "user-1",
 		codebaseId: "cb-1",
 		deletedAt: null,
+		archivedAt: null,
 		name: "Filter Artikel",
 		...overrides,
 	});
@@ -151,6 +186,7 @@ describe("deleteOwnedFeature", () => {
 			userId: "user-2",
 			codebaseId: "cb-1",
 			deletedAt: null,
+			archivedAt: null,
 			name: "Foreign",
 		});
 		const result = await db.transaction((tx) =>
@@ -167,6 +203,7 @@ describe("deleteOwnedFeature", () => {
 			userId: "user-1",
 			codebaseId: "cb-other",
 			deletedAt: null,
+			archivedAt: null,
 			name: "Other repo",
 		});
 		const result = await db.transaction((tx) =>
@@ -193,6 +230,121 @@ describe("deleteOwnedFeature", () => {
 		);
 		expect(result).toEqual({ kind: "already" });
 		expect(storage.updatedProjects).not.toContain("proj-1");
+	});
+});
+
+describe("handleFeatureRename route", () => {
+	function patchRequest(body: unknown) {
+		return new Request("http://local/test", {
+			method: "PATCH",
+			headers: {
+				"Content-Type": "application/json",
+				authorization: "ok",
+			},
+			body: JSON.stringify(body),
+		});
+	}
+
+	it("renames a feature the caller owns under the repository", async () => {
+		seedCodebase(null);
+		seedProject();
+		const response = await handleFeatureRename({
+			request: patchRequest({ name: "Nama Baru" }),
+			params: baseParams,
+		});
+		expect(response.status).toBe(200);
+		const body = (await response.json()) as { name?: string };
+		expect(body.name).toBe("Nama Baru");
+		expect(storage.updatedProjects).toContain("proj-1");
+	});
+
+	it("returns 404 for a project owned by another tenant", async () => {
+		seedCodebase(null);
+		storage.projects.push({
+			id: "proj-1",
+			userId: "user-2",
+			codebaseId: "cb-1",
+			deletedAt: null,
+			archivedAt: null,
+			name: "Foreign",
+		});
+		const response = await handleFeatureRename({
+			request: patchRequest({ name: "Curang" }),
+			params: baseParams,
+		});
+		expect(response.status).toBe(404);
+		const body = (await response.json()) as { code?: string };
+		expect(body.code).toBe("FEATURE_NOT_FOUND");
+	});
+
+	it("rejects a name that is too short", async () => {
+		seedCodebase(null);
+		seedProject();
+		const response = await handleFeatureRename({
+			request: patchRequest({ name: "" }),
+			params: baseParams,
+		});
+		expect(response.status).toBe(400);
+		const body = (await response.json()) as { code?: string };
+		expect(body.code).toBe("FEATURE_NAME_INVALID");
+	});
+});
+
+describe("handleFeatureArchive route", () => {
+	function archiveRequest(archived: boolean) {
+		return new Request("http://local/test", {
+			method: "PATCH",
+			headers: {
+				"Content-Type": "application/json",
+				authorization: "ok",
+			},
+			body: JSON.stringify({ archived }),
+		});
+	}
+
+	it("archives a feature the caller owns under the repository", async () => {
+		seedCodebase(null);
+		seedProject();
+		const response = await handleFeatureArchive({
+			request: archiveRequest(true),
+			params: baseParams,
+		});
+		expect(response.status).toBe(200);
+		const body = (await response.json()) as {
+			archivedAt?: string | null;
+		};
+		expect(body.archivedAt).not.toBeNull();
+	});
+
+	it("unarchives the same feature back to null", async () => {
+		seedCodebase(null);
+		seedProject({ archivedAt: new Date("2026-03-01T00:00:00.000Z") });
+		const response = await handleFeatureArchive({
+			request: archiveRequest(false),
+			params: baseParams,
+		});
+		expect(response.status).toBe(200);
+		const body = (await response.json()) as {
+			archivedAt?: string | null;
+		};
+		expect(body.archivedAt).toBeNull();
+	});
+
+	it("returns 404 for a project owned by another tenant", async () => {
+		seedCodebase(null);
+		storage.projects.push({
+			id: "proj-1",
+			userId: "user-2",
+			codebaseId: "cb-1",
+			deletedAt: null,
+			archivedAt: null,
+			name: "Foreign",
+		});
+		const response = await handleFeatureArchive({
+			request: archiveRequest(true),
+			params: baseParams,
+		});
+		expect(response.status).toBe(404);
 	});
 });
 
