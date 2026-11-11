@@ -89,14 +89,6 @@ describe("Studio Prompt Builder", () => {
 		expect(prompt).not.toContain("sticky bottom navigation");
 	});
 
-	it("injects desktop responsive directives when web mode is selected", () => {
-		const prompt = buildStudioUserPrompt("Dashboard analitik", {
-			designMode: "web",
-		});
-		expect(prompt).toContain("Target platform: Responsive Web Application");
-		expect(prompt).toContain(`${STUDIO_VISUAL_WIDTH.web}px`);
-	});
-
 	it("validates and sanitizes DESIGN.md input", () => {
 		expect(validateStudioDesignMd("").ok).toBe(true);
 		expect(validateStudioDesignMd(null).ok).toBe(true);

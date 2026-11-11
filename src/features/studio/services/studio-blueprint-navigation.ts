@@ -230,6 +230,7 @@ export function extendStudioBlueprintWithScreen(input: {
 					? "Destinasi navigasi utama"
 					: "Layar kontekstual aplikasi"),
 			order: nextOrder,
+			navigationRole: screenRole.role,
 		},
 	];
 

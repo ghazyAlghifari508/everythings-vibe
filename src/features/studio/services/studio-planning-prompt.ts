@@ -47,6 +47,7 @@ Choose one coherent project-wide designTokens set: primary accent, secondary acc
 	}
 	sections.push(
 		"Plan one shared layout contract (gutter, contentMaxWidth, ascending spacing and typography scales), appropriate density and existing shared component geometry. In each screenPlan.role specify the task hierarchy, component roles, media presentation and responsive intent concisely. Discovery may use a horizontal promo track, customization readable vertical option rows, checkout separate quantity/price/action tracks, tracking ordered real states; these are examples, not a forced template. Distinct screen compositions reuse the same tokens and navigation.",
+		"Choose productIdentity.layoutIntent explicitly: public-website (marketing, portfolio, public storefront), web-application (dashboard/workspace), or mobile-application. Website brand and intrinsic-width text links share one desktop navbar, optional ctaDestination uses an existing destination; use responsive disclosure on mobile. Applications choose sidebar/top from their tasks, not a landing-page template. Set screenPlan.navigationRole primary or contextual, keeping mobile bottom navigation for top-level destinations and back navigation for nested flows. Public heroes communicate the product value and suitable CTA; do not add a generic page-title bar above them. Reuse the same contentMaxWidth and gutter across sibling screens, with desktop-sized web content and component-specific grids, scrollers and media fit.",
 	);
 
 	sections.push(

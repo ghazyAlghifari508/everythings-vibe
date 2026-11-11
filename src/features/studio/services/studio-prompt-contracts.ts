@@ -28,7 +28,7 @@ export const MOBILE_PLATFORM_CONTRACT = `Target platform: Mobile Application Exp
 - Keep exactly one bottom tab <nav> containing every destination label in blueprint order; do not duplicate the full tab set in a second <nav>.
 - Put every screen body inside one content region; the first visible block establishes the screen's own hierarchy (list, search, hero, cards), not a repeated title row.`;
 
-export const WEB_PLATFORM_CONTRACT = `Target platform: Responsive Web Application Experience.
+export const WEB_PLATFORM_CONTRACT = `Target platform: Responsive Website or Web Application Experience, as specified by productIdentity.layoutIntent.
 - Design for desktop browsers at a ${STUDIO_VISUAL_WIDTH.web}px wide viewport with clean, fluid responsive adaptation to tablet (768px-1023px) and mobile (<768px).
 - Sizing & Containment (Anti-Clipping Rules):
   * Use fluid widths (max-width: 100%, w-full); never use fixed pixel widths (e.g. width: 1200px or w-[800px]) that exceed parent cards or viewport.
@@ -53,7 +53,7 @@ export const WEB_PLATFORM_CONTRACT = `Target platform: Responsive Web Applicatio
   * Provide a dedicated empty state box when tables or lists have no records.
 - Shared Shell Integration:
   * Studio deterministically injects the global topbar (product branding) and primary navigation; generate only screen-specific content inside <main data-studio-content>. Do not emit a second global sidebar, topbar, or header.
-  * The product name belongs to the injected topbar only. The screen title and its contextual actions belong to a content header as the first block inside <main data-studio-content>, e.g. <header data-studio-page-header><h1>Pelanggan</h1><div data-ui="actions">...</div></header>. Never place the brand and the screen title side by side in one row.
+  * Public websites: generate the value proposition, suitable hero and CTA without a redundant generic page title above them. Studio aligns branding and primary navigation within one navbar. Web applications: the screen title and contextual controls belong inside the main content header, never beside the global brand.
   * On a detail/edit/confirmation screen, the content header starts with a back link to its parent destination (e.g. "< Back to Pelanggan") while the primary navigation keeps the parent item active.`;
 
 export const STUDIO_SYSTEM_PROMPT = `You are an expert front-end builder generating a complete, production-grade single-file HTML page.
@@ -89,6 +89,7 @@ OUTPUT CONTRACT (NON-NEGOTIABLE):
       "productName": "Application name",
       "targetAudience": "Primary audience",
       "platform": "web" | "mobile",
+      "layoutIntent": "public-website" | "web-application" | "mobile-application",
       "visualDirection": "Concise visual direction"
     },
     "designTokens": {
@@ -131,16 +132,18 @@ OUTPUT CONTRACT (NON-NEGOTIABLE):
       "labels": ["Home", "Search"],
       "iconMapping": { "home": "home", "search": "search" },
       "ordering": ["home", "search"],
+      "ctaDestination": "existing destination id only when the public website needs a navigation CTA, otherwise null",
       "activeItemRule": "Highlight the item matching the active screen"
     },
     "screenPlan": [
-      { "name": "Screen Name", "role": "Task-specific composition, hierarchy, component roles, media fit and narrow-width behavior", "order": 0 }
+      { "name": "Screen Name", "role": "Task-specific composition, hierarchy, component roles, media fit and narrow-width behavior", "navigationRole": "primary or contextual", "order": 0 }
     ]
   }
 }
 - The screens array and blueprint.screenPlan must each contain exactly the requested count, ordered 0..N, using the requested viewport platform.
 - The navigation contract (destinations, labels, ordering, icons) is shared by every screen; only the active item changes per screen.
 - canonicalShell uses literal enum values: navigation bottom on mobile, sidebar or top for web; density compact or comfortable; statusBar none. layout contains one project-wide numeric gutter, contentMaxWidth, ascending spacing and typography scales in px chosen for this brief (examples are not universal defaults). Reuse colors/radius/navigation from their existing fields; never duplicate them in layout. Map EVERY screen name to its active destination id (or null only for contextual screens). Icon ids: home, plus, search, user, wallet, chart, analytics, calendar, location, plane, settings, circle. Studio renders these components deterministically.
+- Set productIdentity.layoutIntent from the product purpose: public-website for public marketing, portfolios, editorial and storefront websites; web-application for task-oriented dashboards and workspaces; mobile-application only for mobile apps. Never infer a portfolio from web alone. Public websites require top navigation with aligned brand, intrinsic-width links, optional CTA and a responsive menu; web applications choose sidebar or top by information architecture, not a landing navbar. Mobile bottom navigation contains genuine top-level destinations only. Mark each screen navigationRole primary or contextual; contextual flows retain their parent active destination and get a back affordance even when the title has no detail/edit keyword. Choose a web contentMaxWidth suitable for desktop, not a 390-440px phone shell.
 - Names must be standard, clean UI titles matching the user domain.
 - projectTitle is a product name, not the brief. Keep it 2-4 words and under 60 characters. Never return a sentence, a paragraph, a copy of the user's request, or a description of the work to be done.
 - Use the brand or product name the user wrote, spelled exactly as they wrote it. If the user named no brand, name the product after its domain, audience, and main purpose, for example "Analytics Dashboard" or "Inventory Console". Never invent a brand that contradicts the user.

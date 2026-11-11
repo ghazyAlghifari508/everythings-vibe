@@ -61,6 +61,7 @@ export const studioNavigationContractSchema = z.object({
 	iconMapping: z.record(z.string(), z.string()),
 	ordering: z.array(z.string().min(1)).min(1).max(8),
 	activeItemRule: z.string().min(1).max(300),
+	ctaDestination: z.string().min(1).nullable().optional(),
 });
 
 const orderedScale = (minimum: number, maximum: number) =>
@@ -83,6 +84,9 @@ export const studioDesignBlueprintSchema = z.object({
 		productName: z.string().min(1).max(200),
 		targetAudience: z.string().min(1).max(300),
 		platform: z.enum(["web", "mobile"]),
+		layoutIntent: z
+			.enum(["public-website", "web-application", "mobile-application"])
+			.optional(),
 		visualDirection: z.string().min(1).max(500),
 	}),
 	designTokens: z
@@ -141,6 +145,7 @@ export const studioDesignBlueprintSchema = z.object({
 			z.object({
 				name: z.string().min(1).max(100),
 				role: z.string().min(1).max(500),
+				navigationRole: z.enum(["primary", "contextual"]).optional(),
 				order: z.number().int().nonnegative(),
 			}),
 		)
@@ -193,12 +198,22 @@ export function validateBlueprint(
 		return { ok: false, error: "Order screen harus unik dan berurutan." };
 	const blueprint = parsed.data;
 	const mobile = blueprint.productIdentity.platform === "mobile";
+	const layoutIntent =
+		blueprint.productIdentity.layoutIntent ??
+		(mobile ? "mobile-application" : "web-application");
+	if ((layoutIntent === "mobile-application") !== mobile)
+		return { ok: false, error: "Layout intent tidak sesuai platform." };
+	const cta = blueprint.navigationContract.ctaDestination;
+	if (cta && !destinations.includes(cta))
+		return { ok: false, error: "Destinasi CTA tidak dikenal." };
 	const shell = blueprint.canonicalShell;
 	if (
 		shell &&
 		(mobile ? shell.navigation !== "bottom" : shell.navigation === "bottom")
 	)
 		return { ok: false, error: "Shell navigasi tidak sesuai platform." };
+	if (shell && layoutIntent === "public-website" && shell.navigation !== "top")
+		return { ok: false, error: "Website publik memerlukan navigasi atas." };
 	if (
 		shell &&
 		Object.values(shell.activeDestinations).some(
@@ -230,6 +245,7 @@ export function validateBlueprint(
 		ok: true,
 		blueprint: {
 			...blueprint,
+			productIdentity: { ...blueprint.productIdentity, layoutIntent },
 			navigationContract: {
 				...blueprint.navigationContract,
 				iconMapping: Object.fromEntries(
@@ -241,7 +257,11 @@ export function validateBlueprint(
 			},
 			canonicalShell: shell ?? {
 				version: 1,
-				navigation: mobile ? "bottom" : "sidebar",
+				navigation: mobile
+					? "bottom"
+					: layoutIntent === "public-website"
+						? "top"
+						: "sidebar",
 				statusBar: "none",
 				density: "comfortable",
 				activeDestinations,
