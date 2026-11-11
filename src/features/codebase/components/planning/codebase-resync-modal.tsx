@@ -102,7 +102,8 @@ export function CodebaseResyncModal({
 						variant="secondary"
 						onClick={onRetrySession}
 						disabled={isStarting}
-						className="min-h-11 px-3.5 text-xs"
+						size="sm"
+						className="min-h-8 px-3 text-xs"
 					>
 						Coba lagi
 					</Button>
@@ -128,57 +129,55 @@ export function CodebaseResyncModal({
 
 				{/* One scroll container for the steps; the prompt owns its own
 				internal scroll because a long credential keeps its full text. */}
-				<div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6 sm:py-6">
-					<div className="flex flex-col">
-						<ScreenConnectPromptStep
-							key={payload?.sessionId ?? "no-session"}
-							projectName={projectName}
-							payload={
-								!isStarting &&
-								!sessionError &&
-								!isSyncStatusComplete(attemptStatus)
-									? payload
-									: null
-							}
-							isStarting={isStarting}
-							status={attemptStatus}
-							onRequestNewToken={onReplacePrompt}
-							heading="Salin instruksi sync ulang"
-							promptMode="resync"
-							copyAriaLabel="Salin instruksi sync ulang"
-							contentTestId="resync-prompt-content"
-							recoveryState={recoveryState}
-						/>
+				<div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 sm:px-6 sm:py-5 flex flex-col">
+					<ScreenConnectPromptStep
+						key={payload?.sessionId ?? "no-session"}
+						projectName={projectName}
+						payload={
+							!isStarting &&
+							!sessionError &&
+							!isSyncStatusComplete(attemptStatus)
+								? payload
+								: null
+						}
+						isStarting={isStarting}
+						status={attemptStatus}
+						onRequestNewToken={onReplacePrompt}
+						heading="Salin instruksi sync ulang"
+						promptMode="resync"
+						copyAriaLabel="Salin instruksi sync ulang"
+						contentTestId="resync-prompt-content"
+						recoveryState={recoveryState}
+					/>
 
-						<ScreenConnectAgentStep
-							title="Jalankan di AI coding agent"
-							description="Gunakan root repository yang sama."
-							showHarnesses={true}
-							hasConnector={true}
-						/>
+					<ScreenConnectAgentStep
+						title="Jalankan di AI coding agent"
+						description="Gunakan root repository yang sama."
+						showHarnesses={true}
+						hasConnector={true}
+					/>
 
-						<ScreenConnectSyncStep
-							status={attemptStatus}
-							stageView={stageView}
-							canRetry={stageView.canRetry && Boolean(onRetrySync)}
-							statusError={sessionError ? null : statusError}
-							isStarting={isStarting}
-							hasSession={Boolean(attemptSessionId)}
-							onRetrySync={onRetrySync}
-							canContinueToSummary={isVerified}
-							analysis={analysis}
-							analysisError={analysisError}
-							isAnalyzing={isAnalyzing}
-							onRetryAnalysis={onRetryAnalysis}
-							isLegacyAnalysisMissingSuggestions={false}
-							heading="Pantau sinkronisasi"
-							description={null}
-							idleLabel={sessionError ? "Belum dimulai" : "Menunggu agent"}
-						/>
-					</div>
+					<ScreenConnectSyncStep
+						status={attemptStatus}
+						stageView={stageView}
+						canRetry={stageView.canRetry && Boolean(onRetrySync)}
+						statusError={sessionError ? null : statusError}
+						isStarting={isStarting}
+						hasSession={Boolean(attemptSessionId)}
+						onRetrySync={onRetrySync}
+						canContinueToSummary={isVerified}
+						analysis={analysis}
+						analysisError={analysisError}
+						isAnalyzing={isAnalyzing}
+						onRetryAnalysis={onRetryAnalysis}
+						isLegacyAnalysisMissingSuggestions={false}
+						heading="Pantau sinkronisasi"
+						description={null}
+						idleLabel={sessionError ? "Belum dimulai" : "Menunggu agent"}
+					/>
 				</div>
 
-				<DialogFooter className="shrink-0 flex items-center justify-end gap-2.5 border-t border-graphite px-5 py-3 sm:px-6 sm:py-4">
+				<DialogFooter className="shrink-0 flex items-center justify-end gap-2.5 border-t border-graphite px-5 py-3 sm:px-6 sm:py-3.5">
 					{!isVerified && (
 						<Button
 							type="button"

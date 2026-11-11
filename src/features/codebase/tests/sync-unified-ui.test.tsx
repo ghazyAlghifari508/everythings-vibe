@@ -387,4 +387,94 @@ describe("FIX 05: Unified Sync and Re-sync UI (Section 12 Requirements)", () => 
 		).toBeDefined();
 		expect(screen.getByText("Pantau progres")).toBeDefined();
 	});
+
+	// 15. Shared step layout geometry and number rail
+	it("shares step layout geometry and number rail between initial sync and re-sync modal", () => {
+		render(
+			<CodebaseResyncModal
+				isOpen
+				onClose={() => {}}
+				projectName="Test Repo"
+				payload={samplePayload}
+				status={createStatus()}
+			/>,
+		);
+
+		// Number rail circles have consistent w-6 / h-6 dimensions
+		const railCircles = document.querySelectorAll("span.rounded-full");
+		expect(railCircles.length).toBeGreaterThanOrEqual(3);
+		for (const circle of Array.from(railCircles).slice(0, 3)) {
+			expect(circle.className).toContain("w-6");
+			expect(circle.className).toContain("h-6");
+			expect(circle.className).toContain("border-iron");
+		}
+	});
+
+	// 16. No duplicate nested padding wrappers in re-sync modal
+	it("maintains unified outer padding hierarchy without duplicate nested padding wrappers in re-sync modal", () => {
+		render(
+			<CodebaseResyncModal
+				isOpen
+				onClose={() => {}}
+				projectName="Test Repo"
+				payload={samplePayload}
+				status={createStatus()}
+			/>,
+		);
+
+		const panel = screen.getByTestId("codebase-resync-panel");
+		const scrollArea = panel.querySelector(".overflow-y-auto");
+		expect(scrollArea).not.toBeNull();
+		// Body owns the single padding responsibility with balanced vertical rhythm
+		expect(scrollArea?.className).toContain("px-5");
+		expect(scrollArea?.className).toContain("sm:px-6");
+		expect(scrollArea?.className).toContain("py-4");
+		expect(scrollArea?.className).toContain("sm:py-5");
+
+		// No redundant secondary padding div wrapping the steps
+		const directChildren = Array.from(scrollArea?.children ?? []);
+		// Children should directly be the step containers, not an extra padded div
+		expect(directChildren.length).toBe(3);
+	});
+
+	// 17. Prompt box takes full column width with bounded wrapping
+	it("ensures prompt box takes full column width with bounded text wrapping", () => {
+		render(
+			<CodebaseResyncModal
+				isOpen
+				onClose={() => {}}
+				projectName="Test Repo"
+				payload={samplePayload}
+				status={createStatus()}
+			/>,
+		);
+
+		const promptBox = screen.getByTestId("prompt-box");
+		expect(promptBox.className).toContain("w-full");
+		const content = screen.getByTestId("resync-prompt-content");
+		expect(content.className).toContain("break-words");
+		expect(content.className).toContain("max-h-56");
+	});
+
+	// 18. Footer consistency and balanced spacing
+	it("maintains consistent footer padding and alignment in re-sync modal", () => {
+		render(
+			<CodebaseResyncModal
+				isOpen
+				onClose={() => {}}
+				projectName="Test Repo"
+				payload={samplePayload}
+				status={createStatus()}
+			/>,
+		);
+
+		const panel = screen.getByTestId("codebase-resync-panel");
+		const footer =
+			panel.querySelector("footer") ?? panel.querySelector(".border-t");
+		expect(footer).not.toBeNull();
+		expect(footer?.className).toContain("border-graphite");
+		expect(footer?.className).toContain("px-5");
+		expect(footer?.className).toContain("sm:px-6");
+		expect(footer?.className).toContain("sm:py-3.5");
+	});
 });
