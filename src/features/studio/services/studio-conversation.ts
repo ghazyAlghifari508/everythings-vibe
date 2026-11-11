@@ -127,6 +127,7 @@ export async function synchronizeStudioConversation(
 		)
 		.orderBy(asc(studioFrames.order));
 	for (const message of messages) {
+		if (!message.jobIds.length) continue;
 		const progress = resolveStudioMessageProgress(
 			message,
 			jobs,

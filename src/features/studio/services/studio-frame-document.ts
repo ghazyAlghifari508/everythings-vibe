@@ -1,8 +1,9 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, or } from "drizzle-orm";
 import { db } from "@/db";
 import {
 	type StudioFrameRow,
 	type StudioProjectRow,
+	studioElementRevisions,
 	studioFrames,
 	studioProjects,
 } from "@/db/schema";
@@ -43,6 +44,28 @@ export async function finalizeStudioFrameDetail(
 		source: "persisted",
 	};
 	if (!persisted) return base;
+	const [approved] = await db
+		.select()
+		.from(studioElementRevisions)
+		.where(
+			and(
+				eq(studioElementRevisions.projectId, project.id),
+				eq(studioElementRevisions.userId, project.userId),
+				eq(studioElementRevisions.frameId, frame.id),
+				or(
+					eq(studioElementRevisions.appliedRevision, frame.revision),
+					eq(studioElementRevisions.undoRevision, frame.revision),
+				),
+			),
+		)
+		.limit(1);
+	if (
+		approved &&
+		(approved.appliedRevision === frame.revision
+			? approved.afterHtml
+			: approved.beforeHtml) === frame.htmlCode
+	)
+		return base;
 	const tokens = extractDesignSystemTokens(project.designMd);
 	const canonical = Boolean(
 		project.designBlueprint &&

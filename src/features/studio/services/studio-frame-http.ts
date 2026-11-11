@@ -1,6 +1,11 @@
 import { getRequestHeaders } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { requireUser } from "@/lib/session";
+import {
+	mutateStudioElementHttp,
+	readStudioElementHttp,
+	studioElementHttpSchemas,
+} from "./studio-element-http";
 import { readStudioFrameDocument } from "./studio-frame-document";
 import {
 	STUDIO_FRAME_ERRORS,
@@ -33,6 +38,11 @@ export async function GET({
 	try {
 		const user = await requireUser(getRequestHeaders());
 		const url = new URL(request.url);
+		const elementResponse = await readStudioElementHttp(url, user.id);
+		if (elementResponse) {
+			status = elementResponse.status;
+			return elementResponse;
+		}
 		const projectId = url.searchParams.get("projectId");
 		const frameId = url.searchParams.get("frameId");
 		if (!projectId || !frameId) {
@@ -83,6 +93,7 @@ export async function GET({
 }
 
 export const studioFrameBodySchema = z.discriminatedUnion("action", [
+	...studioElementHttpSchemas,
 	z.object({
 		action: z.literal("operation"),
 		projectId: z.string().min(1),
@@ -123,6 +134,21 @@ export async function POST({
 			);
 		}
 		const body = parseRes.data;
+		if (
+			body.action === "element-prepare" ||
+			body.action === "element-transition"
+		) {
+			if (request.headers.get("origin") !== new URL(request.url).origin) {
+				return Response.json(
+					{
+						error: "Asal permintaan tidak valid.",
+						code: "STUDIO_UNAUTHORIZED",
+					},
+					{ status: 403 },
+				);
+			}
+			return await mutateStudioElementHttp(body, user.id, request.signal);
+		}
 		if (body.action === "operation") {
 			const accepted = await enqueueStudioOperation(body.projectId, user.id, {
 				prompt: body.prompt,

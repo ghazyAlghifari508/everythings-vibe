@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { studioElementTargetSchema } from "./studio-element";
 
 export const studioMessageStatusSchema = z.enum([
 	"accepted",
@@ -12,6 +13,7 @@ export const studioMessageStatusSchema = z.enum([
 export const studioMessageAttachmentSchema = z.object({
 	frameId: z.string().min(1),
 	name: z.string(),
+	target: studioElementTargetSchema.optional(),
 });
 export const studioMessageProgressSchema = z.object({
 	phase: z.enum([
