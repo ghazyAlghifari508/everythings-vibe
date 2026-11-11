@@ -2,6 +2,7 @@ import type { StudioDesignMode } from "@/features/studio/types/studio-prompts";
 import type { StudioDesignBlueprint } from "./studio-design-blueprint";
 import {
 	DOMAIN_RECIPES,
+	FLOW_SUCCESSORS,
 	GENERIC_FOCUS,
 	NAV_DESTINATION_DESCRIPTION,
 	PLATFORM_FALLBACK,
@@ -44,6 +45,12 @@ export interface StudioSuggestionInput {
 	frameNames: readonly string[];
 	/** Frame descriptions hold the prompt that asked for each screen. */
 	frameDescriptions?: readonly string[];
+	/**
+	 * The project's own message history: the original brief and every later
+	 * request. The brief names the audience and the workflow the user asked for
+	 * before any screen existed.
+	 */
+	projectBrief?: string;
 }
 
 /** Two or three cards stay readable; a longer list is a wall of filler. */
@@ -108,12 +115,21 @@ function buildPrompt(
 	name: string,
 	focus: string,
 ) {
+	// Who the screen is for and which surface it lives on decide the layout as
+	// much as the screen content does, so both reach the prompt explicitly.
+	const audience = input.blueprint?.productIdentity.targetAudience?.trim();
 	return [
 		`Buat satu halaman ${name}${formatTarget(input.projectTitle)}.`,
 		sentence(focus),
+		audience ? `Sasarannya ${audience}.` : "",
+		input.designMode === "mobile"
+			? "Susun tata letak mobile satu kolom dengan target sentuh yang nyaman."
+			: "",
 		"Gunakan navigasi, warna, tipografi, header, dan komponen yang konsisten dengan layar project yang sudah ada.",
 		"Jangan mengubah halaman lain.",
-	].join(" ");
+	]
+		.filter(Boolean)
+		.join(" ");
 }
 
 function suggestionId(name: string): string {
@@ -172,6 +188,19 @@ function conceptForName(name: string): StudioScreenConcept | null {
 	return null;
 }
 
+/**
+ * Successor names for a screen the canvas already holds. Names can carry extra
+ * words ("Katalog Produk"), so a key matches when either token set contains the
+ * other, the same rule that rejects near-duplicate screens.
+ */
+function successorsForName(name: string): readonly string[] {
+	const tokens = tokensOf(name);
+	if (tokens.length === 0) return [];
+	for (const [key, successors] of Object.entries(FLOW_SUCCESSORS))
+		if (isSameScreen(tokensOf(key), tokens)) return successors;
+	return [];
+}
+
 /** Recipes whose own trigger words appear in this project text, in lexicon order. */
 function matchedRecipes(
 	text: string,
@@ -188,10 +217,11 @@ function matchedRecipes(
 }
 
 /**
- * Candidates in source-priority order: the user's own requests and PRD, the
- * remaining blueprint plan, the journey the existing screens already imply, the
- * navigation destinations without a screen, the detected product domain, and
- * only then the base sets.
+ * Candidates in source-priority order: the user's own earlier requests and PRD,
+ * the remaining blueprint plan, the journey the existing screen names already
+ * imply, the navigation destinations without a screen, the detected product
+ * domain, the step after a screen that is already on the canvas, and only then
+ * the platform base sets.
  */
 function collectCandidates(
 	input: StudioSuggestionInput,
@@ -224,15 +254,17 @@ function collectCandidates(
 	if (blueprint)
 		for (const screen of [...blueprint.screenPlan].sort(
 			(a, b) => a.order - b.order,
-		))
+		)) {
+			const known = conceptForName(screen.name);
 			candidates.push({
 				name: screen.name,
 				title: `Buat halaman ${screen.name}`,
-				label: screen.name,
+				label: known?.label ?? screen.name,
 				description: brief(screen.role),
 				focus: screen.role,
 				reason: "Rencana layar blueprint belum ada di canvas",
 			});
+		}
 
 	// 4. An existing screen name can imply the rest of its flow.
 	for (const { concept, hit } of matchedRecipes(
@@ -263,6 +295,7 @@ function collectCandidates(
 	// 6. The product domain adds the workflow a page name cannot express.
 	const domainText = [
 		prd,
+		input.projectBrief ?? "",
 		input.projectTitle,
 		(input.frameNames ?? []).join("\n"),
 		(input.frameDescriptions ?? []).join("\n"),
@@ -281,7 +314,26 @@ function collectCandidates(
 			);
 	}
 
-	// 7. Base screens, only when the project itself said nothing more specific.
+	// 7. The step a screen on the canvas already calls for. "Katalog" alone never
+	// says "Keranjang", and that missing link is the journey gap the user feels.
+	for (const name of input.frameNames ?? [])
+		for (const successor of successorsForName(name)) {
+			const known = conceptForName(successor);
+			const reason = `Alur lanjutan dari layar "${name}"`;
+			candidates.push(
+				known
+					? fromConcept(known, reason)
+					: {
+							name: successor,
+							label: successor,
+							description: NAV_DESTINATION_DESCRIPTION,
+							focus: GENERIC_FOCUS,
+							reason,
+						},
+			);
+		}
+
+	// 8. Base screens, only when the project itself said nothing more specific.
 	for (const concept of PLATFORM_FALLBACK[input.designMode])
 		candidates.push(
 			fromConcept(concept, "Layar dasar yang belum ada di canvas"),
@@ -294,6 +346,9 @@ export function deriveStudioScreenSuggestions(
 	input: StudioSuggestionInput,
 ): StudioScreenSuggestion[] {
 	const taken = input.frameNames.map(tokensOf).filter((t) => t.length > 0);
+	// Bubbles are read at a glance, so two cards must never show the same action
+	// phrase even when their screen names differ.
+	const takenLabels = new Set<string>();
 	const suggestions: StudioScreenSuggestion[] = [];
 
 	for (const candidate of collectCandidates(input)) {
@@ -301,6 +356,9 @@ export function deriveStudioScreenSuggestions(
 		const name = cleanScreenName(candidate.name);
 		const tokens = tokensOf(name);
 		if (tokens.length === 0) continue;
+		const label = cleanScreenName(candidate.label || name);
+		const normalizedLabel = normalizeStudioScreenName(label);
+		if (!normalizedLabel || takenLabels.has(normalizedLabel)) continue;
 		// A candidate is a duplicate when its own name, or any name that means
 		// the same screen ("Checkout" for "Pembayaran"), is already on the canvas
 		// or in the row.
@@ -315,10 +373,11 @@ export function deriveStudioScreenSuggestions(
 		)
 			continue;
 		taken.push(...forms);
+		takenLabels.add(normalizedLabel);
 		suggestions.push({
 			id: suggestionId(name),
 			title: candidate.title?.trim() || `Buat halaman ${name}`,
-			label: candidate.label || name,
+			label,
 			description: brief(candidate.description),
 			prompt: buildPrompt(input, name, candidate.focus),
 			intent: "add_screen",
@@ -332,7 +391,8 @@ export function deriveStudioScreenSuggestions(
 /**
  * Stable project-content revision. Frame names carry add/rename/delete, so the
  * key changes with the canvas; the PRD hash and blueprint version cover plan
- * edits without re-reading the documents.
+ * edits without re-reading the documents. The brief hash makes a new user
+ * request re-derive the row, and nothing else about a poll does.
  */
 export function studioSuggestionRevision(input: StudioSuggestionInput): string {
 	return [
@@ -343,6 +403,7 @@ export function studioSuggestionRevision(input: StudioSuggestionInput): string {
 		normalizeStudioScreenName(input.projectTitle),
 		input.frameNames.map(normalizeStudioScreenName).join("|"),
 		hashText((input.frameDescriptions ?? []).join("\n")),
+		hashText(input.projectBrief ?? ""),
 	].join("::");
 }
 
