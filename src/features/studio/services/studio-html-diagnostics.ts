@@ -14,6 +14,7 @@ export function inspectStudioHtml(html: string): {
 	const dom = new JSDOM(html);
 	const document = dom.window.document;
 	const { hard, warnings } = inspectStudioLayout(document);
+	const structural: StudioQualityFinding[] = [];
 	const ids = new Set<string>();
 	for (const element of document.querySelectorAll("[id]")) {
 		if (ids.has(element.id)) hard.push(`Duplicate id: ${element.id}.`);
@@ -137,10 +138,20 @@ export function inspectStudioHtml(html: string): {
 			"[data-studio-content] [data-studio-shell], [data-studio-content] [data-studio-header]",
 		)
 	) {
-		hard.push("Duplicate global shell inside screen content.");
+		structural.push({
+			code: "DUPLICATE_GLOBAL_SHELL",
+			severity: "repairable",
+			confidence: "high",
+			message: "Duplicate global shell inside screen content.",
+		});
 	}
 	if (document.querySelectorAll("nav[data-studio-navigation]").length > 1) {
-		hard.push("Duplicate global navigation detected.");
+		structural.push({
+			code: "DUPLICATE_GLOBAL_NAVIGATION",
+			severity: "repairable",
+			confidence: "high",
+			message: "Duplicate global navigation detected.",
+		});
 	}
 	if (
 		/\[data-studio-shell\]|#studio-canonical-style|\[data-studio-header\]/i.test(
@@ -192,19 +203,7 @@ export function inspectStudioHtml(html: string): {
 			}
 		}
 	}
-	for (const el of document.querySelectorAll("[style*='width']")) {
-		const style = el.getAttribute("style") ?? "";
-		const match =
-			/(?<![-\w])(min-width|width)\s*:\s*(\d+(?:\.\d+)?)(px)\b/i.exec(style);
-		const scroller = el.parentElement?.closest(
-			'[data-table-container],.table-container,.overflow-x-auto,[style*="overflow-x:auto"],[style*="overflow-x: auto"]',
-		);
-		if (match && Number(match[2]) > 1440 && !scroller) {
-			hard.push("Lebar tetap melebihi viewport.");
-			break;
-		}
-	}
-	const structural = inspectStudioStructuralQuality(document);
+	structural.push(...inspectStudioStructuralQuality(document));
 	const findings: StudioQualityFinding[] = [
 		...[...new Set(hard)].map(
 			(message): StudioQualityFinding => ({

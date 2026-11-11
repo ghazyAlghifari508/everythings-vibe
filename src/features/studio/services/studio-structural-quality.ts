@@ -6,7 +6,7 @@ export interface StudioQualityFinding {
 }
 
 const essentialSelector =
-	'label,button,output,legend,[data-primary],[data-ui="value"],[data-price],[data-quantity]';
+	'h1,h2,h3,label,button,output,legend,[data-primary],[data-ui="value"],[data-price],[data-quantity]';
 const overflow = (style: CSSStyleDeclaration, axis: "x" | "y") => {
 	const value = axis === "x" ? style.overflowX : style.overflowY;
 	// JSDOM retains visible longhand defaults even with a declared shorthand.
@@ -33,6 +33,20 @@ export function inspectStudioStructuralQuality(
 		}
 		return style;
 	};
+	const intentionallyHidden = (element: Element) => {
+		for (let node: Element | null = element; node; node = node.parentElement) {
+			const style = styleOf(node);
+			if (
+				node.matches('[hidden],[aria-hidden="true"],template,.sr-only') ||
+				style.display === "none" ||
+				/^(hidden|collapse)$/.test(style.visibility) ||
+				(node.matches("details:not([open])") &&
+					!node.querySelector("summary")?.contains(element))
+			)
+				return true;
+		}
+		return false;
+	};
 	const report = (code: string, message: string) =>
 		findings.set(code, {
 			code,
@@ -42,14 +56,7 @@ export function inspectStudioStructuralQuality(
 		});
 	for (const element of document.querySelectorAll(essentialSelector)) {
 		if (!(element.textContent ?? "").trim()) continue;
-		// Hidden alternatives, collapsed disclosures and screen-reader text are intentional.
-		if (
-			element.closest(
-				'[hidden],[aria-hidden="true"],template,details:not([open])',
-			) ||
-			element.classList.contains("sr-only")
-		)
-			continue;
+		if (intentionallyHidden(element)) continue;
 		const style = styleOf(element);
 		if (
 			style.textOverflow === "ellipsis" &&
@@ -67,14 +74,14 @@ export function inspectStudioStructuralQuality(
 		) {
 			const parentStyle = styleOf(parent);
 			if (
-				(clipped(parentStyle) ||
-					/^(hidden|clip)$/.test(overflow(parentStyle, "y"))) &&
-				[
-					pixels(parentStyle.height),
-					pixels(parentStyle.maxHeight),
-					pixels(parentStyle.width),
-					pixels(parentStyle.maxWidth),
-				].includes(0)
+				(clipped(parentStyle) &&
+					[pixels(parentStyle.width), pixels(parentStyle.maxWidth)].includes(
+						0,
+					)) ||
+				(/^(hidden|clip)$/.test(overflow(parentStyle, "y")) &&
+					[pixels(parentStyle.height), pixels(parentStyle.maxHeight)].includes(
+						0,
+					))
 			)
 				report(
 					"CRITICAL_CONTENT_HIDDEN",
@@ -82,17 +89,30 @@ export function inspectStudioStructuralQuality(
 				);
 		}
 		if (
-			element.matches(
-				'output,[data-ui="value"],[data-price],[data-quantity]',
-			) &&
-			element.querySelector("br")
-		)
-			report(
-				"ATOMIC_LABEL_BROKEN",
-				"Price or quantity contains a forced line break; keep currency, amount and unit in one atomic group.",
+			element.matches('output,[data-ui="value"],[data-price],[data-quantity]')
+		) {
+			const fragments = Array.from(element.childNodes).filter((node) =>
+				node.textContent?.trim(),
 			);
+			const flex = /^(inline-)?flex$/.test(style.display);
+			const forcedBlocks =
+				fragments.length > 1 &&
+				((flex && /column/.test(style.flexDirection)) ||
+					(!flex &&
+						style.display !== "grid" &&
+						style.display !== "inline-grid" &&
+						Array.from(element.children).some((child) =>
+							/^(block|flex|grid)$/.test(styleOf(child).display),
+						)));
+			if (element.querySelector("br") || forcedBlocks)
+				report(
+					"ATOMIC_LABEL_BROKEN",
+					"Price or quantity contains forced line tracks; keep currency, amount and unit in one atomic group.",
+				);
+		}
 	}
 	for (const image of document.querySelectorAll("img")) {
+		if (intentionallyHidden(image)) continue;
 		const frame = image.parentElement?.closest("[data-media],figure");
 		if (!frame || frame === image) continue;
 		const frameStyle = styleOf(frame);
@@ -115,24 +135,25 @@ export function inspectStudioStructuralQuality(
 			);
 	}
 	for (const track of document.querySelectorAll('[data-ui="carousel"]')) {
+		if (intentionallyHidden(track)) continue;
 		const style = styleOf(track);
-		if (/^(auto|scroll)$/.test(overflow(style, "x"))) continue;
+		if (style.display !== "flex" && style.display !== "inline-flex") continue;
 		if (
-			style.display === "flex" &&
-			Array.from(track.children).some((child) => {
-				const item = styleOf(child);
-				return Number(item.flexShrink) > 0;
-			})
+			Array.from(track.children).some(
+				(child) =>
+					!intentionallyHidden(child) && Number(styleOf(child).flexShrink) > 0,
+			)
 		)
 			report(
 				"SCROLLER_SHRINKING",
-				"Declared carousel shrinks cards without horizontal scrolling; preserve item width and contain native scrolling in the track.",
+				"Declared carousel allows cards to shrink; preserve readable item width with flex-shrink:0 and contain native scrolling in the track.",
 			);
 	}
 	for (const row of document.querySelectorAll(
 		'div,section,footer,[data-ui="actions"]',
 	)) {
 		if (!row.querySelector(essentialSelector)) continue;
+		if (intentionallyHidden(row)) continue;
 		const style = styleOf(row);
 		const width = pixels(style.width);
 		if (

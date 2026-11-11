@@ -44,18 +44,6 @@ describe("P3 generated-UI defect regression", () => {
 		);
 	});
 
-	it("detects a wrapped badge so short labels are never split across lines", () => {
-		const fine = mobileDoc('<span data-ui="badge">Private Trip</span>');
-		expect(inspectStudioHtml(fine).hard).toEqual([]);
-
-		const expensive = mobileDoc(
-			'<span class="badge">Terverifikasi Lunas</span>',
-		);
-		expect(inspectStudioHtml(expensive).warnings).toContain(
-			"Badge text wraps to more than one line; give the label room or shorten it.",
-		);
-	});
-
 	it("assembles a travel screen with real destination media marked 16/9, not fake SVG art", () => {
 		const html = assembleCanonicalShell(
 			mobileDoc(

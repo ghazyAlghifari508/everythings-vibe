@@ -101,11 +101,11 @@ const MEDIA_RATIOS = [
 function mediaRules(): string {
 	const sized = MEDIA_RATIOS.map(
 		([name, ratio]) =>
-			`:where([data-media="${name}"]){aspect-ratio:${ratio};width:100%;object-fit:cover}`,
+			`:where([data-media="${name}"]){aspect-ratio:${ratio};width:100%;object-fit:${name === "product" ? "contain" : "cover"}}`,
 	);
 	const filled = MEDIA_RATIOS.map(
 		([name]) =>
-			`:where([data-media="${name}"] > img, [data-media="${name}"] > picture > img, [data-media="${name}"] > video){width:100%;height:100%;object-fit:cover}`,
+			`:where([data-media="${name}"] > img, [data-media="${name}"] > picture > img, [data-media="${name}"] > video){width:100%;height:100%;object-fit:${name === "product" ? "contain" : "cover"}}`,
 	);
 	return [
 		...sized,
@@ -115,9 +115,10 @@ function mediaRules(): string {
 		`:where([data-media="logo"]){object-fit:contain;width:auto;height:auto;max-width:100%;max-height:100%}`,
 		`:where([data-media="logo"] > img, [data-media="logo"] > svg){object-fit:contain;max-width:100%;max-height:100%}`,
 		`:where([data-media="photo"]){object-fit:cover}`,
+		`:where([data-media="product"]){background:var(--app-surface)}`,
 		`:where([data-media-fit="contain"], [data-media-fit="contain"] > img, [data-media-fit="contain"] > picture > img){object-fit:contain}`,
 		`:where([data-media-fit="cover"], [data-media-fit="cover"] > img, [data-media-fit="cover"] > picture > img){object-fit:cover}`,
-		`@supports not (aspect-ratio:16/9){:where([data-media="banner"], [data-media="promo"], [data-media="product"], [data-media="thumb"]){width:100%;min-height:200px;object-fit:cover}}`,
+		`@supports not (aspect-ratio:16/9){:where([data-media="banner"], [data-media="promo"], [data-media="thumb"]){width:100%;min-height:200px;object-fit:cover}:where([data-media="product"]){width:100%;object-fit:contain}}`,
 	].join("\n");
 }
 
