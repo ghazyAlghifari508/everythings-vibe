@@ -1,9 +1,20 @@
-import type { StudioFrameRow, StudioProjectRow } from "@/db/schema";
+import { and, eq } from "drizzle-orm";
+import { db } from "@/db";
+import {
+	type StudioFrameRow,
+	type StudioProjectRow,
+	studioFrames,
+	studioProjects,
+} from "@/db/schema";
 import { extractCleanHtml } from "@/features/studio/utils/clean-html";
 import { ScrapeError } from "@/lib/design-errors";
 import type { StudioProjectFullDetail } from "../types/studio-service";
+import { validateCanonicalShell } from "./studio-canonical-shell";
+import { enforceDesignSystemOnHtml } from "./studio-design-system-html";
 import { extractDesignSystemTokens } from "./studio-design-tokens";
+import { StudioFrameError } from "./studio-frame-errors";
 import { finalizeStudioFrameHtml } from "./studio-frame-finalize";
+import { validateGeneratedHtml } from "./studio-generated-html-validation";
 import { getStudioProjectDetail } from "./studio-project-detail";
 
 export interface StudioFrameDocument {
@@ -12,23 +23,16 @@ export interface StudioFrameDocument {
 	screen: string;
 	designMd: string | null;
 	repairCount: number;
-	/** "persisted" means the safe rebuild was skipped; the stored HTML stands. */
+	/** Legacy documents without canonical markers keep their authored composition. */
 	source: "finalized" | "persisted";
 }
 
-/**
- * Builds the final document for a persisted frame.
- *
- * Both consumers — the canvas capture and the ZIP export — go through this one
- * function, so preview and export cannot drift into two renderers with
- * different shell CSS. A rebuild that fails is never allowed to break a preview
- * or an export: the stored document is returned untouched instead.
- */
-export function finalizeStudioFrameDetail(
+/** Refresh the shared document before either preview capture or ZIP export reads it. */
+export async function finalizeStudioFrameDetail(
 	project: StudioProjectRow,
 	frame: StudioFrameRow,
 	logoUrl: string | null,
-): StudioFrameDocument {
+): Promise<StudioFrameDocument> {
 	const persisted = extractCleanHtml(frame.htmlCode ?? "");
 	const base: StudioFrameDocument = {
 		html: persisted,
@@ -39,19 +43,70 @@ export function finalizeStudioFrameDetail(
 		source: "persisted",
 	};
 	if (!persisted) return base;
-	try {
-		const finalized = finalizeStudioFrameHtml(persisted, {
-			blueprint: project.designBlueprint,
-			screen: frame.name,
-			tokens: extractDesignSystemTokens(project.designMd),
-			logoUrl,
-			viewport: frame.viewport,
-			mode: "refresh",
-		});
-		return { ...base, ...finalized, source: "finalized" };
-	} catch {
-		return base;
+	const tokens = extractDesignSystemTokens(project.designMd);
+	const canonical = Boolean(
+		project.designBlueprint &&
+			/data-studio-shell|id="studio-canonical-style"/.test(persisted),
+	);
+	const finalized = finalizeStudioFrameHtml(persisted, {
+		blueprint: project.designBlueprint,
+		screen: frame.name,
+		tokens,
+		logoUrl,
+		viewport: frame.viewport,
+		mode: "refresh",
+	});
+	const html = canonical
+		? enforceDesignSystemOnHtml(
+				finalized.html,
+				tokens,
+				logoUrl,
+				project.designBlueprint,
+			)
+		: finalized.html;
+	if (canonical && project.designBlueprint) {
+		const issues = [
+			...validateCanonicalShell(
+				html,
+				project.designBlueprint,
+				frame.name,
+				tokens,
+				logoUrl,
+			),
+			...validateGeneratedHtml(html, {
+				blueprint: project.designBlueprint,
+				viewport: frame.viewport === "mobile" ? "mobile" : "web",
+				expectTokens: Boolean(tokens),
+			}),
+		];
+		if (issues.length)
+			throw new StudioFrameError("STUDIO_CONTRACT_VIOLATION", issues.join(" "));
 	}
+	// Synthetic legacy frames live only in revision history; never rewrite those snapshots.
+	if (html !== frame.htmlCode && frame.id !== `legacy-${project.id}`) {
+		const [saved] = await db
+			.update(studioFrames)
+			.set({ htmlCode: html, visualHash: null, updatedAt: new Date() })
+			.from(studioProjects)
+			.where(
+				and(
+					eq(studioFrames.id, frame.id),
+					eq(studioFrames.projectId, project.id),
+					eq(studioProjects.id, studioFrames.projectId),
+					eq(studioProjects.userId, project.userId),
+					eq(studioFrames.revision, frame.revision),
+					eq(studioFrames.htmlCode, frame.htmlCode ?? ""),
+				),
+			)
+			.returning({ id: studioFrames.id });
+		if (!saved) throw new StudioFrameError("STUDIO_STALE_REVISION");
+	}
+	return {
+		...base,
+		html,
+		repairCount: finalized.repairCount,
+		source: canonical ? "finalized" : "persisted",
+	};
 }
 
 export async function readStudioFrameDocument(

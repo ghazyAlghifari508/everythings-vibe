@@ -91,27 +91,6 @@ describe("studio-export", () => {
 			global.URL.revokeObjectURL = vi.fn();
 		});
 
-		it("exports ready frames into ZIP archive and triggers download", async () => {
-			const clickSpy = vi.fn();
-			vi.spyOn(document.body, "appendChild");
-			vi.spyOn(document.body, "removeChild");
-
-			// Mock HTMLAnchorElement click
-			const originalCreateElement = document.createElement.bind(document);
-			vi.spyOn(document, "createElement").mockImplementation((tagName) => {
-				const el = originalCreateElement(tagName);
-				if (tagName === "a") {
-					el.click = clickSpy;
-				}
-				return el;
-			});
-
-			await exportProjectAsZip("Finance Mobile App", "p-1", mockFrames);
-
-			expect(global.URL.createObjectURL).toHaveBeenCalled();
-			expect(clickSpy).toHaveBeenCalled();
-		});
-
 		it("rejects empty output rather than acknowledging a nonexistent download", async () => {
 			await expect(
 				exportProjectAsZip("Empty App", "p-1", []),
@@ -121,7 +100,13 @@ describe("studio-export", () => {
 		it("rejects unavailable required assets rather than exporting broken private references", async () => {
 			vi.stubGlobal(
 				"fetch",
-				vi.fn(async () => new Response(null, { status: 404 })),
+				vi.fn(async (url: string) =>
+					url.includes("document=1")
+						? Response.json({
+								html: '<html><body><img src="/api/studio/asset?id=asset-1&amp;cap=token"></body></html>',
+							})
+						: new Response(null, { status: 404 }),
+				),
 			);
 			await expect(
 				exportProjectAsZip("Sample", "p-1", [

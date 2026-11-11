@@ -180,6 +180,10 @@ it("queues a pending revision for the produced version and lets ready-target rev
 
 it("serializes two revisions of one target without overwriting a newer version", async () => {
 	const { project, userId, frames } = await seed();
+	await db
+		.update(studioFrames)
+		.set({ visualHash: "previous-revision" })
+		.where(eq(studioFrames.id, frames[0].id));
 	const [first] = await revise(project.id, userId, [frames[0].id]);
 	const [second] = await revise(project.id, userId, [frames[0].id]);
 	expect(second.dependsOnJobId).toBe(first.id);
@@ -189,6 +193,7 @@ it("serializes two revisions of one target without overwriting a newer version",
 	await runStudioJobPipeline(second.id, project.id, userId);
 	const detail = await getStudioProjectDetail(project.id, userId);
 	expect(detail.frames[0].revision).toBe(3);
+	expect(detail.frames[0].visualHash).toBeNull();
 	expect(
 		detail.jobs
 			.filter((job) => job.jobType === "revise")

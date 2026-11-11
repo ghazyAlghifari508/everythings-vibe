@@ -1,6 +1,5 @@
 import JSZip from "jszip";
 import type { StudioFrameRow } from "@/db/schema";
-import { extractCleanHtml } from "@/features/studio/utils/clean-html";
 
 export function sanitizeFilename(name: string): string {
 	return (
@@ -13,40 +12,34 @@ export function sanitizeFilename(name: string): string {
 }
 
 /** Local Studio assets are relative to the app origin and must be bundled. */
-const INTERNAL_ASSET_URL = /\/api\/studio\/asset\?[^"'\s<>]+/g;
+const INTERNAL_ASSET_URL = /\/api\/studio\/asset\?[^"'\s<>)]+/g;
 const INTERNAL_ASSET_REMAINS = /\/api\/studio\/asset\?/;
 /** Any remaining absolute URL is a documented online dependency, not bundled. */
 const EXTERNAL_URL = /https?:\/\/([^/"'\s<>)+]+)/g;
 const NOT_A_DEPENDENCY = /^(?:www\.)?w3\.org$/i;
 
-/**
- * Reads the frame's final document from the server.
- *
- * The ZIP used to ship whatever bytes were persisted, which let an already
- * generated screen keep an old canonical stylesheet forever. The server owns the
- * one final-document transformation, so preview and export cannot disagree. A
- * missing answer falls back to the persisted HTML instead of failing the export.
- */
+/** The server returns the persisted document shared with preview capture. */
 async function readFinalHtml(
 	projectId: string,
 	frameId: string,
-): Promise<string | null> {
+): Promise<string> {
 	try {
 		const response = await fetch(
 			`/api/studio/frame?projectId=${encodeURIComponent(projectId)}&frameId=${encodeURIComponent(frameId)}&document=1`,
 		);
-		if (!response.ok) return null;
+		if (!response.ok) throw new Error("Final document unavailable");
 		const body: unknown = await response.json();
 		if (
 			typeof body === "object" &&
 			body !== null &&
 			"html" in body &&
-			typeof body.html === "string"
+			typeof body.html === "string" &&
+			body.html.trim().length > 0
 		)
 			return body.html;
-		return null;
+		throw new Error("Final document missing");
 	} catch {
-		return null;
+		throw new Error("Gagal membaca HTML final. Coba unduh kembali.");
 	}
 }
 
@@ -106,7 +99,7 @@ async function bundleAssets(
 					? "jpg"
 					: "png";
 		const localPath = `assets/asset-${assetMap.size + 1}.${ext}`;
-		zip.file(localPath, blob);
+		zip.file(localPath, blob.arrayBuffer());
 		assetMap.set(url, `./${localPath}`);
 	}
 	return assetMap;
@@ -124,11 +117,7 @@ export async function exportProjectAsZip(
 		throw new Error("Belum ada layar selesai untuk diekspor.");
 
 	const htmls = await Promise.all(
-		readyFrames.map(
-			async (frame) =>
-				(await readFinalHtml(projectId, frame.id)) ??
-				extractCleanHtml(frame.htmlCode ?? ""),
-		),
+		readyFrames.map((frame) => readFinalHtml(projectId, frame.id)),
 	);
 
 	const assetMap = await bundleAssets(zip, htmls);

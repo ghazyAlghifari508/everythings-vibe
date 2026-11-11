@@ -20,6 +20,7 @@ export async function persistStudioFrameVersion(
 		.set({
 			name: input.name,
 			htmlCode: input.htmlCode,
+			visualHash: null,
 			status: "ready",
 			error: null,
 			revision: input.baseRevision + 1,

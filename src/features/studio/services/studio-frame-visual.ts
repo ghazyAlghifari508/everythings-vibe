@@ -21,9 +21,7 @@ export async function getStudioFrameVisual(
 	const frame = detail.frames.find((entry) => entry.id === frameId);
 	if (!frame?.htmlCode)
 		throw new ScrapeError("WEBSITE_BLOCKED", "Output frame belum tersedia.");
-	// The capture reads the same final document the export ships, so a screen
-	// generated before a canonical CSS fix renders the fixed shell too.
-	const frameDocument = finalizeStudioFrameDetail(
+	const frameDocument = await finalizeStudioFrameDetail(
 		detail.project,
 		frame,
 		detail.logoUrl,
@@ -52,16 +50,15 @@ export async function getStudioFrameVisual(
 				eq(studioAssets.userId, userId),
 			),
 		);
-	// A forced retry replaces broken cached renders; the newest capture wins.
-	// For existing projects with legacy JPEG captures, fall back to assets matching
-	// the frame's previously recorded visualHash when a visual-v3 match is absent.
+	// Old hash formats remain usable only when refreshing did not change the HTML.
 	const cached = options.forceRecapture
 		? undefined
 		: assets
 				.filter(
 					(asset) =>
 						asset.filename.startsWith(`visual-${hash}-`) ||
-						(Boolean(frame.visualHash) &&
+						(frameDocument.html === frame.htmlCode &&
+							Boolean(frame.visualHash) &&
 							asset.filename.startsWith(`visual-${frame.visualHash}-`)),
 				)
 				.sort(
