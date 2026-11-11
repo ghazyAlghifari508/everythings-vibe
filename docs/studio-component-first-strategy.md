@@ -16,16 +16,16 @@ This document establishes the **Component-First Design Strategy** and domain-awa
 
 ## 2. Evaluation of External UI Libraries & Component Systems
 
-Per task requirements, six component ecosystems were investigated to determine applicable architectural patterns and implementation boundaries:
+The original six-system review is retained below. P5 adds the current ten-system review and explicit adoption scope in [p5-implementation.md](prompt-design-studio/p5-implementation.md); use that review for license decisions.
 
 | Component System | Source & License | Nature & Tech Stack | Applicability to Studio Prototypes | Adopted Patterns / Decisions |
 | :--- | :--- | :--- | :--- | :--- |
 | **shadcn/ui** | [ui.shadcn.com](https://ui.shadcn.com/) (MIT) | React 19, Radix Primitives, Tailwind CSS | **High (Structural & CSS)**. Studio application already uses shadcn primitives (`src/components/ui/`). For generated prototypes, Radix runtime cannot execute in static HTML, but its Tailwind utility combinations and accessible DOM structures map 1:1. | Data table layout with bounded scroll wrapper, Card with Header/Title/Content structure, input field groups with floating/stacked labels, badge variants. |
 | **HeroUI** (NextUI) | [heroui.com](https://www.heroui.com/) (MIT) | React, Tailwind Variants, Framer Motion | **High (Visual & Chips)**. Runtime dependencies (Framer Motion) excluded from static frames, but visual aesthetics (soft surface contrast, status chips with indicator dots, rounded stat cards) adapted directly. | Status chips (`Berhasil`, `Tertunda`, `Gagal`) with semantic indicator pips; modern segmented stats cards. |
 | **Magic UI** | [magicui.design](https://magicui.design/) (MIT) | React, Tailwind, Framer Motion | **Medium (Layout Only)**. Heavy JS animations and canvas components excluded to prevent runtime errors in static iframes. Bento-grid layout structures (`grid-cols-1 md:grid-cols-3`) adopted. | Structural bento grid containers for high-density overview cards. Pure CSS transitions only. |
-| **React Bits** | [reactbits.dev](https://reactbits.dev/) (MIT) | React, CSS animations, Canvas | **Low-Medium**. Creative micro-interactions and CSS gradient utilities. Interactive canvas scripts excluded. | Pure CSS hover transitions, hairline divider accents. |
-| **Thinking Orbs** | [thinkingorbs.com](https://www.thinkingorbs.com/) | WebGL / Canvas interactive orbs | **Inapplicable**. Requires WebGL/canvas JavaScript runtime that violates static prototype stability and triggers "AI slop" (distracting background glowing spheres). | Explicitly rejected for utility SaaS. Replaced by restrained CSS background tints if needed. |
-| **Affect UI** | [affectui.com](https://www.affectui.com/) (MIT) | Tailwind CSS enterprise components | **High (Dashboard & Data UX)**. Rich enterprise data tables, faceted filter bars, metric trend cards with delta badges, and audit log list patterns. | Metric cards with percentage delta badges, two-column form-and-table management views, search/filter toolbars. |
+| **React Bits** | [reactbits.dev](https://reactbits.dev/) ([MIT + Commons Clause](https://github.com/DavidHDev/react-bits/blob/main/LICENSE.md)) | React, CSS animations, Canvas | No P5 source adoption. Redistribution restrictions require separate review for reusable generated component/template products. | No animation or visual-effect runtime added. |
+| **Thinking Orbs** | [thinkingorbs.com](https://www.thinkingorbs.com/) ([MIT](https://github.com/yogesharc/thinking-orbs/blob/main/packages/thinkingorbs/LICENSE)) | React, dependency-free JS and SwiftUI AI-status indicators | No matching navigation/layout need in P5. The catalog is not WebGL-only. | No animated status indicator added. |
+| **affectUI** | [affectui.com](https://www.affectui.com/) ([license](https://www.affectui.com/license)) | Self-contained React/TSX components with inline styles | Mixed catalog: free MIT items and commercial Pro items. Not a blanket-MIT Tailwind library. | No P5 source adoption; no Pro source copied or redistributed. |
 
 ---
 
@@ -156,8 +156,8 @@ Different application domains have distinct UX and visual composition models:
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │ SHARED CANONICAL SHELL (Deterministic Studio Assembly)       │
-│ - Global Header: Brand Logo, Application Title, Screen Name │
-│ - Global Navigation: Sidebar (Web) or Bottom Tabs (Mobile)  │
+│ - Header: public brand + navbar; app brand; mobile title    │
+│ - Navigation: public top menu; app sidebar/top; mobile tabs │
 │ - Design Tokens: CSS Variables (--app-primary, etc.)        │
 ├─────────────────────────────────────────────────────────────┤
 │ AI-GENERATED SCREEN BODY (<main data-studio-content>)       │
