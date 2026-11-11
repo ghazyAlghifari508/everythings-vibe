@@ -361,3 +361,122 @@ it("retains the selected target and operation identity when a failed request is 
 	expect(bodies[1].requestId).toBe(bodies[0].requestId);
 	expect(bodies[1].frameIds).toEqual(["chat-f"]);
 });
+
+it("detaching a target keeps its frame on the canvas", () => {
+	render(<StudioWorkspace initialData={fixture()} />);
+	fireEvent.click(screen.getByRole("button", { name: "Eksplorasi" }));
+
+	fireEvent.click(screen.getByRole("button", { name: "Lepas Eksplorasi" }));
+
+	expect(screen.queryByRole("button", { name: "Lepas Eksplorasi" })).toBeNull();
+	// Detaching is a composer-scope action: the artboard itself is untouched.
+	expect(screen.getByRole("button", { name: "Eksplorasi" })).toBeDefined();
+});
+
+it("drops a target whose frame was replaced, so the next request sends no ghost id", async () => {
+	const bodies: { frameIds: string[] }[] = [];
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async (_url: string, init?: RequestInit) => {
+			if (!init?.body) return Response.json(fixture());
+			bodies.push(JSON.parse(String(init.body)));
+			return Response.json({ intent: "revise_selected", jobs: [] });
+		}),
+	);
+	const initial = fixture();
+	const { rerender } = render(<StudioWorkspace initialData={initial} />);
+	fireEvent.click(screen.getByRole("button", { name: "Eksplorasi" }));
+	expect(
+		screen.getByRole("button", { name: "Lepas Eksplorasi" }),
+	).toBeDefined();
+
+	// Planning replaced the slot: the row with id "chat-f" is gone from the canvas.
+	const replaced = fixture();
+	replaced.frames = [];
+	replaced.messages = [];
+	rerender(<StudioWorkspace initialData={replaced} />);
+
+	expect(screen.queryByRole("button", { name: "Lepas Eksplorasi" })).toBeNull();
+	fireEvent.change(screen.getByRole("textbox"), {
+		target: { value: "Ubah warna aksen tombol utama" },
+	});
+	fireEvent.click(screen.getByRole("button", { name: "Kirim prompt" }));
+
+	await waitFor(() => expect(bodies).toHaveLength(1));
+	expect(bodies[0].frameIds).toEqual([]);
+});
+
+it("keeps the submitted target set when the selection changes mid-flight", async () => {
+	const bodies: { frameIds: string[] }[] = [];
+	let release: (() => void) | undefined;
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async (_url: string, init?: RequestInit) => {
+			if (!init?.body) return Response.json(fixture());
+			bodies.push(JSON.parse(String(init.body)));
+			await new Promise<void>((resolve) => {
+				release = resolve;
+			});
+			return Response.json({ intent: "revise_selected", jobs: [] });
+		}),
+	);
+	render(<StudioWorkspace initialData={fixture()} />);
+	fireEvent.click(screen.getByRole("button", { name: "Eksplorasi" }));
+	fireEvent.change(screen.getByRole("textbox"), {
+		target: { value: "Ubah ukuran tombol pada layar ini" },
+	});
+	fireEvent.click(screen.getByRole("button", { name: "Kirim prompt" }));
+	await waitFor(() => expect(bodies).toHaveLength(1));
+
+	// A detach while the request is in flight belongs to the next message.
+	fireEvent.click(screen.getByRole("button", { name: "Lepas Eksplorasi" }));
+	await act(async () => release?.());
+
+	expect(bodies[0].frameIds).toEqual(["chat-f"]);
+});
+
+it("keeps composer targets inside their own project", () => {
+	const initial = fixture();
+	const { rerender } = render(<StudioWorkspace initialData={initial} />);
+	fireEvent.click(screen.getByRole("button", { name: "Eksplorasi" }));
+	expect(
+		screen.getByRole("button", { name: "Lepas Eksplorasi" }),
+	).toBeDefined();
+
+	const other = fixture();
+	other.project = { ...other.project, id: "other-project" };
+	other.frames = [
+		...other.frames.map((frame) => ({
+			...frame,
+			id: "other-f",
+			projectId: other.project.id,
+			name: "Lain",
+		})),
+	];
+	rerender(<StudioWorkspace initialData={other} />);
+
+	// The previous project's frame id is not a target of this canvas.
+	expect(screen.queryByRole("button", { name: "Lepas Eksplorasi" })).toBeNull();
+	expect(screen.queryByRole("button", { name: "Lepas Lain" })).toBeNull();
+});
+
+it("never sends a model request while the canvas selection moves", async () => {
+	const bodies: unknown[] = [];
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async (_url: string, init?: RequestInit) => {
+			if (init?.body) bodies.push(init.body);
+			return Response.json(fixture());
+		}),
+	);
+	render(<StudioWorkspace initialData={fixture()} />);
+
+	for (let index = 0; index < 3; index++) {
+		fireEvent.click(screen.getByRole("button", { name: "Eksplorasi" }));
+		fireEvent.click(screen.getByRole("button", { name: "Lepas Eksplorasi" }));
+	}
+
+	// Suggestions are derived, not requested: selecting or detaching a target
+	// never posts an operation on its own.
+	expect(bodies).toEqual([]);
+});

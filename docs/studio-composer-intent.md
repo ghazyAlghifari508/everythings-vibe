@@ -64,6 +64,42 @@ clarifications never reach the model with a destructive default.
 - concurrent operations still refuse to re-queue a frame that is
   `queued`/`generating`.
 
+## Composer targets (selected frames)
+
+The composer's attachments and the canvas selection are the same state; there is
+exactly one owner, `useStudioWorkspace`.
+
+- **State.** `selectedFrameIds` is the target set. `selectedFrames` is derived by
+  filtering the live frame rows, so a chip always carries an `id` (what the
+  request sends) and the frame's current `name` (what the user reads). The frame
+  `revision` is never part of the client target set; the server derives the base
+  revision from the row it locked.
+- **Detach policy.** Clicking a chip's X removes only that id from
+  `selectedFrameIds` (`removeSelectedFrame`) and therefore also clears the
+  canvas selection ring for it, because the canvas reads the same array. The
+  frame row, its HTML and its history are untouched: detaching is a composer
+  scope action, never a delete. This matches the Stitch observation in
+  `p1-architecture-research.md` §2.3, where removing a chip returns the composer
+  to project scope and the screen stays on the canvas.
+- **Clear all.** With more than one target the row also exposes one "Bersihkan"
+  control, which empties the same state. Both controls are `type="button"`, so a
+  detach can never submit the draft.
+- **Stale targets.** A frame row can disappear (planning deletes and reinserts
+  its slots) while its id is still selected. The operation endpoint refuses a
+  revision whose target set names an unknown frame
+  (`STUDIO_INVALID_INPUT`), so a surviving ghost id used to reject every
+  selected-frame request while the composer showed no chip for it. A pruning
+  effect in `useStudioWorkspace` (`pruneStudioFrameSelection`) keeps the set equal
+  to the live canvas, and returns the same array reference when nothing was
+  dropped so a poll never re-renders the composer.
+- **Selection persistence.** `sessionStorage` keyed by `user:project`, written
+  only after the restore for that key completed. A restore is immediately pruned
+  against the live canvas, so reloading cannot revive a deleted frame's id.
+- **Submit snapshot.** `useStudioComposerRequest` copies the target ids at submit
+  time and uses that copy for both the idempotency signature and the request
+  body. A canvas selection change while the request is in flight belongs to the
+  user's next message, never to the operation already sent.
+
 ## Add-screen preserves the project
 
 `add_screen` inserts only the new frame rows (status `queued`) and one `add` job
@@ -98,6 +134,7 @@ composer-driven `add_screen` operation.
 pnpm vitest run src/features/studio/tests/studio-composer-intent.test.ts
 pnpm vitest run src/features/studio/tests/studio-composer-intent-server.test.ts
 pnpm vitest run src/features/studio/tests/studio-composer.test.tsx
+pnpm vitest run src/features/studio/tests/studio-frame-selection.test.ts
 pnpm vitest run src/features/studio/tests/studio-frame-route.test.ts
 pnpm vitest run src/features/studio/tests/studio-operations.integration.test.ts
 pnpm vitest run src/features/studio/tests/studio-add-screen.integration.test.ts

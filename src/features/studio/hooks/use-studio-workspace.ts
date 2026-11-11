@@ -19,6 +19,7 @@ import { extractDesignSystemTokens } from "@/features/studio/services/studio-des
 import { STUDIO_DESIGN_PRESETS } from "@/features/studio/services/studio-presets";
 import type { StudioScreenSuggestion } from "@/features/studio/services/studio-screen-suggestions";
 import type { StudioDetailLoaderData } from "@/features/studio/types/studio";
+import { pruneStudioFrameSelection } from "@/features/studio/utils/studio-frame-selection";
 import { deriveStudioLifecycle } from "@/features/studio/utils/studio-lifecycle";
 
 const NO_SUGGESTIONS: readonly StudioScreenSuggestion[] = [];
@@ -52,6 +53,7 @@ export interface StudioWorkspaceState {
 	selectFrame: (id: string | null, additive?: boolean) => void;
 	selectFrames: (ids: string[]) => void;
 	removeSelectedFrame: (id: string) => void;
+	clearSelectedFrames: () => void;
 	setError: (message: string) => void;
 	handleDuplicate: () => Promise<void>;
 	handleDelete: () => Promise<void>;
@@ -146,7 +148,15 @@ export function useStudioWorkspace(
 		[frames],
 	);
 
-	const projectSuggestions = useStudioScreenSuggestions(project, frames);
+	const conversationText = useMemo(
+		() => (messages ?? []).map((message) => message.content).join("\n"),
+		[messages],
+	);
+	const projectSuggestions = useStudioScreenSuggestions(
+		project,
+		frames,
+		conversationText,
+	);
 	// While a job is running the project is mid-plan, and a next-screen request
 	// would race the planning step that rewrites the frame list. Suggestions
 	// come back as soon as the canvas is idle again.
@@ -163,6 +173,27 @@ export function useStudioWorkspace(
 		setSelectedFrameIds((previous) => previous.filter((entry) => entry !== id));
 		setSelectedFrameId((previous) => (previous === id ? null : previous));
 	}, []);
+
+	const clearSelectedFrames = useCallback(() => {
+		setSelectedFrameIds([]);
+		setSelectedFrameId(null);
+	}, []);
+
+	// A frame row can be replaced (planning rewrites its slots) or deleted while
+	// its id is still selected. The operation endpoint refuses an unknown target,
+	// so a stale id would reject every selected-frame request while the composer
+	// showed no chip to remove. Pruning keeps targets and canvas in step; both
+	// setters bail out when nothing changed, so a poll never re-renders.
+	const liveFrameIds = useMemo(() => frames.map((frame) => frame.id), [frames]);
+	useEffect(() => {
+		const live = new Set(liveFrameIds);
+		setSelectedFrameIds((previous) =>
+			pruneStudioFrameSelection(previous, liveFrameIds),
+		);
+		setSelectedFrameId((previous) =>
+			previous && !live.has(previous) ? null : previous,
+		);
+	}, [liveFrameIds]);
 
 	const actions = useStudioWorkspaceActions({
 		project,
@@ -248,6 +279,7 @@ export function useStudioWorkspace(
 		selectFrame,
 		selectFrames,
 		removeSelectedFrame,
+		clearSelectedFrames,
 		setError,
 		handleDuplicate: actions.handleDuplicate,
 		handleDelete: actions.handleDelete,

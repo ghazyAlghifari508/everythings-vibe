@@ -136,6 +136,7 @@ export function StudioChatPanel({
 					onValueChange={draft.setPrompt}
 					selectedFrames={workspace.selectedFrames}
 					onRemoveFrame={workspace.removeSelectedFrame}
+					onClearFrames={workspace.clearSelectedFrames}
 					onSubmit={workspace.handleComposerSubmit}
 					loading={workspace.composerLoading}
 					suggestions={workspace.suggestions}

@@ -252,4 +252,82 @@ describe("StudioComposer", () => {
 		const spinner = submitBtn.querySelector('[data-testid="spinner"]');
 		expect(spinner).not.toBeNull();
 	});
+
+	it("detaches one target out of two and leaves the other one attached", () => {
+		const onRemoveFrame = vi.fn();
+		render(
+			<StudioComposer
+				onSubmit={vi.fn()}
+				onRemoveFrame={onRemoveFrame}
+				selectedFrames={[
+					{ id: "f-1", name: "Beranda" },
+					{ id: "f-2", name: "Studi Kasus" },
+				]}
+			/>,
+		);
+
+		fireEvent.click(screen.getByRole("button", { name: "Lepas Beranda" }));
+
+		expect(onRemoveFrame).toHaveBeenCalledTimes(1);
+		expect(onRemoveFrame).toHaveBeenCalledWith("f-1");
+		// The other target keeps its own explicit detach control.
+		expect(
+			screen.getByRole("button", { name: "Lepas Studi Kasus" }),
+		).toBeDefined();
+	});
+
+	it("drops every target through one clear-all control without sending", () => {
+		const onClearFrames = vi.fn();
+		const onSubmit = vi.fn();
+		render(
+			<StudioComposer
+				onSubmit={onSubmit}
+				onClearFrames={onClearFrames}
+				selectedFrames={[
+					{ id: "f-1", name: "Beranda" },
+					{ id: "f-2", name: "Studi Kasus" },
+				]}
+			/>,
+		);
+
+		fireEvent.click(
+			screen.getByRole("button", { name: "Bersihkan semua target revisi" }),
+		);
+
+		expect(onClearFrames).toHaveBeenCalledTimes(1);
+		expect(onSubmit).not.toHaveBeenCalled();
+	});
+
+	it("offers no clear-all control for a single target", () => {
+		render(
+			<StudioComposer
+				onSubmit={vi.fn()}
+				onClearFrames={vi.fn()}
+				selectedFrames={[{ id: "f-1", name: "Beranda" }]}
+			/>,
+		);
+		expect(
+			screen.queryByRole("button", { name: "Bersihkan semua target revisi" }),
+		).toBeNull();
+	});
+
+	it("never submits the draft when a target is detached", () => {
+		const onSubmit = vi.fn();
+		const onRemoveFrame = vi.fn();
+		render(
+			<StudioComposer
+				onSubmit={onSubmit}
+				onRemoveFrame={onRemoveFrame}
+				selectedFrames={[{ id: "f-1", name: "Beranda" }]}
+			/>,
+		);
+
+		fireEvent.change(screen.getByRole("textbox"), {
+			target: { value: "Ubah warna aksen tombol utama" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Lepas Beranda" }));
+
+		expect(onRemoveFrame).toHaveBeenCalledWith("f-1");
+		expect(onSubmit).not.toHaveBeenCalled();
+	});
 });

@@ -1,4 +1,4 @@
-import { TextArea } from "@heroui/react";
+import { TextArea, Tooltip } from "@heroui/react";
 import {
 	ArrowUp01Icon,
 	Cancel01Icon,
@@ -41,6 +41,8 @@ export interface StudioComposerProps {
 	className?: string;
 	selectedFrames?: { id: string; name: string }[];
 	onRemoveFrame?: (id: string) => void;
+	/** Drops every composer target at once; the canvas frames themselves stay. */
+	onClearFrames?: () => void;
 	referenceLabel?: string | null;
 	referenceColors?: readonly string[] | null;
 	/** Next-screen cards derived from the project's own structure. */
@@ -55,6 +57,7 @@ export function StudioComposer({
 	className = "",
 	selectedFrames = [],
 	onRemoveFrame,
+	onClearFrames,
 	referenceLabel,
 	referenceColors,
 	suggestions = [],
@@ -153,28 +156,50 @@ export function StudioComposer({
 				className="flex flex-col gap-3 rounded-xl border border-iron bg-obsidian p-3 text-snow focus-within:border-snow"
 			>
 				{selectedFrames.length > 0 ? (
-					<div className="flex max-h-20 flex-wrap items-center gap-2 overflow-y-auto">
+					<div className="flex flex-wrap items-center gap-2">
 						<span className="text-xs text-fog">
 							{singleFrame
 								? `Editing: ${singleFrame.name}`
 								: `Merevisi ${selectedFrames.length} layar terpilih`}
 						</span>
-						{selectedFrames.map((frame) => (
-							<span
-								key={frame.id}
-								className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-iron px-1.5 py-0.5 text-xs text-snow"
-							>
-								<span className="truncate">{frame.name}</span>
-								<button
-									type="button"
-									aria-label={`Lepas ${frame.name}`}
-									onClick={() => onRemoveFrame?.(frame.id)}
-									className="flex size-11 items-center justify-center rounded text-fog hover:bg-steel hover:text-snow focus-visible:outline-2 focus-visible:outline-snow lg:size-6"
+						<ul
+							aria-label="Target revisi"
+							className="flex max-h-24 min-w-0 flex-wrap items-center gap-1.5 overflow-y-auto"
+						>
+							{selectedFrames.map((frame) => (
+								<li
+									key={frame.id}
+									className="inline-flex max-w-full items-center gap-1 rounded-md border border-iron py-0.5 pr-0.5 pl-2 text-xs text-snow"
 								>
-									<Icon icon={Cancel01Icon} size={12} />
-								</button>
-							</span>
-						))}
+									<span className="truncate">{frame.name}</span>
+									{/* Detaching a target never deletes the frame: the canvas
+									    keeps every artboard and only this selection clears. */}
+									<Tooltip>
+										<Tooltip.Trigger<"button">
+											render={(props) => <button {...props} type="button" />}
+											aria-label={`Lepas ${frame.name}`}
+											onClick={() => onRemoveFrame?.(frame.id)}
+											className="flex size-9 shrink-0 items-center justify-center rounded text-mist hover:bg-steel hover:text-snow focus-visible:outline-2 focus-visible:outline-snow lg:size-8"
+										>
+											<Icon icon={Cancel01Icon} size={14} aria-hidden="true" />
+										</Tooltip.Trigger>
+										<Tooltip.Content className="rounded-md border border-graphite bg-charcoal px-2 py-1 text-xs text-snow">
+											Lepas dari target revisi
+										</Tooltip.Content>
+									</Tooltip>
+								</li>
+							))}
+						</ul>
+						{selectedFrames.length > 1 && onClearFrames ? (
+							<button
+								type="button"
+								onClick={onClearFrames}
+								aria-label="Bersihkan semua target revisi"
+								className="ml-auto min-h-9 shrink-0 rounded px-2 text-xs text-fog hover:bg-steel hover:text-snow focus-visible:outline-2 focus-visible:outline-snow"
+							>
+								Bersihkan
+							</button>
+						) : null}
 					</div>
 				) : null}
 				{referenceLabel ? (

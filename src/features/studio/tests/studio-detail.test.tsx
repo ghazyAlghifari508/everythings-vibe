@@ -53,10 +53,30 @@ import { Route } from "@/routes/design/$id";
 describe("StudioDetailPage Multi-Screen Canvas", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		// The chat panel decides desktop vs modal from a media query; jsdom has no
+		// matchMedia, and the workspace composer only exists in the desktop panel.
+		vi.stubGlobal(
+			"matchMedia",
+			vi.fn(() => ({
+				matches: true,
+				addEventListener: () => {},
+				removeEventListener: () => {},
+			})),
+		);
+		// HeroUI ScrollShadow (the conversation viewport) observes its own size.
+		vi.stubGlobal(
+			"ResizeObserver",
+			class {
+				observe() {}
+				unobserve() {}
+				disconnect() {}
+			},
+		);
 	});
 
 	afterEach(() => {
 		cleanup();
+		vi.unstubAllGlobals();
 	});
 
 	it("renders multi-screen canvas with mobile project and frames", async () => {

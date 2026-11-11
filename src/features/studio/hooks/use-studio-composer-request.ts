@@ -40,11 +40,15 @@ export function useStudioComposerRequest({
 			sending.current = true;
 			setComposerLoading(true);
 			setError("");
+			// The target set is snapshotted here. A canvas selection that changes
+			// while this request is in flight belongs to the user's next message,
+			// never to the operation already submitted.
+			const frameIds = [...selectedFrameIds];
 			const key = `studio-chat-request:${userId}:${projectId}`;
 			const signature = JSON.stringify({
 				projectId,
 				prompt,
-				frameIds: [...selectedFrameIds].sort(),
+				frameIds: [...frameIds].sort(),
 			});
 			try {
 				if (pending.current?.signature !== signature) {
@@ -68,7 +72,7 @@ export function useStudioComposerRequest({
 						action: "operation",
 						projectId,
 						prompt,
-						frameIds: selectedFrameIds,
+						frameIds,
 						requestId: pending.current.id,
 					}),
 				});
