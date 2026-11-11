@@ -378,6 +378,83 @@ describe("StudioCanvas", () => {
 		expect(screen.getByRole("button", { name: /Perbesar/i })).toBeDefined();
 	});
 
+	// Both readout cases below differ only by job status and lease, and the
+	// canvas reads no other job field, so one shared row keeps them honest.
+	const queueJob = {
+		id: "j-queue",
+		projectId: "p-1",
+		userId: "u-1",
+		prompt: "Test",
+		jobType: "initial" as const,
+		targetFrameId: null,
+		requestId: null,
+		requestHash: null,
+		operationIntent: null,
+		operationIndex: null,
+		blueprintJobId: null,
+		dependsOnJobId: null,
+		baseRevision: null,
+		planningCompletedAt: null,
+		errorCode: null,
+		status: "planning" as const,
+		error: null,
+		claimedBy: null,
+		attempts: 0,
+		claimedAt: null,
+		leaseExpiresAt: null,
+		startedAt: null,
+		finishedAt: null,
+		createdAt: new Date(),
+		updatedAt: new Date(),
+	};
+
+	it("leaves phase progress to the chat panel instead of reprinting it on the canvas", () => {
+		const { rerender } = render(
+			<StudioCanvas
+				project={mockProject}
+				frames={[]}
+				activeJob={{ ...queueJob, status: "planning" }}
+				onSelectFrame={vi.fn()}
+			/>,
+		);
+
+		// The chat panel already reports the phase, so a second copy floating
+		// over the canvas would just state the same thing twice.
+		expect(screen.queryByText("Menyusun struktur halaman...")).toBeNull();
+		expect(screen.queryByText("Menunggu antrean generate")).toBeNull();
+
+		rerender(
+			<StudioCanvas
+				project={mockProject}
+				frames={mockFrames}
+				activeJob={{ ...queueJob, status: "generating" }}
+				onSelectFrame={vi.fn()}
+			/>,
+		);
+		expect(screen.queryByText("Menghasilkan halaman...")).toBeNull();
+		// Frames keep their own accessible status while generating.
+		expect(
+			screen.getAllByLabelText("Layar sedang digenerate").length,
+		).toBeGreaterThan(0);
+	});
+
+	it("still reports a genuine queue health problem next to the canvas", () => {
+		render(
+			<StudioCanvas
+				project={mockProject}
+				frames={[]}
+				activeJob={{
+					...queueJob,
+					status: "generating",
+					leaseExpiresAt: new Date(Date.now() - 1000),
+				}}
+				onSelectFrame={vi.fn()}
+			/>,
+		);
+
+		expect(screen.getByText(/Lease worker berakhir/)).toBeDefined();
+	});
+
 	it("renders planning failure state with a retry action when activeJob failed", () => {
 		const onRetryPlanning = vi.fn();
 		const failedJob = {

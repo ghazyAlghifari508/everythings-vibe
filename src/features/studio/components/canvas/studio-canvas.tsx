@@ -298,12 +298,7 @@ export const StudioCanvas = memo(function StudioCanvas({
 				</output>
 			)}
 
-			{activeJob && (
-				<StudioCanvasQueueReadout
-					activeJob={activeJob}
-					hasFrames={frames.length > 0}
-				/>
-			)}
+			{activeJob && <StudioCanvasQueueReadout activeJob={activeJob} />}
 
 			{/* Selection rectangle. Painted imperatively during a drag so a
 			    pointermove never re-renders the canvas; it only appears once the

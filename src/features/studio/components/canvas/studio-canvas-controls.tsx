@@ -128,33 +128,21 @@ function StudioCanvasPlanningStatus({ label }: { label: string }) {
 
 interface StudioCanvasQueueReadoutProps {
 	activeJob: StudioJobRow;
-	hasFrames: boolean;
 }
 
 /**
- * The job readout distinguishes queued/planning even when provisional slots
- * already exist. Generating frames carry their own shimmer.
+ * Queue health is the only canvas-level copy left. Queued/planning/generating
+ * progress already lives in the chat panel, and the frames carry their own
+ * shimmer plus a screen-reader status, so repeating the same phase here would
+ * print one progress message twice. Health problems are not progress messages:
+ * a dead lease or a long unclaimed wait still surfaces next to the canvas.
  */
 export function StudioCanvasQueueReadout({
 	activeJob,
-	hasFrames,
 }: StudioCanvasQueueReadoutProps) {
 	const queueHealth = resolveStudioQueueHealth(activeJob);
-	if (queueHealth) return <StudioCanvasPlanningStatus label={queueHealth} />;
-	if (activeJob.status === "generating" && hasFrames) return null;
-	if (!["queued", "planning", "generating"].includes(activeJob.status))
-		return null;
-	return (
-		<StudioCanvasPlanningStatus
-			label={
-				activeJob.status === "queued"
-					? "Menunggu antrean generate"
-					: activeJob.status === "planning"
-						? "Menyusun struktur halaman..."
-						: "Menghasilkan halaman..."
-			}
-		/>
-	);
+	if (!queueHealth) return null;
+	return <StudioCanvasPlanningStatus label={queueHealth} />;
 }
 
 interface StudioCanvasPlanningFailureProps {
