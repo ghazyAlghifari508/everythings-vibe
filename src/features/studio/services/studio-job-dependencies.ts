@@ -8,6 +8,7 @@ import {
 	studioProjects,
 } from "@/db/schema";
 import { STUDIO_JOB_MAX_ATTEMPTS } from "../types/studio-constants";
+import { synchronizeStudioConversation } from "./studio-conversation";
 import type { StudioJobTransaction } from "./studio-job-lease";
 
 export const STUDIO_ACTIVE_JOB_STATUSES = ["queued", "planning", "generating"];
@@ -221,6 +222,7 @@ export async function failStudioDependency(
 					eq(studioFrames.revision, 0),
 				),
 			);
+	await synchronizeStudioConversation(tx, job.projectId, job.userId);
 }
 
 export async function listRunnableStudioJobs() {

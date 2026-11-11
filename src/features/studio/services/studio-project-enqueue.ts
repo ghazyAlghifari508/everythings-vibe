@@ -15,6 +15,7 @@ import {
 } from "@/db/schema";
 import { ScrapeError } from "@/lib/design-errors";
 import type { CreateStudioProjectInput } from "../types/studio-service";
+import { appendStudioConversation } from "./studio-conversation";
 import { resolveStudioDesignReference } from "./studio-design-reference.server";
 import { studioGenerationOptionsSchema } from "./studio-generation-options";
 import { validateAndProcessLogo } from "./studio-logo-service";
@@ -81,53 +82,57 @@ export async function createStudioProjectWithJob(
 		prdContentHash = validContent.contentHash;
 	}
 
-	const tenSecondsAgo = new Date(Date.now() - 10_000);
-	const [recentJob] = await db
-		.select({
-			job: studioJobs,
-			project: studioProjects,
-		})
-		.from(studioJobs)
-		.innerJoin(studioProjects, eq(studioJobs.projectId, studioProjects.id))
-		.where(
-			and(
-				eq(studioJobs.userId, userId),
-				eq(studioJobs.prompt, checked.prompt),
-				eq(studioProjects.userId, userId),
-				eq(studioProjects.designMode, designMode),
-				eq(studioProjects.initialPageCount, options.initialPageCount),
-				cleanDesignMd === null
-					? isNull(studioProjects.designMd)
-					: eq(studioProjects.designMd, cleanDesignMd),
-				resolved.designReference === null
-					? isNull(studioProjects.designReference)
-					: eq(studioProjects.designReference, resolved.designReference),
-				prdContentHash === null
-					? isNull(studioProjects.prdContentHash)
-					: eq(studioProjects.prdContentHash, prdContentHash),
-				validatedLogo
-					? sql`exists (select 1 from ${studioAssets} where ${studioAssets.id} = ${studioProjects.logoAssetId} and ${studioAssets.userId} = ${userId} and ${studioAssets.data} = ${validatedLogo.data} and ${studioAssets.mimeType} = ${validatedLogo.mimeType})`
-					: isNull(studioProjects.logoAssetId),
-				gte(studioJobs.createdAt, tenSecondsAgo),
-				inArray(studioJobs.status, ["queued", "planning", "generating"]),
-			),
-		)
-		.limit(1);
+	return db.transaction(async (tx) => {
+		await tx.execute(
+			sql`select pg_advisory_xact_lock(hashtext('studio-launch'), hashtext(${userId}))`,
+		);
+		const tenSecondsAgo = new Date(Date.now() - 10_000);
+		const [recentJob] = await tx
+			.select({
+				job: studioJobs,
+				project: studioProjects,
+			})
+			.from(studioJobs)
+			.innerJoin(studioProjects, eq(studioJobs.projectId, studioProjects.id))
+			.where(
+				and(
+					eq(studioJobs.userId, userId),
+					eq(studioJobs.prompt, checked.prompt),
+					eq(studioProjects.userId, userId),
+					eq(studioProjects.designMode, designMode),
+					eq(studioProjects.initialPageCount, options.initialPageCount),
+					cleanDesignMd === null
+						? isNull(studioProjects.designMd)
+						: eq(studioProjects.designMd, cleanDesignMd),
+					resolved.designReference === null
+						? isNull(studioProjects.designReference)
+						: eq(studioProjects.designReference, resolved.designReference),
+					prdContentHash === null
+						? isNull(studioProjects.prdContentHash)
+						: eq(studioProjects.prdContentHash, prdContentHash),
+					validatedLogo
+						? sql`exists (select 1 from ${studioAssets} where ${studioAssets.id} = ${studioProjects.logoAssetId} and ${studioAssets.userId} = ${userId} and ${studioAssets.data} = ${validatedLogo.data} and ${studioAssets.mimeType} = ${validatedLogo.mimeType})`
+						: isNull(studioProjects.logoAssetId),
+					gte(studioJobs.createdAt, tenSecondsAgo),
+					inArray(studioJobs.status, ["queued", "planning", "generating"]),
+				),
+			)
+			.limit(1);
 
-	if (recentJob) {
-		const recentFrames = await db
-			.select()
-			.from(studioFrames)
-			.where(eq(studioFrames.projectId, recentJob.project.id))
-			.orderBy(asc(studioFrames.order));
-		return {
-			project: recentJob.project,
-			job: recentJob.job,
-			frames: recentFrames,
-		};
-	}
+		if (recentJob) {
+			const recentFrames = await tx
+				.select()
+				.from(studioFrames)
+				.where(eq(studioFrames.projectId, recentJob.project.id))
+				.orderBy(asc(studioFrames.order));
+			return {
+				project: recentJob.project,
+				job: recentJob.job,
+				frames: recentFrames,
+			};
+		}
 
-	const { project, job, frames } = await db.transaction(async (tx) => {
+		// Project, initial job, slots and conversation share one commit.
 		let logoAssetId: string | null = null;
 		if (validatedLogo) {
 			const [asset] = await tx
@@ -220,8 +225,13 @@ export async function createStudioProjectWithJob(
 			);
 		}
 
+		await appendStudioConversation(tx, {
+			projectId: newProject.id,
+			userId,
+			operationId: newJob.id,
+			prompt: input.prompt,
+			jobs: [newJob],
+		});
 		return { project: newProject, job: newJob, frames: slots };
 	});
-
-	return { project, job, frames };
 }

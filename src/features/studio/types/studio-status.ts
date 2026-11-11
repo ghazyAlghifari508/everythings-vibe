@@ -2,6 +2,7 @@ import { z } from "zod";
 import type {
 	StudioFrameRow,
 	StudioJobRow,
+	StudioMessageRow,
 	StudioProjectRow,
 } from "@/db/schema";
 import { studioDesignBlueprintSchema } from "../services/studio-design-blueprint";
@@ -9,6 +10,7 @@ import { studioDesignReferenceMetadataSchema } from "../services/studio-generati
 import { studioTitleSourceSchema } from "../services/studio-project-title";
 import { deriveStudioLifecycle } from "../utils/studio-lifecycle";
 import { STUDIO_JOB_QUEUE_HEALTH_MS } from "./studio-constants";
+import { studioMessageSchema } from "./studio-conversation";
 
 const date = z.union([
 	z.date(),
@@ -99,13 +101,23 @@ export const studioStatusSchema = z
 		frames: z.array(frameSchema),
 		activeJob: jobSchema.nullable(),
 		jobs: z.array(jobSchema).optional(),
+		messages: z.array(studioMessageSchema).optional(),
 	})
 	.refine(
-		({ project, frames, activeJob }) =>
+		({ project, frames, activeJob, jobs, messages }) =>
 			frames.every((frame) => frame.projectId === project.id) &&
 			(!activeJob ||
 				(activeJob.projectId === project.id &&
 					activeJob.userId === project.userId)) &&
+			(jobs ?? []).every(
+				(job) => job.projectId === project.id && job.userId === project.userId,
+			) &&
+			(messages ?? []).every(
+				(message) =>
+					message.projectId === project.id && message.userId === project.userId,
+			) &&
+			new Set((messages ?? []).map((message) => message.id)).size ===
+				(messages?.length ?? 0) &&
 			new Set(frames.map((frame) => frame.id)).size === frames.length,
 	);
 
@@ -114,6 +126,7 @@ export interface StudioStatus {
 	frames: StudioFrameRow[];
 	jobs?: StudioJobRow[];
 	activeJob: StudioJobRow | null;
+	messages?: StudioMessageRow[];
 }
 
 export function isStudioProcessing(status: StudioStatus) {

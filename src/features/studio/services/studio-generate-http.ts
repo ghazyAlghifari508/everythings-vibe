@@ -168,7 +168,7 @@ export async function POST({
 
 		const { project, job, frames } = await createStudioProjectWithJob(user.id, {
 			title: body.title,
-			prompt: checked.prompt,
+			prompt: body.prompt,
 			designMode: body.designMode,
 			designMd: body.designMd,
 			logo: body.logo,

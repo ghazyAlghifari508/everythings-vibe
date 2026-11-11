@@ -1,6 +1,7 @@
 import type {
 	StudioFrameRow,
 	StudioJobRow,
+	StudioMessageRow,
 	StudioProjectRow,
 	StudioRevisionRow,
 } from "@/db/schema";
@@ -47,6 +48,7 @@ export interface StudioProjectFullDetail {
 	frames: StudioFrameRow[];
 	activeJob: StudioJobRow | null;
 	jobs: StudioJobRow[];
+	messages: StudioMessageRow[];
 	logoUrl: string | null;
 	revisions: StudioRevisionRow[];
 	latest: StudioRevisionRow | null;

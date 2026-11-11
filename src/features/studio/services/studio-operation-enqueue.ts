@@ -13,6 +13,7 @@ import {
 	type StudioIntentDecision,
 } from "./studio-composer-intent";
 import { resolveStudioOperationIntent } from "./studio-composer-intent.server";
+import { appendStudioConversation } from "./studio-conversation";
 import { StudioFrameError } from "./studio-frame-errors";
 import { STUDIO_MAX_PAGE_COUNT } from "./studio-generation-options";
 import {
@@ -164,6 +165,13 @@ export async function enqueueStudioOperation(
 				jobs.push(job);
 				created.push(frame);
 			}
+			await appendStudioConversation(tx, {
+				projectId,
+				userId,
+				operationId: input.requestId,
+				prompt: input.prompt,
+				jobs,
+			});
 			await tx
 				.update(studioProjects)
 				.set({ updatedAt: new Date() })
@@ -216,6 +224,16 @@ export async function enqueueStudioOperation(
 			if (!job) throw new ScrapeError("STORAGE_FAILED");
 			jobs.push(job);
 		}
+		await appendStudioConversation(tx, {
+			projectId,
+			userId,
+			operationId: input.requestId,
+			prompt: input.prompt,
+			jobs,
+			attachments: current
+				.filter((frame) => ids.includes(frame.id))
+				.map((frame) => ({ frameId: frame.id, name: frame.name })),
+		});
 		return { intent, jobs };
 	});
 }

@@ -8,6 +8,7 @@ import {
 } from "@/db/schema";
 import { ScrapeError } from "@/lib/design-errors";
 import type { StudioProjectFullDetail } from "../types/studio-service";
+import { readStudioConversation } from "./studio-conversation";
 import { buildStudioAssetUrl } from "./studio-logo-service";
 
 export async function getStudioProjectDetail(
@@ -101,6 +102,7 @@ export async function getStudioProjectDetail(
 				frames,
 				activeJob,
 				jobs,
+				messages: await readStudioConversation(tx, projectId, userId),
 				logoUrl,
 				revisions,
 				latest,

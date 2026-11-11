@@ -10,6 +10,7 @@ import {
 	STUDIO_JOB_CLAIM_TTL_MS,
 	STUDIO_JOB_MAX_ATTEMPTS,
 } from "../types/studio-constants";
+import { synchronizeStudioConversation } from "./studio-conversation";
 import {
 	ensureStudioInitialOwnership,
 	failStudioDependency,
@@ -133,7 +134,9 @@ export async function withStudioJobWrite<T>(
 			.where(studioClaimPredicate(claim))
 			.for("update");
 		if (!job) throw new StudioLeaseLostError();
-		return write(tx);
+		const result = await write(tx);
+		await synchronizeStudioConversation(tx, claim.projectId, claim.userId);
+		return result;
 	});
 }
 
@@ -357,6 +360,7 @@ export async function recoverStalledStudioJobs(
 									),
 						),
 					);
+			await synchronizeStudioConversation(tx, job.projectId, job.userId);
 			recovered++;
 		});
 	}

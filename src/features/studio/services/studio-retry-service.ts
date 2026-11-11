@@ -9,6 +9,7 @@ import {
 } from "@/db/schema";
 import type { StudioFrameRetryOutcome } from "../types/studio";
 import { isTemporarySlot } from "../utils/studio-lifecycle";
+import { synchronizeStudioConversation } from "./studio-conversation";
 import { StudioFrameError } from "./studio-frame-errors";
 import { findStudioInitialJob } from "./studio-job-dependencies";
 
@@ -140,6 +141,7 @@ export async function retryStudioFrame(
 			)
 			.returning();
 		if (!updated) throw new StudioFrameError("STUDIO_STORAGE_FAILED");
+		await synchronizeStudioConversation(tx, projectId, userId);
 		return { frame: updated, retry: "queued" };
 	});
 }
@@ -218,6 +220,7 @@ export async function retryStudioPlanning(
 			)
 			.returning();
 		if (!updated) throw new StudioFrameError("STUDIO_STORAGE_FAILED");
+		await synchronizeStudioConversation(tx, projectId, userId);
 		return updated;
 	});
 }
