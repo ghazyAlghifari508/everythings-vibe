@@ -105,7 +105,9 @@ describe("FIX 02 — canonical CSS ownership", () => {
 		expect(css).toContain("font-family:var(--app-font)");
 		const headingDefaults = css
 			.split("\n")
-			.filter((line) => line.trimStart().startsWith(":where([data-studio-shell] h"));
+			.filter((line) =>
+				line.trimStart().startsWith(":where([data-studio-shell] h"),
+			);
 		expect(headingDefaults).toHaveLength(3);
 	});
 
