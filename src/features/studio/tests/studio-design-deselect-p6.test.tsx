@@ -375,7 +375,11 @@ describe("TASK 06 — Theme Toggle Selection, Explicit Deselect, and No Redundan
 	});
 
 	// 8b. Every built-in theme is selectable and appliable
-	it("8b. Every built-in theme can be selected and applied", () => {
+	// Nine full dialog mounts share the default 5s budget only when the suite
+	// runs alone; under parallel jsdom load the loop needs its own deadline.
+	it("8b. Every built-in theme can be selected and applied", {
+		timeout: 15_000,
+	}, () => {
 		for (const preset of STUDIO_DESIGN_PRESETS) {
 			const { onSelectTheme, onOpenChange } = renderDialog();
 

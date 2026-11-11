@@ -12,6 +12,17 @@ import {
 } from "@/features/studio/services/studio-presets";
 import { validateStudioDesignMd } from "@/features/studio/services/studio-prompt-validation";
 
+function hexToRgb(hex: string): string {
+	const value = hex.replace("#", "");
+	const channels =
+		value.length === 3
+			? [...value].map((char) => Number.parseInt(`${char}${char}`, 16))
+			: [value.slice(0, 2), value.slice(2, 4), value.slice(4, 6)].map((part) =>
+					Number.parseInt(part, 16),
+				);
+	return `rgb(${channels.join(", ")})`;
+}
+
 describe("TASK 07 — Nine Themes, Standardized Previews, and Fullscreen Picker", () => {
 	afterEach(() => {
 		cleanup();
@@ -88,17 +99,18 @@ describe("TASK 07 — Nine Themes, Standardized Previews, and Fullscreen Picker"
 			<StudioThemeDashboardPreview tokens={jade.tokens} />,
 		);
 
-		// Both render the exact same DOM node hierarchy
-		const headers1 = c1.querySelectorAll("span");
-		const headers2 = c2.querySelectorAll("span");
-		expect(headers1.length).toBe(headers2.length);
+		// Both render the exact same silhouette hierarchy and density
+		const nodes1 = [...c1.querySelectorAll("*")].map((node) => node.tagName);
+		const nodes2 = [...c2.querySelectorAll("*")].map((node) => node.tagName);
+		expect(nodes1.length).toBe(nodes2.length);
+		expect(nodes1).toEqual(nodes2);
 
-		// Both have same SVG trend chart
-		expect(c1.querySelector("svg")).not.toBeNull();
-		expect(c2.querySelector("svg")).not.toBeNull();
-		expect(c1.querySelector("svg")?.getAttribute("viewBox")).toBe(
-			c2.querySelector("svg")?.getAttribute("viewBox"),
-		);
+		// Same geometry, different theme colors
+		const root1 = c1.firstElementChild as HTMLElement;
+		const root2 = c2.firstElementChild as HTMLElement;
+		expect(root1.className).toBe(root2.className);
+		expect(root1.style.backgroundColor).toBe(hexToRgb(workspace.tokens.canvas));
+		expect(root2.style.backgroundColor).toBe(hexToRgb(jade.tokens.canvas));
 	});
 
 	// 5. Every preview receives valid tokens
@@ -317,9 +329,14 @@ describe("TASK 07 — Nine Themes, Standardized Previews, and Fullscreen Picker"
 		// Every button contains the abstract silhouette preview and theme metadata
 		for (const [index, button] of buttons.entries()) {
 			const preset = STUDIO_DESIGN_PRESETS[index];
-			const preview = button.querySelector('[aria-hidden="true"]');
+			const preview = button.querySelector(
+				'[aria-hidden="true"]',
+			) as HTMLElement | null;
 			expect(preview).not.toBeNull();
-			expect(preview?.querySelector("svg")).not.toBeNull();
+			expect(preview?.style.backgroundColor).toBe(
+				hexToRgb(preset.tokens.canvas),
+			);
+			expect(preview?.style.borderColor).toBe(hexToRgb(preset.tokens.border));
 
 			// Metadata is preserved under the preview
 			expect(button.textContent).toContain(preset.name);

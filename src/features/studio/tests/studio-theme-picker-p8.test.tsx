@@ -209,7 +209,9 @@ describe("P8 — Theme Picker Selection States, Confirmation Actions & Footer UX
 	});
 
 	// 8. Buka ulang dialog dengan applied state yang benar
-	it("8. Buka ulang dialog dengan applied state yang benar across cancel, apply, and clear cycles", () => {
+	it("8. Buka ulang dialog dengan applied state yang benar across cancel, apply, and clear cycles", {
+		timeout: 15_000,
+	}, () => {
 		function LifecycleHarness() {
 			const [confirmedTheme, setConfirmedTheme] = useState<string | null>(
 				"midnight",

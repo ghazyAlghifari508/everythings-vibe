@@ -83,8 +83,14 @@ describe("P9 Polish — Studio Theme Chip, Queued Dot, and Landing Copywriting",
 				orchidPreset?.tokens.ink,
 			);
 
-			// Generic file icon must not be rendered for built-in theme
-			expect(chip.querySelector("svg")).toBeNull();
+			// Generic file icon must not be rendered for built-in theme: the only
+			// svg in the chip is the palette disk itself.
+			expect(
+				chip
+					.querySelector("svg")
+					?.closest('[data-testid="studio-palette-disk"]'),
+			).not.toBeNull();
+			expect(chip.querySelectorAll("svg").length).toBe(1);
 		});
 		it("supports all 9 built-in themes with their authentic tokens", () => {
 			for (const preset of STUDIO_DESIGN_PRESETS) {
