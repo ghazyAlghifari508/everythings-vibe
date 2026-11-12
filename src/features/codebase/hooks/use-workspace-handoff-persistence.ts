@@ -21,6 +21,18 @@ import {
 
 export type QuestionSaveStatus = "idle" | "saving" | "saved" | "error";
 
+/**
+ * Read one string field from an unvalidated JSON body. The handoff endpoints
+ * answer a small, fixed envelope, so a narrow runtime read keeps the caller
+ * honest without inventing a schema for data it never trusts.
+ */
+function readStringField(body: unknown, key: string): string | null {
+	if (typeof body !== "object" || body === null || !(key in body)) return null;
+	const record: Record<string, unknown> = body as Record<string, unknown>;
+	const value = record[key];
+	return typeof value === "string" ? value : null;
+}
+
 /** The answer persistence state as surfacing workspaces consume it: a gated
  *  action can wait for `status`, and a failed save owns its own retry. */
 export interface AnswersPersistenceState {
@@ -80,74 +92,83 @@ export function useWorkspaceHandoffPersistence({
 			if (answersList.length === 0) return { ok: true };
 			setSaveStatus("saving");
 			setSaveError(null);
-			try {
-				const response = await fetch("/api/ask/options", {
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({
+			const payloadFor = (expectedUpdatedAt: string | null) =>
+				JSON.stringify({
+					projectId,
+					action: "save-handoff",
+					handoff: {
 						projectId,
-						action: "save-handoff",
-						handoff: {
-							projectId,
-							answers: answersList,
-							expectedUpdatedAt: lastPersistedUpdatedAt.current ?? undefined,
-							state: {
-								prompt: lastFeaturePrompt.trim() || "Fitur baru",
-								platform: "web",
-								session: 1,
-								questions: serializeAskQuestions(questionsToSave),
-								nonTechAnswers: Object.fromEntries(
-									Object.entries(answersToSave).map(([id, val]) => [
-										id,
-										{ value: val },
-									]),
-								),
-							},
+						answers: answersList,
+						expectedUpdatedAt: expectedUpdatedAt ?? undefined,
+						state: {
+							prompt: lastFeaturePrompt.trim() || "Fitur baru",
+							platform: "web",
+							session: 1,
+							questions: serializeAskQuestions(questionsToSave),
+							nonTechAnswers: Object.fromEntries(
+								Object.entries(answersToSave).map(([id, val]) => [
+									id,
+									{ value: val },
+								]),
+							),
 						},
-					}),
+					},
 				});
-				const body: unknown = await response.json().catch(() => null);
-				if (activeProjectRef.current !== projectId) return { ok: false };
-				if (!response.ok) {
-					const serverError =
-						typeof body === "object" &&
-						body !== null &&
-						"error" in body &&
-						typeof (body as { error: unknown }).error === "string"
-							? (body as { error: string }).error
-							: null;
-					const serverCode =
-						typeof body === "object" &&
-						body !== null &&
-						"code" in body &&
-						typeof (body as { code: unknown }).code === "string"
-							? (body as { code: string }).code
-							: null;
-					const message = describeHandoffSaveFailure(
-						response.status,
-						serverCode,
-						serverError,
-					);
-					setSaveStatus("error");
-					setSaveError(message);
-					return {
-						ok: false,
-						error: message,
-						code: serverCode ?? undefined,
-						status: response.status,
-					};
+			try {
+				// One write, plus at most one retry after adopting the server's version.
+				// Background generation legitimately rewrites this row, so a stale
+				// baseline is expected rather than a conflict; the retry keeps the
+				// user's answer instead of failing it.
+				for (let attempt = 0; attempt < 2; attempt++) {
+					const response = await fetch("/api/ask/options", {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: payloadFor(lastPersistedUpdatedAt.current),
+					});
+					const body: unknown = await response.json().catch(() => null);
+					if (activeProjectRef.current !== projectId) return { ok: false };
+					if (!response.ok) {
+						const serverError = readStringField(body, "error");
+						const serverCode = readStringField(body, "code");
+						const serverUpdatedAt = readStringField(body, "updatedAt");
+						if (
+							attempt === 0 &&
+							response.status === 409 &&
+							serverCode === "HANDOFF_STALE" &&
+							serverUpdatedAt
+						) {
+							lastPersistedUpdatedAt.current = serverUpdatedAt;
+							continue;
+						}
+						const message = describeHandoffSaveFailure(
+							response.status,
+							serverCode,
+							serverError,
+						);
+						setSaveStatus("error");
+						setSaveError(message);
+						return {
+							ok: false,
+							error: message,
+							code: serverCode ?? undefined,
+							status: response.status,
+						};
+					}
+					const savedUpdatedAt = readStringField(body, "updatedAt");
+					if (savedUpdatedAt) lastPersistedUpdatedAt.current = savedUpdatedAt;
+					setSaveStatus("saved");
+					setSaveError(null);
+					return { ok: true };
 				}
-				const savedUpdatedAt =
-					typeof body === "object" &&
-					body !== null &&
-					"updatedAt" in body &&
-					typeof (body as { updatedAt: unknown }).updatedAt === "string"
-						? (body as { updatedAt: string }).updatedAt
-						: undefined;
-				if (savedUpdatedAt) lastPersistedUpdatedAt.current = savedUpdatedAt;
-				setSaveStatus("saved");
-				setSaveError(null);
-				return { ok: true };
+				const message = describeHandoffSaveFailure(409, "HANDOFF_STALE");
+				setSaveStatus("error");
+				setSaveError(message);
+				return {
+					ok: false,
+					error: message,
+					code: "HANDOFF_STALE",
+					status: 409,
+				};
 			} catch {
 				if (activeProjectRef.current !== projectId) return { ok: false };
 				const message = describeHandoffSaveFailure(0, "NETWORK_UNAVAILABLE");
