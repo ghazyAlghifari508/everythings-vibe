@@ -7,6 +7,7 @@
 import { and, desc, eq, gt, isNull, notInArray } from "drizzle-orm";
 import { db } from "@/db";
 import { codebaseSyncSessions, codebases } from "@/db/schema";
+import { ADAPTIVE_CREDIT_PRICING } from "@/features/billing/types/billing-constants";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { requireUser } from "@/lib/session";
 import { checkPreSyncCredit } from "./analysis-credit-preflight.server";
@@ -207,7 +208,10 @@ export async function handleCodebaseSessionCreate({
 						user.id,
 						codebaseId,
 						parsed.data.requestId,
-						!preflight.response,
+						!preflight.response ||
+							preflight.status.availableCredits >=
+								ADAPTIVE_CREDIT_PRICING.operations.codebase_analysis
+									.baseCredits,
 					)
 				: prepareSyncSession(
 						tx,
