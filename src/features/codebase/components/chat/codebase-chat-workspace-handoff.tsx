@@ -129,7 +129,7 @@ export function CodebaseChatWorkspaceHandoffCard({
 	return (
 		<div
 			data-testid="codebase-handoff-card"
-			className="my-3 flex w-full max-w-2xl flex-col rounded-xl border border-graphite bg-charcoal p-4 text-snow shadow-sm sm:p-5"
+			className="my-3 flex w-full flex-col rounded-xl border border-graphite bg-charcoal p-4 text-snow shadow-sm sm:p-5"
 		>
 			{/* Header area with status and optional revision action */}
 			<div className="flex items-start justify-between gap-3 pb-2">

@@ -173,7 +173,7 @@ export function CodebasePlanningStageCard({
 	const cardContent = (
 		<div
 			data-testid="codebase-planning-stage-card"
-			className="my-3 flex w-full max-w-2xl flex-col rounded-xl border border-graphite bg-charcoal p-4 text-snow shadow-sm sm:p-5"
+			className="my-3 flex w-full flex-col rounded-xl border border-graphite bg-charcoal p-4 text-snow shadow-sm sm:p-5"
 		>
 			{/* Card Header */}
 			<div className="flex flex-col gap-0.5 pb-3">
