@@ -85,7 +85,7 @@ const screenCompositionSchema = z.object({
 		"timeline",
 		"workspace",
 	]),
-	hierarchy: z.array(z.string().trim().min(1).max(100)).min(1).max(6),
+	hierarchy: z.array(z.string().trim().min(1).max(240)).min(1).max(6),
 	patterns: z
 		.array(z.enum(STUDIO_COMPONENT_PATTERNS.map(({ id }) => id)))
 		.max(8),
@@ -191,11 +191,16 @@ export function validateBlueprint(
 	| { ok: true; blueprint: StudioDesignBlueprint }
 	| { ok: false; error: string } {
 	const parsed = studioDesignBlueprintSchema.safeParse(input);
-	if (!parsed.success)
+	if (!parsed.success) {
+		const firstIssue = parsed.error.issues[0];
+		const issuePath = firstIssue?.path.length
+			? ` (${firstIssue.path.join(".")}: ${firstIssue.message})`
+			: "";
 		return {
 			ok: false,
-			error: "Blueprint desain tidak memenuhi skema tervalidasi.",
+			error: `Blueprint desain tidak memenuhi skema tervalidasi${issuePath}.`,
 		};
+	}
 	if (
 		parsed.data.navigationContract.labels.length !==
 		parsed.data.navigationContract.destinations.length
