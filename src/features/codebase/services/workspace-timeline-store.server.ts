@@ -8,12 +8,14 @@ import {
 	type WorkspaceScope,
 	workspaceMessageInputSchema,
 } from "../types/workspace-timeline";
+import { ONBOARDING_FEATURE_MESSAGE } from "./analysis";
 import {
 	parseRestoredAnswers,
 	parseRestoredQuestions,
 	restoreAskState,
 } from "./chat-flow";
 import type { AskHandoff } from "./generation-context-handoff";
+import { isProvisionalCodebaseName } from "./naming";
 
 type Executor = Pick<typeof db, "select" | "insert">;
 export const workspaceConversationId = (projectId: string) =>
@@ -167,7 +169,12 @@ export async function persistAskWorkspaceEvents(
 			),
 		)
 		.limit(1);
-	if (prompt && !priorPrompt)
+	if (
+		prompt &&
+		!priorPrompt &&
+		prompt !== ONBOARDING_FEATURE_MESSAGE &&
+		!isProvisionalCodebaseName(prompt)
+	)
 		events.push({
 			...base,
 			id: `0:prompt:${scope.projectId}`,

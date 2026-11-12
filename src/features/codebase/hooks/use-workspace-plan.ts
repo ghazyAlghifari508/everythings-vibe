@@ -178,19 +178,23 @@ export function useWorkspacePlan({
 		activeFeatureState?.codebaseId === codebase.id
 			? activeFeatureState.feature
 			: null;
-	const resolvedFeature = isCreatingNew
-		? null
-		: (activeFeature ?? resolvedPlan);
+	const isAnchorWithoutArtifacts =
+		resolvedPlan?.id === onboardingFeatureId && !resolvedPlan?.hasArtifacts;
+	const resolvedFeature =
+		isCreatingNew || isAnchorWithoutArtifacts
+			? null
+			: (activeFeature ?? resolvedPlan);
 	const effectiveFeatureId = resolvedFeature?.id ?? null;
-	const planState: WorkspacePlanState = isCreatingNew
-		? "empty"
-		: resolvedFeature
-			? "resolved"
-			: planResolution.kind === "empty"
-				? "empty"
-				: planResolution.kind === "unknown"
-					? "failed"
-					: "needs_selection";
+	const planState: WorkspacePlanState =
+		isCreatingNew || isAnchorWithoutArtifacts
+			? "empty"
+			: resolvedFeature
+				? "resolved"
+				: planResolution.kind === "empty"
+					? "empty"
+					: planResolution.kind === "unknown"
+						? "failed"
+						: "needs_selection";
 	return {
 		setRequestedProjectId,
 		isCreatingNew,

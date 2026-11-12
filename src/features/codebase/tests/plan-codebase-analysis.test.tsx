@@ -27,6 +27,7 @@ vi.mock("@tanstack/react-router", () => ({
 
 const SYNC_PAYLOAD = {
 	projectId: "cb-onboard-1",
+	sessionId: "sess-onboard-1",
 	apiBaseUrl: "http://localhost:3000",
 	syncToken: "onboard-token-1",
 	syncCommand:
