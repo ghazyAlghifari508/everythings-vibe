@@ -147,9 +147,14 @@ export async function getOrCreateGenerationOperation(
 			// A refused model output cost nothing and wrote nothing, so an explicit
 			// user retry opens a fresh bounded window instead of dead-ending at
 			// "batas percobaan tercapai". Infrastructure failures keep the ceiling.
+			// Rows failed before the rejection code existed are recognized by the
+			// pipeline's own refusal wording ("... tidak disimpan"), which no
+			// provider or transient failure ever uses.
+			const refusedOutput =
+				existing.errorCode === "OUTPUT_REJECTED" ||
+				/tidak disimpan/i.test(existing.error ?? "");
 			const reopenRejectedOutput =
-				existing.errorCode === "OUTPUT_REJECTED" &&
-				existing.attempt >= existing.maxAttempts;
+				refusedOutput && existing.attempt >= existing.maxAttempts;
 			if (existing.attempt >= existing.maxAttempts && !reopenRejectedOutput)
 				throw new DurableGenerationError(
 					"Batas percobaan tercapai. Hubungi dukungan.",
