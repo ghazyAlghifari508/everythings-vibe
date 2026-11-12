@@ -7,8 +7,8 @@ const state = vi.hoisted(() => ({
 	writeFailure: false,
 	output: "",
 }));
-vi.mock("@/db", () => ({
-	db: {
+vi.mock("@/db", () => {
+	const db = {
 		select: () => {
 			const chain = {
 				from: () => chain,
@@ -26,8 +26,13 @@ vi.mock("@/db", () => ({
 				},
 			}),
 		}),
-	},
-}));
+		// The handoff writer opens a transaction when no executor is supplied, so
+		// the mock must expose one; the same chain serves as the transaction.
+		transaction: async (callback: (tx: typeof db) => Promise<unknown>) =>
+			callback(db),
+	};
+	return { db };
+});
 vi.mock(
 	"@/features/codebase/services/generation-context",
 	async (importOriginal) => {
