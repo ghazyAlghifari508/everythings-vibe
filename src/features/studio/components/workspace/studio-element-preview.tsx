@@ -32,7 +32,7 @@ export function StudioElementPreview({
 		>
 			<DialogContent
 				hideCloseButton
-				className="flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-6xl flex-col overflow-hidden rounded-xl p-4 sm:p-6"
+				className="flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] sm:max-w-6xl flex-col overflow-hidden rounded-xl p-4 sm:p-6"
 				onEscapeKeyDown={(event) => {
 					if (editing.busy) event.preventDefault();
 				}}
