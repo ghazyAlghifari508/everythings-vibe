@@ -8,7 +8,12 @@ const state = vi.hoisted(() => ({
 	output: "",
 }));
 vi.mock("@/db", () => {
-	const db = {
+	type MockDb = {
+		select: () => unknown;
+		insert: () => unknown;
+		transaction: <T>(callback: (tx: MockDb) => Promise<T>) => Promise<T>;
+	};
+	const db: MockDb = {
 		select: () => {
 			const chain = {
 				from: () => chain,
@@ -28,7 +33,7 @@ vi.mock("@/db", () => {
 		}),
 		// The handoff writer opens a transaction when no executor is supplied, so
 		// the mock must expose one; the same chain serves as the transaction.
-		transaction: async (callback: (tx: typeof db) => Promise<unknown>) =>
+		transaction: <T>(callback: (tx: MockDb) => Promise<T>): Promise<T> =>
 			callback(db),
 	};
 	return { db };
