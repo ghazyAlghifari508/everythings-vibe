@@ -154,7 +154,13 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 								stage={ws.stage}
 								stageBusy={ws.stageBusy}
 								stageError={ws.stageError}
-								tasksUnresolved={ws.hydration.tasks !== "empty"}
+								tasksUnresolved={
+									// Unresolved means the task read has not answered (pending) or
+									// failed. A ready tree resolved, and an empty one simply has no
+									// tasks yet, so both keep the next action available.
+									ws.hydration.tasks === "pending" ||
+									ws.hydration.tasks === "failed"
+								}
 								codebaseName={codebase.name}
 								planningSnapshotId={
 									effectiveFeatureId
