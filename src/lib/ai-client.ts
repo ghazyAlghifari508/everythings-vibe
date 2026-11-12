@@ -8,6 +8,7 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { streamText } from "ai";
 import {
+	AI_FIRST_TOKEN_TIMEOUT_MS,
 	AI_STALL_TIMEOUT_MS,
 	AI_TOTAL_TIMEOUT_MS,
 	ROUTER_BASE_URL,
@@ -114,10 +115,15 @@ export async function* streamChat(
 	// zero-chunk upstream (reasoning burst or hang) surfaces as an error instead
 	// of an infinite spinner. Total ceiling covers the whole stream.
 	let yieldedText = false;
+	// Nothing has streamed yet: the provider may still be queueing the request,
+	// so the first delta is judged against the longer first-token allowance.
+	let sawProgress = false;
 	let lastProgress = Date.now();
 	const totalDeadline = Date.now() + AI_TOTAL_TIMEOUT_MS;
-	const mkStallError = () =>
-		new Error("AI tidak merespons dalam 2 menit. Coba generate ulang.");
+	const mkStallError = (budgetMs: number) =>
+		new Error(
+			`AI tidak merespons dalam ${budgetMs / 60_000} menit. Coba generate ulang.`,
+		);
 	const mkTotalError = () =>
 		new Error(
 			"Generasi melebihi batas waktu. Coba lagi dengan prompt lebih ringkas.",
@@ -131,18 +137,23 @@ export async function* streamChat(
 			const remainingTotal = totalDeadline - now;
 			// Stall budget counts from the last PROGRESS (reasoning/text),
 			// not from the last part of any kind: a provider emitting
-			// metadata forever must not keep the generator alive.
+			// metadata forever must not keep the generator alive. Until the
+			// first progress arrives the provider may still be queueing the
+			// request, so that window gets the longer first-token allowance.
+			const budgetMs = sawProgress
+				? AI_STALL_TIMEOUT_MS
+				: AI_FIRST_TOKEN_TIMEOUT_MS;
 			const stallMs = Math.min(
-				Math.max(lastProgress + AI_STALL_TIMEOUT_MS - now, 0),
+				Math.max(lastProgress + budgetMs - now, 0),
 				remainingTotal,
 			);
 			let stallId: ReturnType<typeof setTimeout> | undefined;
 			let totalId: ReturnType<typeof setTimeout> | undefined;
 			const stallPromise = new Promise<never>((_, reject) => {
-				stallId = setTimeout(() => reject(mkStallError()), stallMs);
+				stallId = setTimeout(() => reject(mkStallError(budgetMs)), stallMs);
 			});
 			const totalPromise = new Promise<never>((_, reject) => {
-				if (remainingTotal < AI_STALL_TIMEOUT_MS) {
+				if (remainingTotal < budgetMs) {
 					totalId = setTimeout(() => reject(mkTotalError()), remainingTotal);
 				}
 			});
@@ -162,6 +173,7 @@ export async function* streamChat(
 			if (next.done) break;
 			const part = next.value;
 			if (part.type === "reasoning-delta") {
+				sawProgress = true;
 				lastProgress = Date.now();
 				onThinking?.(part.text);
 				continue;
@@ -169,12 +181,14 @@ export async function* streamChat(
 			if (part.type === "raw") {
 				const thinking = extractReasoningContent(part.rawValue);
 				if (!thinking) continue;
+				sawProgress = true;
 				lastProgress = Date.now();
 				onThinking?.(thinking);
 				continue;
 			}
 			if (part.type === "text-delta") {
 				if (!part.text) continue;
+				sawProgress = true;
 				lastProgress = Date.now();
 				yieldedText = true;
 				yield part.text;
@@ -206,8 +220,7 @@ export async function* streamChat(
 			}
 			// Other part types (start, finish, etc.) don't count as progress — stall
 			// timer is NOT reset, so a stream that only emits non-progress stays bounded.
-			if (Date.now() - lastProgress >= AI_STALL_TIMEOUT_MS)
-				throw mkStallError();
+			if (Date.now() - lastProgress >= budgetMs) throw mkStallError(budgetMs);
 		}
 		if (!yieldedText) {
 			if (outcome) outcome.finishReason = "error";

@@ -64,7 +64,16 @@ export const AI_STREAM_RETRY_ATTEMPTS = 1;
 
 // No-progress watchdog: if upstream emits no text-delta AND no reasoning-delta
 // for this long, abort and surface an error instead of an infinite spinner.
+// Applies once the provider has emitted something: silence mid-stream is a dead
+// stream.
 export const AI_STALL_TIMEOUT_MS = 120_000;
+
+// Before the first delta the provider may legitimately hold the connection
+// while it queues the request, switches models, or fills a large prompt — with
+// nothing to stream yet. Judging that window with the mid-stream budget
+// reported a working provider as "tidak tersedia" and killed whole background
+// generations, so the first token gets its own, longer allowance.
+export const AI_FIRST_TOKEN_TIMEOUT_MS = 240_000;
 
 // Hard ceiling per generation (covers full stream including burst + tokens).
 export const AI_TOTAL_TIMEOUT_MS = 600_000;

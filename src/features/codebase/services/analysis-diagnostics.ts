@@ -69,7 +69,7 @@ export function classifyAnalysisFailure(
 	}
 	if (/aborted|aborterror/i.test(message)) return "aborted";
 	if (
-		/tidak merespons dalam 2 menit|melebihi batas waktu|timeout|timed out|etimedout|stall/i.test(
+		/tidak merespons dalam \d+ menit|melebihi batas waktu|timeout|timed out|etimedout|stall/i.test(
 			message,
 		)
 	) {
