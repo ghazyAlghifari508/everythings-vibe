@@ -73,7 +73,7 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 							/>
 							<div className="flex flex-col sm:flex-row sm:items-center gap-1 min-w-0">
 								<span className="font-semibold text-snow">
-									Koneksi ke server terputus:
+									Workspace belum sinkron:
 								</span>
 								<span className="text-fog truncate">{ws.error}</span>
 							</div>

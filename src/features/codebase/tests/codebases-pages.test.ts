@@ -7,6 +7,10 @@ function readWorkspaceSource() {
 		"src/routes/codebases/$id.tsx",
 		"src/features/codebase/components/workspace/codebase-detail-page.tsx",
 		"src/features/codebase/hooks/use-codebase-workspace.ts",
+		// The composer and the post-generation completion tail own the message
+		// routing and the read-after-write checks these contracts describe.
+		"src/features/codebase/hooks/use-workspace-composer.ts",
+		"src/features/codebase/hooks/use-workspace-operation-completion.ts",
 	]
 		.map((path) => readFileSync(path, "utf8"))
 		.join("\n");
@@ -577,10 +581,13 @@ describe("workspace resume after refresh", () => {
 		);
 	});
 
-	it("never offers the Task step before tasks are proven absent", () => {
-		expect(workspaceSource).toContain(
-			'tasksUnresolved={hydration.tasks !== "empty"}',
-		);
+	it("never offers the Task step before the task read resolves", () => {
+		// Only a pending or failed task read counts as unresolved: a ready tree is
+		// an answer, and an empty one simply has no tasks yet. The inverted form
+		// (`!== "empty"`) hid `Buat Handoff` from a finished plan.
+		expect(workspaceSource).not.toContain('hydration.tasks !== "empty"');
+		expect(workspaceSource).toContain('ws.hydration.tasks === "pending"');
+		expect(workspaceSource).toContain('ws.hydration.tasks === "failed"');
 	});
 
 	it("never runs two pipeline generations at once", () => {
@@ -685,7 +692,7 @@ describe("composer message routing without intent choice", () => {
 		expect(workspaceSource).not.toContain("selectedIntent");
 		expect(workspaceSource).not.toContain("needsIntentChoice");
 		// A message in a plan with planning revises that same plan.
-		expect(workspaceSource).toContain("activeHasPlanning");
+		expect(workspaceSource).toContain("hasExistingPlan");
 		expect(workspaceSource).toMatch(/await runRevision\(trimmed/);
 		// A new feature still goes through the existing creation path.
 		expect(workspaceSource).toContain("ensureFeatureInWorkspace(trimmed)");
@@ -699,12 +706,12 @@ describe("composer message routing without intent choice", () => {
 	});
 
 	it("keeps a revision on the existing append-only versioning path", () => {
-		expect(workspaceSource).toMatch(/mode: "revise"/);
-		// The revision reuses /api/chat, so no parallel versioning system exists.
+		// The revision reuses the PRD generation route, so no parallel versioning
+		// system exists.
 		expect(workspaceSource).not.toMatch(/\/api\/[a-z-]*revision/);
 		// Success is only reported after the document is readable again.
 		expect(workspaceSource).toMatch(
-			/const content = await loadPrd\(\)[\s\S]*if \(!content\)/,
+			/const content = await loadPrd\(\);[\s\S]*if \(content &&/,
 		);
 	});
 
@@ -781,7 +788,7 @@ describe("codebase starter suggestions route wiring", () => {
 
 	it("passes validated suggestions from the loaded analysis output to the workspace", () => {
 		expect(detailSource).toContain(
-			"starterSuggestions={analysisOutput?.starterSuggestions}",
+			"starterSuggestions={ws.analysisOutput?.starterSuggestions}",
 		);
 	});
 
@@ -877,7 +884,7 @@ describe("read-only source preview contract", () => {
 		expect(presentationSource).toContain(
 			'const isSourcePreviewOpen = sourcePreview.kind !== "idle"',
 		);
-		expect(detailSource).toContain("onSelectFile={selectSourceFile}");
+		expect(detailSource).toContain("onSelectFile={ws.selectSourceFile}");
 		expect(detailSource).toContain("clearSourcePreview();");
 		// Every artifact branch is gated off while a source file is open, so a
 		// stale document render can never sit next to stale source text.
@@ -892,7 +899,14 @@ describe("read-only source preview contract", () => {
 				"utf8",
 			),
 		).toContain("<CodebaseSourcePreview");
-		expect(detailSource).toContain('? "SUMBER"');
+		// The panel header is the file name alone: the canvas no longer carries a
+		// language/badge chip or a second revise control.
+		const canvasSource = readFileSync(
+			"src/features/codebase/components/explorer/codebase-artifact-canvas.tsx",
+			"utf8",
+		);
+		expect(canvasSource).not.toContain("badge");
+		expect(canvasSource).not.toContain("codebase-canvas-revise");
 	});
 });
 

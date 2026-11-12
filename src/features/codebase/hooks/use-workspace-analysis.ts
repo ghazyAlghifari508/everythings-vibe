@@ -97,6 +97,14 @@ export function useWorkspaceAnalysis({
 					`/api/v1/projects/${encodeURIComponent(projectId)}/codebase/analysis?snapshotId=${encodeURIComponent(snapshotId)}`,
 				);
 				const body: unknown = await response.json().catch(() => null);
+				// 404 is the read's answer for "no readable analysis for this snapshot
+				// yet" (the attempt is still running, or has not been requested), and
+				// 429 is the read's own throttle. Both are transient states the poller
+				// retries; neither is a failed read, so neither paints an error banner.
+				if (response.status === 404 || response.status === 429) {
+					if (analysisIdentityRef.current === key) setError(null);
+					return;
+				}
 				if (
 					!response.ok ||
 					!matchesWorkspaceAnalysis(body, projectId, snapshotId)
