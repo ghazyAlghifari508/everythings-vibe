@@ -79,11 +79,10 @@ describe("CodebaseKanbanBoard panel layout", () => {
 		);
 		expect(titleNode?.className).not.toContain("line-clamp");
 	});
-	it("keeps status, feature grouping, priority, and subtask progress without false agent activity", () => {
+	it("keeps status, feature grouping, and subtask progress without false agent activity", () => {
 		render();
 		expect(container.textContent).toContain("Ekspor Ringkasan");
 		expect(container.textContent).toContain("1/4 subtask");
-		expect(container.textContent).toContain("Penting");
 		expect(container.textContent).not.toContain("Agent coding...");
 		expect(
 			container.querySelector("[data-testid='codebase-kanban-progress']")

@@ -7,7 +7,6 @@ import {
 import { useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import type { TaskCard } from "@/features/greenfield/hooks/use-kanban-polling";
-import { PriorityIndicator } from "./priority-indicator";
 import { TaskDetailDialog } from "./task-detail-dialog";
 
 export { PriorityIndicator } from "./priority-indicator";
@@ -52,12 +51,9 @@ export function KanbanCard({
 						highlighted ? "ring-2 ring-amber animate-flash" : ""
 					}`}
 				>
-					<div className="flex w-full min-w-0 items-start justify-between gap-2.5">
-						<p className="min-w-0 flex-1 font-inter text-sm font-[510] leading-snug text-snow [overflow-wrap:anywhere]">
-							{card.name}
-						</p>
-						<PriorityIndicator priority={card.priority} />
-					</div>
+					<p className="w-full font-inter text-sm font-[510] leading-snug text-snow [overflow-wrap:anywhere]">
+						{card.name}
+					</p>
 
 					{card.description && (
 						<p className="mt-1 line-clamp-2 text-xs text-fog [overflow-wrap:anywhere]">
