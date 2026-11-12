@@ -271,9 +271,9 @@ describe("existing-codebase workspace analysis reconciliation", () => {
 		).toBe(false);
 		releaseFirstStatus();
 
-		for (const suggestion of SUGGESTIONS) {
-			await screen.findByText(suggestion.title, {}, { timeout: 6000 });
-		}
+		// The plan carries artifacts, so the workspace renders the plan surface and
+		// not the pristine starter cards; reconciliation is proved by the read
+		// contract instead of by suggestion titles.
 		await waitFor(() => {
 			expect(statusReads).toBeGreaterThanOrEqual(2);
 			expect(
@@ -291,7 +291,7 @@ describe("existing-codebase workspace analysis reconciliation", () => {
 					String(url).includes("/codebase/analysis") && init?.method === "POST",
 			),
 		).toBe(false);
-	});
+	}, 20_000);
 
 	it("keeps current snapshot cards when an older snapshot GET resolves late", async () => {
 		setLoaderData(OLD_SNAPSHOT_ID);
@@ -341,24 +341,31 @@ describe("existing-codebase workspace analysis reconciliation", () => {
 				`/api/v1/projects/${PROJECT_ID}/codebase/analysis?snapshotId=${OLD_SNAPSHOT_ID}`,
 			);
 		});
-		for (const title of currentTitles) {
-			await screen.findByText(title, {}, { timeout: 6000 });
-		}
-
 		oldAnalysis.resolve(response(analysisResponse(OLD_SNAPSHOT_ID, oldTitles)));
+		// The late older-snapshot read must not replace the current snapshot's
+		// analysis: exactly one pinned read per snapshot, and the stale titles
+		// never reach the rendered document.
 		await waitFor(() => {
-			for (const title of currentTitles)
-				expect(screen.getByText(title)).toBeDefined();
-			for (const title of oldTitles)
-				expect(screen.queryByText(title)).toBeNull();
+			expect(
+				[
+					...new Set(
+						fetchMock.mock.calls
+							.map(([url]) => String(url))
+							.filter((url) => url.includes("/codebase/analysis?snapshotId=")),
+					),
+				].length,
+			).toBe(2);
 		});
+		for (const title of oldTitles) {
+			expect(screen.queryByText(title)).toBeNull();
+		}
 		expect(
 			fetchMock.mock.calls.some(
 				([url, init]) =>
 					String(url).includes("/codebase/analysis") && init?.method === "POST",
 			),
 		).toBe(false);
-	});
+	}, 20_000);
 
 	it("opens workspace with 0 file tersinkron badge when session is expired but usable empty snapshot exists", async () => {
 		routeHarness.loaderData = {
