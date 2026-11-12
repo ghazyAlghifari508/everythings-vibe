@@ -106,12 +106,10 @@ describe("P06 — CodebaseChatWorkspaceHandoffCard & Prompt Contracts", () => {
 			screen.queryByRole("button", { name: "Salin prompt handoff" }),
 		).toBeNull();
 
-		// Raw export command is tucked away into the disclosure, not dominating the card
+		// Manual export and revision buttons removed from handoff card per product design
 		expect(screen.queryByTestId("codebase-manual-export-panel")).toBeNull();
-		const disclosureTrigger = screen.getByTestId(
-			"codebase-manual-export-trigger",
-		);
-		expect(disclosureTrigger.getAttribute("aria-expanded")).toBe("false");
+		expect(screen.queryByTestId("codebase-manual-export-trigger")).toBeNull();
+		expect(screen.queryByTestId("codebase-open-completed-revision")).toBeNull();
 	});
 
 	it("3. handles primary prompt copy and displays concise success feedback without claiming export happened", async () => {
@@ -176,106 +174,31 @@ describe("P06 — CodebaseChatWorkspaceHandoffCard & Prompt Contracts", () => {
 		expect(screen.queryByTestId("codebase-handoff-copy-error")).toBeNull();
 	});
 
-	it("5. expands and collapses the manual export command disclosure cleanly", async () => {
-		const onCopyExport = vi.fn();
+	it("5. does not render manual export disclosure on the handoff card", () => {
 		render(
 			<CodebaseChatWorkspaceHandoffCard
 				exportCmd={defaultExportCmd}
 				handoffPrompt={defaultHandoffPrompt}
-				onCopyExport={onCopyExport}
 			/>,
 		);
 
-		const trigger = screen.getByTestId("codebase-manual-export-trigger");
-		expect(trigger.getAttribute("aria-expanded")).toBe("false");
-		expect(screen.queryByTestId("codebase-manual-export-panel")).toBeNull();
-
-		// Expand disclosure
-		fireEvent.click(trigger);
-		expect(trigger.getAttribute("aria-expanded")).toBe("true");
-
-		const panel = screen.getByTestId("codebase-manual-export-panel");
-		expect(panel).not.toBeNull();
-		expect(panel.textContent).toContain("Ekspor dokumen secara manual");
-		expect(panel.textContent).toContain(
-			"Jalankan perintah berikut dari root repository untuk menyimpan dokumen planning.",
-		);
-		expect(panel.textContent).toContain(defaultExportCmd);
-
-		// Copy export command
-		const copyExportBtn = screen.getByTestId("codebase-copy-export-cmd-btn");
-		expect(copyExportBtn.textContent).toContain("Salin perintah");
-
-		await act(async () => {
-			fireEvent.click(copyExportBtn);
-		});
-		expect(onCopyExport).toHaveBeenCalledTimes(1);
-		expect(writeTextMock).toHaveBeenCalledWith(defaultExportCmd);
-		expect(copyExportBtn.textContent).toContain("Tersalin");
-
-		// Collapse disclosure
-		fireEvent.click(trigger);
-		expect(trigger.getAttribute("aria-expanded")).toBe("false");
+		expect(screen.queryByTestId("codebase-manual-export-trigger")).toBeNull();
 		expect(screen.queryByTestId("codebase-manual-export-panel")).toBeNull();
 	});
 
-	it("6. supports plan revision flow through optional revision controls when reopening completed plan", () => {
-		const onStartCompletedRevision = vi.fn();
-		const onCancelCompletedRevision = vi.fn();
-
-		const { rerender } = render(
+	it("6. keeps handoff focused without revision controls once handoff is reached", () => {
+		render(
 			<CodebaseChatWorkspaceHandoffCard
 				exportCmd={defaultExportCmd}
 				handoffPrompt={defaultHandoffPrompt}
 				isRevisingCompletedPlan={false}
-				onStartCompletedRevision={onStartCompletedRevision}
+				onStartCompletedRevision={vi.fn()}
 			/>,
 		);
 
-		const reviseBtn = screen.getByTestId("codebase-open-completed-revision");
-		expect(reviseBtn.textContent).toContain("Revisi Planning");
-		fireEvent.click(reviseBtn);
-		expect(onStartCompletedRevision).toHaveBeenCalledTimes(1);
-
-		// While in revision mode, offers cancel button
-		rerender(
-			<CodebaseChatWorkspaceHandoffCard
-				exportCmd={defaultExportCmd}
-				handoffPrompt={defaultHandoffPrompt}
-				isRevisingCompletedPlan={true}
-				onCancelCompletedRevision={onCancelCompletedRevision}
-			/>,
-		);
-
-		const cancelBtn = screen.getByTestId("codebase-cancel-completed-revision");
-		expect(cancelBtn.textContent).toContain("Batal Revisi");
-		fireEvent.click(cancelBtn);
-		expect(onCancelCompletedRevision).toHaveBeenCalledTimes(1);
-	});
-
-	it("7. displays concise error feedback when copying manual export command fails", async () => {
-		writeTextMock.mockRejectedValueOnce(
-			new Error("Clipboard permission denied"),
-		);
-
-		render(
-			<CodebaseChatWorkspaceHandoffCard
-				exportCmd={defaultExportCmd}
-				handoffPrompt={defaultHandoffPrompt}
-			/>,
-		);
-
-		const trigger = screen.getByTestId("codebase-manual-export-trigger");
-		fireEvent.click(trigger);
-
-		const copyExportBtn = screen.getByTestId("codebase-copy-export-cmd-btn");
-		await act(async () => {
-			fireEvent.click(copyExportBtn);
-		});
-
-		const errorAlert = screen.getByTestId("codebase-handoff-copy-error");
-		expect(errorAlert).toBeDefined();
-		expect(errorAlert.textContent).toContain("Gagal menyalin otomatis");
-		expect(copyExportBtn.textContent).not.toContain("Tersalin");
+		expect(screen.queryByTestId("codebase-open-completed-revision")).toBeNull();
+		expect(
+			screen.queryByTestId("codebase-cancel-completed-revision"),
+		).toBeNull();
 	});
 });

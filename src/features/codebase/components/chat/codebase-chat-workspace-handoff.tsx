@@ -1,12 +1,6 @@
 "use client";
 
-import {
-	ArrowDown01Icon,
-	ArrowUp01Icon,
-	Copy01Icon,
-	Task01Icon,
-	Tick01Icon,
-} from "@hugeicons/core-free-icons";
+import { Copy01Icon, Task01Icon, Tick01Icon } from "@hugeicons/core-free-icons";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
@@ -50,7 +44,7 @@ export function buildPlanHandoffPrompt(
 }
 
 export interface CodebaseChatWorkspaceHandoffCardProps {
-	exportCmd: string;
+	exportCmd?: string;
 	handoffPrompt: string;
 	codebaseName?: string;
 	featureName?: string;
@@ -67,27 +61,24 @@ export interface CodebaseChatWorkspaceHandoffCardProps {
 }
 
 export function CodebaseChatWorkspaceHandoffCard({
-	exportCmd,
+	exportCmd: _exportCmd,
 	handoffPrompt,
 	codebaseName,
 	featureName,
 	copiedCmd = false,
-	copiedExport = false,
+	copiedExport: _copiedExport = false,
 	copyError = null,
 	onCopyCmd,
-	onCopyExport,
+	onCopyExport: _onCopyExport,
 	taskCount,
-	isRevisingCompletedPlan = false,
-	onStartCompletedRevision,
-	onCancelCompletedRevision,
+	isRevisingCompletedPlan: _isRevisingCompletedPlan = false,
+	onStartCompletedRevision: _onStartCompletedRevision,
+	onCancelCompletedRevision: _onCancelCompletedRevision,
 }: CodebaseChatWorkspaceHandoffCardProps) {
-	const [isExportExpanded, setIsExportExpanded] = useState(false);
 	const [localCopiedPrompt, setLocalCopiedPrompt] = useState(false);
-	const [localCopiedExport, setLocalCopiedExport] = useState(false);
 	const [localError, setLocalError] = useState<string | null>(null);
 
 	const isPromptCopied = copiedCmd || localCopiedPrompt;
-	const isExportCopied = copiedExport || localCopiedExport;
 	const displayError = copyError ?? localError;
 
 	const handleCopyPrompt = async () => {
@@ -99,24 +90,6 @@ export function CodebaseChatWorkspaceHandoffCard({
 			setLocalCopiedPrompt(true);
 			setLocalError(null);
 			setTimeout(() => setLocalCopiedPrompt(false), 2000);
-		} else {
-			setLocalError(
-				result.error ??
-					"Gagal menyalin otomatis. Silakan salin teks secara manual.",
-			);
-			setTimeout(() => setLocalError(null), 3500);
-		}
-	};
-
-	const handleCopyExportCmd = async () => {
-		if (onCopyExport) {
-			onCopyExport();
-		}
-		const result = await copyToClipboard(exportCmd);
-		if (result.success) {
-			setLocalCopiedExport(true);
-			setLocalError(null);
-			setTimeout(() => setLocalCopiedExport(false), 2000);
 		} else {
 			setLocalError(
 				result.error ??
@@ -164,29 +137,6 @@ export function CodebaseChatWorkspaceHandoffCard({
 						) : null}
 					</div>
 				</div>
-				{isRevisingCompletedPlan && onCancelCompletedRevision ? (
-					<Button
-						type="button"
-						variant="outline"
-						size="sm"
-						onClick={onCancelCompletedRevision}
-						data-testid="codebase-cancel-completed-revision"
-						className="min-h-8 text-xs font-medium text-fog hover:text-snow"
-					>
-						Batal Revisi
-					</Button>
-				) : onStartCompletedRevision ? (
-					<Button
-						type="button"
-						variant="outline"
-						size="sm"
-						onClick={onStartCompletedRevision}
-						data-testid="codebase-open-completed-revision"
-						className="min-h-8 text-xs font-medium text-fog hover:text-snow"
-					>
-						Revisi Planning
-					</Button>
-				) : null}
 			</div>
 
 			{/* Clear explanation of handoff purpose */}
@@ -245,75 +195,6 @@ export function CodebaseChatWorkspaceHandoffCard({
 					{displayError}
 				</p>
 			) : null}
-
-			{/* Collapsible raw export command disclosure */}
-			<div className="mt-3.5 border-t border-graphite/60 pt-3">
-				<button
-					type="button"
-					onClick={() => setIsExportExpanded((prev) => !prev)}
-					aria-expanded={isExportExpanded}
-					aria-controls="codebase-manual-export-panel"
-					data-testid="codebase-manual-export-trigger"
-					className="inline-flex w-full items-center justify-between py-1 text-xs font-medium text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-				>
-					<span>Detail ekspor manual</span>
-					<span className="sr-only">Ekspor dokumen secara manual</span>
-					<Icon
-						icon={isExportExpanded ? ArrowUp01Icon : ArrowDown01Icon}
-						size={14}
-						aria-hidden="true"
-						className="text-slate transition-transform duration-200"
-					/>
-				</button>
-
-				{isExportExpanded ? (
-					<div
-						id="codebase-manual-export-panel"
-						data-testid="codebase-manual-export-panel"
-						className="mt-2.5 flex flex-col gap-2 rounded-lg border border-graphite bg-obsidian/70 p-3"
-					>
-						<h4 className="text-xs font-semibold text-snow">
-							Ekspor dokumen secara manual
-						</h4>
-						<p className="text-xs leading-relaxed text-fog">
-							Jalankan perintah berikut dari root repository untuk menyimpan
-							dokumen planning.
-						</p>
-						<div className="flex items-center justify-between gap-2 rounded border border-graphite/80 bg-onyx p-2">
-							<code className="min-w-0 flex-1 select-all break-all font-mono text-[11px] text-mist">
-								{exportCmd}
-							</code>
-						</div>
-						<div className="flex justify-end">
-							<Button
-								type="button"
-								variant="outline"
-								size="sm"
-								onClick={handleCopyExportCmd}
-								data-testid="codebase-copy-export-cmd-btn"
-								className="min-h-8 text-xs font-medium text-fog hover:text-snow"
-							>
-								{isExportCopied ? (
-									<>
-										<Icon
-											icon={Tick01Icon}
-											size={12}
-											aria-hidden="true"
-											className="text-emerald"
-										/>
-										<span className="text-emerald">Tersalin</span>
-									</>
-								) : (
-									<>
-										<Icon icon={Copy01Icon} size={12} aria-hidden="true" />
-										<span>Salin perintah</span>
-									</>
-								)}
-							</Button>
-						</div>
-					</div>
-				) : null}
-			</div>
 		</div>
 	);
 }
