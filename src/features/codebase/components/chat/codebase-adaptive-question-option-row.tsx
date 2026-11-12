@@ -1,7 +1,7 @@
 "use client";
 
 import { Checkbox, Description, Radio } from "@heroui/react";
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -26,7 +26,7 @@ interface CodebaseAdaptiveQuestionOptionRowProps {
  *  change (never text colour alone), and the state comes from the field's own
  *  render props rather than a shadow copy of the selection state. */
 const CARD =
-	"rounded-lg border px-3.5 py-3 transition-colors focus-within:ring-2 focus-within:ring-indigo";
+	"rounded-lg border px-3.5 py-3 transition-colors focus-within:ring-2 focus-within:ring-indigo cursor-pointer";
 
 /** The shared two-column track: column 1 is the selection control's own width,
  *  column 2 is the text column. The card, the clickable label, the description,
@@ -82,6 +82,28 @@ export function CodebaseAdaptiveQuestionOptionRow({
 	recommended = false,
 	children,
 }: CodebaseAdaptiveQuestionOptionRowProps) {
+	/**
+	 * The whole card is the hit target. Only the control sits inside the label,
+	 * so a click on the heading row already toggles; a click anywhere else on
+	 * the surface (padding, description) forwards to the same control instead of
+	 * doing nothing. Typing controls inside the option (the free-text field of
+	 * "Lainnya") keep their own behavior: a caret click is never a selection.
+	 *
+	 * `display: contents` keeps this host out of the card's grid, so it only
+	 * widens a mouse hit target for a control that is already keyboard-operable
+	 * as a React Aria field (arrows move within the group, Space selects).
+	 */
+	const selectFromSurface = (event: MouseEvent<HTMLElement>) => {
+		if (disabled) return;
+		const target = event.target as HTMLElement | null;
+		if (!target) return;
+		// The label toggles natively; forwarding again would double-toggle.
+		if (target.closest("input, textarea, select, button, a, label")) return;
+		const control = event.currentTarget.querySelector<HTMLInputElement>(
+			'input[type="radio"], input[type="checkbox"]',
+		);
+		control?.click();
+	};
 	const headingRow = (
 		<span className={HEADING_ROW}>
 			<span className={HEADING}>{heading}</span>
@@ -107,39 +129,47 @@ export function CodebaseAdaptiveQuestionOptionRow({
 
 	if (inputType === "checkbox") {
 		return (
-			<Checkbox
+			/* biome-ignore lint/a11y/noStaticElementInteractions: pointer-only hit target for the card; the option's own React Aria control stays the keyboard path */
+			/* biome-ignore lint/a11y/useKeyWithClickEvents: keyboard selection is owned by the radiogroup/checkbox control, not by this hit target */
+			<div className="contents" onClick={selectFromSurface}>
+				<Checkbox
+					value={value}
+					isDisabled={disabled}
+					className={({ isSelected, isDisabled }) =>
+						cardClass(Boolean(isSelected), Boolean(isDisabled))
+					}
+				>
+					<Checkbox.Content className={CONTENT}>
+						<Checkbox.Control className={CONTROL}>
+							<Checkbox.Indicator className={INDICATOR} />
+						</Checkbox.Control>
+						{headingRow}
+					</Checkbox.Content>
+					{rest}
+				</Checkbox>
+			</div>
+		);
+	}
+
+	return (
+		/* biome-ignore lint/a11y/noStaticElementInteractions: pointer-only hit target for the card; the option's own React Aria control stays the keyboard path */
+		/* biome-ignore lint/a11y/useKeyWithClickEvents: keyboard selection is owned by the radiogroup control, not by this hit target */
+		<div className="contents" onClick={selectFromSurface}>
+			<Radio
 				value={value}
 				isDisabled={disabled}
 				className={({ isSelected, isDisabled }) =>
 					cardClass(Boolean(isSelected), Boolean(isDisabled))
 				}
 			>
-				<Checkbox.Content className={CONTENT}>
-					<Checkbox.Control className={CONTROL}>
-						<Checkbox.Indicator className={INDICATOR} />
-					</Checkbox.Control>
+				<Radio.Content className={CONTENT}>
+					<Radio.Control className={CONTROL}>
+						<Radio.Indicator className={INDICATOR} />
+					</Radio.Control>
 					{headingRow}
-				</Checkbox.Content>
+				</Radio.Content>
 				{rest}
-			</Checkbox>
-		);
-	}
-
-	return (
-		<Radio
-			value={value}
-			isDisabled={disabled}
-			className={({ isSelected, isDisabled }) =>
-				cardClass(Boolean(isSelected), Boolean(isDisabled))
-			}
-		>
-			<Radio.Content className={CONTENT}>
-				<Radio.Control className={CONTROL}>
-					<Radio.Indicator className={INDICATOR} />
-				</Radio.Control>
-				{headingRow}
-			</Radio.Content>
-			{rest}
-		</Radio>
+			</Radio>
+		</div>
 	);
 }

@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import { RadioGroup } from "@heroui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import {
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CodebaseAdaptiveQuestionOptionRow } from "../components/chat/codebase-adaptive-question-option-row";
 
@@ -108,14 +114,13 @@ describe("P04 — adaptive option layout", () => {
 		);
 	});
 
-	it("keeps the option selectable as a whole card with a keyboard-reachable control", () => {
+	it("keeps the option's control a real native input inside the card label", () => {
 		renderOptions();
 
 		const control = screen.getByRole("radio", { name: /^Lainnya$/i });
 		expect((control as HTMLInputElement).type).toBe("radio");
 
-		// The control is a real native input, and the card is its label: the whole
-		// surface is the hit area React Aria wires up.
+		// The control is a real native input, and the card's content is its label.
 		const label = control.closest("label") as HTMLElement;
 		expect(label).toBeTruthy();
 		expect(label.getAttribute("for")).toBeNull();
@@ -123,5 +128,51 @@ describe("P04 — adaptive option layout", () => {
 		// No custom keyboard model: no tabindex was invented on the card.
 		expect(label.getAttribute("tabindex")).toBeNull();
 		expect(vi.isMockFunction(control.click)).toBe(false);
+	});
+
+	it("selects the option when the card surface outside the label is clicked", async () => {
+		renderOptions();
+
+		const description = screen.getByText(SEARCH_DESCRIPTION);
+		const control = screen.getByRole("radio", {
+			name: /^Judul, deskripsi, dan teknologi$/i,
+		}) as HTMLInputElement;
+		// The description is deliberately outside the label, so this click proves
+		// the card forwards it to the control instead of swallowing it.
+		expect((description.closest("label") as HTMLElement | null) ?? null).toBe(
+			null,
+		);
+
+		fireEvent.click(description);
+
+		await waitFor(() => expect(control.checked).toBe(true));
+	});
+
+	it("selects the option when the card's own padding is clicked", async () => {
+		renderOptions();
+
+		const control = screen.getByRole("radio", {
+			name: /^Lainnya$/i,
+		}) as HTMLInputElement;
+		const card = control.closest("label")?.parentElement as HTMLElement;
+
+		fireEvent.click(card);
+
+		await waitFor(() => expect(control.checked).toBe(true));
+	});
+
+	it("leaves the free-text field's own clicks alone", async () => {
+		renderOptions();
+
+		const field = screen.getByLabelText("Jawaban lain");
+		const control = screen.getByRole("radio", {
+			name: /^Lainnya$/i,
+		}) as HTMLInputElement;
+		expect(control.checked).toBe(false);
+
+		fireEvent.click(field);
+
+		// A caret click is a typing intent, never a selection.
+		expect(control.checked).toBe(false);
 	});
 });
