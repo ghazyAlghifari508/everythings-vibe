@@ -23,8 +23,10 @@ export interface GenerationGuards {
 	quarantine(reason: string): Promise<void>;
 	/** Mark the charge settled: nothing may release or quarantine it afterwards. */
 	settle(): void;
-	/** Release, drop the project generation lock, emit the error, and close. */
-	fail(message: string): Promise<void>;
+	/** Release, drop the project generation lock, emit the error, and close.
+	 *  `code` classifies the rejection for the caller (for example a refused
+	 *  model output, which stays retryable) without changing the user copy. */
+	fail(message: string, code?: string): Promise<void>;
 	/** Drop the project generation lock if this stream still owns it. */
 	resetLock(): Promise<void>;
 	/** Emit done and close (a no-op once the stream already finished or failed). */
@@ -114,14 +116,18 @@ export function createGenerationStream(
 				settle: () => {
 					isSettled = true;
 				},
-				fail: async (message) => {
+				fail: async (message, code) => {
 					if (eventDone || eventErrored) return;
 					eventErrored = true;
 					await safeRelease(message);
 					// The error event below must always reach the client; only the
 					// lock reset is ownership-gated.
 					await input.resetLock();
-					sse.send({ type: "error", error: message });
+					sse.send({
+						type: "error",
+						error: message,
+						...(code ? { code } : {}),
+					});
 					sse.close();
 				},
 				resetLock: input.resetLock,

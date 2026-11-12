@@ -144,7 +144,13 @@ export async function getOrCreateGenerationOperation(
 				"GENERATION_CONFLICT",
 			);
 		if (existing) {
-			if (existing.attempt >= existing.maxAttempts)
+			// A refused model output cost nothing and wrote nothing, so an explicit
+			// user retry opens a fresh bounded window instead of dead-ending at
+			// "batas percobaan tercapai". Infrastructure failures keep the ceiling.
+			const reopenRejectedOutput =
+				existing.errorCode === "OUTPUT_REJECTED" &&
+				existing.attempt >= existing.maxAttempts;
+			if (existing.attempt >= existing.maxAttempts && !reopenRejectedOutput)
 				throw new DurableGenerationError(
 					"Batas percobaan tercapai. Hubungi dukungan.",
 					"ATTEMPTS_EXHAUSTED",
@@ -176,6 +182,9 @@ export async function getOrCreateGenerationOperation(
 					startedAt: null,
 					finishedAt: null,
 					updatedAt: new Date(),
+					// A reopened window counts from zero, so the retry gets the same
+					// bounded number of automatic attempts as the first one.
+					...(reopenRejectedOutput ? { attempt: 0 } : {}),
 				})
 				.where(
 					and(

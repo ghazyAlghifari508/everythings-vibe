@@ -35,6 +35,15 @@ const TRUNCATED_MESSAGE =
 const INVALID_TREE_MESSAGE =
 	"AI menghasilkan task yang tidak valid (JSON rusak atau subfitur di luar daftar fitur). Coba lagi.";
 
+/**
+ * The model produced output this pipeline refuses (truncated, unparseable,
+ * uncovered, or naming a surface the PRD does not declare). Nothing was
+ * charged and nothing was written, so the failure is retryable: the operation
+ * keeps a fresh attempt window for a deliberate user retry instead of ending in
+ * "batas percobaan tercapai".
+ */
+const OUTPUT_REJECTED = "OUTPUT_REJECTED";
+
 export interface TaskPersistenceInput {
 	run: GenerationRun;
 	projectId: string;
@@ -95,7 +104,7 @@ export async function persistGeneratedTaskTree(
 
 	if (isTruncatedGeneration(input.fullResponse, input.finishReason)) {
 		await guards.release("generation truncated");
-		await guards.fail(TRUNCATED_MESSAGE);
+		await guards.fail(TRUNCATED_MESSAGE, OUTPUT_REJECTED);
 		return;
 	}
 
@@ -106,7 +115,7 @@ export async function persistGeneratedTaskTree(
 		);
 		if (!firstPass) {
 			await guards.release("invalid task json");
-			await guards.fail(INVALID_TREE_MESSAGE);
+			await guards.fail(INVALID_TREE_MESSAGE, OUTPUT_REJECTED);
 			return;
 		}
 
@@ -142,6 +151,7 @@ export async function persistGeneratedTaskTree(
 				coverage.report.missing.length > 0
 					? `Task tree belum men-cover semua Acceptance Criteria (belum ter-cover: ${coverage.report.missing.join(", ")}). Tidak disimpan — coba generate ulang.`
 					: `Task tree merujuk Acceptance Criteria yang tidak ada (${coverage.report.unknown.join(", ")}). Tidak disimpan — coba generate ulang.`,
+				OUTPUT_REJECTED,
 			);
 			return;
 		}
@@ -163,6 +173,7 @@ export async function persistGeneratedTaskTree(
 				await guards.release("unknown task surfaces");
 				await guards.fail(
 					`Task merujuk halaman yang tidak ada di PRD (${uniqueUnknown.join(", ")}). Tidak disimpan — coba generate ulang.`,
+					OUTPUT_REJECTED,
 				);
 				return;
 			}
