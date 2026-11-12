@@ -7,6 +7,7 @@ import {
 	type FeaturePlanMutationParams,
 	handleFeatureArchive,
 	handleFeatureDelete,
+	handleFeaturePlanPatch,
 	handleFeatureRename,
 } from "@/features/codebase/services/feature-plan-mutations.server";
 
@@ -289,6 +290,46 @@ describe("handleFeatureRename route", () => {
 		expect(response.status).toBe(400);
 		const body = (await response.json()) as { code?: string };
 		expect(body.code).toBe("FEATURE_NAME_INVALID");
+	});
+});
+
+describe("handleFeaturePlanPatch route dispatch", () => {
+	/** The route's real entry point consumes the body once and rebuilds the
+	 *  request for the sub-handler. That rebuilt request must still carry the
+	 *  caller's authentication headers, or every rename and archive 401s. */
+	function patchRequest(body: unknown) {
+		return new Request("http://local/test", {
+			method: "PATCH",
+			headers: {
+				"Content-Type": "application/json",
+				authorization: "ok",
+			},
+			body: JSON.stringify(body),
+		});
+	}
+
+	it("archives through the dispatcher with the caller's auth header intact", async () => {
+		seedCodebase(null);
+		seedProject();
+		const response = await handleFeaturePlanPatch({
+			request: patchRequest({ archived: true }),
+			params: baseParams,
+		});
+		expect(response.status).toBe(200);
+		const body = (await response.json()) as { archivedAt?: string | null };
+		expect(body.archivedAt).not.toBeNull();
+	});
+
+	it("renames through the dispatcher with the caller's auth header intact", async () => {
+		seedCodebase(null);
+		seedProject();
+		const response = await handleFeaturePlanPatch({
+			request: patchRequest({ name: "Nama Baru" }),
+			params: baseParams,
+		});
+		expect(response.status).toBe(200);
+		const body = (await response.json()) as { name?: string };
+		expect(body.name).toBe("Nama Baru");
 	});
 });
 

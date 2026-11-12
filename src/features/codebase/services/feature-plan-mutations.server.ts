@@ -169,8 +169,8 @@ export async function handleFeaturePlanPatch({
 }): Promise<Response> {
 	const body: unknown = await request.json().catch(() => null);
 	return hasBooleanArchived(body)
-		? handleFeatureArchive({ request: requestWithBody(body), params })
-		: handleFeatureRename({ request: requestWithBody(body), params });
+		? handleFeatureArchive({ request: requestWithBody(request, body), params })
+		: handleFeatureRename({ request: requestWithBody(request, body), params });
 }
 
 /** Type guard: does this parsed body carry a boolean `archived` field? */
@@ -185,11 +185,21 @@ function hasBooleanArchived(
 	);
 }
 
-/** Rebuild a request whose JSON body is already known, for the sub-handlers. */
-function requestWithBody(body: unknown): Request {
-	return new Request("http://local/feature", {
+/** Rebuild a request whose JSON body is already known, for the sub-handlers.
+ *  The original request is the base, so authentication headers (session
+ *  cookies) travel with the body: a hand-built request carrying only
+ *  `Content-Type` made every rename and archive answer 401 before any
+ *  ownership check ran. */
+function requestWithBody(request: Request, body: unknown): Request {
+	// Copy the caller's headers, then let the new body own its length: a stale
+	// `content-length` from the consumed request makes the Request constructor
+	// throw.
+	const headers = new Headers(request.headers);
+	headers.delete("content-length");
+	headers.set("content-type", "application/json");
+	return new Request(request.url, {
 		method: "PATCH",
-		headers: { "Content-Type": "application/json" },
+		headers,
 		body: JSON.stringify(body ?? {}),
 	});
 }
