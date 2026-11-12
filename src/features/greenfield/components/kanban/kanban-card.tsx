@@ -52,22 +52,22 @@ export function KanbanCard({
 						highlighted ? "ring-2 ring-amber animate-flash" : ""
 					}`}
 				>
-					<div className="flex w-full items-start justify-between gap-2.5">
-						<p className="flex-1 font-inter text-sm font-[510] leading-snug text-snow">
+					<div className="flex w-full min-w-0 items-start justify-between gap-2.5">
+						<p className="min-w-0 flex-1 font-inter text-sm font-[510] leading-snug text-snow [overflow-wrap:anywhere]">
 							{card.name}
 						</p>
 						<PriorityIndicator priority={card.priority} />
 					</div>
 
 					{card.description && (
-						<p className="mt-1 line-clamp-2 text-xs text-fog">
+						<p className="mt-1 line-clamp-2 text-xs text-fog [overflow-wrap:anywhere]">
 							{card.description}
 						</p>
 					)}
 
-					<div className="mt-3 flex flex-wrap items-center gap-2">
+					<div className="mt-3 flex min-w-0 flex-wrap items-center gap-2">
 						{/* Feature Badge */}
-						<span className="inline-flex items-center gap-1 rounded-md border border-graphite/40 bg-white/5 px-2 py-0.5 text-[10px] text-mist">
+						<span className="inline-flex min-w-0 max-w-full items-center gap-1 truncate rounded-md border border-graphite/40 bg-white/5 px-2 py-0.5 text-[10px] text-mist">
 							{card.featureName}
 						</span>
 

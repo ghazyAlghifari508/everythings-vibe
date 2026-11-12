@@ -13,7 +13,6 @@ import type { AnalysisResponse } from "@/features/codebase/services/analysis";
 import { resolveCodebaseDisplayName } from "@/features/codebase/services/naming";
 import {
 	isResyncSessionVerified,
-	isSyncStatusComplete,
 	resolveSyncStageView,
 	type SyncPromptPayload,
 	type SyncStatusResponse,
@@ -116,9 +115,9 @@ export function CodebaseResyncModal({
 			<DialogContent
 				data-testid="codebase-resync-panel"
 				closeAriaLabel="Tutup sync ulang"
-				className="flex max-h-[85vh] w-full flex-col gap-0 overflow-hidden p-0 outline-none sm:max-w-2xl"
+				className="flex max-h-[85vh] w-full flex-col gap-0 overflow-hidden p-0 !p-0 outline-none sm:max-w-2xl"
 			>
-				<DialogHeader className="shrink-0 space-y-1 border-b border-graphite px-5 py-4 pr-12 text-left sm:px-6 sm:py-5">
+				<DialogHeader className="shrink-0 space-y-1 border-b border-graphite px-4 py-3.5 pr-12 text-left sm:px-5 sm:py-4">
 					<DialogTitle className="font-inter text-base font-semibold text-snow sm:text-lg">
 						Perbarui repository
 					</DialogTitle>
@@ -129,17 +128,14 @@ export function CodebaseResyncModal({
 
 				{/* One scroll container for the steps; the prompt owns its own
 				internal scroll because a long credential keeps its full text. */}
-				<div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 sm:px-6 sm:py-5 flex flex-col">
+				<div className="min-h-0 flex-1 overflow-y-auto px-4 pt-3.5 pb-4 sm:px-5 sm:pt-4 sm:pb-5 flex flex-col">
 					<ScreenConnectPromptStep
 						key={payload?.sessionId ?? "no-session"}
 						projectName={projectName}
-						payload={
-							!isStarting &&
-							!sessionError &&
-							!isSyncStatusComplete(attemptStatus)
-								? payload
-								: null
-						}
+						/* The prompt stays on screen after a verified re-sync: the
+						credential belongs to the attempt the user just ran, and the
+						progress rows below already report completion. */
+						payload={isStarting || sessionError ? null : payload}
 						isStarting={isStarting}
 						status={attemptStatus}
 						onRequestNewToken={onReplacePrompt}
@@ -177,7 +173,7 @@ export function CodebaseResyncModal({
 					/>
 				</div>
 
-				<DialogFooter className="shrink-0 flex items-center justify-end gap-2.5 border-t border-graphite px-5 py-3 sm:px-6 sm:py-3.5">
+				<DialogFooter className="shrink-0 flex items-center justify-end gap-2.5 border-t border-graphite px-4 py-3 sm:px-5 sm:py-3.5">
 					{!isVerified && (
 						<Button
 							type="button"

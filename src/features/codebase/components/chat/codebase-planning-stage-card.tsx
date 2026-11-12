@@ -246,10 +246,10 @@ export function CodebasePlanningStageCard({
 			{/* Stage-specific Actions */}
 			<div
 				data-testid="codebase-stage-actions"
-				className="mt-4 flex flex-wrap items-center gap-2 border-t border-graphite/60 pt-3"
+				className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-graphite/60 pt-3"
 			>
 				{/* Revisi stays next to the next action: one row of related controls,
-				    not two corners of the card. */}
+				    anchored to the card's trailing edge. */}
 				<Button
 					type="button"
 					variant="outline"
