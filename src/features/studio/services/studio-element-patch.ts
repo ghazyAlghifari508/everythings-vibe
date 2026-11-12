@@ -147,7 +147,11 @@ export function patchStudioElement(
 			if (edit.kind === "remove") node.remove();
 			else if (edit.kind === "replace") node.outerHTML = replacement;
 			else if (edit.kind === "text") node.textContent = edit.text;
-			// Source splicing must preserve surrounding DOM, including parser repair boundaries.
+			// Normalize adjacent text nodes after live DOM mutations (such as removing
+			// an element bordered by whitespace on both sides) so `isEqualNode` matches
+			// a fresh parse without allowing parser reparenting or malformed boundaries.
+			dom.window.document.documentElement.normalize();
+			parsed.window.document.documentElement.normalize();
 			if (
 				!dom.window.document.documentElement.isEqualNode(
 					parsed.window.document.documentElement,
