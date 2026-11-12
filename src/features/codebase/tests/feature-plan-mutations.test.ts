@@ -150,7 +150,9 @@ function seedCodebase(onboardingProjectId: string | null = null) {
 	});
 }
 
-function seedProject(overrides: Partial<{ deletedAt: Date }> = {}) {
+function seedProject(
+	overrides: Partial<(typeof storage.projects)[number]> = {},
+) {
 	storage.projects.push({
 		id: "proj-1",
 		userId: "user-1",
