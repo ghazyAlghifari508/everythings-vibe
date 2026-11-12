@@ -106,6 +106,7 @@ export function CodebaseChatWorkspaceTimeline({
 			artifacts={artifacts}
 			activeArtifactId={activeArtifactId}
 			taskCount={kanbanProgress?.total}
+			isHandoffActive={isHandoffActive}
 			onGeneratePrd={onGeneratePrd}
 			onGenerateAc={onGenerateAc}
 			onGenerateTask={onGenerateTask}
@@ -170,7 +171,8 @@ export function CodebaseChatWorkspaceTimeline({
 							: null
 						: null}
 					{entry.kind === "operation" ? (
-						entry.run ? (
+						entry.run &&
+						!(entry.run.stage === "task" && entry.run.status === "done") ? (
 							<CodebaseChatWorkspaceMessages
 								messages={[]}
 								run={entry.run}
@@ -178,7 +180,7 @@ export function CodebaseChatWorkspaceTimeline({
 								onRetryStage={onRetryStage}
 								onRetryGenerate={onRetryGenerate}
 							/>
-						) : (
+						) : !entry.run ? (
 							<output className="text-sm text-fog">
 								{STAGES[entry.stage]}:{" "}
 								{entry.event?.status === "failed"
@@ -187,7 +189,7 @@ export function CodebaseChatWorkspaceTimeline({
 										? "dibatalkan"
 										: "sedang diproses"}
 							</output>
-						)
+						) : null
 					) : null}
 					{entry.kind === "revision" ? (
 						<>

@@ -19,6 +19,7 @@ export interface CodebasePlanningStageCardProps {
 	artifacts?: readonly CodebaseArtifactRef[];
 	activeArtifactId?: string | null;
 	taskCount?: number;
+	isHandoffActive?: boolean;
 	onGeneratePrd?: () => void;
 	onGenerateAc?: () => void;
 	onGenerateTask?: () => void;
@@ -72,7 +73,8 @@ export function CodebasePlanningStageCard({
 	tasksUnresolved = false,
 	artifacts = [],
 	activeArtifactId = null,
-	taskCount,
+	taskCount: _taskCount,
+	isHandoffActive = false,
 	onGeneratePrd,
 	onGenerateAc,
 	onGenerateTask,
@@ -211,18 +213,6 @@ export function CodebasePlanningStageCard({
 				</div>
 			) : null}
 
-			{/* Task completion summary */}
-			{isTasksCompleted ? (
-				<p
-					data-testid="codebase-planning-task-summary"
-					className="mt-3 text-xs text-fog"
-				>
-					{taskCount !== undefined
-						? `${taskCount} task berhasil dibuat.`
-						: "12 task berhasil dibuat."}
-				</p>
-			) : null}
-
 			{/* Stage Error Notice */}
 			{stageError ? (
 				<div
@@ -244,86 +234,91 @@ export function CodebasePlanningStageCard({
 			) : null}
 
 			{/* Stage-specific Actions */}
-			<div
-				data-testid="codebase-stage-actions"
-				className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-graphite/60 pt-3"
-			>
-				{/* Revisi stays next to the next action: one row of related controls,
-				    anchored to the card's trailing edge. */}
-				<Button
-					type="button"
-					variant="outline"
-					size="sm"
-					onClick={handleRevisionClick}
-					data-testid="codebase-planning-action-revise"
-					className="min-h-8 border-graphite bg-obsidian text-xs font-medium text-fog hover:border-steel hover:text-snow"
+			{!isHandoffActive &&
+			(Boolean(onStartRevision) ||
+				isPrdNext ||
+				isAcNext ||
+				isTaskNext ||
+				(isTasksCompleted && onTriggerHandoff)) ? (
+				<div
+					data-testid="codebase-stage-actions"
+					className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-graphite/60 pt-3"
 				>
-					Revisi
-				</Button>
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						onClick={handleRevisionClick}
+						data-testid="codebase-planning-action-revise"
+						className="min-h-8 border-graphite bg-obsidian text-xs font-medium text-fog hover:border-steel hover:text-snow"
+					>
+						Revisi
+					</Button>
 
-				<div className="flex items-center gap-2">
-					{isPrdNext && onGeneratePrd ? (
-						<Button
-							type="button"
-							size="sm"
-							disabled={stageBusy === "prd"}
-							onClick={onGeneratePrd}
-							data-testid="codebase-stage-prd-btn"
-							className="inline-flex min-h-8 items-center gap-1.5 rounded-md bg-snow px-3 text-xs font-semibold text-onyx transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
-						>
-							{stageBusy === "prd" ? "Menyusun PRD..." : "Buat PRD"}
-							{stageBusy !== "prd" ? (
+					<div className="flex items-center gap-2">
+						{isPrdNext && onGeneratePrd ? (
+							<Button
+								type="button"
+								size="sm"
+								disabled={stageBusy === "prd"}
+								onClick={onGeneratePrd}
+								data-testid="codebase-stage-prd-btn"
+								className="inline-flex min-h-8 items-center gap-1.5 rounded-md bg-snow px-3 text-xs font-semibold text-onyx transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
+							>
+								{stageBusy === "prd" ? "Menyusun PRD..." : "Buat PRD"}
+								{stageBusy !== "prd" ? (
+									<Icon icon={ArrowRight01Icon} size={12} aria-hidden="true" />
+								) : null}
+							</Button>
+						) : null}
+
+						{isAcNext && onGenerateAc ? (
+							<Button
+								type="button"
+								size="sm"
+								disabled={stageBusy === "ac"}
+								onClick={onGenerateAc}
+								data-testid="codebase-stage-ac-btn"
+								className="inline-flex min-h-8 items-center gap-1.5 rounded-md bg-snow px-3 text-xs font-semibold text-onyx transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
+							>
+								{stageBusy === "ac" ? "Menyusun AC..." : "Buat AC"}
+								{stageBusy !== "ac" ? (
+									<Icon icon={ArrowRight01Icon} size={12} aria-hidden="true" />
+								) : null}
+							</Button>
+						) : null}
+
+						{isTaskNext && onGenerateTask && !tasksUnresolved ? (
+							<Button
+								type="button"
+								size="sm"
+								disabled={stageBusy === "task"}
+								onClick={onGenerateTask}
+								data-testid="codebase-stage-task-btn"
+								className="inline-flex min-h-8 items-center gap-1.5 rounded-md bg-snow px-3 text-xs font-semibold text-onyx transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
+							>
+								{stageBusy === "task" ? "Menyusun task..." : "Buat Task"}
+								{stageBusy !== "task" ? (
+									<Icon icon={ArrowRight01Icon} size={12} aria-hidden="true" />
+								) : null}
+							</Button>
+						) : null}
+
+						{isTasksCompleted && onTriggerHandoff ? (
+							<Button
+								type="button"
+								size="sm"
+								onClick={onTriggerHandoff}
+								data-testid="codebase-stage-handoff-btn"
+								className="inline-flex min-h-8 items-center gap-1.5 rounded-md bg-snow px-3 text-xs font-semibold text-onyx transition hover:brightness-105"
+							>
+								Buat Handoff
 								<Icon icon={ArrowRight01Icon} size={12} aria-hidden="true" />
-							) : null}
-						</Button>
-					) : null}
-
-					{isAcNext && onGenerateAc ? (
-						<Button
-							type="button"
-							size="sm"
-							disabled={stageBusy === "ac"}
-							onClick={onGenerateAc}
-							data-testid="codebase-stage-ac-btn"
-							className="inline-flex min-h-8 items-center gap-1.5 rounded-md bg-snow px-3 text-xs font-semibold text-onyx transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
-						>
-							{stageBusy === "ac" ? "Menyusun AC..." : "Buat AC"}
-							{stageBusy !== "ac" ? (
-								<Icon icon={ArrowRight01Icon} size={12} aria-hidden="true" />
-							) : null}
-						</Button>
-					) : null}
-
-					{isTaskNext && onGenerateTask && !tasksUnresolved ? (
-						<Button
-							type="button"
-							size="sm"
-							disabled={stageBusy === "task"}
-							onClick={onGenerateTask}
-							data-testid="codebase-stage-task-btn"
-							className="inline-flex min-h-8 items-center gap-1.5 rounded-md bg-snow px-3 text-xs font-semibold text-onyx transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
-						>
-							{stageBusy === "task" ? "Menyusun task..." : "Buat Task"}
-							{stageBusy !== "task" ? (
-								<Icon icon={ArrowRight01Icon} size={12} aria-hidden="true" />
-							) : null}
-						</Button>
-					) : null}
-
-					{isTasksCompleted && onTriggerHandoff ? (
-						<Button
-							type="button"
-							size="sm"
-							onClick={onTriggerHandoff}
-							data-testid="codebase-stage-handoff-btn"
-							className="inline-flex min-h-8 items-center gap-1.5 rounded-md bg-snow px-3 text-xs font-semibold text-onyx transition hover:brightness-105"
-						>
-							Buat Handoff
-							<Icon icon={ArrowRight01Icon} size={12} aria-hidden="true" />
-						</Button>
-					) : null}
+							</Button>
+						) : null}
+					</div>
 				</div>
-			</div>
+			) : null}
 		</div>
 	);
 

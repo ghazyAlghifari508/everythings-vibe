@@ -76,7 +76,7 @@ export function CodebaseChatWorkspaceMessages({
 					</div>
 				),
 			)}
-			{run ? (
+			{run && !(run.stage === "task" && run.status === "done") ? (
 				<div data-testid="codebase-run-thinking">
 					<AgentThinking
 						status={run.status}

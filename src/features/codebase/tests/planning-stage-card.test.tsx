@@ -248,9 +248,7 @@ describe("P05 — Unified Planning Stage Card", () => {
 		const rows = screen.getAllByTestId("codebase-file-card");
 		expect(rows).toHaveLength(4);
 		expect(rows[3]?.textContent).toContain("Task");
-		expect(
-			screen.getByTestId("codebase-planning-task-summary").textContent,
-		).toBe("12 task berhasil dibuat.");
+		expect(screen.queryByTestId("codebase-planning-task-summary")).toBeNull();
 
 		const handoffBtn = screen.getByTestId("codebase-stage-handoff-btn");
 		expect(handoffBtn.textContent).toContain("Buat Handoff");
@@ -336,13 +334,34 @@ describe("P05 — Unified Planning Stage Card", () => {
 		);
 
 		expect(screen.getAllByTestId("codebase-file-card")).toHaveLength(4);
-		expect(
-			screen.getByTestId("codebase-planning-task-summary").textContent,
-		).toBe("8 task berhasil dibuat.");
+		expect(screen.queryByTestId("codebase-planning-task-summary")).toBeNull();
 		expect(
 			screen.getByTestId("codebase-stage-handoff-btn").textContent,
 		).toContain("Buat Handoff");
 		expect(screen.queryByTestId("codebase-stage-task-btn")).toBeNull();
+	});
+
+	it("hides Revisi and Buat Handoff actions once at handoff stage", () => {
+		render(
+			<CodebasePlanningStageCard
+				featureName="Autentikasi Pengguna"
+				stage="handoff"
+				taskCount={8}
+				isHandoffActive={true}
+				artifacts={[
+					mockFeatureArtifact,
+					mockPrdArtifact,
+					mockAcArtifact,
+					mockTasksArtifact,
+				]}
+				onTriggerHandoff={vi.fn()}
+				onStartRevision={vi.fn()}
+			/>,
+		);
+
+		expect(screen.queryByTestId("codebase-stage-actions")).toBeNull();
+		expect(screen.queryByTestId("codebase-planning-action-revise")).toBeNull();
+		expect(screen.queryByTestId("codebase-stage-handoff-btn")).toBeNull();
 	});
 
 	it("9. Revision targeting: the Revisi action targets the latest completed document", () => {
