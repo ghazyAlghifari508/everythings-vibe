@@ -257,6 +257,9 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 								copyUnavailableReason={ws.canvasCopy.unavailableReason}
 								onClose={() => {
 									userTookOverCanvas.current = true;
+									if (isSourcePreviewOpen) {
+										ws.clearSourcePreview();
+									}
 									ws.setCanvasOpen(false);
 								}}
 								onDownload={
