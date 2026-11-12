@@ -302,9 +302,22 @@ function collectCandidates(
 		blueprint?.productIdentity.productName ?? "",
 		blueprint?.productIdentity.targetAudience ?? "",
 	].join("\n");
-	for (const domain of DOMAIN_RECIPES) {
-		const hit = domainText.match(domain.detect)?.[0];
-		if (!hit) continue;
+	// Rank domain recipes by specificity (match count), so a portfolio mentioning
+	// "budget" or "kopi" once doesn't get overwhelmed by unrelated finance/culinary screens.
+	const scoredDomains = DOMAIN_RECIPES.map((domain) => {
+		const matches =
+			domainText.match(new RegExp(domain.detect.source, "gi")) ?? [];
+		const hit = matches[0] ?? "";
+		return { domain, count: matches.length, hit };
+	})
+		.filter((entry) => entry.count > 0 && entry.hit.length > 0)
+		.sort((a, b) => b.count - a.count);
+
+	// Take screens from the top domain(s) only when multiple domains match,
+	// rather than letting incidental single-keyword matches inject irrelevant flows.
+	const topCount = scoredDomains[0]?.count ?? 0;
+	for (const { domain, count, hit } of scoredDomains) {
+		if (topCount > 1 && count === 1) continue;
 		for (const screen of domain.screens)
 			candidates.push(
 				fromConcept(

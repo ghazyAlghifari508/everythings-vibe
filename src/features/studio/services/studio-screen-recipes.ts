@@ -225,7 +225,7 @@ export const DOMAIN_RECIPES: readonly StudioDomainRecipe[] = [
 	{
 		label: "travel",
 		detect:
-			/\b(wisata|travel|perjalanan|liburan|destinasi|tiket|hotel|penerbangan|tour|kunjungan)\b/i,
+			/\b(wisata|travel|liburan|destinasi|tiket|hotel|penerbangan|tour|kunjungan|itinerary)\b|(?<!\bperjalanan\s+)(perjalanan\s+(wisata|liburan|trip|tour)|trip\b)/i,
 		screens: [
 			{
 				name: "Riwayat Perjalanan",
@@ -286,7 +286,7 @@ export const DOMAIN_RECIPES: readonly StudioDomainRecipe[] = [
 	{
 		label: "keuangan",
 		detect:
-			/\b(keuangan|dompet|finansial|tabungan|investasi|anggaran|budget|pengeluaran|pemasukan|saldo)\b/i,
+			/\b(keuangan|dompet|finansial|tabungan|investasi|anggaran|pengeluaran|pemasukan|saldo)\b|(?<!estimasi\s+)\bbudget\b/i,
 		screens: [
 			{
 				name: "Kategori Transaksi",
