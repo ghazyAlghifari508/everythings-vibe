@@ -75,10 +75,43 @@ describe("resolveActivePlan", () => {
 
 	it("prefers the plan holding real artifacts over the onboarding anchor", () => {
 		// The reported bug: the anchor is repository analysis context, so it must
-		// not win over the plan that actually carries the user's planning.
+		// not win over the plan that actually carries the user's planning. It is
+		// dropped before selection, so the only remaining plan wins outright.
 		const result = resolveActivePlan({
 			anchorProjectId: "anchor-plan",
 			plans: [plan("anchor-plan"), plan("watchlist", { hasArtifacts: true })],
+		});
+		expect(result).toEqual({
+			kind: "resolved",
+			plan: plan("watchlist", { hasArtifacts: true }),
+			source: "only_plan",
+		});
+	});
+
+	it("never resolves the artifact-less onboarding anchor, even when a stale pointer names it", () => {
+		// The anchor is repository analysis context, not a feature plan. A stale
+		// pointer naming it must fall through to the plan the user actually owns
+		// instead of resolving a plan that carries nothing.
+		const result = resolveActivePlan({
+			requestedProjectId: "anchor-plan",
+			anchorProjectId: "anchor-plan",
+			plans: [plan("anchor-plan"), plan("fresh")],
+		});
+		expect(result).toEqual({
+			kind: "resolved",
+			plan: plan("fresh"),
+			source: "only_plan",
+		});
+	});
+
+	it("resolves the plan holding real artifacts even while the bare anchor is listed", () => {
+		const result = resolveActivePlan({
+			anchorProjectId: "anchor-plan",
+			plans: [
+				plan("anchor-plan"),
+				plan("watchlist", { hasArtifacts: true }),
+				plan("draft"),
+			],
 		});
 		expect(result).toEqual({
 			kind: "resolved",
@@ -87,15 +120,23 @@ describe("resolveActivePlan", () => {
 		});
 	});
 
-	it("falls back to the anchor when no plan carries artifacts yet", () => {
+	it("reports an empty repository when only the bare anchor exists", () => {
 		const result = resolveActivePlan({
 			anchorProjectId: "anchor-plan",
-			plans: [plan("anchor-plan"), plan("fresh")],
+			plans: [plan("anchor-plan")],
+		});
+		expect(result).toEqual({ kind: "empty" });
+	});
+
+	it("keeps an anchor that carries real planning as a normal candidate", () => {
+		const result = resolveActivePlan({
+			anchorProjectId: "anchor-plan",
+			plans: [plan("anchor-plan", { hasArtifacts: true })],
 		});
 		expect(result).toEqual({
 			kind: "resolved",
-			plan: plan("anchor-plan"),
-			source: "anchor",
+			plan: plan("anchor-plan", { hasArtifacts: true }),
+			source: "only_plan",
 		});
 	});
 

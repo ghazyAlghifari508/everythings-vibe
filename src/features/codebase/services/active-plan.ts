@@ -47,8 +47,7 @@ export interface ActivePlanCandidate {
 export type ActivePlanSource =
 	| "explicit"
 	| "only_plan"
-	| "sole_plan_with_artifacts"
-	| "anchor";
+	| "sole_plan_with_artifacts";
 
 export type ActivePlanResolution =
 	| { kind: "resolved"; plan: ActivePlanCandidate; source: ActivePlanSource }
@@ -103,7 +102,17 @@ export function resolveActivePlan(
 	// Archived plans are decluttered, not active candidates: they cannot be
 	// resolved as the workspace's active plan. The remaining list is what the
 	// switcher shows and what re-resolves after an archive or delete.
-	const plans = input.plans.filter((plan) => !plan.archivedAt);
+	//
+	// An onboarding anchor that holds no planning of its own is repository
+	// analysis context, never a user feature plan: it is dropped here so a
+	// stale pointer naming it falls through to the plan the user actually owns
+	// instead of resolving to a plan that carries nothing.
+	const anchorId = cleanId(input.anchorProjectId);
+	const plans = input.plans.filter(
+		(plan) =>
+			!plan.archivedAt &&
+			!(anchorId && plan.id === anchorId && !plan.hasArtifacts),
+	);
 	if (plans.length === 0) return { kind: "empty" };
 
 	const requestedId = cleanId(input.requestedProjectId);
@@ -125,12 +134,6 @@ export function resolveActivePlan(
 			plan: withArtifacts[0],
 			source: "sole_plan_with_artifacts",
 		};
-	}
-
-	const anchorId = cleanId(input.anchorProjectId);
-	if (withArtifacts.length === 0 && anchorId) {
-		const anchor = findById(plans, anchorId);
-		if (anchor) return { kind: "resolved", plan: anchor, source: "anchor" };
 	}
 
 	return { kind: "needs_selection", plans };
