@@ -345,7 +345,7 @@ describe("P05 — Unified Planning Stage Card", () => {
 		expect(screen.queryByTestId("codebase-stage-task-btn")).toBeNull();
 	});
 
-	it("9. Revision targeting: main Revisi targets latest completed document, row Revisi targets specific artifact", () => {
+	it("9. Revision targeting: the Revisi action targets the latest completed document", () => {
 		const onStartRevision = vi.fn();
 
 		render(
@@ -358,20 +358,14 @@ describe("P05 — Unified Planning Stage Card", () => {
 			/>,
 		);
 
-		// Main Revisi button at AC stage targets the AC document
+		// One Revisi control per card: it targets the latest completed document.
 		fireEvent.click(screen.getByTestId("codebase-planning-action-revise"));
 		expect(onStartRevision).toHaveBeenLastCalledWith(mockAcArtifact);
 
-		// Individual row Revisi button targets specific document
-		const reviseFeatureBtn = screen.getByTestId(
-			"codebase-document-revise-feature",
-		);
-		fireEvent.click(reviseFeatureBtn);
-		expect(onStartRevision).toHaveBeenLastCalledWith(mockFeatureArtifact);
-
-		const revisePrdBtn = screen.getByTestId("codebase-document-revise-prd");
-		fireEvent.click(revisePrdBtn);
-		expect(onStartRevision).toHaveBeenLastCalledWith(mockPrdArtifact);
+		// The document rows are pure open targets: no per-row revise/download
+		// controls compete with the card action.
+		expect(screen.queryByTestId("codebase-document-revise-feature")).toBeNull();
+		expect(screen.queryByTestId("codebase-document-download-prd")).toBeNull();
 	});
 
 	it("10. Switching feature plan safely updates title and artifacts without duplicates", () => {

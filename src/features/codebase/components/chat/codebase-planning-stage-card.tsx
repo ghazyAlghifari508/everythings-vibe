@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight01Icon, Tick01Icon } from "@hugeicons/core-free-icons";
+import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import type { CodebasePipelineStage } from "@/features/codebase/services/chat-flow";
@@ -27,7 +27,6 @@ export interface CodebasePlanningStageCardProps {
 		target?: PlanningDocumentStageKind | CodebaseArtifactRef,
 	) => void;
 	onOpenArtifact?: (artifact: CodebaseArtifactRef) => void;
-	onDownloadArtifact?: (artifact: CodebaseArtifactRef) => void;
 	onRetryStage?: () => void;
 }
 
@@ -80,7 +79,6 @@ export function CodebasePlanningStageCard({
 	onTriggerHandoff,
 	onStartRevision,
 	onOpenArtifact,
-	onDownloadArtifact,
 	onRetryStage,
 }: CodebasePlanningStageCardProps) {
 	const featureArtifact = artifacts.find((a) => a.id.startsWith("feature-"));
@@ -208,61 +206,8 @@ export function CodebasePlanningStageCard({
 							status="persisted"
 							isActive={artifact.id === activeArtifactId}
 							onOpen={onOpenArtifact}
-							onDownload={onDownloadArtifact}
-							onRevise={
-								onStartRevision ? () => onStartRevision(artifact) : undefined
-							}
 						/>
 					))}
-				</div>
-			) : null}
-
-			{/* Stage progress and contextual guide */}
-			{isPrdNext && onGeneratePrd ? (
-				<div className="mt-3 flex flex-col gap-1 text-xs text-fog">
-					<p className="flex items-center gap-1.5 font-medium text-emerald">
-						<Icon icon={Tick01Icon} size={14} aria-hidden="true" />
-						Spesifikasi fitur siap
-					</p>
-					<p>
-						<span className="font-medium text-snow">Berikutnya:</span> PRD
-					</p>
-					<p className="text-[11.5px] leading-relaxed text-fog/80">
-						Menyusun PRD 8 seksi dari spesifikasi fitur dan konteks repository.
-					</p>
-				</div>
-			) : null}
-
-			{isAcNext && onGenerateAc ? (
-				<div className="mt-3 flex flex-col gap-1 text-xs text-fog">
-					<p className="flex items-center gap-1.5 font-medium text-emerald">
-						<Icon icon={Tick01Icon} size={14} aria-hidden="true" />
-						PRD selesai
-					</p>
-					<p>
-						<span className="font-medium text-snow">Berikutnya:</span>{" "}
-						Acceptance Criteria
-					</p>
-					<p className="text-[11.5px] leading-relaxed text-fog/80">
-						Menyusun Acceptance Criteria dari PRD dan konteks repository.
-					</p>
-				</div>
-			) : null}
-
-			{isTaskNext && onGenerateTask && !tasksUnresolved ? (
-				<div className="mt-3 flex flex-col gap-1 text-xs text-fog">
-					<p className="flex items-center gap-1.5 font-medium text-emerald">
-						<Icon icon={Tick01Icon} size={14} aria-hidden="true" />
-						Acceptance Criteria selesai
-					</p>
-					<p>
-						<span className="font-medium text-snow">Berikutnya:</span> Task dan
-						Kanban
-					</p>
-					<p className="text-[11.5px] leading-relaxed text-fog/80">
-						Menyusun breakdown task dari PRD dan Acceptance Criteria, lalu
-						mengaktifkan papan Kanban.
-					</p>
 				</div>
 			) : null}
 
@@ -301,9 +246,10 @@ export function CodebasePlanningStageCard({
 			{/* Stage-specific Actions */}
 			<div
 				data-testid="codebase-stage-actions"
-				className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-graphite/60 pt-3"
+				className="mt-4 flex flex-wrap items-center gap-2 border-t border-graphite/60 pt-3"
 			>
-				{/* Left Action: Revisi */}
+				{/* Revisi stays next to the next action: one row of related controls,
+				    not two corners of the card. */}
 				<Button
 					type="button"
 					variant="outline"
@@ -315,7 +261,6 @@ export function CodebasePlanningStageCard({
 					Revisi
 				</Button>
 
-				{/* Right Action: Next generation CTA or Buat Handoff */}
 				<div className="flex items-center gap-2">
 					{isPrdNext && onGeneratePrd ? (
 						<Button

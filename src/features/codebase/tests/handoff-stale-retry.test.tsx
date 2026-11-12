@@ -29,7 +29,12 @@ interface SaveBody {
 	handoff?: { expectedUpdatedAt?: string };
 }
 
-type SaveOutcome = { ok: boolean; error?: string; code?: string; status?: number };
+type SaveOutcome = {
+	ok: boolean;
+	error?: string;
+	code?: string;
+	status?: number;
+};
 
 function setup(options: { saveResponse: (attempt: number) => Response }) {
 	const saveBodies: SaveBody[] = [];
@@ -152,6 +157,8 @@ describe("handoff save version recovery", () => {
 		expect(outcome.ok).toBe(false);
 		expect(saveAttempts()).toBe(1);
 		expect(hook.result.current.saveStatus).toBe("error");
-		expect(hook.result.current.saveError).toContain("Klarifikasi sudah dikunci.");
+		expect(hook.result.current.saveError).toContain(
+			"Klarifikasi sudah dikunci.",
+		);
 	});
 });

@@ -1724,12 +1724,6 @@ describe("CodebaseChatWorkspace pipeline stages", () => {
 
 		const cta = container.querySelector("[data-testid='codebase-stage-prd']");
 		expect(cta).not.toBeNull();
-		// Settled outcome plus the next request, in one conversational block.
-		expect(cta?.textContent).toContain("Spesifikasi fitur siap");
-		expect(cta?.textContent).toContain("Berikutnya: PRD");
-		expect(cta?.textContent).toContain(
-			"Menyusun PRD 8 seksi dari spesifikasi fitur dan konteks repository.",
-		);
 		// The finished artifact is the same FileCard used in the chat stream.
 		expect(
 			cta?.querySelector("[data-testid='codebase-file-card']"),
@@ -1760,8 +1754,6 @@ describe("CodebaseChatWorkspace pipeline stages", () => {
 
 		const cta = container.querySelector("[data-testid='codebase-stage-ac']");
 		expect(cta).not.toBeNull();
-		expect(cta?.textContent).toContain("PRD selesai");
-		expect(cta?.textContent).toContain("Berikutnya: Acceptance Criteria");
 		const button = [...(cta?.querySelectorAll("button") ?? [])].find((b) =>
 			/Menyusun AC/.test(b.textContent ?? ""),
 		);
@@ -1774,9 +1766,6 @@ describe("CodebaseChatWorkspace pipeline stages", () => {
 
 		const cta = container.querySelector("[data-testid='codebase-stage-task']");
 		expect(cta).not.toBeNull();
-		expect(cta?.textContent).toContain("Acceptance Criteria selesai");
-		expect(cta?.textContent).toContain("Berikutnya: Task dan Kanban");
-
 		const button = [...(cta?.querySelectorAll("button") ?? [])].find((b) =>
 			/Buat Task/.test(b.textContent ?? ""),
 		);

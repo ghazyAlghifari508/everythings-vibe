@@ -87,7 +87,6 @@ export interface CodebaseChatWorkspaceProps {
 	isConfirming?: boolean;
 	specError?: string | null;
 	onOpenArtifact?: (artifact: CodebaseArtifactRef) => void;
-	onDownloadArtifact?: (artifact: CodebaseArtifactRef) => void;
 	onSubmitAnswer?: (questionId: string, answer: string) => void;
 	onSendMessage?:
 		| ((message: string) => void)

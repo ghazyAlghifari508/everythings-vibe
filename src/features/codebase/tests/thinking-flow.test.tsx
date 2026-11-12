@@ -241,7 +241,6 @@ describe("P5 Unified Agent Thinking & Cardless Generation Workflow", () => {
 			"[data-testid='codebase-stage-prd']",
 		);
 		expect(prdStage).not.toBeNull();
-		expect(prdStage?.textContent).toContain("Berikutnya: PRD");
 		expect(prdStage?.className).not.toContain("bg-obsidian");
 
 		// Stage: prd -> offers AC
@@ -268,7 +267,6 @@ describe("P5 Unified Agent Thinking & Cardless Generation Workflow", () => {
 			"[data-testid='codebase-stage-ac']",
 		);
 		expect(acStage).not.toBeNull();
-		expect(acStage?.textContent).toContain("Berikutnya: Acceptance Criteria");
 	});
 
 	// 6. Project switch

@@ -10,11 +10,9 @@ import { CodebasePlanSwitcherPanel } from "@/features/codebase/components/planni
 import { CodebaseWorkspaceResync } from "@/features/codebase/components/workspace/codebase-workspace-resync";
 import { CodebaseWorkspaceShell } from "@/features/codebase/components/workspace/codebase-workspace-shell";
 import { codebaseStarterSuggestionsSchema } from "@/features/codebase/services/analysis";
-import { inferArtifactTargetKind } from "@/features/codebase/services/composer-interactions";
 import { canReadExistingPlans } from "@/features/codebase/services/workspace-readiness";
 import { useCodebaseWorkspace } from "../../hooks/use-codebase-workspace";
 import type { CodebaseWorkspaceData } from "../../services/workspace-loader.functions";
-import type { CodebaseArtifactRef } from "../explorer/codebase-file-card";
 import { WorkspaceConnectionScreenWrapper as ConnectionScreen } from "./workspace-connection-screen";
 import { WorkspaceHeader } from "./workspace-header";
 import { WorkspaceScreenResolver } from "./workspace-screen-resolver";
@@ -36,18 +34,6 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 		isFeatureArtifactActive,
 		userTookOverCanvas,
 	} = ws;
-
-	const handleReviseFromCanvas = (artifact: CodebaseArtifactRef) => {
-		const kind = inferArtifactTargetKind(artifact);
-		if (kind) {
-			ws.setRevisionTarget(kind);
-		}
-		ws.setComposerMode("revise");
-		const el = document.getElementById(
-			"codebase-chat-composer",
-		) as HTMLTextAreaElement | null;
-		el?.focus();
-	};
 
 	const handleOpenTaskProgress = () => {
 		if (!resolvedFeature || !ws.hasTasksInDb) return;
@@ -231,7 +217,6 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 									}
 									ws.setCanvasOpen(true);
 								}}
-								onDownloadArtifact={ws.handleDownloadArtifact}
 								onSubmitAnswer={ws.handleSubmitAnswer}
 								onSendMessage={ws.handleSendMessage}
 								onSubmitComposer={ws.handleSubmitComposer}
@@ -260,13 +245,7 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 												? `Task · ${resolvedFeature?.name ?? codebase.name}`
 												: (activeArtifact?.fileName ?? "Preview artefak")))
 								}
-								badge={
-									isSourcePreviewOpen
-										? "SUMBER"
-										: (activeArtifact?.badge ?? "PRATINJAU")
-								}
 								contentScroll={!isTasksArtifactActive}
-								hideBadge={isTasksArtifactActive}
 								copyValue={ws.canvasCopy.value}
 								copyLabel={ws.canvasCopy.label}
 								copyUnavailableReason={ws.canvasCopy.unavailableReason}
@@ -277,11 +256,6 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 								onDownload={
 									!isSourcePreviewOpen && activeArtifact
 										? () => ws.handleDownloadArtifact(activeArtifact)
-										: undefined
-								}
-								onRevise={
-									!isSourcePreviewOpen && activeArtifact
-										? () => handleReviseFromCanvas(activeArtifact)
 										: undefined
 								}
 								isLoading={

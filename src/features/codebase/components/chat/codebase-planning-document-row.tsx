@@ -3,14 +3,12 @@
 import {
 	Alert02Icon,
 	ArrowRight01Icon,
-	Download01Icon,
 	File01Icon,
 	File02Icon,
-	PencilEdit01Icon,
 	Task01Icon,
 	Tick01Icon,
 } from "@hugeicons/core-free-icons";
-import type { KeyboardEvent, MouseEvent } from "react";
+import type { KeyboardEvent } from "react";
 import { Icon } from "@/components/ui/icon";
 import {
 	type CodebaseArtifactRef,
@@ -27,8 +25,6 @@ export interface CodebasePlanningDocumentRowProps {
 	status?: "persisted" | "processing" | "error";
 	isActive?: boolean;
 	onOpen?: (artifact: CodebaseArtifactRef) => void;
-	onDownload?: (artifact: CodebaseArtifactRef) => void;
-	onRevise?: (artifact: CodebaseArtifactRef) => void;
 }
 
 function resolveDocumentIcon(stageKind: PlanningDocumentStageKind) {
@@ -51,8 +47,6 @@ export function CodebasePlanningDocumentRow({
 	status = "persisted",
 	isActive = false,
 	onOpen,
-	onDownload,
-	onRevise,
 }: CodebasePlanningDocumentRowProps) {
 	const handleRowClick = () => {
 		onOpen?.(artifact);
@@ -63,16 +57,6 @@ export function CodebasePlanningDocumentRow({
 			event.preventDefault();
 			onOpen?.(artifact);
 		}
-	};
-
-	const handleReviseClick = (event: MouseEvent<HTMLButtonElement>) => {
-		event.stopPropagation();
-		onRevise?.(artifact);
-	};
-
-	const handleDownloadClick = (event: MouseEvent<HTMLButtonElement>) => {
-		event.stopPropagation();
-		onDownload?.(artifact);
 	};
 
 	const DocumentIcon = resolveDocumentIcon(stageKind);
@@ -141,43 +125,6 @@ export function CodebasePlanningDocumentRow({
 			</div>
 
 			<div className="flex shrink-0 items-center gap-2">
-				{onRevise ? (
-					<button
-						type="button"
-						onClick={handleReviseClick}
-						data-testid={`codebase-document-revise-${stageKind}`}
-						title={`Revisi ${title}`}
-						aria-label={`Revisi ${title}`}
-						className="inline-flex h-7 items-center gap-1 rounded border border-graphite bg-charcoal px-2 text-[11px] font-medium text-fog opacity-0 transition-opacity hover:border-steel hover:text-snow focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo group-hover:opacity-100"
-					>
-						<Icon
-							icon={PencilEdit01Icon}
-							size={12}
-							strokeWidth={1.5}
-							aria-hidden="true"
-						/>
-						<span>Revisi</span>
-					</button>
-				) : null}
-
-				{onDownload ? (
-					<button
-						type="button"
-						onClick={handleDownloadClick}
-						data-testid={`codebase-document-download-${stageKind}`}
-						title={`Unduh ${title}`}
-						aria-label={`Unduh ${title}`}
-						className="inline-flex h-7 w-7 items-center justify-center rounded border border-graphite bg-charcoal text-fog opacity-0 transition-opacity hover:border-steel hover:text-snow focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo group-hover:opacity-100"
-					>
-						<Icon
-							icon={Download01Icon}
-							size={13}
-							strokeWidth={1.5}
-							aria-hidden="true"
-						/>
-					</button>
-				) : null}
-
 				<div className="flex items-center gap-1.5 pl-1">
 					{status === "persisted" ? (
 						<output

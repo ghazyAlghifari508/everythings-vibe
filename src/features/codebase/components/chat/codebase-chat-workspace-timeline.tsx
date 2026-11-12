@@ -55,7 +55,6 @@ export function CodebaseChatWorkspaceTimeline({
 		onGenerateAc,
 		onGenerateTask,
 		onOpenArtifact,
-		onDownloadArtifact,
 		onOpenReview,
 	} = props;
 	const tasksArtifact = artifacts.find((item) => item.id.startsWith("tasks-"));
@@ -113,7 +112,6 @@ export function CodebaseChatWorkspaceTimeline({
 			onTriggerHandoff={() => setHandoffRevealed(true)}
 			onStartRevision={controls.handleStartRevision}
 			onOpenArtifact={onOpenArtifact}
-			onDownloadArtifact={onDownloadArtifact}
 			onRetryStage={onRetryStage}
 		/>
 	) : null;

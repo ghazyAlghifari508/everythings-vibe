@@ -4,7 +4,6 @@ import {
 	Cancel01Icon,
 	Copy01Icon,
 	Download01Icon,
-	PencilEdit01Icon,
 	Tick01Icon,
 } from "@hugeicons/core-free-icons";
 import { type ReactNode, useEffect, useRef, useState } from "react";
@@ -12,8 +11,6 @@ import { Icon } from "@/components/ui/icon";
 
 interface CodebaseArtifactCanvasProps {
 	fileName: string;
-	badge: string;
-	hideBadge?: boolean;
 	contentScroll?: boolean;
 	/**
 	 * The active artifact's real content to copy. `null` means no complete
@@ -33,15 +30,12 @@ interface CodebaseArtifactCanvasProps {
 	error?: string | null;
 	onRetry?: () => void;
 	onDownload?: () => void;
-	onRevise?: () => void;
 	onClose: () => void;
 	children: ReactNode;
 }
 
 export function CodebaseArtifactCanvas({
 	fileName,
-	badge,
-	hideBadge = false,
 	contentScroll = true,
 	copyValue,
 	copyLabel,
@@ -52,7 +46,6 @@ export function CodebaseArtifactCanvas({
 	error,
 	onRetry,
 	onDownload,
-	onRevise,
 	onClose,
 	children,
 }: CodebaseArtifactCanvasProps) {
@@ -129,11 +122,6 @@ export function CodebaseArtifactCanvas({
 						>
 							{fileName}
 						</span>
-						{!hideBadge ? (
-							<span className="shrink-0 rounded border border-graphite bg-charcoal px-1.5 py-px font-mono text-[10px] font-medium uppercase text-fog">
-								{badge}
-							</span>
-						) : null}
 					</div>
 					<div className="flex shrink-0 items-center gap-1.5">
 						<button
@@ -172,24 +160,6 @@ export function CodebaseArtifactCanvas({
 							>
 								Gagal menyalin
 							</output>
-						) : null}
-						{onRevise ? (
-							<button
-								type="button"
-								onClick={onRevise}
-								aria-label={`Revisi ${fileName}`}
-								title={`Revisi ${fileName}`}
-								data-testid="codebase-canvas-revise"
-								className="inline-flex h-7 items-center gap-1 rounded border border-graphite bg-charcoal px-2 text-[11px] font-medium text-fog transition-colors hover:border-steel hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-							>
-								<Icon
-									icon={PencilEdit01Icon}
-									size={13}
-									strokeWidth={1.5}
-									aria-hidden="true"
-								/>
-								<span>Revisi</span>
-							</button>
 						) : null}
 						<button
 							type="button"
