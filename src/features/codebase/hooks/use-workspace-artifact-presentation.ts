@@ -77,7 +77,7 @@ export function useWorkspaceArtifactPresentation({
 		if (hasTasksInDb)
 			list.push({
 				id: `tasks-${resolvedFeature.id}`,
-				title: `Task · ${resolvedFeature.name}`,
+				title: `Task: ${resolvedFeature.name}`,
 				fileName: `tasks-${featureSlug}.json`,
 				fileSizeBytes: taskTree
 					? new TextEncoder().encode(JSON.stringify(taskTree, null, 2)).length

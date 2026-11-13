@@ -248,7 +248,7 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 										? ws.sourcePreviewPath
 										: (activeArtifact?.title ??
 											(isTasksArtifactActive
-												? `Task · ${resolvedFeature?.name ?? codebase.name}`
+												? `Task: ${resolvedFeature?.name ?? codebase.name}`
 												: (activeArtifact?.fileName ?? "Preview artefak")))
 								}
 								contentScroll={!isTasksArtifactActive}

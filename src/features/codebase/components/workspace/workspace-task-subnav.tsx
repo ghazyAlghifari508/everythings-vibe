@@ -26,14 +26,14 @@ export function WorkspaceTaskSubnav({
 			>
 				<Tabs.Tab
 					id="kanban"
-					className="flex min-h-11 cursor-pointer items-center gap-2 rounded-md px-3 text-sm text-fog outline-none data-[selected=true]:bg-steel/40 data-[selected=true]:text-snow data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-indigo"
+					className="flex min-h-11 cursor-pointer items-center gap-2 rounded-md px-3 text-sm text-fog outline-none transition-colors hover:bg-white/5 hover:text-snow data-[selected=true]:bg-steel/40 data-[selected=true]:text-snow data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-indigo"
 				>
 					<Icon icon={KanbanIcon} size={18} />
 					Kanban
 				</Tabs.Tab>
 				<Tabs.Tab
 					id="checklist"
-					className="flex min-h-11 cursor-pointer items-center gap-2 rounded-md px-3 text-sm text-fog outline-none data-[selected=true]:bg-steel/40 data-[selected=true]:text-snow data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-indigo"
+					className="flex min-h-11 cursor-pointer items-center gap-2 rounded-md px-3 text-sm text-fog outline-none transition-colors hover:bg-white/5 hover:text-snow data-[selected=true]:bg-steel/40 data-[selected=true]:text-snow data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-indigo"
 				>
 					<Icon icon={CheckListIcon} size={18} />
 					Checklist
