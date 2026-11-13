@@ -90,9 +90,10 @@ export function CodebasePlanRow({
 			{hasActions ? (
 				<DropdownMenuSub>
 					<DropdownMenuSubTrigger
+						hideArrow
 						data-testid={`codebase-plan-actions-${plan.id}`}
 						aria-label={`Kelola fitur ${plan.name}`}
-						className="data-[state=open]:bg-white/5"
+						className="p-1 hover:bg-white/5 data-[state=open]:bg-white/5"
 					>
 						<Icon icon={MoreVerticalIcon} size={14} aria-hidden />
 					</DropdownMenuSubTrigger>

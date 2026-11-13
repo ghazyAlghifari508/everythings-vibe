@@ -16,7 +16,6 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Icon } from "@/components/ui/icon";
-import { Input } from "@/components/ui/input";
 import {
 	type ActivePlanCandidate,
 	describePlanReadiness,
@@ -98,17 +97,18 @@ export function CodebasePlanSwitcher({
 					<div className="relative">
 						<Icon
 							icon={SearchIcon}
-							size={14}
+							size={13}
 							aria-hidden
-							className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate"
+							className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-slate"
 						/>
-						<Input
+						<input
+							type="text"
 							data-testid="codebase-plan-search"
 							aria-label="Cari fitur"
 							placeholder="Cari fitur..."
 							value={query}
 							onChange={(event) => setQuery(event.target.value)}
-							className="h-8 bg-charcoal pl-8 text-[12px]"
+							className="flex h-7 w-full rounded-md border border-graphite/80 bg-charcoal pl-7 pr-2 text-xs text-snow placeholder:text-slate focus:border-steel focus:outline-none focus:ring-1 focus:ring-indigo/60 transition-colors"
 						/>
 					</div>
 				</div>
