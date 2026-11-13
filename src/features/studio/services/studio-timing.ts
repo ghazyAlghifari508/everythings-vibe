@@ -13,6 +13,9 @@ export function studioJobTiming(
 		issueCodes?: string[];
 		issueStages?: string[];
 		issueCount?: number;
+		hardCount?: number;
+		repairableCount?: number;
+		advisoryCount?: number;
 		sourceContentNodes?: number;
 		assembledContentNodes?: number;
 		correctionRequired?: boolean;

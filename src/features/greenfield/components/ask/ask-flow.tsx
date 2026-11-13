@@ -132,7 +132,7 @@ export function AskFlow({
 			autosaveCtrl,
 			showToast,
 		});
-		navigate({ to: "/fitur/$id", params: { id: projectId } });
+		navigate({ to: "/vibeplan/$id/fitur", params: { id: projectId } });
 	};
 
 	if (isLoadingQuestions) {

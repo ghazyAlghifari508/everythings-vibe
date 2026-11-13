@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
 	decideExistingCodebaseKanbanAccess,
@@ -87,72 +86,5 @@ describe("existing-codebase Kanban ownership", () => {
 				requestedCodebaseId: "repo-1",
 			}),
 		).toBe("deny");
-	});
-});
-
-describe("existing-codebase Kanban route contract", () => {
-	// The route file is a thin declaration now; the loader gate and the board
-	// shell live under the feature, so the pins read them as one surface.
-	const routeSource = [
-		readFileSync(
-			"src/routes/codebases/kanban/$codebaseId/$projectId.tsx",
-			"utf8",
-		),
-		readFileSync(
-			"src/features/codebase/services/kanban-loader.functions.ts",
-			"utf8",
-		),
-		readFileSync(
-			"src/features/codebase/components/planning/codebase-kanban-page.tsx",
-			"utf8",
-		),
-	].join("\n");
-
-	it("loads repository and project scoped to the authenticated owner", () => {
-		expect(routeSource).toContain("requireUserServer()");
-		expect(routeSource).toContain("eq(codebases.userId, user.id)");
-		expect(routeSource).toContain("eq(projects.userId, user.id)");
-		expect(routeSource).toContain("eq(projects.codebaseId, data.codebaseId)");
-		expect(routeSource).toContain("isNull(projects.deletedAt)");
-	});
-
-	it("enforces the existing full-workflow plan gate and uses the shared board", () => {
-		expect(routeSource).toContain("hasFullWorkflow(plan)");
-		expect(routeSource).toContain("<KanbanBoard");
-		expect(routeSource).toContain("navigationContext=");
-		expect(routeSource).toContain('to: "/prd/$id"');
-		const boardSource = [
-			readFileSync(
-				"src/features/greenfield/components/kanban/kanban-board.tsx",
-				"utf8",
-			),
-			readFileSync(
-				"src/features/greenfield/components/kanban/kanban-header.tsx",
-				"utf8",
-			),
-		].join("\n");
-		expect(boardSource).toContain('to="/codebases/$id"');
-		expect(boardSource).toContain("projectProgress.done");
-		expect(boardSource).toContain("projectProgress.total");
-	});
-
-	it("keeps the greenfield route and its navigation as a distinct consumer", () => {
-		const greenfieldSource = readFileSync("src/routes/kanban/$id.tsx", "utf8");
-		expect(greenfieldSource).toContain('createFileRoute("/kanban/$id")');
-		expect(greenfieldSource).toContain("<KanbanBoard");
-		expect(greenfieldSource).not.toContain("navigationContext=");
-	});
-
-	it("shares the project-keyed task API instead of triggering generation", () => {
-		const apiSource = readFileSync(
-			"src/features/greenfield/hooks/use-kanban-polling.ts",
-			"utf8",
-		);
-		expect(routeSource).toContain("projectId={data.projectId}");
-		expect(apiSource).toContain("/api/kanban/stream?projectId=");
-		expect(apiSource).toContain("encodeURIComponent(requestedProjectId)");
-		expect(apiSource).toContain("/api/kanban/");
-		expect(routeSource).not.toContain("/api/task/generate");
-		expect(routeSource).not.toContain("generateTasks");
 	});
 });

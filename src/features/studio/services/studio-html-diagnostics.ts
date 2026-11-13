@@ -1,11 +1,18 @@
 import { JSDOM } from "jsdom";
 import { inspectStudioLayout } from "./studio-layout-diagnostics";
+import {
+	inspectStudioStructuralQuality,
+	type StudioQualityFinding,
+} from "./studio-structural-quality";
 
 export function inspectStudioHtml(html: string): {
 	hard: string[];
+	repairable: string[];
 	warnings: string[];
+	findings: StudioQualityFinding[];
 } {
-	const document = new JSDOM(html).window.document;
+	const dom = new JSDOM(html);
+	const document = dom.window.document;
 	const { hard, warnings } = inspectStudioLayout(document);
 	const ids = new Set<string>();
 	for (const element of document.querySelectorAll("[id]")) {
@@ -197,7 +204,41 @@ export function inspectStudioHtml(html: string): {
 			break;
 		}
 	}
-	return { hard: [...new Set(hard)], warnings: [...new Set(warnings)] };
+	const structural = inspectStudioStructuralQuality(document);
+	const findings: StudioQualityFinding[] = [
+		...[...new Set(hard)].map(
+			(message): StudioQualityFinding => ({
+				code: studioIssueCode(message),
+				severity: "hard",
+				confidence: "high",
+				message,
+			}),
+		),
+		...structural,
+		...[...new Set(warnings)].map(
+			(message): StudioQualityFinding => ({
+				code:
+					message === "Repeated status label in the same component."
+						? "DUPLICATE_STATUS"
+						: studioIssueCode(message),
+				severity: "advisory",
+				confidence: "medium",
+				message,
+			}),
+		),
+	];
+	dom.window.close();
+	return {
+		hard: [...new Set(hard)],
+		repairable: structural
+			.filter(
+				(finding) =>
+					finding.severity === "repairable" && finding.confidence === "high",
+			)
+			.map((finding) => finding.message),
+		warnings: [...new Set(warnings)],
+		findings,
+	};
 }
 
 /**
@@ -205,11 +246,20 @@ export function inspectStudioHtml(html: string): {
  * count before assembly that becomes zero after is a transformation defect,
  * not an empty screen: the assembly must never discard valid content.
  */
-export function studioContentNodeCount(html: string): number {
+export function studioContentNodeCount(
+	html: string,
+	excludeChrome = false,
+): number {
 	const content = new JSDOM(html).window.document.querySelector(
 		"[data-studio-content]",
 	);
 	if (!content) return 0;
+	if (excludeChrome) {
+		for (const chrome of content.querySelectorAll(
+			"nav,header,[data-studio-navigation],[data-studio-header],[data-studio-status-bar]",
+		))
+			chrome.remove();
+	}
 	if (content.children.length > 0) return content.children.length;
 	// A text-only content region is still meaningful content; it must not be
 	// reported as emptied by assembly.

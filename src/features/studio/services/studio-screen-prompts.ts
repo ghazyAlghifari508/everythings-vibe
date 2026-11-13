@@ -16,7 +16,6 @@ import {
 	WEB_PLATFORM_CONTRACT,
 } from "./studio-prompt-contracts";
 import { sanitizeStudioDesignMd } from "./studio-prompt-validation";
-import { STUDIO_BASE_QUALITY_PROMPT } from "./studio-quality-rules";
 
 export function buildStudioFramePrompt(opts: StudioFramePromptOptions): string {
 	const sections: string[] = [];
@@ -90,7 +89,6 @@ Ensure features, forms, lists, metrics, terminology, and realistic Indonesian co
 		`${opts.projectPrompt} ${opts.screenName} ${opts.screenDescription ?? ""}`,
 	);
 	sections.push(
-		STUDIO_BASE_QUALITY_PROMPT,
 		`<DOMAIN_AWARE_QUALITY_CONTRACT>
 ${domainContract}
 
@@ -179,7 +177,6 @@ export function buildStudioUserPrompt(
 	// Domain-aware quality contract & component-first guidance
 	const domainContract = getDomainQualityContract(prompt);
 	sections.push(
-		STUDIO_BASE_QUALITY_PROMPT,
 		`<DOMAIN_AWARE_QUALITY_CONTRACT>
 ${domainContract}
 

@@ -141,14 +141,18 @@ export function StudioDesignPickerDialog({
 		onOpenChange(false);
 	}
 
+	function handleClearTheme() {
+		onClear();
+		setDraftThemeState({ status: "pristine" });
+		resetCustom();
+		onOpenChange(false);
+	}
+
 	function handleApplyTheme() {
-		if (activeThemeId) {
-			const md = getStudioPresetDesignMd(activeThemeId);
-			if (!md) return;
-			onSelectTheme(activeThemeId);
-		} else {
-			onClear();
-		}
+		if (!activeThemeId) return;
+		const md = getStudioPresetDesignMd(activeThemeId);
+		if (!md) return;
+		onSelectTheme(activeThemeId);
 		setDraftThemeState({ status: "pristine" });
 		resetCustom();
 		onOpenChange(false);
@@ -221,6 +225,7 @@ export function StudioDesignPickerDialog({
 						{tab === "tema" ? (
 							<StudioDesignThemePanel
 								activeThemeId={activeThemeId}
+								appliedThemeId={selectedThemeId}
 								onToggleTheme={handleToggleTheme}
 							/>
 						) : null}
@@ -264,33 +269,82 @@ export function StudioDesignPickerDialog({
 							</div>
 						) : null}
 
-						<DialogFooter className="mt-4 flex flex-row items-center justify-end gap-2 border-t border-graphite/40 pt-4 sm:flex-row sm:justify-end">
-							<Button type="button" variant="secondary" onClick={handleCancel}>
-								Batal
-							</Button>
-							{tab === "tema" ? (
-								<Button type="button" onClick={handleApplyTheme}>
-									{activeThemeId ? "Gunakan Tema" : "Gunakan tanpa tema"}
-								</Button>
-							) : null}
-							{tab === "milik" ? (
-								<Button
-									type="button"
-									disabled={!customValid}
-									onClick={() => {
-										if (!customValid || !custom.mdName) return;
-										onSelectCustom({
-											filename: custom.mdName,
-											designMd: custom.mdText,
-											logo: custom.logo,
-										});
-										resetCustom();
-										onOpenChange(false);
-									}}
-								>
-									Gunakan Desain Ini
-								</Button>
-							) : null}
+						<DialogFooter className="mt-4 flex flex-col-reverse gap-2 border-t border-graphite/40 pt-4 sm:flex-row sm:items-center sm:justify-between">
+							<div className="flex items-center gap-2">
+								{tab === "tema" && selectedThemeId ? (
+									<Button
+										type="button"
+										variant="secondary"
+										onClick={handleClearTheme}
+									>
+										Hapus Pilihan
+									</Button>
+								) : null}
+							</div>
+							<div className="flex items-center justify-end gap-2">
+								{tab === "tema" ? (
+									!selectedThemeId && !activeThemeId ? (
+										<Button
+											type="button"
+											variant="secondary"
+											onClick={handleCancel}
+										>
+											Tutup
+										</Button>
+									) : (
+										<>
+											<Button
+												type="button"
+												variant="secondary"
+												onClick={handleCancel}
+											>
+												Batal
+											</Button>
+											{activeThemeId ? (
+												<Button type="button" onClick={handleApplyTheme}>
+													Terapkan Tema
+												</Button>
+											) : null}
+										</>
+									)
+								) : null}
+								{tab === "template" ? (
+									<Button
+										type="button"
+										variant="secondary"
+										onClick={handleCancel}
+									>
+										Tutup
+									</Button>
+								) : null}
+								{tab === "milik" ? (
+									<>
+										<Button
+											type="button"
+											variant="secondary"
+											onClick={handleCancel}
+										>
+											Batal
+										</Button>
+										<Button
+											type="button"
+											disabled={!customValid}
+											onClick={() => {
+												if (!customValid || !custom.mdName) return;
+												onSelectCustom({
+													filename: custom.mdName,
+													designMd: custom.mdText,
+													logo: custom.logo,
+												});
+												resetCustom();
+												onOpenChange(false);
+											}}
+										>
+											Gunakan Desain Ini
+										</Button>
+									</>
+								) : null}
+							</div>
 						</DialogFooter>
 					</div>
 				</div>

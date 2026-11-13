@@ -8,51 +8,18 @@ import {
 import type { RenderDesignMdOptions } from "./design-md-render";
 import { primaryFontFamily } from "./design-normalize-typography";
 
-// Identity, theme narrative and the measured token tables (sections 1-6).
+// Identity, theme narrative and the measured token tables (sections 4-7).
+// Capture contexts, requested scope and analysis status live in the overview, so
+// they are stated once there instead of being repeated under the token tables.
 
-// The capture contexts are one table for the whole document: repeating a theme
-// paragraph per capture duplicated the same facts without adding any.
 function themeOverviewBody(
 	model: DesignTokenModel,
 	options: RenderDesignMdOptions,
 ): string[] {
 	const body: string[] = [];
-	const captures = model.capturedViews ?? [];
 	body.push(`**Theme:** ${model.theme || "unknown"}`);
 	const overview = options.overview?.trim() || model.overview?.trim();
 	if (overview) body.push("", overview);
-	body.push(
-		"",
-		`Measured from ${model.viewport.width}x${model.viewport.height} on ${model.sourceUrl}. Observed values are browser measurements; role names are classifications of measured usage.`,
-	);
-	if (model.settings)
-		body.push(
-			"",
-			`Analysis scope: ${model.settings.focus}; depth: ${model.settings.depth}; code reference: ${model.settings.codeReference}.`,
-		);
-	if (captures.length > 1) {
-		body.push(
-			"",
-			"Requested browser preference is not the same as a verified website theme; the appearance column is what the canvas actually rendered.",
-			"",
-			table(
-				["Capture", "Viewport", "Browser preference", "Observed appearance"],
-				captures.map((view, index) => [
-					String(index + 1),
-					`${view.width}x${view.height}`,
-					escapeCell(view.colorScheme),
-					escapeCell(
-						model.views?.[index]?.observedTheme ?? model.theme ?? "unknown",
-					),
-				]),
-			),
-		);
-	}
-	if (captures.length === 1)
-		for (const view of captures)
-			body.push(
-				`- Captured ${view.width}x${view.height}, browser preference ${view.colorScheme}: ${escapeCell(view.sourceUrl)}`,
-			);
 	return body;
 }
 
@@ -108,14 +75,7 @@ export function renderTokenSections(
 	const focus = model.settings?.focus ?? "complete";
 	const tokens = focus !== "components";
 
-	// --- 1. Visual Identity --------------------------------------------------
-	const identity = options.identityNarrative?.trim();
-	if (identity) {
-		lines.push("", heading(2, "Visual Identity"));
-		lines.push("", identity);
-	}
-
-	// --- 2. Foundations / Shared Tokens --------------------------------------
+	// --- 4. Foundations / Shared Tokens --------------------------------------
 	// The block is assembled first so a capture scope that contributes no
 	// measured difference adds no empty heading, and the theme overview is only
 	// stated once for the document.

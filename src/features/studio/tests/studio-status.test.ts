@@ -196,6 +196,89 @@ describe("Studio authoritative synchronization", () => {
 			await vi.advanceTimersByTimeAsync(ms);
 		});
 
+	it("does not discard successful rows or terminal job when an older empty snapshot arrives", async () => {
+		const initial = statusFixture();
+		initial.frames = [
+			{ ...initial.frames[0], updatedAt: new Date("2026-01-03T00:00:00Z") },
+		];
+		initial.activeJob.status = "completed";
+		initial.activeJob.updatedAt = new Date("2026-01-03T00:00:00Z");
+		const stale = statusFixture();
+		fetchMock.mockResolvedValueOnce(
+			reply({ ...stale, frames: [], activeJob: null }),
+		);
+		const { result } = renderHook(() => useStudioStatus(initial));
+		await act(async () => {
+			await result.current.syncProjectStatus();
+		});
+		expect(result.current.frames).toEqual(initial.frames);
+		expect(result.current.activeJob).toEqual(initial.activeJob);
+		expect(result.current.isProcessing).toBe(false);
+	});
+
+	it("rejects an older frame set even when the stale job has the same id", async () => {
+		const initial = statusFixture();
+		initial.project.updatedAt = new Date("2026-01-03T00:00:00Z");
+		initial.frames[0].updatedAt = initial.project.updatedAt;
+		initial.activeJob.status = "completed";
+		initial.activeJob.updatedAt = initial.project.updatedAt;
+		initial.frames = [initial.frames[0]];
+		const stale = statusFixture();
+		stale.frames = [];
+		fetchMock.mockResolvedValueOnce(reply(stale));
+		const { result } = renderHook(() => useStudioStatus(initial));
+		await act(async () => {
+			await result.current.syncProjectStatus();
+		});
+		expect(result.current.frames).toEqual(initial.frames);
+		expect(result.current.activeJob?.status).toBe("completed");
+		expect(result.current.isProcessing).toBe(false);
+	});
+	it("retains a newer frame absent from an older snapshot with unchanged job timestamps", async () => {
+		const initial = statusFixture();
+		initial.frames[0].updatedAt = new Date("2026-01-03T00:00:00Z");
+		const stale = statusFixture();
+		stale.frames = [];
+		fetchMock.mockResolvedValueOnce(reply(stale));
+		const { result } = renderHook(() => useStudioStatus(initial));
+		await act(async () => {
+			await result.current.syncProjectStatus();
+		});
+		expect(result.current.frames[0]).toEqual(initial.frames[0]);
+	});
+
+	it("does not apply old project state during navigation or reconnect", async () => {
+		const initial = statusFixture();
+		const { promise, resolve: release } = Promise.withResolvers<Response>();
+		fetchMock.mockImplementationOnce(() => promise);
+		const { result, rerender } = renderHook(
+			({ data }) => useStudioStatus(data),
+			{ initialProps: { data: initial } },
+		);
+		await tick();
+		const next = statusFixture();
+		next.project.id = "next-project";
+		next.frames = next.frames.map((frame) => ({
+			...frame,
+			projectId: next.project.id,
+		}));
+		next.activeJob = {
+			...next.activeJob,
+			id: "next-job",
+			projectId: next.project.id,
+		};
+		rerender({ data: next });
+		await act(async () => {
+			release(reply(initial));
+		});
+		expect(result.current.project.id).toBe("next-project");
+		fetchMock.mockResolvedValueOnce(reply(next));
+		await act(async () => {
+			window.dispatchEvent(new Event("online"));
+		});
+		expect(result.current.activeJob?.id).toBe("next-job");
+	});
+
 	it("records frontend receipt once for each newly ready frame", async () => {
 		const initial = statusFixture();
 		const next = statusFixture();

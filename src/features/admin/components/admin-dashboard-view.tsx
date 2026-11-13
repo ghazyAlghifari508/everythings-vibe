@@ -333,7 +333,7 @@ export function AdminDashboardView({
 										<div className="flex items-center gap-2.5 shrink-0">
 											{getStepBadge(p.step)}
 											<Link
-												to="/prd/$id"
+												to="/vibeplan/$id/prd"
 												params={{ id: p.id }}
 												className="rounded p-1 text-fog hover:bg-white/5 hover:text-snow transition-colors"
 												title="Buka proyek"

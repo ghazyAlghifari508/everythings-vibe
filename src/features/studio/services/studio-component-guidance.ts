@@ -1,17 +1,15 @@
 import { STUDIO_COMPONENT_PATTERNS } from "./studio-component-patterns";
 
-/**
- * Component-first design patterns adapted for standalone HTML/Tailwind prototypes.
- * Derived from shadcn/ui, HeroUI, and Affect UI architectures.
- *
- * Ensures generated frames have bounded overflow, robust typography,
- * consistent visual density, and domain-appropriate layout composition.
- */
+// Pattern composition is documented in docs/studio-fix03-quality-pipeline.md.
 
 export const STUDIO_COMPONENT_FIRST_GUIDANCE = `COMPONENT-FIRST DESIGN PATTERNS (STANDALONE HTML/CSS):
 - The following data-ui patterns receive shared inline CSS from Studio. Adapt content to the brief; do not copy sample records or add controls without a user need:
 ${STUDIO_COMPONENT_PATTERNS.map((pattern) => `${pattern.name}: ${pattern.html}`).join("\n")}
 - Search: keep clear action in its own 44px flex track, never absolute over input text. The visible glyph stays small.
+- Control sizing belongs to the component you write. Studio does not resize every button, input and select: it guarantees a touch target only for the screen's single primary action (data-primary or button[type=submit]). Style the rest yourself, and keep a small control small: a quantity stepper stays ~36px square with a 40px value track, a radio stays a native radio, an icon button stays square. Mark the screen's one main action with data-primary; leave every other action quiet. A control you keep visually small still needs a real hit area: keep it at least 24px tall (the stepper pattern's buttons are 36px), and let the primary action carry the 44px touch target.
+- Media declares its role instead of inheriting a shared ratio: data-media="product" and "thumb" (4/3), "banner" (16/9), "promo" (21/9), "avatar" (1/1), "logo" (contain, no ratio), "photo" (your own ratio, object-fit:cover). A product container you designed as 16/10 stays 16/10: declare the ratio on the component and do not let a global rule decide for it.
+- A horizontal carousel keeps its own track: data-ui="carousel" children are flex:0 0 auto and scroll inside the track. A card inside a carousel keeps the width its component declares; it is never squeezed to the column.
+- The outer gutter is var(--app-gutter), chosen once in blueprint.layout.gutter (legacy density fallback: 16px compact, 24px comfortable). The content region already applies it. Use --app-space-N and --app-type-N from shared scales when available, and --app-content-width for content bounds; never reselect them per screen.
 - Segments: preserve full labels in nonshrinking buttons with contained horizontal scrolling; never squeeze them into narrow tracks.
 - Dropdown: prefer a labeled native select; custom chevrons need a separate nonshrinking track and right inset.
 - Group contextual actions together near the section heading; allow wrapping or stacking on narrow screens.
@@ -24,7 +22,7 @@ ${STUDIO_COMPONENT_PATTERNS.map((pattern) => `${pattern.name}: ${pattern.html}`)
   <div class="overflow-x-auto w-full max-w-full" data-table-container="1">
     <table class="w-full text-left text-sm border-collapse min-w-[560px]">
   Never allow wide tables to expand flex/grid parents or clip at the screen edge.
-- Two-Column Layout on Desktop: For management/transaction views on web, arrange form and table side-by-side:
+- Two-Column Layout on Desktop: Optional when a screen genuinely needs simultaneous form entry and comparison; not an obligatory template:
   <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
     <div class="lg:col-span-5" data-card>...Form...</div>
     <div class="lg:col-span-7 min-w-0">...Table with data-table-container...</div>
@@ -36,18 +34,14 @@ ${STUDIO_COMPONENT_PATTERNS.map((pattern) => `${pattern.name}: ${pattern.html}`)
     <input id="id" class="w-full text-sm rounded-lg border border-[var(--app-border)] p-2.5 bg-transparent" />
   </div>
   Always pair <label for="id"> with <input id="id"> for accessibility.
-- Metric / KPI Cards: Group metrics into structured cards with label, formatted value, and change badge:
-  <div class="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4" data-card>
-    <div class="text-xs text-[var(--app-muted)] flex justify-between"><span>Total Inflow</span><span class="text-emerald-600 font-semibold">+12%</span></div>
-    <div class="text-2xl font-bold font-mono text-[var(--app-ink)] mt-1 whitespace-nowrap">Rp 45.000.000</div>
-  </div>
+- Metrics are optional, only on screens where numerical summaries serve the actual task. Do not add a verified/delta badge without meaningful supporting data.
 - Long Text & Currency:
   - Format currency cleanly with digit grouping (e.g. "Rp 125.500.000"), using whitespace-nowrap and tabular numbers.
-  - Apply truncate or break-words on customer names, descriptions, or long labels so they never push columns out.
+  - Wrap descriptions naturally. Truncate only optional secondary content with an accessible expansion path, never essential form options, prices or primary action labels.
 - Real Media (destinations, products, people, places):
   - Where a domain naturally demands photography, use genuine photos from a verified public HTTPS source (e.g. images.unsplash.com), never inline SVG landscapes or gradient shapes acting as a photo, and never base64 blobs or scraped hotlinked sites.
   - Keep media honest and licensed: prefer Unsplash hotlinks (free license, source attribution optional) over arbitrary hotlinked Pinterest/personal CDNs; do not fabricate a provider key or claim an API integration that is not wired up.
-  - Media is a design element with bounded geometry: every image element gets width:100%, height:auto, aspect-ratio, and object-fit:cover; no fixed pixel heights that phone-crop into a sliver, no layout dependence on any single external file.
+  - Choose one frame geometry per media role. An image fills that frame (width/height 100%) with contain for a whole product or cover for intentional photo crop and a deliberate object-position; standalone intrinsic images may use height:auto. Never combine conflicting fixed parent/image heights or force every image into cover/16:9.
   - Always supply a graceful fallback so an unavailable photo cannot break frame generation: wrap the photo in a container with the surface background and a muted caption of what is shown, and keep the rest of the card meaningful without the image. Never let a missing image leave an empty hole the size of the gallery.
 - Empty States: When a list or table is empty, render an informative box with an icon, Indonesian explanation, and action button:
   <div class="text-center py-10 px-4 border border-dashed border-[var(--app-border)] rounded-xl" data-card>
@@ -58,19 +52,12 @@ ${STUDIO_COMPONENT_PATTERNS.map((pattern) => `${pattern.name}: ${pattern.html}`)
 export function getDomainQualityContract(prompt?: string): string {
 	const lower = (prompt ?? "").toLowerCase();
 	if (
-		lower.includes("transaksi") ||
-		lower.includes("uang") ||
-		lower.includes("keuangan") ||
-		lower.includes("finansial") ||
-		lower.includes("finance") ||
-		lower.includes("kas") ||
-		lower.includes("anggaran")
+		/\b(?:transaksi|uang|keuangan|finansial|finance|kas|anggaran)\b/.test(lower)
 	) {
 		return `DOMAIN-SPECIFIC UX (Finance / Accounting SaaS):
-- Primary focus: Net cash flow, balance clarity, recent transactions, and category breakdown.
-- Desktop layout: Summary KPI cards at top, followed by two-column workspace (Transaction Entry Form on left, Filterable Transaction History Table on right).
-- Currency presentation: Formatted rupiah/currency values with digit separators and font-mono.
-- Status badges: Distinguish 'Berhasil' (emerald), 'Tertunda' (amber), 'Gagal' (rose).`;
+- Choose composition by task: balance overview, transaction entry, comparison/history table or payment detail. Side-by-side form/table only when both tasks are required together; no mandatory KPI quota.
+- Currency presentation: formatted values with digit separators and atomic currency/amount/unit grouping.
+- Status badges only for actual payment/transaction states, expressed in words as well as color.`;
 	}
 	if (
 		lower.includes("toko") ||
@@ -78,11 +65,12 @@ export function getDomainQualityContract(prompt?: string): string {
 		lower.includes("produk") ||
 		lower.includes("belanja") ||
 		lower.includes("ecommerce") ||
-		lower.includes("shop")
+		lower.includes("shop") ||
+		/\b(?:kopi|coffee|cafe|café)\b/.test(lower)
 	) {
 		return `DOMAIN-SPECIFIC UX (E-Commerce / Catalog):
 - Primary focus: Product discovery, clear pricing, category navigation, and cart affordances.
-- Layout: Filter/category bar, balanced responsive grid of product cards with real product photos, price, and primary action button.
+- Choose a discovery list, responsive product grid or horizontal recommendation track by content density; customization uses readable option rows, checkout distinct quantity/price/action tracks, tracking ordered status steps.
 - Real product photography is required for a catalog surface: every product card leads with an actual product photo (verified public HTTPS source), not a placeholder box, inline SVG, or CSS-gradient stand-in. Keep each price line atomic on one line ("Rp 22.000", never split "Rp" from the amount).`;
 	}
 	if (
@@ -104,8 +92,8 @@ export function getDomainQualityContract(prompt?: string): string {
 		lower.includes("karya")
 	) {
 		return `DOMAIN-SPECIFIC UX (Portfolio / Creative Showcase):
-- Primary focus: Featured works, case study highlights, technical capabilities, and direct contact callouts.
-- Visual rhythm: Prominent media showcase cards with tag pills rather than heavy data tables.`;
+- Primary focus: featured works, case studies, capabilities and direct contact.
+- Use prominent media with useful scanning categories, not obligatory tag pills or data tables.`;
 	}
 	return `DOMAIN-SPECIFIC UX (Professional Web Application):
 - Tailor components strictly to user journey: clear screen title, high-utility cards, contextual actions, and appropriate data density.`;

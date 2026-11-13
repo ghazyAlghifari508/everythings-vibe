@@ -8,8 +8,11 @@ import {
 	studioProjects,
 } from "@/db/schema";
 import type { StudioFrameRetryOutcome } from "../types/studio";
+import {
+	deriveStudioLifecycle,
+	isTemporarySlot,
+} from "../utils/studio-lifecycle";
 import { StudioFrameError } from "./studio-frame-errors";
-import { isTemporarySlot } from "./studio-frame-generation";
 
 export interface StudioFrameRetryResult {
 	frame: StudioFrameRow;
@@ -198,6 +201,15 @@ export async function retryStudioPlanning(
 				),
 			);
 		if (active) throw new StudioFrameError("STUDIO_RETRY_RUNNING");
+		const frames = await tx
+			.select()
+			.from(studioFrames)
+			.where(eq(studioFrames.projectId, projectId));
+		if (
+			!deriveStudioLifecycle({ project, frames, activeJob: job })
+				.canRetryPlanning
+		)
+			throw new StudioFrameError("STUDIO_INVALID_INPUT");
 		const [updated] = await tx
 			.update(studioJobs)
 			.set({ ...resetClaim, updatedAt: new Date() })

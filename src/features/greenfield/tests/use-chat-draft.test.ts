@@ -46,6 +46,15 @@ describe("useChatDraft", () => {
 		expect(getPrdDraft("proj-2")).toBe("Updated draft text");
 	});
 
+	it("flushes an unsent draft on departure without clearing another project's draft", () => {
+		savePrdDraft("other", "Other project draft");
+		const { result, unmount } = renderHook(() => useChatDraft("current"));
+		act(() => result.current.setInput("Unsent revision"));
+		unmount();
+		expect(getPrdDraft("current")).toBe("Unsent revision");
+		expect(getPrdDraft("other")).toBe("Other project draft");
+	});
+
 	it("clears draft and input on clearDraft()", () => {
 		savePrdDraft("proj-3", "Temporary draft");
 		const { result } = renderHook(() => useChatDraft("proj-3"));

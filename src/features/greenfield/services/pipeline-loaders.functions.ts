@@ -16,7 +16,7 @@ async function requireFullWorkflow(
 	const { plan } = await getUserPlanAndQuota();
 	if (!hasFullWorkflow(plan)) {
 		throw redirect({
-			to: "/prd/$id",
+			to: "/vibeplan/$id/prd",
 			params: { id },
 			search: { paywall: stage },
 		});

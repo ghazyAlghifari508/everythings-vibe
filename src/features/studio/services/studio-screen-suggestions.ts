@@ -22,6 +22,8 @@ export interface StudioScreenSuggestion {
 	id: string;
 	/** Action label, e.g. "Buat halaman riwayat perjalanan". */
 	title: string;
+	/** Short bubble label, e.g. "Kelola Stok", "Beranda", "Profil". */
+	label?: string;
 	/** One short line: what the user gets from this screen. */
 	description: string;
 	prompt: string;
@@ -131,6 +133,7 @@ function hashText(value: string): string {
 interface SuggestionCandidate {
 	name: string;
 	title?: string;
+	label?: string;
 	description: string;
 	focus: string;
 	reason: string;
@@ -144,6 +147,7 @@ function fromConcept(
 	return {
 		name: concept.name,
 		title: concept.title,
+		label: concept.label ?? concept.name,
 		description: concept.description,
 		focus: concept.focus,
 		reason,
@@ -223,6 +227,8 @@ function collectCandidates(
 		))
 			candidates.push({
 				name: screen.name,
+				title: `Buat halaman ${screen.name}`,
+				label: screen.name,
 				description: brief(screen.role),
 				focus: screen.role,
 				reason: "Rencana layar blueprint belum ada di canvas",
@@ -246,6 +252,7 @@ function collectCandidates(
 			const known = conceptForName(label);
 			candidates.push({
 				name: label,
+				label: known?.label ?? label,
 				description: known?.description ?? NAV_DESTINATION_DESCRIPTION,
 				focus: known?.focus ?? GENERIC_FOCUS,
 				reason: "Destinasi navigasi belum punya layar",
@@ -311,6 +318,7 @@ export function deriveStudioScreenSuggestions(
 		suggestions.push({
 			id: suggestionId(name),
 			title: candidate.title?.trim() || `Buat halaman ${name}`,
+			label: candidate.label || name,
 			description: brief(candidate.description),
 			prompt: buildPrompt(input, name, candidate.focus),
 			intent: "add_screen",

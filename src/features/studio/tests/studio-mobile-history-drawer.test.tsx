@@ -88,4 +88,23 @@ describe("StudioMobileHistoryDrawer", () => {
 
 		expect(onSelectProject).toHaveBeenCalledWith("proj-1");
 	});
+
+	it("renders aligned empty state when history is empty", () => {
+		render(
+			<StudioMobileHistoryDrawer
+				open={true}
+				onOpenChange={vi.fn()}
+				history={[]}
+				onSelectProject={vi.fn()}
+				onDeleteProject={vi.fn()}
+				onRenameProject={vi.fn()}
+				onDuplicateProject={vi.fn()}
+			/>,
+		);
+
+		expect(screen.getByText("Belum ada proyek")).toBeDefined();
+		expect(
+			screen.getByText("Desain yang kamu buat akan muncul di sini."),
+		).toBeDefined();
+	});
 });

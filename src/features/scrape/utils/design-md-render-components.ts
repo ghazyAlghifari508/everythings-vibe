@@ -22,6 +22,34 @@ interface ComponentBlock {
 	guidance: string[];
 }
 
+interface MergedVariant {
+	label: string;
+	samples: number;
+	characteristics: Map<string, string>;
+}
+
+function variantSignature(treatment: ModelComponentTreatment): string {
+	return JSON.stringify(
+		treatment.characteristics
+			.map(({ label, value }) => [label, value])
+			.sort(([left], [right]) => String(left).localeCompare(String(right))),
+	);
+}
+
+// Two variants that share a positional label are told apart by the measured
+// characteristic that actually differs, never by a capture suffix alone.
+function differingCharacteristic(
+	variant: MergedVariant,
+	siblings: MergedVariant[],
+): string | null {
+	const others = siblings.filter((entry) => entry !== variant);
+	for (const [key, value] of variant.characteristics) {
+		if (others.some((entry) => entry.characteristics.get(key) !== value))
+			return `${key} ${value}`;
+	}
+	return null;
+}
+
 function characteristicLines(
 	characteristics: ModelComponentCharacteristic[],
 ): string[] {
@@ -59,10 +87,9 @@ export function renderMergedComponentSections(
 			{
 				component: ModelComponent;
 				perView: Map<string, Map<string, string>>;
-				variants: Map<
-					string,
-					{ samples: number; characteristics: Map<string, string> }
-				>;
+				variants: Map<string, MergedVariant>;
+				/** True when at least one capture measured several treatments. */
+				multiVariant: boolean;
 			}
 		>();
 		for (const view of views)
@@ -73,10 +100,12 @@ export function renderMergedComponentSections(
 						component,
 						perView: new Map<string, Map<string, string>>(),
 						variants: new Map(),
+						multiVariant: false,
 					};
 					perComponent.set(component.name, entry);
 					order.push(component.name);
 				}
+				if ((component.treatments?.length ?? 0) > 1) entry.multiVariant = true;
 				entry.perView.set(
 					view.label,
 					new Map(
@@ -86,10 +115,13 @@ export function renderMergedComponentSections(
 						]),
 					),
 				);
-				// Variants are kept by label so a real treatment measured in any
-				// capture survives the merge, with its samples summed.
+				// Variants are keyed by their measured treatment, not by their positional
+				// label: "Variant 1" of one capture is a different treatment from "Variant 1"
+				// of another when the measured values differ.
 				for (const treatment of component.treatments ?? []) {
-					const variant = entry.variants.get(treatment.label) ?? {
+					const key = `${treatment.label}\u0000${variantSignature(treatment)}`;
+					const variant = entry.variants.get(key) ?? {
+						label: treatment.label,
 						samples: 0,
 						characteristics: new Map<string, string>(),
 					};
@@ -99,7 +131,7 @@ export function renderMergedComponentSections(
 							characteristic.label,
 							characteristic.value,
 						);
-					entry.variants.set(treatment.label, variant);
+					entry.variants.set(key, variant);
 				}
 			}
 
@@ -128,24 +160,36 @@ export function renderMergedComponentSections(
 	}
 
 	// Rules are stated once for the document: a general rule repeated per capture
-	// is the same instruction, not new evidence.
-	const seen = new Set<string>();
-	const ruleLine = (rule: { rule: string; evidence: string }) =>
-		`- ${escapeCell(rule.rule)} _(evidence: ${escapeCell(rule.evidence)})_`;
-	const dos: string[] = [];
-	const donts: string[] = [];
-	for (const view of views) {
-		for (const rule of view.model.guidelines.dos)
-			if (!seen.has(rule.rule)) {
-				seen.add(rule.rule);
-				dos.push(ruleLine(rule));
+	// is the same instruction, not new evidence. Rule text never carries a capture
+	// scope, so identical rules collapse and only a rule limited to some captures
+	// names the captures that measured it.
+	const groupedRules = (
+		read: (view: DesignView) => { rule: string; evidence: string }[],
+	): string[] => {
+		const groups = new Map<
+			string,
+			{ rule: string; evidence: string; scopes: string[] }
+		>();
+		for (const view of views)
+			for (const entry of read(view)) {
+				const group = groups.get(entry.rule) ?? {
+					rule: entry.rule,
+					evidence: entry.evidence,
+					scopes: [],
+				};
+				if (!group.scopes.includes(view.label)) group.scopes.push(view.label);
+				groups.set(entry.rule, group);
 			}
-		for (const rule of view.model.guidelines.donts)
-			if (!seen.has(rule.rule)) {
-				seen.add(rule.rule);
-				donts.push(ruleLine(rule));
-			}
-	}
+		return [...groups.values()].map((group) => {
+			const scope =
+				group.scopes.length < views.length
+					? ` Measured in: ${group.scopes.join("; ")}.`
+					: ` Measured in all ${views.length} captured contexts.`;
+			return `- ${escapeCell(group.rule)} _(evidence: ${escapeCell(`${group.evidence}${scope}`)})_`;
+		});
+	};
+	const dos = groupedRules((view) => view.model.guidelines.dos);
+	const donts = groupedRules((view) => view.model.guidelines.donts);
 	if (dos.length || donts.length) {
 		lines.push("", heading(2, "Do's & Don'ts"));
 		if (dos.length) lines.push("", heading(3, "DO"), ...dos);
@@ -175,10 +219,8 @@ function renderMergedComponent(
 	entry: {
 		component: ModelComponent;
 		perView: Map<string, Map<string, string>>;
-		variants: Map<
-			string,
-			{ samples: number; characteristics: Map<string, string> }
-		>;
+		variants: Map<string, MergedVariant>;
+		multiVariant: boolean;
 	},
 	commonNotes: string[],
 ): void {
@@ -207,13 +249,24 @@ function renderMergedComponent(
 			lines.push(`- ${escapeCell(`${label}: ${value}`)}`);
 		lines.push("");
 	}
-	// A component with more than one measured treatment keeps each real variant;
-	// a single treatment is already the base style above.
-	if (entry.variants.size > 1) {
+	// A capture that measured several treatments keeps each real variant; a
+	// component measured once per capture is already described by its base style
+	// and the measured differences below, so it adds no variant list.
+	if (entry.multiVariant && entry.variants.size > 1) {
+		const groups = [...entry.variants.values()];
+		const byLabel = new Map<string, MergedVariant[]>();
+		for (const group of groups)
+			byLabel.set(group.label, [...(byLabel.get(group.label) ?? []), group]);
 		lines.push("**Variants**");
-		for (const [label, variant] of entry.variants) {
-			const samples = `${variant.samples} measured sample${variant.samples === 1 ? "" : "s"}`;
-			const details = [...variant.characteristics]
+		for (const group of groups) {
+			const siblings = byLabel.get(group.label) ?? [];
+			const differentiator =
+				siblings.length > 1 ? differingCharacteristic(group, siblings) : null;
+			const label = differentiator
+				? `${group.label} (${differentiator})`
+				: group.label;
+			const samples = `${group.samples} measured sample${group.samples === 1 ? "" : "s"}`;
+			const details = [...group.characteristics]
 				.map(([key, value]) => `${key}: ${value}`)
 				.join("; ");
 			lines.push(

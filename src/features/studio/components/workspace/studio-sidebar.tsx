@@ -6,6 +6,7 @@ import {
 	Copy01Icon,
 	Delete02Icon,
 	File01Icon,
+	Folder02Icon,
 	Image01Icon,
 	Loading01Icon,
 	MoreVerticalIcon,
@@ -112,6 +113,12 @@ export function StudioSidebar({
 						type="search"
 						value={query}
 						onChange={(e) => setQuery(e.target.value)}
+						onKeyDown={(e) => {
+							if (e.key === "Escape" && query) {
+								e.preventDefault();
+								setQuery("");
+							}
+						}}
 						placeholder="Cari project..."
 						aria-label="Cari project studio"
 						className="w-full rounded-lg border border-graphite bg-onyx py-1.5 pl-8 pr-7 text-xs text-snow placeholder:text-fog focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo"
@@ -132,20 +139,21 @@ export function StudioSidebar({
 			{/* Project List */}
 			<div className="flex flex-1 min-h-0 flex-col overflow-y-auto p-2">
 				{history.length === 0 ? (
-					<div className="flex h-full min-h-[220px] flex-1 flex-col items-center justify-center p-6 text-center">
-						<p className="text-xs font-semibold text-mist">
-							Belum ada project studio.
-						</p>
-						<p className="mt-1 text-[11px] text-fog">
-							Tulis deskripsi antarmuka di samping untuk memulai.
+					<div className="flex flex-col items-center px-4 py-8 text-center">
+						<div
+							className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg border border-graphite/70 bg-onyx text-fog"
+							aria-hidden="true"
+						>
+							<Icon icon={Folder02Icon} size={18} />
+						</div>
+						<p className="text-xs font-semibold text-snow">Belum ada proyek</p>
+						<p className="mt-1 text-[11px] text-fog leading-relaxed">
+							Desain yang kamu buat akan muncul di sini.
 						</p>
 					</div>
 				) : filtered.length === 0 ? (
-					<div className="flex h-full min-h-[160px] flex-1 flex-col items-center justify-center p-4 text-center">
-						<p className="text-xs text-fog">
-							Tidak ada project yang cocok dengan &quot;
-							<span className="text-snow">{query}</span>&quot;.
-						</p>
+					<div className="flex flex-col items-center px-4 py-6 text-center">
+						<p className="text-xs text-fog">Tidak ada proyek yang cocok.</p>
 					</div>
 				) : (
 					<ul className="space-y-1">

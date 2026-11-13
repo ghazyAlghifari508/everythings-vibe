@@ -273,7 +273,8 @@ export function useAskSession({
 			if (await restoreFromServer()) return;
 
 			// Prompt fallback chain: promptRef (from server handoff) -> sessionStorage -> projectName
-			const prompt = promptRef.current || getSetupPrompt() || projectName;
+			const prompt =
+				promptRef.current || getSetupPrompt(projectId) || projectName;
 			if (!prompt) {
 				navigate({ to: "/", replace: true });
 				return;
