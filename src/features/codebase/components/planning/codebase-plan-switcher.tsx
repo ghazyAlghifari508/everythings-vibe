@@ -4,7 +4,7 @@ import {
 	Add01Icon,
 	ArrowDown01Icon,
 	Layers01Icon,
-	Tick01Icon,
+	SearchIcon,
 } from "@hugeicons/core-free-icons";
 import { useState } from "react";
 import {
@@ -20,45 +20,42 @@ import {
 	type ActivePlanCandidate,
 	describePlanReadiness,
 } from "@/features/codebase/services/active-plan";
+import { CodebasePlanRow } from "./codebase-plan-row";
 
-function formatPlanDate(value: string | null): string | null {
-	if (!value) return null;
-	const date = new Date(value);
-	if (Number.isNaN(date.getTime())) return null;
-	return new Intl.DateTimeFormat("id-ID", {
-		day: "numeric",
-		month: "short",
-		year: "numeric",
-	}).format(date);
-}
-
-/**
- * Switch between the user-facing feature plans of one repository.
- *
- * The trigger names the active plan, so the workspace always says which
- * feature is on screen. Each entry states its real artifact readiness,
- * because that is what tells a finished plan apart from a resumable draft.
- * The onboarding anchor never reaches this list: the caller filters it with
- * `selectUserFacingPlans`, so repository analysis context cannot pose as a
- * feature plan. Selecting a plan is a navigation choice: the parent drops the
- * previous plan's loaded artifacts and rehydrates from the server, so nothing
- * from one plan can be shown as another's. Creating a plan is an explicit
- * action of its own, never a side effect of sending a message.
- */
 export function CodebasePlanSwitcher({
 	plans,
+	archivedPlans = [],
 	activePlanId,
 	activePlanName,
 	onSelectPlan,
 	onCreateFeature,
+	onRename,
+	onArchive,
+	onDelete,
 }: {
 	plans: readonly ActivePlanCandidate[];
+	/** Archived features, shown collapsed so they stay recoverable. */
+	archivedPlans?: readonly ActivePlanCandidate[];
 	activePlanId: string | null;
 	activePlanName: string | null;
 	onSelectPlan: (projectId: string) => void;
 	onCreateFeature: () => void;
+	onRename?: (plan: ActivePlanCandidate) => void;
+	onArchive?: (plan: ActivePlanCandidate) => void;
+	onDelete?: (plan: ActivePlanCandidate) => void;
 }) {
 	const [open, setOpen] = useState(false);
+	const [showArchived, setShowArchived] = useState(false);
+	const [query, setQuery] = useState("");
+	const normalized = query.trim().toLowerCase();
+	const filtered = normalized
+		? plans.filter((plan) => plan.name.toLowerCase().includes(normalized))
+		: plans;
+	const filteredArchived = normalized
+		? archivedPlans.filter((plan) =>
+				plan.name.toLowerCase().includes(normalized),
+			)
+		: archivedPlans;
 
 	return (
 		<DropdownMenu open={open} onOpenChange={setOpen}>
@@ -87,46 +84,109 @@ export function CodebasePlanSwitcher({
 					/>
 				</button>
 			</DropdownMenuTrigger>
-			<DropdownMenuContent align="start" className="w-72">
-				<DropdownMenuLabel className="text-[11px] font-semibold uppercase tracking-wider">
-					Fitur repository
+			<DropdownMenuContent
+				align="start"
+				className="w-80 overflow-hidden"
+				onCloseAutoFocus={(event) => event.preventDefault()}
+			>
+				<DropdownMenuLabel className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider">
+					<span>Fitur repository</span>
+					<span className="text-slate">{plans.length} fitur</span>
 				</DropdownMenuLabel>
+				<div className="px-2 pb-1.5">
+					<div className="relative">
+						<Icon
+							icon={SearchIcon}
+							size={13}
+							aria-hidden
+							className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-slate"
+						/>
+						<input
+							type="text"
+							data-testid="codebase-plan-search"
+							aria-label="Cari fitur"
+							placeholder="Cari fitur..."
+							value={query}
+							onChange={(event) => setQuery(event.target.value)}
+							className="flex h-7 w-full rounded-md border border-graphite/80 bg-charcoal pl-7 pr-2 text-xs text-snow placeholder:text-slate focus:border-steel focus:outline-none focus:ring-1 focus:ring-indigo/60 transition-colors"
+						/>
+					</div>
+				</div>
 				<DropdownMenuSeparator />
-				{plans.map((plan) => {
-					const isActive = plan.id === activePlanId;
-					const updated = formatPlanDate(plan.updatedAt);
-					const readiness = describePlanReadiness(plan);
-					const status =
-						plan.hasArtifacts && updated
-							? `${readiness} · ${updated}`
-							: readiness;
-					return (
-						<DropdownMenuItem
-							key={plan.id}
-							data-testid={`codebase-plan-option-${plan.id}`}
-							aria-current={isActive ? "true" : undefined}
-							onSelect={() => {
-								if (!isActive) onSelectPlan(plan.id);
-							}}
-							className="flex items-start justify-between gap-2"
+				{/* Bounded scroll region: the list never grows past max-h, so a
+				    repository with many features can't push the create action or
+				    the create action off-screen. */}
+				<div
+					data-testid="codebase-plan-list"
+					className="max-h-64 overflow-y-auto py-1"
+				>
+					{filtered.length === 0 ? (
+						<p
+							data-testid="codebase-plan-empty"
+							className="px-3 py-4 text-center text-[11px] text-slate"
 						>
-							<span className="flex min-w-0 flex-col gap-0.5">
-								<span className="truncate text-[13px] text-snow">
-									{plan.name}
-								</span>
-								<span className="text-[10.5px] text-slate">{status}</span>
-							</span>
-							{isActive ? (
-								<Icon
-									icon={Tick01Icon}
-									size={13}
-									aria-hidden
-									className="mt-0.5 shrink-0 text-emerald"
+							{normalized ? "Tidak ada fitur yang cocok." : "Belum ada fitur."}
+						</p>
+					) : (
+						filtered.map((plan) => {
+							const isActive = plan.id === activePlanId;
+							return (
+								<CodebasePlanRow
+									key={plan.id}
+									plan={plan}
+									isActive={isActive}
+									onSelect={() => {
+										setOpen(false);
+										if (!isActive) onSelectPlan(plan.id);
+									}}
+									onRename={onRename ? () => onRename(plan) : undefined}
+									onArchive={onArchive ? () => onArchive(plan) : undefined}
+									onDelete={onDelete ? () => onDelete(plan) : undefined}
 								/>
-							) : null}
+							);
+						})
+					)}
+				</div>
+				{archivedPlans.length > 0 ? (
+					<>
+						<DropdownMenuSeparator />
+						<DropdownMenuItem
+							data-testid="codebase-plan-toggle-archived"
+							onSelect={() => setShowArchived((current) => !current)}
+							className="flex items-center justify-between text-[11px] text-slate"
+						>
+							<span>Diarsipkan</span>
+							<span>{archivedPlans.length}</span>
 						</DropdownMenuItem>
-					);
-				})}
+						{showArchived ? (
+							<div
+								data-testid="codebase-plan-archived-list"
+								className="max-h-40 overflow-y-auto py-1"
+							>
+								{filteredArchived.length === 0 ? (
+									<p className="px-3 py-3 text-center text-[11px] text-slate">
+										Tidak ada fitur arsip yang cocok.
+									</p>
+								) : (
+									filteredArchived.map((plan) => (
+										<CodebasePlanRow
+											key={plan.id}
+											plan={plan}
+											isActive={plan.id === activePlanId}
+											onSelect={() => {
+												setOpen(false);
+												onSelectPlan(plan.id);
+											}}
+											onRename={onRename ? () => onRename(plan) : undefined}
+											onArchive={onArchive ? () => onArchive(plan) : undefined}
+											onDelete={onDelete ? () => onDelete(plan) : undefined}
+										/>
+									))
+								)}
+							</div>
+						) : null}
+					</>
+				) : null}
 				<DropdownMenuSeparator />
 				<DropdownMenuItem
 					data-testid="codebase-plan-create-new"
@@ -148,4 +208,4 @@ export function CodebasePlanSwitcher({
 	);
 }
 
-export { formatPlanDate };
+export { describePlanReadiness };

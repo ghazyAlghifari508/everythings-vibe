@@ -13,6 +13,7 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Icon } from "@/components/ui/icon";
+import { PopoverAnchor } from "@/components/ui/popover";
 import type { ComposerOperationMode } from "@/features/codebase/services/composer-interactions";
 
 interface CodebaseComposerToolbarProps {
@@ -138,23 +139,27 @@ export function CodebaseComposerToolbar({
 				</DropdownMenuContent>
 			</DropdownMenu>
 
-			<button
-				type="button"
-				disabled={disabled}
-				onClick={onToggleMention}
-				data-testid="composer-mention-trigger"
-				data-composer-mention-trigger="true"
-				aria-label="Sisipkan referensi dokumen"
-				aria-expanded={isMentionOpen}
-				title="Sisipkan referensi dokumen (@)"
-				className={`inline-flex min-h-8 min-w-8 shrink-0 items-center justify-center rounded-md border px-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-50 ${
-					isMentionOpen
-						? "border-indigo/50 bg-indigo/15 text-snow"
-						: "border-graphite bg-obsidian text-fog hover:border-steel hover:text-snow"
-				}`}
-			>
-				<Icon icon={AtIcon} size={14} aria-hidden="true" />
-			</button>
+			<PopoverAnchor asChild>
+				<button
+					type="button"
+					disabled={disabled}
+					onClick={onToggleMention}
+					data-testid="composer-mention-trigger"
+					data-composer-mention-trigger="true"
+					data-composer-mention-anchor="true"
+					aria-label="Sisipkan referensi dokumen"
+					aria-haspopup="dialog"
+					aria-expanded={isMentionOpen}
+					title="Sisipkan referensi dokumen (@)"
+					className={`inline-flex min-h-8 min-w-8 shrink-0 items-center justify-center rounded-md border px-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-50 ${
+						isMentionOpen
+							? "border-indigo/50 bg-indigo/15 text-snow"
+							: "border-graphite bg-obsidian text-fog hover:border-steel hover:text-snow"
+					}`}
+				>
+					<Icon icon={AtIcon} size={14} aria-hidden="true" />
+				</button>
+			</PopoverAnchor>
 		</div>
 	);
 }

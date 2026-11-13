@@ -79,15 +79,33 @@ describe("CodebaseKanbanBoard panel layout", () => {
 		);
 		expect(titleNode?.className).not.toContain("line-clamp");
 	});
-	it("keeps status, feature grouping, and subtask progress", () => {
+	it("keeps status, feature grouping, and subtask progress without false agent activity", () => {
 		render();
 		expect(container.textContent).toContain("Ekspor Ringkasan");
 		expect(container.textContent).toContain("1/4 subtask");
-		expect(container.textContent).toContain("Agent coding...");
+		expect(container.textContent).not.toContain("Agent coding...");
 		expect(
 			container.querySelector("[data-testid='codebase-kanban-progress']")
 				?.textContent,
 		).toBe("1 dari 3 selesai");
+	});
+	it("opens task detail dialog upon clicking a shared card without nested conflicts", () => {
+		render();
+		const cardEl = container.querySelector<HTMLElement>(
+			"[data-testid='kanban-card']",
+		);
+		expect(cardEl).not.toBeNull();
+		act(() => {
+			cardEl?.click();
+		});
+		const dialog = document.body.querySelector(
+			"[data-testid='task-detail-dialog']",
+		);
+		expect(dialog).not.toBeNull();
+		expect(dialog?.textContent).toContain("Detail Task");
+		expect(dialog?.textContent).toContain(
+			"Tambah tombol ekspor di halaman rekomendasi",
+		);
 	});
 	it("updates a single progress summary from new data without mutating task input", () => {
 		const before = structuredClone(columns);
@@ -312,6 +330,53 @@ describe("CodebaseKanbanBoard states", () => {
 		expect(
 			container.querySelectorAll("[data-testid^='codebase-kanban-col-']"),
 		).toHaveLength(0);
+	});
+	it("renders Indonesian kanban column titles Belum Mulai, Dikerjakan, Selesai", () => {
+		render();
+		expect(
+			container.querySelector(
+				"[data-testid='codebase-kanban-col-Belum Mulai']",
+			),
+		).not.toBeNull();
+		expect(
+			container.querySelector("[data-testid='codebase-kanban-col-Dikerjakan']"),
+		).not.toBeNull();
+		expect(
+			container.querySelector("[data-testid='codebase-kanban-col-Selesai']"),
+		).not.toBeNull();
+	});
+	it("renders context-specific empty labels per column instead of generic Kosong", () => {
+		render({
+			columns: {
+				pending: [card({ id: "task-1" })],
+				in_progress: [],
+				completed: [],
+				failed: [],
+			},
+		});
+		const doingCol = container.querySelector(
+			"[data-testid='codebase-kanban-col-Dikerjakan']",
+		);
+		const doneCol = container.querySelector(
+			"[data-testid='codebase-kanban-col-Selesai']",
+		);
+		expect(doingCol?.textContent).toContain("Belum ada task yang dikerjakan");
+		expect(doneCol?.textContent).toContain("Belum ada task yang selesai");
+		expect(container.textContent).not.toContain("Kosong");
+
+		render({
+			columns: {
+				pending: [],
+				in_progress: [card({ id: "task-2", status: "in_progress" })],
+				completed: [],
+				failed: [card({ id: "task-4", status: "failed" })],
+			},
+		});
+		const pendingCol = container.querySelector(
+			"[data-testid='codebase-kanban-col-Belum Mulai']",
+		);
+		expect(pendingCol?.textContent).toContain("Belum ada task");
+		expect(container.textContent).not.toContain("Kosong");
 	});
 	it("shows the failed column and a note only when tasks failed", () => {
 		render();

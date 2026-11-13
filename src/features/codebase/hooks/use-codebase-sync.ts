@@ -10,7 +10,10 @@ import {
 	syncStatusResponseSchema,
 } from "@/features/codebase/services/sync";
 import { shouldFetchWorkspaceAnalysis } from "@/features/codebase/services/workspace-analysis";
-import { CODEBASE_SYNC_POLL_INTERVAL_MS } from "@/features/codebase/types/codebase-constants";
+import {
+	CODEBASE_SYNC_POLL_INTERVAL_MS,
+	CODEBASE_SYNC_REQUEST_TIMEOUT_MS,
+} from "@/features/codebase/types/codebase-constants";
 import { resolveWorkspaceSnapshotReady } from "../utils/workspace-contracts";
 import { useWorkspaceAnalysis } from "./use-workspace-analysis";
 import { useWorkspaceSyncSession } from "./use-workspace-sync-session";
@@ -28,7 +31,19 @@ export function useCodebaseSync({
 	initialAnalysis: AnalysisResponse | null;
 	hasStoredSnapshot: boolean;
 }) {
-	const [status, setStatus] = useState<SyncStatusResponse | null>(null);
+	const [storedStatus, setStatus] = useState<SyncStatusResponse | null>(null);
+	const codebaseStatus =
+		storedStatus?.projectId === codebaseId ? storedStatus : null;
+	const [workspaceSnapshot, setWorkspaceSnapshot] = useState({
+		codebaseId,
+		persistedSnapshotId: currentSnapshotId,
+		snapshotId: currentSnapshotId,
+	});
+	const retainedSnapshotId =
+		workspaceSnapshot.codebaseId === codebaseId &&
+		workspaceSnapshot.persistedSnapshotId === currentSnapshotId
+			? workspaceSnapshot.snapshotId
+			: currentSnapshotId;
 	const [error, setError] = useState<string | null>(null);
 	/**
 	 * A failed status read, separate from the shared workspace error. The re-sync
@@ -37,7 +52,16 @@ export function useCodebaseSync({
 	 */
 	const [statusError, setStatusError] = useState<string | null>(null);
 	const [isWorking, setIsWorking] = useState(false);
-	const inFlight = useRef(false);
+	const inFlight = useRef<{
+		scope: object;
+		controller: AbortController;
+	} | null>(null);
+	const contextRef = useRef({ codebaseId, projectId });
+	if (
+		contextRef.current.codebaseId !== codebaseId ||
+		contextRef.current.projectId !== projectId
+	)
+		contextRef.current = { codebaseId, projectId };
 	/**
 	 * The exact shared-error string this hook last wrote. A later successful
 	 * read clears only that message, never a composer/analysis error it did not
@@ -51,15 +75,21 @@ export function useCodebaseSync({
 	}, []);
 	const session = useWorkspaceSyncSession({
 		codebaseId,
-		status,
+		status: codebaseStatus,
 		setStatus,
 		setError,
 	});
-	const { activeSessionId, setActiveSessionId } = session;
+	const { activeSessionId, setActiveSessionId, statusScopeRef, canReadStatus } =
+		session;
+	const status =
+		canReadStatus &&
+		(!activeSessionId || codebaseStatus?.sessionId === activeSessionId)
+			? codebaseStatus
+			: null;
 	const analysisState = useWorkspaceAnalysis({
 		projectId,
 		currentSnapshotId,
-		polledSnapshotId: status?.workspaceSnapshotId ?? currentSnapshotId,
+		polledSnapshotId: retainedSnapshotId,
 		initialAnalysis,
 		setError,
 		setIsWorking,
@@ -72,20 +102,42 @@ export function useCodebaseSync({
 		readWorkspaceAnalysis,
 	} = analysisState;
 	const readStatus = useCallback(async () => {
-		if (inFlight.current) return;
-		inFlight.current = true;
+		const scope = statusScopeRef.current;
+		if (
+			!canReadStatus ||
+			scope.blocked ||
+			scope.codebaseId !== codebaseId ||
+			scope.sessionId !== activeSessionId
+		)
+			return;
+		if (inFlight.current?.scope === scope) return;
+		inFlight.current?.controller.abort();
+		const context = contextRef.current;
+		const controller = new AbortController();
+		const request = { scope, controller };
+		inFlight.current = request;
+		const timeout = setTimeout(
+			() => controller.abort(),
+			CODEBASE_SYNC_REQUEST_TIMEOUT_MS,
+		);
+		const isCurrent = () =>
+			statusScopeRef.current === scope &&
+			contextRef.current === context &&
+			!controller.signal.aborted;
 		try {
 			const queryParams = new URLSearchParams();
-			const sessionToQuery = activeSessionId ?? status?.sessionId;
+			const sessionToQuery = scope.sessionId;
 			if (sessionToQuery) queryParams.set("sessionId", sessionToQuery);
 			if (projectId) queryParams.set("projectId", projectId);
 			const query = queryParams.toString() ? `?${queryParams}` : "";
 			const response = await fetch(
 				`/api/codebases/${encodeURIComponent(codebaseId)}/status${query}`,
+				{ signal: controller.signal, cache: "no-store" },
 			);
 			const parsed = syncStatusResponseSchema.safeParse(
 				await response.json().catch(() => null),
 			);
+			if (!isCurrent()) return;
 			if (!response.ok || !parsed.success) {
 				const message = response.ok
 					? "Status sync tidak valid. Coba muat ulang."
@@ -93,10 +145,24 @@ export function useCodebaseSync({
 				reportStatusError(message);
 				return;
 			}
+			if (
+				parsed.data.projectId !== codebaseId ||
+				(scope.sessionId && parsed.data.sessionId !== scope.sessionId) ||
+				(parsed.data.analysisProjectId &&
+					projectId &&
+					parsed.data.analysisProjectId !== projectId)
+			)
+				return;
 			const activeSnapshotId = resolveWorkspaceSnapshotIdentity({
-				persistedSnapshotId: currentSnapshotId,
-				polledSnapshotId: parsed.data.workspaceSnapshotId ?? currentSnapshotId,
+				persistedSnapshotId: retainedSnapshotId,
+				polledSnapshotId: parsed.data.workspaceSnapshotId,
 			});
+			if (activeSnapshotId !== retainedSnapshotId)
+				setWorkspaceSnapshot({
+					codebaseId,
+					persistedSnapshotId: currentSnapshotId,
+					snapshotId: activeSnapshotId,
+				});
 			analysisIdentityRef.current = `${projectId ?? ""}:${activeSnapshotId ?? ""}`;
 			const staleStatusError = statusErrorMessageRef.current;
 			if (staleStatusError !== null) {
@@ -105,7 +171,7 @@ export function useCodebaseSync({
 				setStatusError(null);
 			}
 			setStatus(parsed.data);
-			if (!activeSessionId && parsed.data.sessionId) {
+			if (!scope.sessionId) {
 				setActiveSessionId(parsed.data.sessionId);
 			}
 			const snapshotId = activeSnapshotId;
@@ -135,9 +201,11 @@ export function useCodebaseSync({
 			}
 			// Reading status must never start billable analysis.
 		} catch {
-			reportStatusError("Server tidak dapat dihubungi. Coba lagi.");
+			if (isCurrent())
+				reportStatusError("Server tidak dapat dihubungi. Coba lagi.");
 		} finally {
-			inFlight.current = false;
+			clearTimeout(timeout);
+			if (inFlight.current === request) inFlight.current = null;
 		}
 	}, [
 		activeSessionId,
@@ -146,9 +214,11 @@ export function useCodebaseSync({
 		currentSnapshotId,
 		initialAnalysis,
 		projectId,
+		retainedSnapshotId,
 		readWorkspaceAnalysis,
 		reportStatusError,
-		status?.sessionId,
+		statusScopeRef,
+		canReadStatus,
 		analysisIdentityRef,
 		setAnalysis,
 		setActiveSessionId,
@@ -171,17 +241,24 @@ export function useCodebaseSync({
 		codebaseId,
 		sessionId: activeSessionId,
 		analysisProjectId: projectId,
+		enabled: canReadStatus && Boolean(activeSessionId),
 	});
 	const lastLiveFrameRef = useRef<string | null>(null);
 	const readStatusRef = useRef(readStatus);
 	readStatusRef.current = readStatus;
 	useEffect(() => {
-		if (!liveStatus.status) return;
+		if (
+			!canReadStatus ||
+			!liveStatus.status ||
+			liveStatus.status.projectId !== codebaseId ||
+			liveStatus.status.sessionId !== activeSessionId
+		)
+			return;
 		const fingerprint = JSON.stringify(liveStatus.status);
 		if (lastLiveFrameRef.current === fingerprint) return;
 		lastLiveFrameRef.current = fingerprint;
 		void readStatusRef.current();
-	}, [liveStatus.status]);
+	}, [liveStatus.status, activeSessionId, codebaseId, canReadStatus]);
 	useEffect(() => {
 		if (
 			status?.status === "uploaded" &&

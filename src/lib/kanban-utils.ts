@@ -14,6 +14,35 @@ export const TASK_STATUS_LABELS: Record<TaskCardStatus, string> = {
 	failed: "Gagal",
 };
 
+export const KANBAN_COLUMN_EMPTY_LABELS: Record<string, string> = {
+	"Belum Mulai": "Belum ada task",
+	Dikerjakan: "Belum ada task yang dikerjakan",
+	Selesai: "Belum ada task yang selesai",
+	Gagal: "Tidak ada task gagal",
+};
+
+export function getKanbanColumnEmptyLabel(columnKeyOrTitle: string): string {
+	if (columnKeyOrTitle in KANBAN_COLUMN_EMPTY_LABELS) {
+		return KANBAN_COLUMN_EMPTY_LABELS[columnKeyOrTitle];
+	}
+	switch (columnKeyOrTitle) {
+		case "todo":
+		case "pending":
+			return "Belum ada task";
+		case "doing":
+		case "in_progress":
+		case "In Progress":
+			return "Belum ada task yang dikerjakan";
+		case "done":
+		case "completed":
+		case "Done":
+			return "Belum ada task yang selesai";
+		case "failed":
+			return "Tidak ada task gagal";
+		default:
+			return "Belum ada task";
+	}
+}
 export interface PriorityConfig {
 	label: "Utama" | "Penting" | "Pendukung";
 	level: TaskPriorityLevel;

@@ -93,21 +93,19 @@ export function CodebaseAdaptiveQuestionOptions({
 			{customChosen ? (
 				// The free-text field belongs to the same question, so it continues the
 				// chosen option's own card instead of becoming a second card beside the
-				// list. `[padding-inline-start:2.625rem]` matches the option heading
-				// inset: card px-3.5 + control 1rem + gap 0.75rem.
-				<div className="mt-2 [padding-inline-start:2.625rem]">
-					<CodebaseAdaptiveQuestionAnswerInput
-						id={customInputId}
-						label="Jawaban lain"
-						disabled={disabled}
-						value={customText}
-						placeholder={customPlaceholder ?? "Tulis jawabanmu sendiri..."}
-						className="h-11 rounded-none border-0 border-b border-graphite bg-transparent px-0 text-[13px] text-snow shadow-none placeholder:text-slate focus:ring-0 focus-visible:border-indigo"
-						autoFocus={!disabled}
-						onChange={onCustomTextChange}
-						onSubmit={onCustomSubmit}
-					/>
-				</div>
+				// list. The option row places it on the card's text column, so it needs
+				// no indent of its own.
+				<CodebaseAdaptiveQuestionAnswerInput
+					id={customInputId}
+					label="Jawaban lain"
+					disabled={disabled}
+					value={customText}
+					placeholder={customPlaceholder ?? "Tulis jawabanmu sendiri..."}
+					className="h-11 rounded-none border-0 border-b border-graphite bg-transparent px-0 text-[13px] text-snow shadow-none placeholder:text-slate focus:ring-0 focus-visible:border-indigo"
+					autoFocus={!disabled}
+					onChange={onCustomTextChange}
+					onSubmit={onCustomSubmit}
+				/>
 			) : null}
 		</CodebaseAdaptiveQuestionOptionRow>
 	);

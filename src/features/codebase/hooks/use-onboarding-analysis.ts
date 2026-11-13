@@ -3,7 +3,6 @@ import {
 	canContinueToCodebaseConclusion,
 	ONBOARDING_FEATURE_MESSAGE,
 } from "@/features/codebase/services/analysis";
-import { isProvisionalCodebaseName } from "@/features/codebase/services/naming";
 import {
 	readPlanCodebaseProjectPointer,
 	storePlanCodebaseProjectPointer,
@@ -79,7 +78,7 @@ export function useOnboardingAnalysis({
 	const ensureFeatureProject = useCallback(
 		async (
 			codebaseId: string,
-			fallbackName: string,
+			_fallbackName?: string,
 		): Promise<string | null> => {
 			const stored = readPlanCodebaseProjectPointer();
 			const owner = identityRef.current;
@@ -91,11 +90,7 @@ export function useOnboardingAnalysis({
 			// as the feature message, or the analysis would read the placeholder
 			// as user intent. The neutral onboarding intent asks for an initial
 			// repository summary instead.
-			const trimmed = fallbackName.trim();
-			const message =
-				trimmed.length >= 3 && !isProvisionalCodebaseName(trimmed)
-					? trimmed
-					: ONBOARDING_FEATURE_MESSAGE;
+			const message = ONBOARDING_FEATURE_MESSAGE;
 			try {
 				const outcome = await requestFeatureProject(codebaseId, message);
 				if (owner !== identityRef.current) return null;

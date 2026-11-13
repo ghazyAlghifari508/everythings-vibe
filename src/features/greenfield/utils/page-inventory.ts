@@ -41,6 +41,21 @@ function stripLeadingNumbering(text: string): string {
 		.trim();
 }
 
+/**
+ * Drop the annotations the PRD appends after a page name: a parenthetical
+ * file/route reference (`(PortfolioPage.tsx)`) and a bracketed status marker
+ * (`[MODIFIED]`). They identify the implementation, never the surface, and a
+ * task is required to name the surface only — keeping them in the comparison
+ * key rejected every task that correctly referenced the documented page.
+ */
+function stripPageAnnotations(text: string): string {
+	return text
+		.replace(/\([^)]*\)/g, " ")
+		.replace(/\[[^\]]*\]/g, " ")
+		.replace(/\s+/g, " ")
+		.trim();
+}
+
 function cleanPageName(raw: string): string {
 	// Markdown emphasis around a name is formatting, not part of the name.
 	const unemphasized = raw
@@ -49,12 +64,19 @@ function cleanPageName(raw: string): string {
 		.replace(/^`(.+?)`$/, "$1")
 		.replace(/[*_`]/g, "")
 		.trim();
-	return stripLeadingNumbering(unemphasized).slice(0, MAX_PAGE_NAME_CHARS);
+	return stripPageAnnotations(stripLeadingNumbering(unemphasized)).slice(
+		0,
+		MAX_PAGE_NAME_CHARS,
+	);
 }
 
-/** Normalized comparison key: case-insensitive, whitespace-collapsed, unnumbered. */
+/** Normalized comparison key: case-insensitive, whitespace-collapsed, unnumbered,
+ *  annotation-free. */
 export function normalizePageName(name: string): string {
-	return stripLeadingNumbering(name).toLowerCase().replace(/\s+/g, " ").trim();
+	return stripPageAnnotations(stripLeadingNumbering(name))
+		.toLowerCase()
+		.replace(/\s+/g, " ")
+		.trim();
 }
 
 /**
@@ -102,14 +124,25 @@ export function findUnknownSurfaces(
 	inventory: string[],
 ): string[] {
 	if (inventory.length === 0) return [];
-	const known = new Set(inventory.map(normalizePageName));
+	const known = new Set<string>();
+	for (const item of inventory) {
+		const norm = normalizePageName(item);
+		if (norm) known.add(norm);
+		// Legacy inventories name a surface by its implementation file; keep that
+		// reference as an accepted key so an older task tree still resolves.
+		for (const reference of item.matchAll(/\(([^)]+)\)/g)) {
+			const key = reference[1].toLowerCase().replace(/\s+/g, " ").trim();
+			if (key) known.add(key);
+		}
+	}
 	const unknown: string[] = [];
 	for (const surface of surfaces) {
 		const name = surface.trim();
 		if (!name) continue;
 		if (known.has(normalizePageName(name))) continue;
-		if (unknown.includes(name)) continue;
-		unknown.push(name);
+		if (!unknown.includes(name)) {
+			unknown.push(name);
+		}
 	}
 	return unknown;
 }

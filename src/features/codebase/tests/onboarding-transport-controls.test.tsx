@@ -48,7 +48,7 @@ test("an active upload without a browser token never offers a replacement creden
 		screen.queryByText("Agent sedang menyinkronkan repository."),
 	).toBeNull();
 	expect(screen.getByTestId("prompt-box").textContent).toContain(
-		"Prompt ini hanya tersedia sekali",
+		"Repository sedang disinkronkan.",
 	);
 });
 
@@ -149,6 +149,6 @@ test("an expired credential is replaced by the renewal state, never by success c
 	expect(screen.queryByText("secret")).toBeNull();
 	expect(screen.getByText("Sesi sinkronisasi berakhir")).toBeDefined();
 	expect(
-		screen.getByRole("button", { name: "Buat prompt baru" }),
+		screen.getByRole("button", { name: "Buat instruksi baru" }),
 	).toBeDefined();
 });

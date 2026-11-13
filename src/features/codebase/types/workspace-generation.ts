@@ -90,6 +90,7 @@ export const workspaceGenerationOperationSchema = z.object({
 	status: z.enum(["queued", "running", "completed", "failed", "cancelled"]),
 	attempt: z.number().int().nonnegative().optional(),
 	result: z.record(z.string(), z.unknown()).nullable().optional(),
+	input: z.record(z.string(), z.unknown()).nullable().optional(),
 	error: z.string().nullable().optional(),
 	errorCode: z.string().nullable().optional(),
 	baselineArtifactId: z.string().nullable().optional(),

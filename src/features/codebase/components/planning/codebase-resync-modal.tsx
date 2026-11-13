@@ -76,19 +76,15 @@ export function CodebaseResyncModal({
 	const resolvedRepositoryName =
 		resolveCodebaseDisplayName(projectName) ?? "Repository belum terdeteksi";
 
-	// The prompt's session is the attempt on screen. A status frame from any
-	// other session is the previous attempt and must not paint progress,
-	// stages, or completion under this one.
-	const attemptSessionId =
-		payload?.sessionId ?? activeSessionId ?? status?.sessionId ?? null;
-	// While the server prepares a new session, no frame belongs to it yet. The
-	// previous attempt's polled status must not paint under the new operation.
-	const statusBelongsToAttempt =
-		!status ||
-		!attemptSessionId ||
-		!status.sessionId ||
-		status.sessionId === attemptSessionId;
-	const attemptStatus = isStarting || !statusBelongsToAttempt ? null : status;
+	// Only the explicit attempt may supply progress; an unbound status is not recovery.
+	const attemptSessionId = payload?.sessionId ?? activeSessionId ?? null;
+	const attemptStatus =
+		!isStarting &&
+		!sessionError &&
+		attemptSessionId &&
+		status?.sessionId === attemptSessionId
+			? status
+			: null;
 	const stageView = resolveSyncStageView(attemptStatus);
 	const isVerified = isResyncSessionVerified({
 		status: attemptStatus,
@@ -105,7 +101,8 @@ export function CodebaseResyncModal({
 						variant="secondary"
 						onClick={onRetrySession}
 						disabled={isStarting}
-						className="min-h-11 px-3.5 text-xs"
+						size="sm"
+						className="min-h-8 px-3 text-xs"
 					>
 						Coba lagi
 					</Button>
@@ -118,9 +115,9 @@ export function CodebaseResyncModal({
 			<DialogContent
 				data-testid="codebase-resync-panel"
 				closeAriaLabel="Tutup sync ulang"
-				className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 outline-none sm:max-w-xl"
+				className="flex max-h-[85vh] w-full flex-col gap-0 overflow-hidden p-0 !p-0 outline-none sm:max-w-2xl"
 			>
-				<DialogHeader className="shrink-0 space-y-1 border-b border-graphite px-5 py-5 pr-12 text-left sm:px-6">
+				<DialogHeader className="shrink-0 space-y-1 border-b border-graphite px-4 py-3.5 pr-12 text-left sm:px-5 sm:py-4">
 					<DialogTitle className="font-inter text-base font-semibold text-snow sm:text-lg">
 						Perbarui repository
 					</DialogTitle>
@@ -131,50 +128,63 @@ export function CodebaseResyncModal({
 
 				{/* One scroll container for the steps; the prompt owns its own
 				internal scroll because a long credential keeps its full text. */}
-				<div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
-					<div className="flex flex-col gap-6">
-						<ScreenConnectPromptStep
-							key={payload?.sessionId ?? "no-session"}
-							projectName={projectName}
-							payload={payload}
-							isStarting={isStarting}
-							status={attemptStatus}
-							onRequestNewToken={onReplacePrompt}
-							heading="Salin instruksi sync ulang"
-							promptMode="resync"
-							copyAriaLabel="Salin instruksi sync ulang"
-							contentTestId="resync-prompt-content"
-							recoveryState={recoveryState}
-						/>
+				<div className="min-h-0 flex-1 overflow-y-auto px-4 pt-3.5 pb-4 sm:px-5 sm:pt-4 sm:pb-5 flex flex-col">
+					<ScreenConnectPromptStep
+						key={payload?.sessionId ?? "no-session"}
+						projectName={projectName}
+						/* The prompt stays on screen after a verified re-sync: the
+						credential belongs to the attempt the user just ran, and the
+						progress rows below already report completion. */
+						payload={isStarting || sessionError ? null : payload}
+						isStarting={isStarting}
+						status={attemptStatus}
+						onRequestNewToken={onReplacePrompt}
+						heading="Salin instruksi sync ulang"
+						promptMode="resync"
+						copyAriaLabel="Salin instruksi sync ulang"
+						contentTestId="resync-prompt-content"
+						recoveryState={recoveryState}
+					/>
 
-						<ScreenConnectAgentStep
-							title="Jalankan di AI coding agent"
-							description="Gunakan root repository yang sama."
-							showHarnesses={false}
-						/>
+					<ScreenConnectAgentStep
+						title="Jalankan di AI coding agent"
+						description="Gunakan root repository yang sama."
+						showHarnesses={true}
+						hasConnector={true}
+					/>
 
-						<ScreenConnectSyncStep
-							status={attemptStatus}
-							stageView={stageView}
-							canRetry={stageView.canRetry && Boolean(onRetrySync)}
-							statusError={sessionError ? null : statusError}
-							isStarting={isStarting}
-							hasSession={Boolean(payload || activeSessionId || attemptStatus)}
-							onRetrySync={onRetrySync}
-							canContinueToSummary={isVerified}
-							analysis={analysis}
-							analysisError={analysisError}
-							isAnalyzing={isAnalyzing}
-							onRetryAnalysis={onRetryAnalysis}
-							isLegacyAnalysisMissingSuggestions={false}
-							heading="Pantau sinkronisasi"
-							description={null}
-							idleLabel={sessionError ? "Belum dimulai" : "Menunggu agent"}
-						/>
-					</div>
+					<ScreenConnectSyncStep
+						status={attemptStatus}
+						stageView={stageView}
+						canRetry={stageView.canRetry && Boolean(onRetrySync)}
+						statusError={sessionError ? null : statusError}
+						isStarting={isStarting}
+						hasSession={Boolean(attemptSessionId)}
+						onRetrySync={onRetrySync}
+						canContinueToSummary={isVerified}
+						analysis={analysis}
+						analysisError={analysisError}
+						isAnalyzing={isAnalyzing}
+						onRetryAnalysis={onRetryAnalysis}
+						isLegacyAnalysisMissingSuggestions={false}
+						heading="Pantau sinkronisasi"
+						description={null}
+						idleLabel={sessionError ? "Belum dimulai" : "Menunggu agent"}
+					/>
 				</div>
 
-				<DialogFooter className="shrink-0 items-center justify-end border-t border-graphite px-5 py-3 sm:px-6">
+				<DialogFooter className="shrink-0 flex items-center justify-end gap-2.5 border-t border-graphite px-4 py-3 sm:px-5 sm:py-3.5">
+					{!isVerified && (
+						<Button
+							type="button"
+							variant="secondary"
+							onClick={onClose}
+							size="sm"
+							className="min-h-8 font-sans text-xs font-medium text-fog hover:text-snow"
+						>
+							Tutup
+						</Button>
+					)}
 					<Button
 						type="button"
 						onClick={onClose}
@@ -187,8 +197,10 @@ export function CodebaseResyncModal({
 						}
 						size="sm"
 						className={cn(
-							"font-sans text-xs font-semibold",
-							isVerified ? "bg-indigo text-snow hover:bg-indigo/90" : null,
+							"min-h-8 font-sans text-xs font-semibold transition-colors",
+							isVerified
+								? "bg-indigo text-snow hover:bg-indigo/90"
+								: "border border-iron/60 bg-obsidian text-fog opacity-50 cursor-not-allowed",
 						)}
 					>
 						Selesai

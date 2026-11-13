@@ -10,10 +10,12 @@ import {
 	type CodebasePipelineStage,
 	type CodebaseRunStage,
 	type CodebaseRunState,
+	isRunActive,
+	observeOperation,
 	operationSettleEpoch,
-	operationStartEpoch,
+	runFromOperation,
 	settleRun,
-	startRun,
+	settleRunForOperation,
 } from "@/features/codebase/services/chat-flow";
 import {
 	type DurableGenerationOperation,
@@ -49,6 +51,8 @@ export function useWorkspaceOperations({
 }) {
 	const activePollerCtrl = useRef<AbortController | null>(null);
 	const inFlightStageRef = useRef<CodebaseRunStage | null>(null);
+	const onOperationCompletedRef = useRef(onOperationCompleted);
+	onOperationCompletedRef.current = onOperationCompleted;
 
 	const monitorOperation = useCallback(
 		async (op: DurableGenerationOperation, signal: AbortSignal) => {
@@ -57,12 +61,18 @@ export function useWorkspaceOperations({
 			inFlightStageRef.current = op.stage;
 			setStageBusy(op.stage);
 			setStageError(null);
-			// Hydration starts the clock at the operation's own acceptance time, so a
-			// remount reports the run the server recorded instead of a fresh timer.
-			const hydrated = startRun(op.stage, operationStartEpoch(op));
+			// A run that already tracks this stage keeps its own identity and clock; any
+			// other run is rebuilt from the attempt window the server recorded, so a
+			// remount reports the real attempt instead of a fresh or inherited timer.
 			setRun((cur) => {
-				if (cur?.status === "running" && cur.stage === op.stage) return cur;
-				return hydrated;
+				if (
+					cur &&
+					isRunActive(cur) &&
+					cur.stage === op.stage &&
+					(cur.operationId === null || cur.operationId === op.id)
+				)
+					return cur;
+				return runFromOperation(op);
 			});
 
 			// ponytail: single-flight per stage poller; upgrade to multiplexed SSE channel when available.
@@ -71,52 +81,43 @@ export function useWorkspaceOperations({
 				stage: op.stage,
 				operationId: op.id,
 				signal,
+				onTick: (tick) => {
+					if (signal.aborted || activeProjectIdRef.current !== projectId)
+						return;
+					setRun((cur) => observeOperation(cur, tick));
+				},
 			});
 
 			if (signal.aborted || activeProjectIdRef.current !== projectId) return;
 			inFlightStageRef.current = null;
 			setStageBusy(null);
 
-			// A run that already exists keeps its own clock; only a run the client never
-			// observed is reconstructed from the server's acceptance timestamp.
-			const preserveOrRebuild =
-				(fallbackStage: CodebaseRunStage, op: DurableGenerationOperation) =>
-				(cur: CodebaseRunState | null) =>
-					cur?.status === "running"
-						? cur
-						: startRun(fallbackStage, operationStartEpoch(op));
-
 			if (settled?.status === "completed") {
-				const persisted = await onOperationCompleted(settled.stage, settled);
+				const persisted = await onOperationCompletedRef.current(
+					settled.stage,
+					settled,
+				);
 				if (signal.aborted || activeProjectIdRef.current !== projectId) return;
 				const finishedAt = operationSettleEpoch(settled);
 				if (persisted) {
 					setRun((cur) =>
-						settleRun(
-							preserveOrRebuild(settled.stage, settled)(cur),
-							"done",
-							finishedAt,
-						),
+						settleRunForOperation(cur, settled, "done", finishedAt),
 					);
 				} else {
 					const errorMsg =
 						"Hasil generasi belum tersimpan di server. Coba generate ulang.";
 					setStageError(errorMsg);
 					setRun((cur) =>
-						settleRun(
-							preserveOrRebuild(settled.stage, settled)(cur),
-							"failed",
-							finishedAt,
-							errorMsg,
-						),
+						settleRunForOperation(cur, settled, "failed", finishedAt, errorMsg),
 					);
 				}
 			} else if (settled?.status === "failed") {
 				const errorMsg = settled.error ?? "Generasi gagal.";
 				setStageError(errorMsg);
 				setRun((cur) =>
-					settleRun(
-						preserveOrRebuild(settled.stage, settled)(cur),
+					settleRunForOperation(
+						cur,
+						settled,
 						"failed",
 						operationSettleEpoch(settled),
 						errorMsg,
@@ -124,8 +125,9 @@ export function useWorkspaceOperations({
 				);
 			} else if (settled?.status === "cancelled") {
 				setRun((cur) =>
-					settleRun(
-						preserveOrRebuild(settled.stage, settled)(cur),
+					settleRunForOperation(
+						cur,
+						settled,
 						"failed",
 						operationSettleEpoch(settled),
 						"Dibatalkan.",
@@ -133,13 +135,7 @@ export function useWorkspaceOperations({
 				);
 			}
 		},
-		[
-			activeProjectIdRef,
-			setRun,
-			setStageBusy,
-			setStageError,
-			onOperationCompleted,
-		],
+		[activeProjectIdRef, setRun, setStageBusy, setStageError],
 	);
 
 	// On mount and project change: hydrate operations from server without restarting AI
@@ -177,20 +173,27 @@ export function useWorkspaceOperations({
 					}
 				}
 
+				// A terminal operation is replayed onto the attempt window it recorded, so
+				// the reported duration is that attempt's own instead of time since remount.
+				const hydrate =
+					(op: DurableGenerationOperation) => (cur: CodebaseRunState | null) =>
+						cur && isRunActive(cur) && cur.stage === op.stage
+							? cur
+							: runFromOperation(op);
+
 				// 2. Hydrate completed, failed, or cancelled stages (latest stage first)
 				for (const stage of [...RUN_STAGES].reverse()) {
 					const op = ops[stage];
 					if (op?.status === "completed") {
-						const persisted = await onOperationCompleted(op.stage, op);
+						const persisted = await onOperationCompletedRef.current(
+							op.stage,
+							op,
+						);
 						if (ctrl.signal.aborted || activeProjectIdRef.current !== projectId)
 							return;
-						const hydrate = (cur: CodebaseRunState | null) =>
-							cur?.status === "running"
-								? cur
-								: startRun(op.stage, operationStartEpoch(op));
 						if (persisted) {
 							setRun((cur) =>
-								settleRun(hydrate(cur), "done", operationSettleEpoch(op)),
+								settleRun(hydrate(op)(cur), "done", operationSettleEpoch(op)),
 							);
 						} else {
 							const notSavedMsg =
@@ -198,7 +201,7 @@ export function useWorkspaceOperations({
 							setStageError(notSavedMsg);
 							setRun((cur) =>
 								settleRun(
-									hydrate(cur),
+									hydrate(op)(cur),
 									"failed",
 									operationSettleEpoch(op),
 									notSavedMsg,
@@ -212,9 +215,7 @@ export function useWorkspaceOperations({
 						setStageError(errorMsg);
 						setRun((cur) =>
 							settleRun(
-								cur?.status === "running"
-									? cur
-									: startRun(op.stage, operationStartEpoch(op)),
+								hydrate(op)(cur),
 								"failed",
 								operationSettleEpoch(op),
 								errorMsg,
@@ -225,9 +226,7 @@ export function useWorkspaceOperations({
 					if (op?.status === "cancelled") {
 						setRun((cur) =>
 							settleRun(
-								cur?.status === "running"
-									? cur
-									: startRun(op.stage, operationStartEpoch(op)),
+								hydrate(op)(cur),
 								"failed",
 								operationSettleEpoch(op),
 								"Dibatalkan.",
@@ -248,7 +247,6 @@ export function useWorkspaceOperations({
 		effectiveFeatureId,
 		activeProjectIdRef,
 		monitorOperation,
-		onOperationCompleted,
 		setRun,
 		setStageError,
 	]);

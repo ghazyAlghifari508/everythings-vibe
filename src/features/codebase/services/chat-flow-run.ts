@@ -14,13 +14,24 @@ export type CodebaseRunStage = "questions" | "feature" | "prd" | "ac" | "task";
 export type CodebasePipelineStage = CodebaseRunStage | "handoff";
 
 /**
+ * Observable status of one run.
+ *
+ * `queued` means the durable operation was accepted but no worker attempt has
+ * started yet: the job is waiting for a worker, so nothing is executing and the
+ * UI must not claim the AI is thinking. `running` means one attempt is actually
+ * executing and only that attempt's clock is displayed.
+ */
+export type CodebaseRunStatus = "queued" | "running" | "done" | "failed";
+
+/**
  * What the workspace knows about one in-flight or finished AI request.
  *
- * Every field is a client-observable fact: when the request was accepted,
- * when it settled, whether it succeeded, and the server's own failure message.
- * There is deliberately no phase, activity log or reasoning field: the
- * generators stream nothing but durable-operation status, so any "stage" the UI
- * could invent here would be fabricated progress.
+ * Every field is a client-observable fact: which durable operation and attempt
+ * this run observes, when that attempt started, when it settled, whether it
+ * succeeded, and the server's own failure message. There is deliberately no
+ * phase, activity log or reasoning field: the generators stream nothing but
+ * durable-operation status, so any "stage" the UI could invent here would be
+ * fabricated progress.
  */
 export interface CodebaseRunState {
 	stage: CodebaseRunStage;
@@ -29,11 +40,27 @@ export interface CodebaseRunState {
 	 * stale id and can never overwrite a newer run's status or duration.
 	 */
 	requestId: string;
-	/** Wall-clock acceptance of the request, from the server when it reported one. */
-	startedAt: number;
-	/** Wall-clock settle time, null while the request is still in flight. */
+	/**
+	 * Durable operation this run observes. `null` only for client-local runs
+	 * (revisions) that never had a durable operation. A run never adopts a second
+	 * operation: another operation's status cannot touch this run.
+	 */
+	operationId: string | null;
+	/**
+	 * Server attempt counter of the observed operation, `0` while it has not been
+	 * claimed. Together with `operationId` this is the attempt identity a late
+	 * callback must match before it may settle the run.
+	 */
+	attempt: number;
+	/**
+	 * Start of the current attempt, taken from the server's own attempt window.
+	 * `null` while the operation is still queued: a retry never inherits the
+	 * duration of the attempt before it.
+	 */
+	startedAt: number | null;
+	/** Wall-clock settle time of the current attempt, null while it is in flight. */
 	finishedAt: number | null;
-	status: "running" | "done" | "failed";
+	status: CodebaseRunStatus;
 	/** Server-reported failure message, null unless the run failed. */
 	error: string | null;
 }
@@ -47,6 +74,21 @@ export const CODEBASE_STAGE_DONE_LABEL: Record<CodebaseRunStage, string> = {
 	task: "Task siap",
 };
 
+/**
+ * The only operation fields a run reads. Kept structural so both the durable
+ * operation DTO and an ad-hoc server response are accepted without a cast.
+ */
+export interface ObservedOperation {
+	id: string;
+	stage: CodebaseRunStage;
+	status: "queued" | "running" | "completed" | "failed" | "cancelled";
+	attempt?: number | null;
+	createdAt?: string | null;
+	startedAt?: string | null;
+	finishedAt?: string | null;
+	error?: string | null;
+}
+
 let runSequence = 0;
 
 /**
@@ -59,18 +101,9 @@ function nextRequestId(startedAt: number): string {
 }
 
 /**
- * Only owner requests may mutate a run. An omitted `requestId` keeps the legacy
- * unguarded behaviour used by callers that hold no request identity.
+ * A run whose attempt is executing on the server. Named for that fact: a queued
+ * operation is accepted work, not running work.
  */
-function ownedBy(
-	run: CodebaseRunState | null,
-	requestId?: string,
-): run is CodebaseRunState {
-	return (
-		run !== null && (requestId === undefined || run.requestId === requestId)
-	);
-}
-
 export function startRun(
 	stage: CodebaseRunStage,
 	startedAt: number,
@@ -78,6 +111,8 @@ export function startRun(
 	return {
 		stage,
 		requestId: nextRequestId(startedAt),
+		operationId: null,
+		attempt: 0,
 		startedAt,
 		finishedAt: null,
 		status: "running",
@@ -86,27 +121,120 @@ export function startRun(
 }
 
 /**
- * Re-anchor a running request on the moment the server actually accepted it, so
- * the elapsed timer measures the operation instead of the client's submit
- * latency. Ignored for a settled run, a foreign request, or an unparseable
- * timestamp — a missing server time never moves the clock.
+ * A run whose operation is accepted but not yet claimed by a worker. It carries
+ * no start time at all: the attempt clock begins only when an attempt does.
  */
-export function anchorRunStart(
+export function queueRun(stage: CodebaseRunStage): CodebaseRunState {
+	return {
+		stage,
+		requestId: nextRequestId(0),
+		operationId: null,
+		attempt: 0,
+		startedAt: null,
+		finishedAt: null,
+		status: "queued",
+		error: null,
+	};
+}
+
+/**
+ * The start of the operation's CURRENT attempt, from the server's own attempt
+ * window and never from a client submit time.
+ *
+ * - `queued`: no attempt exists yet, so there is no clock (`null`).
+ * - otherwise: the attempt's own `startedAt`. Rows written before attempt
+ *   timestamps existed fall back to their creation time, which is the only
+ *   recorded acceptance they have.
+ */
+export function attemptStartEpoch(op: {
+	status?: string;
+	createdAt?: string | null;
+	startedAt?: string | null;
+}): number | null {
+	if (op.status === "queued") return null;
+	const started = op.startedAt ? Date.parse(op.startedAt) : Number.NaN;
+	if (Number.isFinite(started)) return started;
+	const accepted = op.createdAt ? Date.parse(op.createdAt) : Number.NaN;
+	return Number.isFinite(accepted) ? accepted : null;
+}
+
+/**
+ * The operation's own settle time when the server recorded one, otherwise now.
+ * A run rehydrated after the page was reopened must report the duration the
+ * operation took, not the time since the browser was opened.
+ */
+export function operationSettleEpoch(op: {
+	finishedAt?: string | null;
+}): number {
+	if (!op.finishedAt) return Date.now();
+	const epoch = Date.parse(op.finishedAt);
+	return Number.isFinite(epoch) ? epoch : Date.now();
+}
+
+/**
+ * Adopt an operation snapshot into the run that observes it.
+ *
+ * Ignored for a settled run (a late snapshot never revives or rewrites an
+ * outcome), for a snapshot of another operation, and for an older attempt of
+ * the same operation. `queued` clears the attempt clock; `running` anchors it
+ * on the new attempt's own start, which is exactly what makes a retry start at
+ * `00.0s` instead of continuing the previous attempt's duration.
+ */
+export function observeOperation(
 	run: CodebaseRunState | null,
-	acceptedAt: string | null | undefined,
-	requestId?: string,
+	op: ObservedOperation,
 ): CodebaseRunState | null {
-	if (!run || run.status !== "running" || !ownedBy(run, requestId)) return run;
-	if (!acceptedAt) return run;
-	const epoch = parseEpoch(acceptedAt, Number.NaN);
-	if (!Number.isFinite(epoch)) return run;
-	if (epoch === run.startedAt) return run;
-	return { ...run, startedAt: epoch };
+	if (!run) return run;
+	if (run.status === "done" || run.status === "failed") return run;
+	if (run.stage !== op.stage) return run;
+	if (run.operationId !== null && run.operationId !== op.id) return run;
+	const attempt = op.attempt ?? run.attempt;
+	if (attempt < run.attempt) return run;
+	if (op.status === "queued")
+		return {
+			...run,
+			operationId: op.id,
+			attempt,
+			status: "queued",
+			startedAt: null,
+			finishedAt: null,
+		};
+	if (op.status === "running")
+		return {
+			...run,
+			operationId: op.id,
+			attempt,
+			status: "running",
+			startedAt: attemptStartEpoch(op) ?? Date.now(),
+			finishedAt: null,
+		};
+	// Terminal snapshots settle through `settleRun*`, which records the outcome.
+	return run;
+}
+
+/**
+ * Rebuild the run window the server recorded for an operation. A queued
+ * operation yields a queued run; every other status yields an active-shaped run
+ * carrying that attempt's real window, which the caller settles immediately with
+ * `operationSettleEpoch` (used to rehydrate after a remount or a reconnect).
+ */
+export function runFromOperation(op: ObservedOperation): CodebaseRunState {
+	if (op.status === "queued") {
+		const queued = queueRun(op.stage);
+		return { ...queued, operationId: op.id };
+	}
+	return {
+		...startRun(op.stage, attemptStartEpoch(op) ?? Date.now()),
+		operationId: op.id,
+		attempt: op.attempt ?? 0,
+	};
 }
 
 /**
  * Settle a run. A run that already settled is returned unchanged so a late
- * callback cannot rewrite the recorded outcome or the recorded duration.
+ * callback cannot rewrite the recorded outcome or the recorded duration. A
+ * queued run settles too: the operation can complete without the client ever
+ * observing its attempt (adopted or reconciled artifact).
  */
 export function settleRun(
 	run: CodebaseRunState | null,
@@ -114,7 +242,7 @@ export function settleRun(
 	finishedAt: number,
 	error?: string,
 ): CodebaseRunState | null {
-	if (!run || run.status !== "running") return run;
+	if (!run || (run.status !== "running" && run.status !== "queued")) return run;
 	return {
 		...run,
 		status,
@@ -138,52 +266,51 @@ export function settleRunIfCurrent(
 	return settleRun(run, status, finishedAt, error);
 }
 
-function parseEpoch(value: string, fallback: number): number {
-	const epoch = Date.parse(value);
-	return Number.isFinite(epoch) ? epoch : fallback;
-}
-
 /**
- * The moment the server accepted the operation, taken from its own timestamps
- * and never from the client's submit time. Falls back to the worker start, then
- * to now, so a missing server field degrades to a client clock instead of
- * inverting one.
+ * Settle the run with the outcome of one specific operation, refusing callbacks
+ * that do not belong to it:
+ *
+ * - a settled run keeps its recorded outcome;
+ * - another stage or another operation cannot settle this run;
+ * - an attempt OLDER than the one this run observes cannot settle it, so a
+ *   stale worker callback can never overwrite a newer attempt's status;
+ * - when `requestId` is given, only that request may settle the run.
  */
-export function operationStartEpoch(op: {
-	createdAt?: string | null;
-	startedAt?: string | null;
-}): number {
-	const accepted = op.createdAt ? Date.parse(op.createdAt) : Number.NaN;
-	if (Number.isFinite(accepted)) return accepted;
-	const started = op.startedAt ? Date.parse(op.startedAt) : Number.NaN;
-	if (Number.isFinite(started)) return started;
-	return Date.now();
+export function settleRunForOperation(
+	run: CodebaseRunState | null,
+	op: ObservedOperation,
+	status: "done" | "failed",
+	finishedAt: number,
+	error?: string,
+	requestId?: string,
+): CodebaseRunState | null {
+	if (!run) return run;
+	if (requestId !== undefined && run.requestId !== requestId) return run;
+	if (run.status !== "running" && run.status !== "queued") return run;
+	if (run.stage !== op.stage) return run;
+	if (run.operationId !== null && run.operationId !== op.id) return run;
+	if ((op.attempt ?? run.attempt) < run.attempt) return run;
+	return settleRun(run, status, finishedAt, error);
 }
 
-/**
- * The operation's own settle time when the server recorded one, otherwise now.
- * A run rehydrated after the page was reopened must report the duration the
- * operation took, not the time since the browser was opened.
- */
-export function operationSettleEpoch(op: {
-	finishedAt?: string | null;
-}): number {
-	if (!op.finishedAt) return Date.now();
-	return parseEpoch(op.finishedAt, Date.now());
+/** True while the run holds an accepted operation whose outcome is unknown. */
+export function isRunActive(run: CodebaseRunState | null): boolean {
+	return run?.status === "queued" || run?.status === "running";
 }
 
-/** True only while the run's request is genuinely in flight. */
+/** True only while an attempt is genuinely executing on the server. */
 export function isRunWorking(run: CodebaseRunState | null): boolean {
 	return run?.status === "running";
 }
 
 /**
- * The real measured duration of a settled run, or null when the run never
- * settled. Never derived from a mount time or a simulated counter.
+ * The real measured duration of the current attempt, or null when the attempt
+ * has no recorded start (queued) or never settled. Never derived from a mount
+ * time or a simulated counter.
  */
 export function runDurationSeconds(
 	run: CodebaseRunState | null,
 ): number | null {
-	if (!run || run.finishedAt === null) return null;
+	if (!run || run.finishedAt === null || run.startedAt === null) return null;
 	return Math.max(0, (run.finishedAt - run.startedAt) / 1000);
 }

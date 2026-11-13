@@ -1,20 +1,28 @@
 "use client";
 
+import { FeatureGroup } from "@/features/greenfield/components/kanban/feature-group";
 import type { TaskCard } from "@/features/greenfield/hooks/use-kanban-polling";
-import { CodebaseKanbanCard } from "./codebase-kanban-board-card";
+import {
+	getKanbanColumnEmptyLabel,
+	groupCardsByFeature,
+} from "@/lib/kanban-utils";
 
 export interface ColumnSpec {
 	key: string;
 	title: string;
 	cards: TaskCard[];
 	highlightInProgress?: boolean;
+	highlightedCardId?: string | null;
 }
 
 export function CodebaseKanbanColumn({
 	title,
 	cards,
-	highlightInProgress,
+	highlightedCardId,
 }: ColumnSpec) {
+	const featureGroups = groupCardsByFeature(cards);
+	const featuresList = Object.keys(featureGroups);
+
 	return (
 		<section
 			data-testid={`codebase-kanban-col-${title}`}
@@ -26,15 +34,21 @@ export function CodebaseKanbanColumn({
 					{cards.length}
 				</span>
 			</div>
-			<div className="flex flex-1 flex-col gap-2 p-2.5">
-				{cards.length === 0 ? (
-					<p className="text-[11px] leading-4 text-slate">Kosong</p>
+			<div className="flex flex-1 flex-col gap-2 p-2.5 overflow-y-auto">
+				{featuresList.length === 0 ? (
+					<div className="flex flex-1 items-center justify-center p-3 text-center">
+						<p className="text-xs text-fog/60">
+							{getKanbanColumnEmptyLabel(title)}
+						</p>
+					</div>
 				) : (
-					cards.map((card) => (
-						<CodebaseKanbanCard
-							key={card.id}
-							card={card}
-							highlightInProgress={highlightInProgress}
+					featuresList.map((featureName, idx) => (
+						<FeatureGroup
+							key={featureName}
+							featureName={featureName}
+							cards={featureGroups[featureName]}
+							colorIndex={idx}
+							highlightedCardId={highlightedCardId}
 						/>
 					))
 				)}

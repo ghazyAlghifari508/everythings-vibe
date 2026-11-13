@@ -25,6 +25,7 @@ import {
 	sessionOwnershipCondition,
 } from "./analysis-route-scope.server";
 import { selectWorkspaceAnalysis } from "./analysis-selection";
+import { authFailureResponse } from "./route-failure";
 import { CODEBASE_SYNC_RATE_LIMIT_ACTION, isSyncCapableProject } from "./sync";
 
 export async function readCodebaseAnalysis(
@@ -34,8 +35,8 @@ export async function readCodebaseAnalysis(
 	let user: { id: string };
 	try {
 		user = await requireUser(request.headers);
-	} catch {
-		return Response.json({ error: "Unauthorized" }, { status: 401 });
+	} catch (error) {
+		return authFailureResponse(error);
 	}
 
 	const plan = await resolvePlan(user.id);

@@ -149,7 +149,7 @@ describe("Phase 07 Composer Redesign — Plan/Revise Modes & Workflow Separation
 				setPrdContent,
 				setAcContent: vi.fn(),
 				setChatAnswers: vi.fn(),
-				setChatMessages: vi.fn(),
+				persistMessage: vi.fn(async () => {}),
 				effectiveFeatureId: "proj-1",
 				onboardingFeatureId: "anchor",
 				artifactCount: 2,
@@ -196,6 +196,7 @@ describe("Phase 07 Composer Redesign — Plan/Revise Modes & Workflow Separation
 		});
 		expect(runRevision).toHaveBeenCalledWith("Ubah navigasi menjadi modal", {
 			targetKind: "prd",
+			requestId: expect.any(String),
 			optionalReferences: ["src/pages/Content.jsx"],
 			referenceBindings: [
 				{
@@ -320,12 +321,6 @@ describe("Phase 07 Composer Redesign — Plan/Revise Modes & Workflow Separation
 		);
 
 		expect(screen.queryByRole("textbox")).toBeNull();
-		fireEvent.click(screen.getByTestId("codebase-open-completed-revision"));
-		expect(screen.getByRole("textbox")).toBeTruthy();
-		expect(
-			screen.getByTestId("composer-mode-trigger").getAttribute("data-mode"),
-		).toBe("revise");
-		fireEvent.click(screen.getByTestId("codebase-cancel-completed-revision"));
-		expect(screen.queryByRole("textbox")).toBeNull();
+		expect(screen.queryByTestId("codebase-open-completed-revision")).toBeNull();
 	});
 });

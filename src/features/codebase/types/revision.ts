@@ -44,6 +44,7 @@ export const revisionRequestSchema = z
 	.object({
 		projectId: identity,
 		codebaseId: identity,
+		requestId: identity.optional(),
 		targetArtifactKind: z.enum(["feature", "prd", "ac", "tasks"]),
 		targetArtifactVersionId: identity,
 		userInstruction: z

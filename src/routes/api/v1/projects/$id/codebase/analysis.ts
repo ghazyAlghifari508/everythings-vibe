@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { readCodebaseAnalysis } from "@/features/codebase/services/analysis-route-read.server";
 import { triggerCodebaseAnalysis } from "@/features/codebase/services/analysis-route-trigger.server";
+import { guardCodebaseHandler } from "@/features/codebase/services/route-failure";
 
 // Analysis trigger/read boundary (Task 6).
 //
@@ -30,14 +31,20 @@ export const Route = createFileRoute("/api/v1/projects/$id/codebase/analysis")({
 			}: {
 				request: Request;
 				params: { id: string };
-			}) => readCodebaseAnalysis(request, params.id),
+			}) =>
+				guardCodebaseHandler("codebases/analysis/read", () =>
+					readCodebaseAnalysis(request, params.id),
+				),
 			POST: async ({
 				request,
 				params,
 			}: {
 				request: Request;
 				params: { id: string };
-			}) => triggerCodebaseAnalysis(request, params.id),
+			}) =>
+				guardCodebaseHandler("codebases/analysis/trigger", () =>
+					triggerCodebaseAnalysis(request, params.id),
+				),
 		},
 	},
 });

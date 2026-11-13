@@ -29,13 +29,13 @@ export function buildPromptRecoveryState(
 	onRequestNewPrompt: (() => void) | null,
 ): LockedPromptState {
 	if (kind === "replacing")
-		return { variant: "pending", title: "Menyiapkan prompt baru..." };
+		return { variant: "pending", title: "Menyiapkan instruksi baru..." };
 
 	if (kind === "failed")
 		return {
 			variant: "unavailable",
-			title: "Prompt belum berhasil dibuat",
-			description: "Permintaan belum berhasil. Coba buat prompt lagi.",
+			title: "Instruksi belum berhasil dibuat",
+			description: "Permintaan belum berhasil. Coba buat instruksi lagi.",
 			action: replacementButton("Coba lagi", onRequestNewPrompt),
 		};
 
@@ -44,20 +44,19 @@ export function buildPromptRecoveryState(
 			variant: "unavailable",
 			title: "Sesi sinkronisasi berakhir",
 			description:
-				"Buat prompt baru untuk melanjutkan sinkronisasi repository ini.",
-			action: replacementButton("Buat prompt baru", onRequestNewPrompt),
+				"Buat instruksi baru untuk melanjutkan sinkronisasi repository ini.",
+			action: replacementButton("Buat instruksi baru", onRequestNewPrompt),
 		};
 
-	const action = replacementButton("Buat prompt baru", onRequestNewPrompt);
+	const action = replacementButton("Buat instruksi baru", onRequestNewPrompt);
 	return {
 		variant: "unavailable",
-		title: "Lanjutkan sinkronisasi",
-		description:
-			"Prompt sebelumnya tidak tersedia lagi setelah halaman ditutup. Buat prompt baru untuk melanjutkan repository ini.",
+		title: "Instruksi sync sebelumnya tidak tersedia.",
+		description: "Buat instruksi baru untuk melanjutkan.",
 		// Only stated when a replacement is actually offered: it is the one
 		// consequence the user has to accept before clicking.
 		note: action
-			? "Prompt sebelumnya tidak berlaku setelah diganti."
+			? "Instruksi sebelumnya tidak berlaku setelah diganti."
 			: undefined,
 		action,
 	};

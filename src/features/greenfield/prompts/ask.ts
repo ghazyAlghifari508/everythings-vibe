@@ -86,4 +86,4 @@ ATURAN:
 7. Options: 3-5 opsi yang kontekstual, saling berbeda secara bermakna (meaningfully distinct), tidak ambigu, dan menjelaskan konsekuensi pilihan secara jelas. JANGAN opsi generik seperti "Tergantung" atau "Lain-lain", dan JANGAN menawarkan opsi yang maknanya sama.
 8. JANGAN menambahkan fitur baru melalui pertanyaan sugestif (misal: "Apakah kamu mau kami tambahkan ekspor PDF juga?").
 9. JANGAN mengarang file, fungsi, dependency, endpoint, database, atau perilaku framework yang tidak ada di analisis codebase. Jika tidak yakin, jadikan sebagai ketidakpastian yang perlu diklarifikasi, bukan klaim palsu.
-10. id: unique, snake_case, tanpa spasi. JANGAN membuat pertanyaan atau opsi yang duplikat.`;
+10. id: unique, snake_case, tanpa spasi, maks 128 karakter. question maks 2000 karakter, label maks 100, description dan recommendationReason maks 400 karakter. JANGAN membuat pertanyaan atau opsi yang duplikat.`;

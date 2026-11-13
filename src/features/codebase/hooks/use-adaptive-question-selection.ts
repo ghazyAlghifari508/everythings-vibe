@@ -6,8 +6,8 @@ export interface AdaptiveQuestionSelectionParams {
 	/** Resolved by the caller, which owns the option-id contract. */
 	customId: string;
 	submitted: string;
+	/** Whether this card is the wizard's current step and accepts input. */
 	active: boolean;
-	isEditing: boolean;
 	onSubmit: (questionId: string, answer: string) => void;
 }
 
@@ -111,7 +111,6 @@ export function useAdaptiveQuestionSelection({
 	customId,
 	submitted,
 	active,
-	isEditing,
 	onSubmit,
 }: AdaptiveQuestionSelectionParams): AdaptiveQuestionSelection {
 	const groupName = useId();
@@ -169,7 +168,7 @@ export function useAdaptiveQuestionSelection({
 		: isMulti
 			? multiOptionIds.length > 0
 			: selectedOptionId !== null;
-	const canSubmit = (active || isEditing) && hasChoice && customSatisfied;
+	const canSubmit = active && hasChoice && customSatisfied;
 
 	const buildAnswer = (): string => {
 		if (isText) return trimmedCustom;

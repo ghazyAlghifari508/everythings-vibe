@@ -144,7 +144,18 @@ export async function getOrCreateGenerationOperation(
 				"GENERATION_CONFLICT",
 			);
 		if (existing) {
-			if (existing.attempt >= existing.maxAttempts)
+			// A refused model output cost nothing and wrote nothing, so an explicit
+			// user retry opens a fresh bounded window instead of dead-ending at
+			// "batas percobaan tercapai". Infrastructure failures keep the ceiling.
+			// Rows failed before the rejection code existed are recognized by the
+			// pipeline's own refusal wording ("... tidak disimpan"), which no
+			// provider or transient failure ever uses.
+			const refusedOutput =
+				existing.errorCode === "OUTPUT_REJECTED" ||
+				/tidak disimpan/i.test(existing.error ?? "");
+			const reopenRejectedOutput =
+				refusedOutput && existing.attempt >= existing.maxAttempts;
+			if (existing.attempt >= existing.maxAttempts && !reopenRejectedOutput)
 				throw new DurableGenerationError(
 					"Batas percobaan tercapai. Hubungi dukungan.",
 					"ATTEMPTS_EXHAUSTED",
@@ -157,6 +168,14 @@ export async function getOrCreateGenerationOperation(
 					"Hasil dan kredit perlu diperiksa sebelum mencoba kembali.",
 					"ACCOUNTING_RECONCILIATION_REQUIRED",
 				);
+			// Retry: the SAME operation is re-queued, so no duplicate job and no new
+			// credit identity (the billing key is project:stage:operationId). The
+			// attempt counter stays cumulative, and the attempt window is cleared:
+			// `status = 'queued'` therefore never reports a finished attempt's clock.
+			// The previous failure stays in the diagnostics log, not on the row.
+			console.info(
+				`[DurableGeneration] Re-queuing operation ${existing.id} (stage: ${existing.stage}, attempt: ${existing.attempt}/${existing.maxAttempts}, previous error: ${existing.errorCode ?? "none"} - ${existing.error ?? "none"})`,
+			);
 			const [retried] = await tx
 				.update(codebaseGenerationOperations)
 				.set({
@@ -168,6 +187,9 @@ export async function getOrCreateGenerationOperation(
 					startedAt: null,
 					finishedAt: null,
 					updatedAt: new Date(),
+					// A reopened window counts from zero, so the retry gets the same
+					// bounded number of automatic attempts as the first one.
+					...(reopenRejectedOutput ? { attempt: 0 } : {}),
 				})
 				.where(
 					and(
@@ -344,8 +366,10 @@ export async function executeGenerationOperationBounded(
 			claim.operationId,
 			error,
 		);
+		const rawMessage = error instanceof Error ? error.message : String(error);
 		await failGenerationOperation(claim, {
 			message:
+				rawMessage ||
 				"Generasi terhenti. Hasil yang tersimpan tetap tersedia; coba kembali setelah status diperiksa.",
 			code,
 		});

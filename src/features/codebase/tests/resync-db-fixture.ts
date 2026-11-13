@@ -22,9 +22,12 @@ export async function seed() {
 		plan: "pro",
 		credits: 100,
 	});
-	await db
-		.insert(s.codebases)
-		.values({ id: codebaseId, userId: auth.userId, name: "Repository" });
+	await db.insert(s.codebases).values({
+		id: codebaseId,
+		userId: auth.userId,
+		name: "Repository",
+		repositoryIdentity: "github.com/owner/repository",
+	});
 	await db.insert(s.projects).values({
 		id: projectId,
 		userId: auth.userId,
@@ -32,6 +35,19 @@ export async function seed() {
 		name: "Saved plan",
 		projectMode: "existing_codebase",
 		step: "task",
+		featureTree: {
+			productName: "Saved plan",
+			features: [
+				{
+					id: "feature",
+					name: "Saved feature",
+					phase: 1,
+					description: "Preserved feature",
+					subfeatures: [],
+				},
+			],
+			createdAt: new Date().toISOString(),
+		},
 	});
 	await db
 		.update(s.codebases)
@@ -82,6 +98,17 @@ export async function seed() {
 	await db
 		.insert(s.codebaseGenerationContexts)
 		.values({ id: crypto.randomUUID(), projectId, snapshotId });
+	await db.insert(s.codebaseAskHandoffs).values({
+		projectId,
+		userId: auth.userId,
+		snapshotId,
+		answers: [{ question: "Who uses this?", answer: "Existing customers" }],
+		compiledPrompt: "Preserve customer workflows",
+		state: {
+			prompt: "Preserve customer workflows",
+			chatAnswers: { audience: "Existing customers" },
+		},
+	});
 	return {
 		db,
 		s,

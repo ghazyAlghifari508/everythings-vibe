@@ -174,7 +174,7 @@ describe("CodebaseConclusion pending analysis state", () => {
 			c.querySelector('[data-testid="codebase-analysis-pending"]'),
 		).toBeNull();
 		expect(c.textContent).not.toContain("Menganalisis repository");
-		expect(c.textContent).toContain("Detected environment");
+		expect(c.textContent).toContain("Teknologi repository");
 		expect(c.textContent).toContain("Next.js");
 	});
 

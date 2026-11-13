@@ -17,6 +17,7 @@ import {
 	LockedPromptStateView,
 } from "./locked-prompt-state";
 import { buildPromptRecoveryState } from "./prompt-recovery-state";
+import { ScreenConnectStepItem } from "./screen-connect-step-item";
 
 function resolveExpiryMs(value: string | undefined): number | null {
 	if (!value) return null;
@@ -54,6 +55,8 @@ interface ScreenConnectPromptStepProps {
 	 * and one-time-credential rules stay identical.
 	 */
 	recoveryState?: LockedPromptState;
+	/** Vertical line connector extending to next step. */
+	hasConnector?: boolean;
 }
 
 export function ScreenConnectPromptStep({
@@ -63,24 +66,28 @@ export function ScreenConnectPromptStep({
 	status,
 	onRequestNewToken,
 	lockedPrompt = null,
-	creditNote = null,
+	creditNote: _creditNote = null,
 	error = null,
 	heading = "Salin instruksi untuk AI agent",
 	promptMode = "initial",
 	copyAriaLabel = "Salin prompt untuk AI agent",
 	contentTestId,
 	recoveryState,
+	hasConnector = true,
 }: ScreenConnectPromptStepProps) {
 	const { copied, copyError, copy } = useCopyFeedback();
 	const promptText = payload
 		? buildAgentPrompt(payload, { projectName, mode: promptMode })
 		: "";
 	const sessionStatus = status?.status ?? null;
-	const expiryMs = resolveExpiryMs(payload?.expiresAt ?? status?.expiresAt);
+	const expiryRaw = payload?.expiresAt ?? status?.expiresAt;
+	const expiryMs = resolveExpiryMs(expiryRaw);
+	const hasExpiry = Boolean(expiryRaw);
 	const expiryState =
-		sessionStatus === "expired" || expiryMs === null || expiryMs <= 0
+		sessionStatus === "expired" ||
+		(hasExpiry && (expiryMs === null || expiryMs <= 0))
 			? "expired"
-			: expiryMs <= CODEBASE_SYNC_EXPIRY_SOON_MS
+			: expiryMs !== null && expiryMs <= CODEBASE_SYNC_EXPIRY_SOON_MS
 				? "soon"
 				: "valid";
 	const [, forceTick] = useState(0);
@@ -125,103 +132,112 @@ export function ScreenConnectPromptStep({
 	const activeLock = promptUsable || cliInFlight ? null : lockedPrompt;
 
 	return (
-		<div className="flex items-start gap-3.5">
-			<span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-iron font-mono text-xs text-mist">
-				1
-			</span>
-			<div className="flex min-w-0 flex-1 flex-col gap-2">
-				<div className="flex items-center justify-between gap-3">
-					<div className="text-xs font-semibold text-mist">{heading}</div>
-					{promptUsable && !activeLock && (
-						<Button
-							type="button"
-							onClick={handleCopy}
-							aria-label={copyAriaLabel}
-							variant="secondary"
-							className="min-h-11 shrink-0 gap-1.5 px-3 text-xs"
-						>
-							{copied ? (
-								<>
-									<Icon
-										icon={Tick01Icon}
-										size={13}
-										className="text-emerald-400"
-									/>
-									<span className="text-emerald-400">Tersalin</span>
-								</>
-							) : (
-								<>
-									<Icon icon={Copy01Icon} size={13} />
-									<span>Salin</span>
-								</>
-							)}
-						</Button>
-					)}
+		<ScreenConnectStepItem
+			stepNumber={1}
+			hasConnector={hasConnector}
+			connectorTestId="step-connector-1"
+		>
+			<div className="flex min-h-8 items-center justify-between gap-3">
+				<div className="text-xs font-semibold text-mist leading-none">
+					{heading}
 				</div>
-				<div
-					data-testid="prompt-box"
-					className="relative rounded-lg border border-graphite bg-onyx p-3.5 font-mono text-xs leading-relaxed text-mist sm:p-4"
-				>
-					{activeLock ? (
-						<LockedPromptStateView {...activeLock} />
-					) : promptUsable ? (
-						<>
-							<div
-								data-testid={contentTestId}
-								className="hide-scrollbar max-h-56 select-all overflow-x-auto overflow-y-auto whitespace-pre-wrap text-snow"
-							>
-								{promptText}
-							</div>
-							{copyError && (
-								<p className="mt-2 font-sans text-[11px] text-crimson">
-									{copyError}
-								</p>
-							)}
-							{expiryState === "soon" && (
-								<p className="mt-2 font-sans text-[11px] text-amber-400">
-									Sesi segera berakhir. Salin dan jalankan prompt sekarang, atau
-									perbarui sesi.
-								</p>
-							)}
-						</>
-					) : status?.snapshotId || cliInFlight ? (
-						// No credential is left in this browser (a full reload, a session the
-						// page could not recover, or one whose token is already in the CLI's
-						// hands) and no replacement is legitimate: either the transport
-						// already stored its snapshot, or the agent is mid-sync. Stated as a
-						// prompt-availability fact only — the progress section owns the
-						// outcome, so no status copy is repeated here.
-						<p
-							data-testid="prompt-unavailable"
-							className="font-sans text-xs leading-relaxed text-fog"
-						>
-							Prompt ini hanya tersedia sekali di browser tempat ia dibuat.
-						</p>
-					) : isStarting ? (
-						<div className="flex items-center gap-2 font-sans text-xs text-fog">
-							<Spinner size={14} className="text-blue-400" />
-							<span>Menghubungkan repository...</span>
-						</div>
-					) : (
-						<LockedPromptStateView
-							{...(recoveryState ??
-								buildPromptRecoveryState(
-									// `error` is a genuine failure signal, never a recovery: a
-									// recoverable prompt is owned by the recovery state instead.
-									error
-										? "failed"
-										: sessionStatus === "expired" || expiryState === "expired"
-											? "expired"
-											: "unavailable",
-									onRequestNewToken ?? null,
-								))}
-						/>
-					)}
-				</div>
-				{creditNote && !activeLock && (
-					<p className="text-[11px] leading-relaxed text-fog">{creditNote}</p>
+				{promptUsable && !activeLock && (
+					<Button
+						type="button"
+						onClick={handleCopy}
+						aria-label={copyAriaLabel}
+						variant="secondary"
+						size="sm"
+						className="h-8 shrink-0 gap-1.5 px-3 text-xs font-medium"
+					>
+						{copied ? (
+							<>
+								<Icon
+									icon={Tick01Icon}
+									size={13}
+									className="text-emerald-400"
+								/>
+								<span className="text-emerald-400">Tersalin</span>
+							</>
+						) : (
+							<>
+								<Icon icon={Copy01Icon} size={13} />
+								<span>Salin</span>
+							</>
+						)}
+					</Button>
 				)}
 			</div>
-		</div>
+			<div
+				data-testid="prompt-box"
+				className="relative w-full rounded-lg border border-graphite bg-onyx p-3.5 font-mono text-xs leading-relaxed text-mist sm:p-4"
+			>
+				{activeLock ? (
+					<LockedPromptStateView {...activeLock} />
+				) : promptUsable ? (
+					<>
+						<div
+							data-testid={contentTestId}
+							className="hide-scrollbar max-h-56 select-all overflow-x-auto overflow-y-auto whitespace-pre-wrap break-words text-snow"
+						>
+							{promptText}
+						</div>
+						{copyError && (
+							<p className="mt-2 font-sans text-[11px] text-crimson">
+								{copyError}
+							</p>
+						)}
+						{expiryState === "soon" && (
+							<p className="mt-2 font-sans text-[11px] text-amber-400">
+								Sesi segera berakhir. Salin dan jalankan prompt sekarang, atau
+								perbarui sesi.
+							</p>
+						)}
+					</>
+				) : status?.snapshotId ? (
+					<div
+						data-testid="prompt-unavailable"
+						className="flex flex-col items-start gap-1 font-sans text-xs leading-relaxed"
+					>
+						<p className="font-semibold text-snow">Sinkronisasi selesai.</p>
+						<p className="text-fog">
+							Snapshot repository telah berhasil dibuat.
+						</p>
+					</div>
+				) : cliInFlight ? (
+					<div
+						data-testid="prompt-unavailable"
+						className="flex flex-col items-start gap-1 font-sans text-xs leading-relaxed"
+					>
+						<p className="font-semibold text-snow">
+							Repository sedang disinkronkan.
+						</p>
+						<p className="text-fog">Pantau progresnya di bawah.</p>
+					</div>
+				) : isStarting ? (
+					<div className="flex items-center gap-2 font-sans text-xs text-fog">
+						<Spinner size={14} className="text-blue-400" />
+						<span>
+							{promptMode === "resync"
+								? "Menyiapkan instruksi sync ulang..."
+								: "Menyiapkan instruksi sync..."}
+						</span>
+					</div>
+				) : (
+					<LockedPromptStateView
+						{...(recoveryState ??
+							buildPromptRecoveryState(
+								error
+									? "failed"
+									: sessionStatus === "expired" ||
+											(hasExpiry && expiryState === "expired")
+										? "expired"
+										: "unavailable",
+								onRequestNewToken ?? null,
+							))}
+					/>
+				)}
+			</div>
+		</ScreenConnectStepItem>
 	);
 }

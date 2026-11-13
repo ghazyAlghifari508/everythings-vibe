@@ -24,6 +24,7 @@ interface CodebaseConclusionProps {
 	onRetrySync?: () => void;
 	onEnterWorkspace: () => void;
 	onBackToSync: () => void;
+	onSelectFile?: (path: string) => void;
 }
 
 /**
@@ -121,6 +122,7 @@ export function CodebaseConclusion({
 	onRetrySync,
 	onEnterWorkspace,
 	onBackToSync,
+	onSelectFile,
 }: CodebaseConclusionProps) {
 	const state = resolveConclusionState({
 		snapshotId: snapshot.snapshotId,
@@ -159,6 +161,7 @@ export function CodebaseConclusion({
 				onRetrySync={onRetrySync}
 				onContinue={onEnterWorkspace}
 				onBackToSync={onBackToSync}
+				onSelectFile={onSelectFile}
 			/>
 		);
 	}
@@ -175,7 +178,7 @@ export function CodebaseConclusion({
 			>
 				{state === "failed" ? (
 					<>
-						<span className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-full border border-crimson/30 bg-crimson/10">
+						<span className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-full border border-graphite bg-obsidian">
 							<Icon
 								icon={AlertCircleIcon}
 								size={18}
@@ -195,9 +198,9 @@ export function CodebaseConclusion({
 						</p>
 						{errorMessage && !isInsufficientCredit && (
 							<Alert
-								variant="subtle"
+								variant="default"
 								role="alert"
-								className="mx-auto mt-3 max-w-md border-crimson/30 bg-crimson/5 p-3 text-left text-xs text-crimson"
+								className="mx-auto mt-3 max-w-md border-graphite/80 bg-obsidian p-3 text-left text-xs text-fog"
 							>
 								{errorMessage}
 							</Alert>
@@ -229,9 +232,9 @@ export function CodebaseConclusion({
 						) : null}
 						{errorMessage && (
 							<Alert
-								variant="subtle"
+								variant="default"
 								role="alert"
-								className="mx-auto mt-3 max-w-md border-crimson/30 bg-crimson/5 p-3 text-left text-xs text-crimson"
+								className="mx-auto mt-3 max-w-md border-graphite/80 bg-obsidian p-3 text-left text-xs text-fog"
 							>
 								{errorMessage}
 							</Alert>

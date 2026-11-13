@@ -1,7 +1,5 @@
 "use client";
 
-import { Tick01Icon } from "@hugeicons/core-free-icons";
-import { Icon } from "@/components/ui/icon";
 import type { CodebaseAnalysis } from "@/features/codebase/services/analysis";
 
 function valueOrUnknown(value?: string | null): string {
@@ -16,26 +14,22 @@ export function CodebaseReviewEnvironmentPanel({
 	analysis,
 }: CodebaseReviewEnvironmentPanelProps) {
 	const envRows: Array<[string, string | undefined | null]> = [
-		["FRAMEWORK", analysis.framework],
-		["LANGUAGE", analysis.language],
-		["DATABASE", analysis.database],
-		["AUTHENTICATION", analysis.auth],
-		["PACKAGE MANAGER", analysis.packageManager],
+		["Framework", analysis.framework],
+		["Bahasa", analysis.language],
+		["Database", analysis.database],
+		["Autentikasi", analysis.auth],
+		["Package manager", analysis.packageManager],
 	];
 
 	return (
 		<>
-			{/* Panel 1: Detected environment */}
+			{/* Panel 1: Teknologi repository */}
 			<div className="rounded-xl border border-graphite bg-charcoal overflow-hidden flex flex-col shadow-sm">
-				<div className="flex items-center justify-between border-b border-graphite p-4 sm:p-5">
+				<div className="border-b border-graphite p-4 sm:p-5">
 					<h3 className="font-inter text-sm font-[600] text-snow">
-						Detected environment
+						Teknologi repository
+						<span className="sr-only">Detected environment</span>
 					</h3>
-					<Icon
-						icon={Tick01Icon}
-						size={14}
-						className="text-emerald-500 font-bold"
-					/>
 				</div>
 				<div className="flex flex-col divide-y divide-graphite/60 p-0">
 					{envRows.map(([label, value]) => {
@@ -63,7 +57,7 @@ export function CodebaseReviewEnvironmentPanel({
 				{analysis.dependencies && analysis.dependencies.length > 0 && (
 					<div className="border-t border-graphite/80 px-4 sm:px-5 py-3 bg-obsidian/40">
 						<span className="block font-mono text-[10px] uppercase text-slate mb-1.5 tracking-wider">
-							DEPENDENSI UTAMA
+							Dependensi utama
 						</span>
 						<div className="flex flex-wrap gap-1.5">
 							{analysis.dependencies.map((dep) => (

@@ -10,6 +10,8 @@ import {
 	canSwitchToPlanMode,
 	consumeTriggerToken,
 	extractProjectIdFromArtifactId,
+	formatArtifactChipLabel,
+	inferArtifactTargetKind,
 	normalizeRepositoryFileList,
 	parseDirectSlashCommand,
 	reconcileSelectedReferences,
@@ -22,7 +24,10 @@ import {
 	normalizeComposerMode,
 } from "@/features/codebase/services/revision-intent";
 import type { CodebaseArtifactRef } from "../components/explorer/codebase-file-card";
-import type { ComposerReferenceBinding } from "../types/revision";
+import type {
+	ComposerArtifactReference,
+	ComposerReferenceBinding,
+} from "../types/revision";
 import { useComposerKeyboard } from "./use-composer-keyboard";
 
 export function useComposerMenus(input: {
@@ -283,6 +288,106 @@ export function useComposerMenus(input: {
 		(hasStaleReferences ||
 			(activeMode === "revise" && effectiveTarget.artifact === null));
 
+	const handleStartRevision = useCallback(
+		(targetInput?: RevisionTargetKind | CodebaseArtifactRef) => {
+			let resolvedArtifact: CodebaseArtifactRef | null = null;
+			let resolvedKind: RevisionTargetKind | null = null;
+
+			if (
+				targetInput &&
+				typeof targetInput === "object" &&
+				"id" in targetInput
+			) {
+				resolvedArtifact = targetInput;
+				resolvedKind = inferArtifactTargetKind(targetInput);
+			} else if (typeof targetInput === "string") {
+				resolvedKind = targetInput;
+				resolvedArtifact =
+					artifacts.find((a) => inferArtifactTargetKind(a) === targetInput) ??
+					null;
+			}
+
+			if (!resolvedKind || !resolvedArtifact) {
+				const taskArt = artifacts.find(
+					(a) => inferArtifactTargetKind(a) === "tasks",
+				);
+				const acArt = artifacts.find(
+					(a) => inferArtifactTargetKind(a) === "ac",
+				);
+				const prdArt = artifacts.find(
+					(a) => inferArtifactTargetKind(a) === "prd",
+				);
+				const featArt = artifacts.find(
+					(a) => inferArtifactTargetKind(a) === "feature",
+				);
+
+				if (taskArt) {
+					resolvedArtifact = taskArt;
+					resolvedKind = "tasks";
+				} else if (acArt) {
+					resolvedArtifact = acArt;
+					resolvedKind = "ac";
+				} else if (prdArt) {
+					resolvedArtifact = prdArt;
+					resolvedKind = "prd";
+				} else if (featArt) {
+					resolvedArtifact = featArt;
+					resolvedKind = "feature";
+				}
+			}
+
+			if (!resolvedKind || !resolvedArtifact) {
+				return;
+			}
+
+			setIsCompletedRevisionOpen(true);
+			setActiveMode("revise");
+			setLockedNotice(null);
+			onComposerModeChange?.("revise");
+
+			setInternalTarget(resolvedKind);
+			setExplicitTargetSelected(true);
+			onChangeRevisionTarget?.(resolvedKind);
+
+			const nextBinding: ComposerArtifactReference = {
+				kind: "artifact",
+				id: resolvedArtifact.id,
+				projectId: extractProjectIdFromArtifactId(
+					resolvedArtifact.id,
+					resolvedProjectId,
+				),
+				targetKind: resolvedKind,
+				label: formatArtifactChipLabel(
+					resolvedArtifact,
+					resolvedKind,
+					featureName,
+				),
+				fileName: resolvedArtifact.fileName,
+			};
+
+			setSelectedReferences((current) => {
+				const filtered = current.filter(
+					(item) =>
+						item.kind !== "artifact" ||
+						item.targetKind !== nextBinding.targetKind,
+				);
+				const updated = [...filtered, nextBinding];
+				onReferencesChange?.(updated);
+				return updated;
+			});
+
+			focusComposer();
+		},
+		[
+			artifacts,
+			featureName,
+			focusComposer,
+			onChangeRevisionTarget,
+			onComposerModeChange,
+			onReferencesChange,
+			resolvedProjectId,
+		],
+	);
 	return {
 		activeMode,
 		canSwitchToPlan,
@@ -338,5 +443,6 @@ export function useComposerMenus(input: {
 		handleSelectSlashCommand: kb.handleSelectSlash,
 		handleComposerKeyDown: kb.handleComposerKeyDown,
 		handleMentionSearchKeyDown: kb.handleMentionSearchKeyDown,
+		handleStartRevision,
 	};
 }

@@ -1,14 +1,13 @@
 "use client";
 
-import { ArrowLeft01Icon, ArrowRight01Icon } from "@hugeicons/core-free-icons";
+import {
+	Alert02Icon,
+	ArrowLeft01Icon,
+	ArrowRight01Icon,
+} from "@hugeicons/core-free-icons";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
-
-function formatTimestamp(value?: string): string {
-	if (!value) return "Tidak tersedia";
-	const date = new Date(value);
-	if (Number.isNaN(date.getTime())) return "Tidak tersedia";
-	return date.toLocaleString("id-ID");
-}
 
 interface CodebaseReviewActionsProps {
 	snapshotId: string;
@@ -37,52 +36,66 @@ export function CodebaseReviewActions({
 		<>
 			{/* Error Recovery Banner (only shown if error occurred) */}
 			{errorMessage && (
-				<div
-					role="alert"
-					className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-crimson/30 bg-crimson/10 p-3.5 text-xs text-crimson"
+				<Alert
+					variant="default"
+					className="rounded-xl border border-graphite/80 bg-charcoal p-3.5 text-xs text-snow shadow-none"
 				>
-					<div className="flex items-center gap-2">
-						<span className="font-semibold">Gagal:</span>
-						<span>{errorMessage}</span>
+					<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+						<div className="flex items-start gap-2.5 min-w-0">
+							<Icon
+								icon={Alert02Icon}
+								size={16}
+								aria-hidden="true"
+								className="mt-0.5 shrink-0 text-crimson"
+							/>
+							<div className="flex flex-col gap-0.5 min-w-0">
+								<AlertTitle className="text-xs font-semibold text-snow">
+									Analisis codebase belum berhasil
+								</AlertTitle>
+								<AlertDescription className="mt-0 text-xs text-fog leading-relaxed">
+									<span>{errorMessage}</span>
+								</AlertDescription>
+							</div>
+						</div>
+						<div className="flex items-center gap-2 shrink-0">
+							{onRetrySync && (
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									onClick={onRetrySync}
+									disabled={isWorking}
+									className="h-8 border-graphite bg-obsidian px-3 font-mono text-[11px] text-snow hover:bg-graphite/30 disabled:opacity-50"
+								>
+									Sync ulang
+								</Button>
+							)}
+							{onRetryAnalysis && (
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									onClick={onRetryAnalysis}
+									disabled={isWorking}
+									className="h-8 border-graphite bg-obsidian px-3 font-mono text-[11px] text-snow hover:bg-graphite/30 disabled:opacity-50"
+								>
+									{isWorking ? "Memproses..." : "Analisis ulang"}
+								</Button>
+							)}
+						</div>
 					</div>
-					<div className="flex items-center gap-2">
-						{onRetrySync && (
-							<button
-								type="button"
-								onClick={onRetrySync}
-								disabled={isWorking}
-								className="rounded border border-crimson/40 px-3 py-1.5 text-xs font-medium text-crimson hover:bg-crimson/15 transition disabled:opacity-50"
-							>
-								Sync ulang
-							</button>
-						)}
-						{onRetryAnalysis && (
-							<button
-								type="button"
-								onClick={onRetryAnalysis}
-								disabled={isWorking}
-								className="rounded border border-crimson/40 px-3 py-1.5 text-xs font-medium text-crimson hover:bg-crimson/15 transition disabled:opacity-50"
-							>
-								{isWorking ? "Memproses..." : "Analisis ulang"}
-							</button>
-						)}
-					</div>
-				</div>
+				</Alert>
 			)}
 
 			{/* Screen Nav / Actions */}
-			<div className="flex flex-wrap items-center gap-3 text-fog text-[11px] border-t border-graphite pt-4">
-				<span>
-					ID: <span className="font-mono text-snow">{snapshotId}</span>
-				</span>
-				<span>· {formatTimestamp(snapshotCreatedAt)}</span>
-			</div>
 
 			{/* Prev/next navigation: previous aligns left, primary aligns
 			right on desktop; stacked full-width actions on mobile. */}
 			<div
 				data-testid="review-nav"
-				className="flex flex-col items-stretch gap-3 text-xs sm:flex-row sm:items-center sm:justify-between"
+				data-snapshot-id={snapshotId}
+				data-snapshot-created-at={snapshotCreatedAt}
+				className="flex flex-col items-stretch gap-3 text-xs sm:flex-row sm:items-center sm:justify-between border-t border-graphite pt-4"
 			>
 				{onBackToSync ? (
 					<button

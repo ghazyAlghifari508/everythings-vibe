@@ -132,8 +132,8 @@ export function isResyncSessionVerified(input: {
 	activeSessionId?: string | null;
 }): boolean {
 	const { status, activeSessionId } = input;
-	if (!status || !status.snapshotId) return false;
-	if (activeSessionId && status.sessionId !== activeSessionId) return false;
+	if (!status || !status.snapshotId || !activeSessionId) return false;
+	if (status.sessionId !== activeSessionId) return false;
 	return (
 		isSyncStatusComplete(status) &&
 		status.analysisStatus === "ready" &&

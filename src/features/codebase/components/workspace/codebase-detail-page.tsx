@@ -1,44 +1,21 @@
 "use client";
 
+import { Alert02Icon } from "@hugeicons/core-free-icons";
+import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
 import { CodebaseChatWorkspace } from "@/features/codebase/components/chat/codebase-chat-workspace";
 import { CodebaseArtifactCanvas } from "@/features/codebase/components/explorer/codebase-artifact-canvas";
 import { CodebaseExplorerSidebar } from "@/features/codebase/components/explorer/codebase-explorer-sidebar";
-import { CodebasePlanSwitcher } from "@/features/codebase/components/planning/codebase-plan-switcher";
+import { CodebasePlanSwitcherPanel } from "@/features/codebase/components/planning/codebase-plan-switcher-panel";
 import { CodebaseWorkspaceResync } from "@/features/codebase/components/workspace/codebase-workspace-resync";
 import { CodebaseWorkspaceShell } from "@/features/codebase/components/workspace/codebase-workspace-shell";
 import { codebaseStarterSuggestionsSchema } from "@/features/codebase/services/analysis";
 import { canReadExistingPlans } from "@/features/codebase/services/workspace-readiness";
 import { useCodebaseWorkspace } from "../../hooks/use-codebase-workspace";
 import type { CodebaseWorkspaceData } from "../../services/workspace-loader.functions";
-import { WorkspaceConnectionScreen } from "./workspace-connection-screen";
+import { WorkspaceConnectionScreenWrapper as ConnectionScreen } from "./workspace-connection-screen";
 import { WorkspaceHeader } from "./workspace-header";
 import { WorkspaceScreenResolver } from "./workspace-screen-resolver";
-
-function ConnectionScreen({
-	name,
-	ws,
-}: {
-	name: string;
-	ws: ReturnType<typeof useCodebaseWorkspace>;
-}) {
-	return (
-		<WorkspaceConnectionScreen
-			name={name}
-			error={ws.error}
-			status={ws.status}
-			payload={ws.payload}
-			isStarting={ws.isStarting}
-			triggerAnalysis={ws.triggerAnalysis}
-			startSession={ws.startSession}
-			readStatus={ws.readStatus}
-			readiness={ws.readiness}
-			analysis={ws.analysis}
-			isWorking={ws.isWorking}
-			activeWorkspaceSnapshotId={ws.activeWorkspaceSnapshotId}
-			manifestFileCount={ws.manifestFileCount ?? undefined}
-		/>
-	);
-}
 
 export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 	const { codebase, planningSnapshotByProject, canOpenFullBoard } = data;
@@ -46,102 +23,29 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 
 	const {
 		snapshotReady,
-		isCreatingNew,
-		isStarting,
-		status,
-		manifestFileCount,
-		error,
-		readStatus,
-		analysis,
-		isWorking,
-		activeWorkspaceSnapshotId,
-		canvasOpen,
-		explorerFiles,
-		explorerStack,
-		selectSourceFile,
 		resolvedFeature,
-		workspaceView,
-		userFacingPlans,
 		effectiveFeatureId,
-		selectPlan,
-		handleCreateFeature,
-		contextFiles,
-		kanbanProgress,
-		chatMessages,
-		aiQuestions,
-		chatAnswers,
-		run,
-		composerMode,
-		setComposerMode,
-		composerAvailable,
-		answersReadOnly,
-		artifacts,
-		activeArtifactId,
-		hasTasksInDb,
-		stage,
-		stageBusy,
-		stageError,
-		hydration,
-		userTookOverCanvas,
-		featureTree,
-		setActiveArtifactId,
-		setCanvasOpen,
-		analysisOutput,
-		onboardingFeature,
-		isRefreshingStarterSuggestions,
-		starterRefreshError,
-		refreshStarterSuggestions,
-		isConfirming,
-		specError,
-		clearSourcePreview,
-		setCanvasView,
-		handleDownloadArtifact,
-		handleSubmitAnswer,
-		handleSendMessage,
-		handleSubmitComposer,
-		handleConfirmGenerate,
-		handleRetryStage,
-		handleGeneratePrd,
-		handleGenerateAc,
-		handleGenerateTask,
-		lastFeaturePrompt,
-		fetchAiQuestions,
-		isSourcePreviewOpen,
-		sourcePreviewPath,
 		activeArtifact,
-		canvasCopy,
 		sourcePreview,
+		isSourcePreviewOpen,
 		isPrdArtifactActive,
-		prdLoading,
 		isAcArtifactActive,
-		acLoading,
-		prdError,
-		acError,
-		loadPrd,
-		loadAc,
 		isTasksArtifactActive,
-		canvasView,
-		kanban,
 		isFeatureArtifactActive,
-		prdContent,
-		acContent,
-		taskTree,
-		readiness,
-		pendingProposal,
-		isReviewOpen,
-		setIsReviewOpen,
-		isApplying,
-		isRejecting,
-		revisionTarget,
-		setRevisionTarget,
-		applyCurrentProposal,
-		rejectCurrentProposal,
-		requestChangesCurrentProposal,
-		history,
+		userTookOverCanvas,
 	} = ws;
 
+	const handleOpenTaskProgress = () => {
+		if (!resolvedFeature || !ws.hasTasksInDb) return;
+		userTookOverCanvas.current = true;
+		ws.clearSourcePreview();
+		ws.setActiveArtifactId(`tasks-${resolvedFeature.id}`);
+		ws.setCanvasView("kanban");
+		ws.setCanvasOpen(true);
+	};
+
 	if (snapshotReady) {
-		if (!canReadExistingPlans(readiness)) {
+		if (!canReadExistingPlans(ws.readiness)) {
 			return <ConnectionScreen name={codebase.name} ws={ws} />;
 		}
 		return (
@@ -151,35 +55,50 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 			>
 				<WorkspaceHeader
 					name={codebase.name}
-					isStarting={isStarting}
-					fileCount={status?.fileCount ?? manifestFileCount}
+					isStarting={ws.isStarting}
+					fileCount={ws.status?.fileCount ?? ws.manifestFileCount}
 					onResync={ws.openResync}
 				/>
-				{error && !ws.isResyncDrawerOpen && (
+				{ws.error && !ws.isResyncDrawerOpen && (
 					<div
 						role="alert"
-						className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-crimson/40 bg-crimson/10 px-4 py-2 text-xs text-crimson"
+						className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-graphite/80 bg-charcoal px-4 py-2.5 text-xs text-snow"
 					>
-						<span>{error}</span>
-						<button
+						<div className="flex items-center gap-2 min-w-0">
+							<Icon
+								icon={Alert02Icon}
+								size={14}
+								aria-hidden="true"
+								className="shrink-0 text-crimson"
+							/>
+							<div className="flex flex-col sm:flex-row sm:items-center gap-1 min-w-0">
+								<span className="font-semibold text-snow">
+									Workspace belum sinkron:
+								</span>
+								<span className="text-fog truncate">{ws.error}</span>
+							</div>
+						</div>
+						<Button
 							type="button"
-							onClick={() => void readStatus()}
-							className="min-h-9 rounded-md border border-crimson/50 px-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+							variant="outline"
+							size="sm"
+							onClick={() => void ws.readStatus()}
+							className="h-7 border-graphite bg-obsidian px-2.5 font-mono text-[11px] text-snow hover:bg-graphite/30"
 						>
-							Coba lagi
-						</button>
+							Periksa status
+						</Button>
 					</div>
 				)}
 				<CodebaseWorkspaceResync projectName={codebase.name} ws={ws} />
 				<div className="min-h-0 flex-1">
 					<CodebaseWorkspaceShell
-						canvasOpen={canvasOpen}
+						canvasOpen={ws.canvasOpen}
 						leftPane={
 							<CodebaseExplorerSidebar
-								files={explorerFiles}
-								stack={explorerStack}
+								files={ws.explorerFiles}
+								stack={ws.explorerStack}
 								codebaseId={codebase.id}
-								onSelectFile={selectSourceFile}
+								onSelectFile={ws.selectSourceFile}
 							/>
 						}
 						chatPane={
@@ -187,122 +106,137 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 								key={effectiveFeatureId ?? "new-feature"}
 								projectId={effectiveFeatureId}
 								codebaseId={codebase.id}
-								isCreatingNew={isCreatingNew}
+								isCreatingNew={ws.isCreatingNew}
 								featureName={resolvedFeature?.name ?? codebase.name}
-								view={workspaceView}
+								view={ws.workspaceView}
 								planSwitcher={
-									userFacingPlans.length > 0 ? (
-										<CodebasePlanSwitcher
-											plans={userFacingPlans}
+									ws.plans.length > 0 ? (
+										<CodebasePlanSwitcherPanel
+											codebaseId={codebase.id}
+											plans={ws.plans}
+											anchorProjectId={data.onboardingFeatureId}
 											activePlanId={effectiveFeatureId}
 											activePlanName={resolvedFeature?.name ?? null}
-											onSelectPlan={selectPlan}
-											onCreateFeature={handleCreateFeature}
+											onSelectPlan={ws.selectPlan}
+											onCreateFeature={ws.handleCreateFeature}
+											applyPlanMutation={ws.applyPlanMutation}
+											removePlan={ws.removePlan}
 										/>
 									) : null
 								}
-								contextFiles={contextFiles}
-								repositoryFiles={explorerFiles}
-								fileCount={status?.fileCount ?? manifestFileCount ?? undefined}
-								kanbanProgress={kanbanProgress}
-								messages={chatMessages}
-								questions={aiQuestions}
-								answers={chatAnswers}
-								run={run}
-								composerMode={composerMode}
-								onComposerModeChange={setComposerMode}
-								composerAvailable={composerAvailable}
-								answersReadOnly={answersReadOnly}
-								artifacts={artifacts}
-								activeArtifactId={activeArtifactId}
-								projectIdForHandoff={hasTasksInDb ? effectiveFeatureId : null}
-								stage={stage}
-								stageBusy={stageBusy}
-								stageError={stageError}
-								tasksUnresolved={hydration.tasks !== "empty"}
+								contextFiles={ws.contextFiles}
+								repositoryFiles={ws.explorerFiles}
+								fileCount={
+									ws.status?.fileCount ?? ws.manifestFileCount ?? undefined
+								}
+								kanbanProgress={ws.kanbanProgress}
+								messages={ws.chatMessages}
+								timelineEvents={ws.timelineEvents}
+								timelineStatus={ws.timelineStatus}
+								onRetryTimeline={ws.refreshTimeline}
+								questions={ws.aiQuestions}
+								answers={ws.chatAnswers}
+								run={ws.run}
+								composerMode={ws.composerMode}
+								onComposerModeChange={ws.setComposerMode}
+								composerAvailable={ws.composerAvailable}
+								answersReadOnly={ws.answersReadOnly}
+								answersPersistence={{
+									status: ws.saveStatus,
+									error: ws.saveError,
+									onRetry: () => void ws.saveAnswers(),
+								}}
+								artifacts={ws.artifacts}
+								activeArtifactId={ws.activeArtifactId}
+								projectIdForHandoff={
+									ws.hasTasksInDb ? effectiveFeatureId : null
+								}
+								stage={ws.stage}
+								stageBusy={ws.stageBusy}
+								stageError={ws.stageError}
+								tasksUnresolved={
+									// Unresolved means the task read has not answered (pending) or
+									// failed. A ready tree resolved, and an empty one simply has no
+									// tasks yet, so both keep the next action available.
+									ws.hydration.tasks === "pending" ||
+									ws.hydration.tasks === "failed"
+								}
 								codebaseName={codebase.name}
 								planningSnapshotId={
 									effectiveFeatureId
 										? (planningSnapshotByProject[effectiveFeatureId] ?? null)
 										: null
 								}
-								currentSnapshotId={activeWorkspaceSnapshotId}
-								pendingProposal={pendingProposal}
-								isReviewOpen={isReviewOpen}
-								isApplyingRevision={isApplying}
-								isRejectingRevision={isRejecting}
-								revisionTarget={revisionTarget}
-								revisionHistory={history}
-								onOpenReview={() => setIsReviewOpen(true)}
-								onCloseReview={() => setIsReviewOpen(false)}
-								onApplyRevision={applyCurrentProposal}
-								onRejectRevision={rejectCurrentProposal}
-								onRequestChangesRevision={requestChangesCurrentProposal}
-								onChangeRevisionTarget={setRevisionTarget}
-								onReviewPlan={() => {
-									userTookOverCanvas.current = true;
-									if (resolvedFeature && featureTree) {
-										setActiveArtifactId(`feature-${resolvedFeature.id}`);
-										setCanvasOpen(true);
-									}
-								}}
-								starterSuggestions={analysisOutput?.starterSuggestions}
+								currentSnapshotId={ws.activeWorkspaceSnapshotId}
+								pendingProposal={ws.pendingProposal}
+								isReviewOpen={ws.isReviewOpen}
+								isApplyingRevision={ws.isApplying}
+								isRejectingRevision={ws.isRejecting}
+								revisionTarget={ws.revisionTarget}
+								revisionHistory={ws.history}
+								onOpenReview={() => ws.setIsReviewOpen(true)}
+								onCloseReview={() => ws.setIsReviewOpen(false)}
+								onApplyRevision={ws.applyCurrentProposal}
+								onRejectRevision={ws.rejectCurrentProposal}
+								onRequestChangesRevision={ws.requestChangesCurrentProposal}
+								onChangeRevisionTarget={ws.setRevisionTarget}
+								onOpenTaskProgress={handleOpenTaskProgress}
+								starterSuggestions={ws.analysisOutput?.starterSuggestions}
 								starterRefresh={
-									analysis?.status === "ready" &&
-									analysis.output &&
+									ws.analysis?.status === "ready" &&
+									ws.analysis.output &&
 									!codebaseStarterSuggestionsSchema.safeParse(
-										analysis.output.starterSuggestions,
+										ws.analysis.output.starterSuggestions,
 									).success &&
-									analysis.projectId === onboardingFeature?.id &&
-									analysis.snapshotId === activeWorkspaceSnapshotId
+									ws.analysis.projectId === ws.onboardingFeature?.id &&
+									ws.analysis.snapshotId === ws.activeWorkspaceSnapshotId
 										? {
-												analysisId: analysis.id,
-												snapshotId: analysis.snapshotId,
-												status: analysis.status,
-												isRefreshing: isRefreshingStarterSuggestions,
-												error: starterRefreshError,
+												analysisId: ws.analysis.id,
+												snapshotId: ws.analysis.snapshotId,
+												status: ws.analysis.status,
+												isRefreshing: ws.isRefreshingStarterSuggestions,
+												error: ws.starterRefreshError,
 											}
 										: undefined
 								}
 								newerAttemptFailure={
-									analysis &&
-									status?.analysisAttemptStatus === "failed" &&
-									status.snapshotId === analysis.snapshotId &&
-									status.analysisAttemptId !== analysis.id
-										? { errorMessage: status.errorMessage ?? null }
+									ws.analysis &&
+									ws.status?.analysisAttemptStatus === "failed" &&
+									ws.status.snapshotId === ws.analysis.snapshotId &&
+									ws.status.analysisAttemptId !== ws.analysis.id
+										? { errorMessage: ws.status.errorMessage ?? null }
 										: null
 								}
-								onRefreshStarterSuggestions={refreshStarterSuggestions}
-								isSending={isWorking}
-								isConfirming={isConfirming}
-								specError={specError}
+								onRefreshStarterSuggestions={ws.refreshStarterSuggestions}
+								isSending={ws.isWorking}
+								isConfirming={ws.isConfirming}
+								specError={ws.specError}
 								onOpenArtifact={(artifact) => {
 									userTookOverCanvas.current = true;
-									clearSourcePreview();
-									setActiveArtifactId(artifact.id);
+									ws.clearSourcePreview();
+									ws.setActiveArtifactId(artifact.id);
 									if (
 										resolvedFeature &&
 										artifact.id === `tasks-${resolvedFeature.id}`
 									) {
-										setCanvasView("kanban");
+										ws.setCanvasView("kanban");
 									}
-									setCanvasOpen(true);
+									ws.setCanvasOpen(true);
 								}}
-								onDownloadArtifact={handleDownloadArtifact}
-								onSubmitAnswer={handleSubmitAnswer}
-								onSendMessage={handleSendMessage}
-								onSubmitComposer={handleSubmitComposer}
-								onConfirmGenerate={() => void handleConfirmGenerate()}
-								onRetryGenerate={() => void handleConfirmGenerate()}
-								onRetryStage={() => void handleRetryStage()}
-								onGeneratePrd={() => void handleGeneratePrd()}
-								onGenerateAc={() => void handleGenerateAc()}
-								onGenerateTask={() => void handleGenerateTask()}
+								onSubmitAnswer={ws.handleSubmitAnswer}
+								onSendMessage={ws.handleSendMessage}
+								onSubmitComposer={ws.handleSubmitComposer}
+								onConfirmGenerate={() => void ws.handleConfirmGenerate()}
+								onRetryGenerate={() => void ws.handleConfirmGenerate()}
+								onRetryStage={() => void ws.handleRetryStage()}
+								onGeneratePrd={() => void ws.handleGeneratePrd()}
+								onGenerateAc={() => void ws.handleGenerateAc()}
+								onGenerateTask={() => void ws.handleGenerateTask()}
 								onRetryQuestions={() => {
-									if (effectiveFeatureId && lastFeaturePrompt)
-										void fetchAiQuestions(
+									if (effectiveFeatureId && ws.lastFeaturePrompt)
+										void ws.fetchAiQuestions(
 											effectiveFeatureId,
-											lastFeaturePrompt,
+											ws.lastFeaturePrompt,
 										);
 								}}
 							/>
@@ -311,52 +245,49 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 							<CodebaseArtifactCanvas
 								fileName={
 									isSourcePreviewOpen
-										? sourcePreviewPath
+										? ws.sourcePreviewPath
 										: (activeArtifact?.title ??
 											(isTasksArtifactActive
-												? `Task · ${resolvedFeature?.name ?? codebase.name}`
+												? `Task: ${resolvedFeature?.name ?? codebase.name}`
 												: (activeArtifact?.fileName ?? "Preview artefak")))
 								}
-								badge={
-									isSourcePreviewOpen
-										? "SUMBER"
-										: (activeArtifact?.badge ?? "PRATINJAU")
-								}
 								contentScroll={!isTasksArtifactActive}
-								hideBadge={isTasksArtifactActive}
-								copyValue={canvasCopy.value}
-								copyLabel={canvasCopy.label}
-								copyUnavailableReason={canvasCopy.unavailableReason}
+								copyValue={ws.canvasCopy.value}
+								copyLabel={ws.canvasCopy.label}
+								copyUnavailableReason={ws.canvasCopy.unavailableReason}
 								onClose={() => {
 									userTookOverCanvas.current = true;
-									setCanvasOpen(false);
+									if (isSourcePreviewOpen) {
+										ws.clearSourcePreview();
+									}
+									ws.setCanvasOpen(false);
 								}}
 								onDownload={
 									!isSourcePreviewOpen && activeArtifact
-										? () => handleDownloadArtifact(activeArtifact)
+										? () => ws.handleDownloadArtifact(activeArtifact)
 										: undefined
 								}
 								isLoading={
 									(sourcePreview.kind === "loading" && isSourcePreviewOpen) ||
-									(isPrdArtifactActive && prdLoading) ||
-									(isAcArtifactActive && acLoading)
+									(isPrdArtifactActive && ws.prdLoading) ||
+									(isAcArtifactActive && ws.acLoading)
 								}
 								error={
 									isSourcePreviewOpen && sourcePreview.kind === "failed"
 										? sourcePreview.message
 										: isPrdArtifactActive
-											? prdError
+											? ws.prdError
 											: isAcArtifactActive
-												? acError
+												? ws.acError
 												: null
 								}
 								onRetry={
 									isSourcePreviewOpen && sourcePreview.kind === "failed"
-										? () => selectSourceFile(sourcePreview.path)
+										? () => ws.selectSourceFile(sourcePreview.path)
 										: isPrdArtifactActive
-											? () => void loadPrd()
+											? () => void ws.loadPrd()
 											: isAcArtifactActive
-												? () => void loadAc()
+												? () => void ws.loadAc()
 												: undefined
 								}
 							>
@@ -368,17 +299,22 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 									isAcArtifactActive={isAcArtifactActive}
 									isTasksArtifactActive={isTasksArtifactActive}
 									isFeatureArtifactActive={isFeatureArtifactActive}
-									prdContent={prdContent}
-									acContent={acContent}
-									canvasView={canvasView}
-									setCanvasView={setCanvasView}
+									prdContent={ws.prdContent}
+									acContent={ws.acContent}
+									canvasView={ws.canvasView}
+									setCanvasView={ws.setCanvasView}
 									codebaseId={codebase.id}
-									kanban={kanban}
+									kanban={ws.kanban}
 									canOpenFullBoard={canOpenFullBoard}
-									taskTree={taskTree}
-									featureTree={featureTree}
-									snapshotId={status?.snapshotId}
-									impactAreas={analysisOutput?.impactAreas}
+									taskTree={ws.taskTree}
+									featureTree={ws.featureTree}
+									snapshotId={ws.status?.snapshotId}
+									planningSnapshotId={
+										effectiveFeatureId
+											? (planningSnapshotByProject[effectiveFeatureId] ?? null)
+											: null
+									}
+									impactAreas={ws.analysisOutput?.impactAreas}
 								/>
 							</CodebaseArtifactCanvas>
 						}

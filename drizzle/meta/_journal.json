@@ -330,6 +330,20 @@
       "when": 1794145590124,
       "tag": "0046_codebase_resync_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1794416000000,
+      "tag": "0047_codebase_workspace_timeline",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1794416001000,
+      "tag": "0048_feature_plan_archive",
+      "breakpoints": true
     }
   ]
 }

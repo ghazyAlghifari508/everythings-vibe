@@ -1,30 +1,37 @@
 import { AiHarnessLogos } from "./ai-harness-logos";
+import { ScreenConnectStepItem } from "./screen-connect-step-item";
 
-interface ScreenConnectAgentStepProps {
+export interface ScreenConnectAgentStepProps {
 	/** Step title; the re-sync modal names the same action in its own words. */
 	title?: string;
 	description?: string;
-	/** Harness marks belong to onboarding; a re-sync needs no new tooling. */
+	/** Harness marks belong to onboarding and re-sync. */
 	showHarnesses?: boolean;
+	/** Vertical line connector extending to next step. */
+	hasConnector?: boolean;
 }
 
 export function ScreenConnectAgentStep({
 	title = "Buka AI coding agent di repository kamu",
 	description = "Pastikan agent berjalan dari root folder project yang ingin dianalisis.",
 	showHarnesses = true,
+	hasConnector = true,
 }: ScreenConnectAgentStepProps) {
 	return (
-		<div className="flex items-start gap-3.5">
-			<span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-iron font-mono text-xs text-mist">
-				2
-			</span>
-			<div className="flex w-full flex-col gap-2.5">
-				<div>
-					<div className="text-xs font-semibold text-mist">{title}</div>
-					<p className="text-[11px] leading-relaxed text-fog">{description}</p>
+		<ScreenConnectStepItem
+			stepNumber={2}
+			hasConnector={hasConnector}
+			connectorTestId="step-connector-2"
+		>
+			<div className="flex flex-col gap-0.5">
+				<div className="text-xs font-semibold text-mist leading-none">
+					{title}
 				</div>
-				{showHarnesses && <AiHarnessLogos className="pt-0.5" />}
+				{description && (
+					<p className="text-[11px] leading-relaxed text-fog">{description}</p>
+				)}
 			</div>
-		</div>
+			{showHarnesses && <AiHarnessLogos className="pt-0.5" />}
+		</ScreenConnectStepItem>
 	);
 }

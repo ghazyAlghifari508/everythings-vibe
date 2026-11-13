@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { expect, test, vi } from "vitest";
 import "./analysis-credit-db-fixture";
 import { auth, request, seed } from "./resync-db-fixture";
+import { analyzeSnapshot, uploadSnapshot } from "./resync-upload-fixture";
 
 vi.mock("@/lib/session", () => ({
 	requireUser: async () => ({ id: auth.userId }),
@@ -9,6 +10,10 @@ vi.mock("@/lib/session", () => ({
 vi.mock("@/lib/rate-limit", () => ({
 	checkRateLimit: async () => ({ allowed: true }),
 }));
+vi.mock("../services/analysis-server-generate", async () => {
+	const { generatedAnalysis } = await import("./resync-upload-fixture");
+	return { defaultGenerate: async () => generatedAnalysis() };
+});
 
 test("handshake racing a different tab's resync retains one upload and its credential", async () => {
 	const f = await seed();
@@ -51,25 +56,8 @@ test("completed uploaded analysis admits a genuinely new request while replay st
 	const minted = await (
 		await request(f.codebaseId, { action: "resync", requestId })
 	).json();
-	const snapshotId = crypto.randomUUID();
-	await f.db.insert(f.s.codebaseSnapshots).values({
-		id: snapshotId,
-		codebaseId: f.codebaseId,
-		syncSessionId: minted.sessionId,
-		status: "uploaded",
-		manifest: [],
-	});
-	await f.db
-		.update(f.s.codebaseSyncSessions)
-		.set({ status: "uploaded" })
-		.where(eq(f.s.codebaseSyncSessions.id, minted.sessionId));
-	await f.db.insert(f.s.codebaseAnalyses).values({
-		id: crypto.randomUUID(),
-		projectId: f.projectId,
-		snapshotId,
-		status: "ready",
-		output: { projectId: f.projectId, snapshotId },
-	});
+	const snapshotId = await uploadSnapshot(f.codebaseId, minted.syncToken);
+	expect((await analyzeSnapshot(f.projectId, snapshotId)).status).toBe(200);
 	const replay = await (
 		await request(f.codebaseId, { action: "resync", requestId })
 	).json();

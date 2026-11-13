@@ -36,6 +36,7 @@ afterEach(() => {
 
 const samplePayload: SyncPromptPayload = {
 	projectId: "cb_existing_999",
+	sessionId: "sess_resync_test",
 	apiBaseUrl: "https://vibeeverything.example.com",
 	syncToken: "tok_resync_safe_123",
 	cliMinVersion: "2.0.0",

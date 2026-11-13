@@ -19,6 +19,7 @@ export interface ComposerMentionCandidate {
 	targetKind: RevisionTargetKind;
 	mentionAlias: "@Feature" | "@PRD" | "@AC" | "@Task";
 	label: string;
+	description?: string;
 	chipLabel: string;
 	fileName: string;
 }
@@ -36,23 +37,35 @@ const ARTIFACT_META: Record<
 	{
 		mentionAlias: "@Feature" | "@PRD" | "@AC" | "@Task";
 		label: string;
+		description: string;
 		shortPrefix: string;
 	}
 > = {
 	feature: {
 		mentionAlias: "@Feature",
 		label: "Feature",
+		description: "Spesifikasi fitur",
 		shortPrefix: "Feature",
 	},
-	prd: { mentionAlias: "@PRD", label: "PRD", shortPrefix: "PRD" },
+	prd: {
+		mentionAlias: "@PRD",
+		label: "PRD",
+		description: "Dokumen kebutuhan fitur",
+		shortPrefix: "PRD",
+	},
 	ac: {
 		mentionAlias: "@AC",
 		label: "Acceptance Criteria",
+		description: "Kriteria penerimaan fitur",
 		shortPrefix: "AC",
 	},
-	tasks: { mentionAlias: "@Task", label: "Task", shortPrefix: "Task" },
+	tasks: {
+		mentionAlias: "@Task",
+		label: "Tasks",
+		description: "Daftar pekerjaan",
+		shortPrefix: "Task",
+	},
 };
-
 const ARTIFACT_KIND_ORDER = ["feature", "prd", "ac", "tasks"] as const;
 
 export function inferArtifactTargetKind(
@@ -180,6 +193,7 @@ export function buildMentionCandidates(input: {
 			targetKind: kind,
 			mentionAlias: meta.mentionAlias,
 			label: meta.label,
+			description: meta.description,
 			chipLabel: formatArtifactChipLabel(artifact, kind, input.featureName),
 			fileName: artifact.fileName,
 		});
@@ -198,10 +212,10 @@ export function filterMentionCandidates(
 			doc.label.toLowerCase().includes(q) ||
 			doc.mentionAlias.toLowerCase().slice(1).includes(q) ||
 			doc.chipLabel.toLowerCase().includes(q) ||
-			doc.fileName.toLowerCase().includes(q),
+			doc.fileName.toLowerCase().includes(q) ||
+			(doc.description ? doc.description.toLowerCase().includes(q) : false),
 	);
 }
-
 export function toReferenceBinding(
 	candidate: ComposerMentionCandidate,
 ): ComposerArtifactReference {

@@ -120,7 +120,7 @@ export function StageRow({
 		<div
 			data-testid={testId}
 			data-stage-state={row.state}
-			className="flex items-start gap-2.5 py-1.5 px-0.5 text-[11px] transition-colors"
+			className="flex items-start gap-2.5 py-1.5 text-[11px] transition-colors"
 		>
 			<span className="mt-0.5 shrink-0">
 				<StageIcon state={row.state} />

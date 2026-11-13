@@ -1,13 +1,16 @@
 import { and, eq, isNull, or } from "drizzle-orm";
-import type { z } from "zod";
+import { z } from "zod";
 import { db } from "@/db";
 import { prdVersions, projects } from "@/db/schema";
 import {
 	resolveActiveSnapshotId,
 	saveAskHandoff,
 } from "@/features/codebase/services/generation-context";
-import type { askHandoffQuestionSchema } from "@/features/codebase/services/generation-context-handoff";
-import type { AskQuestion } from "@/features/greenfield/services/ask-service";
+import { askHandoffQuestionSchema } from "@/features/codebase/services/generation-context-handoff";
+import {
+	type AskQuestion,
+	validateAskQuestions,
+} from "@/features/greenfield/services/ask-service";
 import { shouldMarkQuestionStep } from "@/lib/flow-progress";
 
 export function isClientAbort(err: unknown, signal: AbortSignal): boolean {
@@ -16,47 +19,24 @@ export function isClientAbort(err: unknown, signal: AbortSignal): boolean {
 	return err instanceof Error && err.name === "AbortError";
 }
 
-/**
- * Maps model AskQuestion records strictly to the askHandoffQuestionSchema contract.
- * Strictly avoids `as any` or loose type bypasses.
- */
 export function mapAskQuestionsForHandoff(
-	questions: AskQuestion[],
+	questions: unknown,
 ): z.infer<typeof askHandoffQuestionSchema>[] {
-	return questions.map((q) => {
-		const type: "select" | "text" | "multiselect" =
-			q.type === "text" || q.type === "multiselect" ? q.type : "select";
-
-		const options = Array.isArray(q.options)
-			? q.options.slice(0, 12).map((opt) => ({
-					label: opt.label.slice(0, 100),
-					...(opt.description
-						? { description: opt.description.slice(0, 400) }
-						: {}),
-				}))
-			: undefined;
-
-		const recommended =
-			typeof q.recommended === "number" &&
-			Number.isInteger(q.recommended) &&
-			q.recommended >= 0 &&
-			q.recommended <= 11
-				? q.recommended
-				: undefined;
-
-		const recommendationReason = q.recommendationReason
-			? String(q.recommendationReason).slice(0, 400)
-			: undefined;
-
-		return {
-			id: String(q.id || "").slice(0, 128),
-			question: String(q.question || "").slice(0, 500),
-			type,
-			options,
-			recommended,
-			recommendationReason,
-		};
-	});
+	const canonical = z
+		.unknown()
+		.transform((value, ctx) => {
+			const validated = validateAskQuestions(value);
+			if (!validated) {
+				ctx.addIssue({
+					code: "custom",
+					message: "Invalid Ask question contract",
+				});
+				return z.NEVER;
+			}
+			return validated;
+		})
+		.parse(questions);
+	return z.array(askHandoffQuestionSchema).parse(canonical);
 }
 
 export interface PersistAskHandoffAndStepParams {
@@ -89,9 +69,7 @@ export async function persistAskHandoffAndStep(
 		params.isTrustedUserContext
 	) {
 		try {
-			const snapshotId = await resolveActiveSnapshotId(params.projectId).catch(
-				() => null,
-			);
+			const snapshotId = await resolveActiveSnapshotId(params.projectId);
 			const validPlatform: "web" | "mobile" =
 				params.platform === "mobile" ? "mobile" : "web";
 			const validPrompt = params.prompt || "";
@@ -108,8 +86,13 @@ export async function persistAskHandoffAndStep(
 					platform: validPlatform,
 				},
 			});
-		} catch (e) {
-			console.error("ask options handoff save failed:", e);
+		} catch (cause) {
+			throw Object.assign(
+				new Error("Gagal menyimpan pertanyaan klarifikasi.", { cause }),
+				{
+					code: "PERSISTENCE_FAILED",
+				},
+			);
 		}
 	}
 

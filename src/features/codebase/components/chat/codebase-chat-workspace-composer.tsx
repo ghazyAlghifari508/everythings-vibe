@@ -1,7 +1,7 @@
 "use client";
 
 import type { KeyboardEvent } from "react";
-import { Popover, PopoverAnchor } from "@/components/ui/popover";
+import { Popover } from "@/components/ui/popover";
 import { PromptBar } from "@/components/ui/prompt-bar";
 import type { CodebaseArtifactRef } from "@/features/codebase/components/explorer/codebase-file-card";
 import type {
@@ -120,15 +120,6 @@ export function CodebaseChatWorkspaceComposer({
 			modal={false}
 		>
 			<div className="relative w-full">
-				{/*
-				 * Zero-size positioning anchor on the composer's top edge: the `@`
-				 * surface floats above it and slightly overlaps it. It is absolutely
-				 * positioned, so the composer keeps its exact dimensions.
-				 */}
-				<PopoverAnchor
-					data-testid="composer-mention-anchor"
-					className="pointer-events-none absolute inset-x-0 top-0 h-0"
-				/>
 				{/* The Thinking indicator already animates this request, so the submit
 				    control stays closed while busy without spinning a second time. */}
 				<PromptBar

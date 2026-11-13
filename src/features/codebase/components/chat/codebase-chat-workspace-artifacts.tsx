@@ -2,12 +2,7 @@
 
 import { Alert02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/ui/icon";
-import type { CodebasePipelineStage } from "@/features/codebase/services/chat-flow";
 import type { ArtifactKind } from "@/features/codebase/services/workspace-hydration";
-import {
-	type CodebaseArtifactRef,
-	CodebaseFileCard,
-} from "../explorer/codebase-file-card";
 
 /** Human label per artifact, used when reporting which artifact failed to load. */
 const ARTIFACT_LABEL: Record<ArtifactKind, string> = {
@@ -40,54 +35,6 @@ export function CodebaseChatWorkspaceArtifactsFailed({
 				{failedArtifacts.map(artifactLabel).join(", ")}. Bagian lain tetap
 				tersimpan di server.
 			</span>
-		</div>
-	);
-}
-
-interface CodebaseChatWorkspaceArtifactStreamProps {
-	artifacts: CodebaseArtifactRef[];
-	activeArtifactId: string | null;
-	stage: CodebasePipelineStage;
-	onOpenArtifact?: (artifact: CodebaseArtifactRef) => void;
-	onDownloadArtifact?: (artifact: CodebaseArtifactRef) => void;
-}
-
-export function CodebaseChatWorkspaceArtifactStream({
-	artifacts,
-	activeArtifactId,
-	stage,
-	onOpenArtifact,
-	onDownloadArtifact,
-}: CodebaseChatWorkspaceArtifactStreamProps) {
-	/**
-	 * Artifact the active stage handoff already renders. Every other artifact
-	 * still lists in the stream, so a finished file stays reachable without the
-	 * same card appearing twice.
-	 */
-	const handoffArtifactPrefix =
-		stage === "feature"
-			? "feature-"
-			: stage === "prd"
-				? "prd-"
-				: stage === "ac"
-					? "ac-"
-					: null;
-	const streamArtifacts = handoffArtifactPrefix
-		? artifacts.filter((item) => !item.id.startsWith(handoffArtifactPrefix))
-		: artifacts;
-
-	if (streamArtifacts.length === 0) return null;
-	return (
-		<div className="flex flex-col">
-			{streamArtifacts.map((artifact) => (
-				<CodebaseFileCard
-					key={artifact.id}
-					artifact={artifact}
-					active={artifact.id === activeArtifactId}
-					onOpen={onOpenArtifact}
-					onDownload={onDownloadArtifact}
-				/>
-			))}
 		</div>
 	);
 }

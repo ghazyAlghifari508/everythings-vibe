@@ -16,6 +16,7 @@ import { resolvePlan } from "./analysis-route-scope.server";
 import { deriveFeatureTitle } from "./feature-naming";
 import { saveAskHandoff } from "./generation-context";
 import { isProvisionalCodebaseName } from "./naming";
+import { authFailureResponse } from "./route-failure";
 import {
 	CODEBASE_SYNC_RATE_LIMIT_ACTION,
 	SNAPSHOT_CONTEXT_STATUSES,
@@ -62,8 +63,8 @@ export async function handleCodebaseFeatureCreate({
 	let user: { id: string };
 	try {
 		user = await requireUser(request.headers);
-	} catch {
-		return Response.json({ error: "Unauthorized" }, { status: 401 });
+	} catch (error) {
+		return authFailureResponse(error);
 	}
 
 	const plan = await resolvePlan(user.id);

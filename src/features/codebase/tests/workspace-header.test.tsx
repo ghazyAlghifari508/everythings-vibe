@@ -155,6 +155,52 @@ describe("WorkspaceHeader component", () => {
 		);
 		expect(syncBadge?.textContent).toBe("Menunggu snapshot");
 	});
+
+	it("ensures file count metadata is plain text with icon and not an interactive button", () => {
+		act(() => {
+			root?.render(
+				<WorkspaceHeader
+					name="Ghazy Portofolio"
+					isStarting={false}
+					fileCount={120}
+					onResync={vi.fn()}
+				/>,
+			);
+		});
+
+		const syncBadge = container.querySelector(
+			"[data-testid='codebase-sync-badge']",
+		);
+		expect(syncBadge).not.toBeNull();
+		expect(syncBadge?.tagName.toLowerCase()).toBe("span");
+		expect(syncBadge?.closest("button")).toBeNull();
+		expect(syncBadge?.getAttribute("role")).not.toBe("button");
+		expect(syncBadge?.getAttribute("tabindex")).toBeNull();
+		expect(syncBadge?.textContent).toBe("120 file tersinkron");
+
+		// Subtle file icon is present
+		const icon = syncBadge?.querySelector("svg");
+		expect(icon).not.toBeNull();
+		expect(icon?.getAttribute("aria-hidden")).toBe("true");
+	});
+
+	it("dynamically displays zero file count correctly", () => {
+		act(() => {
+			root?.render(
+				<WorkspaceHeader
+					name="Ghazy Portofolio"
+					isStarting={false}
+					fileCount={0}
+					onResync={vi.fn()}
+				/>,
+			);
+		});
+
+		const syncBadge = container.querySelector(
+			"[data-testid='codebase-sync-badge']",
+		);
+		expect(syncBadge?.textContent).toBe("0 file tersinkron");
+	});
 });
 
 describe("CodebaseChatWorkspaceHeader component", () => {
@@ -168,7 +214,6 @@ describe("CodebaseChatWorkspaceHeader component", () => {
 						<span data-testid="mock-plan-switcher">Plan Switcher</span>
 					}
 					kanbanProgress={null}
-					planningMovedOn={false}
 				/>,
 			);
 		});
@@ -200,7 +245,6 @@ describe("CodebaseChatWorkspaceHeader component", () => {
 					featureName="Fitur Pembayaran"
 					planSwitcher={null}
 					kanbanProgress={null}
-					planningMovedOn={false}
 				/>,
 			);
 		});
@@ -226,7 +270,6 @@ describe("CodebaseChatWorkspaceHeader component", () => {
 					featureName="Sistem Checkout Billing"
 					planSwitcher={null}
 					kanbanProgress={null}
-					planningMovedOn={false}
 				/>,
 			);
 		});
@@ -238,7 +281,8 @@ describe("CodebaseChatWorkspaceHeader component", () => {
 		expect(titleEl?.textContent).not.toContain("Sistem Checkout Billing");
 	});
 
-	it("renders kanban live data badge when progress is available", () => {
+	it("renders actionable task progress button when progress is available", () => {
+		const onOpenTaskProgress = vi.fn();
 		act(() => {
 			root?.render(
 				<CodebaseChatWorkspaceHeader
@@ -246,19 +290,28 @@ describe("CodebaseChatWorkspaceHeader component", () => {
 					featureName="Fitur Baru"
 					planSwitcher={null}
 					kanbanProgress={{ done: 3, total: 5, pct: 60 }}
-					planningMovedOn={false}
+					onOpenTaskProgress={onOpenTaskProgress}
 				/>,
 			);
 		});
 
-		const kanbanBadge = container.querySelector(
+		const progressBtn = container.querySelector(
 			"[data-testid='codebase-kanban-badge']",
+		) as HTMLButtonElement | null;
+		expect(progressBtn).not.toBeNull();
+		expect(progressBtn?.tagName.toLowerCase()).toBe("button");
+		expect(progressBtn?.textContent).toContain("Progress task · 3/5 selesai");
+		expect(progressBtn?.getAttribute("aria-label")).toContain(
+			"Progress task · 3/5 selesai",
 		);
-		expect(kanbanBadge?.textContent).toBe("Kanban Live: 3/5 Selesai (60%)");
+
+		act(() => {
+			progressBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+		expect(onOpenTaskProgress).toHaveBeenCalledTimes(1);
 	});
 
-	it("renders planning review notice when planningMovedOn is true", () => {
-		const onReviewPlan = vi.fn();
+	it("does not render persistent banner in workspace header", () => {
 		act(() => {
 			root?.render(
 				<CodebaseChatWorkspaceHeader
@@ -266,8 +319,6 @@ describe("CodebaseChatWorkspaceHeader component", () => {
 					featureName="Fitur Baru"
 					planSwitcher={null}
 					kanbanProgress={null}
-					planningMovedOn={true}
-					onReviewPlan={onReviewPlan}
 				/>,
 			);
 		});
@@ -275,15 +326,6 @@ describe("CodebaseChatWorkspaceHeader component", () => {
 		const notice = container.querySelector(
 			"[data-testid='codebase-planning-review-notice']",
 		);
-		expect(notice?.textContent).toContain(
-			"Repository sudah disinkronkan ulang setelah planning ini dibuat.",
-		);
-
-		const reviewBtn = notice?.querySelector("button");
-		expect(reviewBtn).not.toBeNull();
-		act(() => {
-			reviewBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-		});
-		expect(onReviewPlan).toHaveBeenCalledTimes(1);
+		expect(notice).toBeNull();
 	});
 });

@@ -120,7 +120,7 @@ test("E expired before upload offers a new session and no analysis progress", ()
 			expiresAt: new Date(Date.now() - 60_000).toISOString(),
 		},
 	});
-	expect(container.textContent).toContain("Buat prompt baru");
+	expect(container.textContent).toContain("Buat instruksi baru");
 	expect(container.textContent).not.toContain("Menganalisis repository");
 	expect(container.textContent).not.toContain("Analisis belum berhasil");
 });
