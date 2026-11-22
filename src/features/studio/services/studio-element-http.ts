@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { studioAssets, studioElementRevisions } from "@/db/schema";
 import { studioElementRequestSchema } from "../types/studio-element";
+import { extractDesignSystemTokens } from "./studio-design-tokens";
 import { buildStudioInspectionDocument } from "./studio-element-inspection";
 import {
 	prepareStudioElementRevision,
@@ -46,7 +47,7 @@ export async function readStudioElementHttp(
 		!z.uuid().safeParse(channel).success
 	)
 		throw new StudioFrameError("STUDIO_INVALID_INPUT");
-	const { frame } = await readOwnedStudioElementFrame(
+	const { frame, project } = await readOwnedStudioElementFrame(
 		db,
 		projectId,
 		frameId,
@@ -94,6 +95,7 @@ export async function readStudioElementHttp(
 		channel,
 		url.origin,
 		assets,
+		extractDesignSystemTokens(project.designMd),
 	);
 	return Response.json(
 		{ ...inspection, projectId, frameId, baseRevision, channel },
