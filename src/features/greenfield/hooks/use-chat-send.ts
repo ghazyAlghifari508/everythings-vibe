@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { MIN_PROMPT_LENGTH } from "@/features/greenfield/components/chat/chat-revision";
+import type { PrdChatMode } from "@/features/greenfield/services/prd-chat-request";
 import type { ChatMessage } from "@/store";
 
 export interface UseChatSendOptions {
@@ -19,7 +20,7 @@ export interface UseChatSendOptions {
 	streamingContentRef: React.MutableRefObject<string>;
 	streamApiCall: (
 		body: Record<string, unknown>,
-		chatMode: string,
+		chatMode: PrdChatMode,
 		originalMessage: string,
 		existingPartialContent?: string,
 	) => Promise<void>;

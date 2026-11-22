@@ -1,10 +1,11 @@
+import type { PrdChatMode } from "@/features/greenfield/services/prd-chat-request";
 import { savePendingPrdPrompt } from "@/lib/prompt-handoff";
 import type { StreamEvent } from "@/lib/sse-events";
 import type { ChatMessage } from "@/store";
 
 export interface StreamDoneContext {
 	parsed: Extract<StreamEvent, { type: "done" }>;
-	chatMode: string;
+	chatMode: PrdChatMode;
 	projectId?: string;
 	streamingNaturalLanguage: string;
 	currentPrdContent?: string;
@@ -39,7 +40,9 @@ export function handleStreamDoneEvent({
 
 	if (chatMode === "generate") {
 		setGeneratingPRD(false);
-		setStreamingPRDContent("");
+		// Keep the streamed document on the canvas: the server confirmed
+		// persistence, and use-prd-detail swaps in the saved version once the
+		// loader returns it. Clearing here would blank the canvas in between.
 		if (typeof parsed.content === "string" && parsed.content) {
 			onPrdRevised?.(parsed.content);
 		}
@@ -69,7 +72,7 @@ export function handleStreamDoneEvent({
 export interface StreamPostContext {
 	gotDoneEvent: boolean;
 	gotErrorEvent: boolean;
-	chatMode: string;
+	chatMode: PrdChatMode;
 	fullContent: string;
 	existingPartialContent: string;
 	addMessage: (message: ChatMessage) => void;
@@ -194,7 +197,7 @@ export function handleStreamHttpError({
 
 export interface StreamErrorEventContext {
 	parsed: Extract<StreamEvent, { type: "error" }>;
-	chatMode: string;
+	chatMode: PrdChatMode;
 	currentDisplayContent: string;
 	originalMessage: string;
 	triggerResumeModal: (
@@ -250,7 +253,7 @@ export function handleStreamErrorEvent({
 
 export interface StreamCatchContext {
 	err: unknown;
-	chatMode: string;
+	chatMode: PrdChatMode;
 	currentDisplayContent: string;
 	originalMessage: string;
 	showToast: (message: string, type: "error" | "info" | "success") => void;
