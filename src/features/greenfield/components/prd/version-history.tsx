@@ -1,6 +1,21 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import {
+	ArrowLeftRightIcon,
+	ChevronDownIcon,
+	HistoryIcon,
+	Tick01Icon,
+} from "@hugeicons/core-free-icons";
+import { type Ref, useMemo } from "react";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import type { Plan } from "@/types/database";
 import { FEATURES } from "@/types/database";
@@ -17,125 +32,125 @@ interface VersionHistoryProps {
 	versions: PrdVersion[];
 	currentVersion: number;
 	onSelectVersion: (content: string, version: number) => void;
+	onCompare?: () => void;
+	triggerRef?: Ref<HTMLButtonElement>;
+	disabled?: boolean;
 	className?: string;
 	plan?: Plan;
 }
 
+/**
+ * One contextual control for the PRD document: version selection and the
+ * compare action live in the same menu. Selection never mutates a document;
+ * it only tells the parent which persisted record to show.
+ */
 export function VersionHistory({
 	versions,
 	currentVersion,
 	onSelectVersion,
+	onCompare,
+	triggerRef,
+	disabled = false,
 	className,
 	plan = "free",
 }: VersionHistoryProps) {
-	const [selected, setSelected] = useState(currentVersion);
-	const [expanded, setExpanded] = useState(false);
-
 	const hasHistoryAccess = FEATURES[plan].versionHistory !== false;
 
-	const dropdownRef = useRef<HTMLDivElement>(null);
+	// ponytail: the API orders newest first, but never trust list order for the
+	// "Terbaru" marker — non-contiguous and stale lists must still be honest.
+	const orderedVersions = useMemo(
+		() =>
+			versions
+				.filter(
+					(version) =>
+						Number.isInteger(version.version) &&
+						version.version > 0 &&
+						typeof version.content === "string",
+				)
+				.sort((a, b) => b.version - a.version),
+		[versions],
+	);
 
-	// ponytail: sync selected when parent's currentVersion changes (e.g. new revision bumps version)
-	useEffect(() => {
-		setSelected(currentVersion);
-	}, [currentVersion]);
+	if (orderedVersions.length <= 1) return null;
 
-	useEffect(() => {
-		const handleClickOutside = (event: MouseEvent) => {
-			if (
-				dropdownRef.current &&
-				!dropdownRef.current.contains(event.target as Node)
-			) {
-				setExpanded(false);
-			}
-		};
-		if (expanded) {
-			document.addEventListener("mousedown", handleClickOutside);
-		}
-		return () => {
-			document.removeEventListener("mousedown", handleClickOutside);
-		};
-	}, [expanded]);
-
-	if (versions.length <= 1) {
-		return (
-			<div className={cn("p-4", className)}>
-				<p className="text-xs text-(--text-secondary)">Belum ada revisi</p>
-			</div>
-		);
-	}
-
-	const handleSelect = (version: PrdVersion) => {
-		setSelected(version.version);
-		setExpanded(false);
-		onSelectVersion(version.content, version.version);
-	};
-
+	const latestVersion = orderedVersions[0]?.version;
+	const canCompare =
+		hasHistoryAccess && orderedVersions.length >= 2 && !!onCompare;
 	return (
-		<div className={cn("relative", className)} ref={dropdownRef}>
-			<button
-				type="button"
-				aria-expanded={expanded}
-				aria-controls="version-history-menu"
-				onClick={() => setExpanded(!expanded)}
-				className="flex items-center gap-2 text-sm font-medium text-(--text-secondary) hover:text-(--text-primary) dark:hover:text-[#F0F0F0]"
-			>
-				<span>Version History (v{selected})</span>
-				<svg
-					aria-hidden="true"
-					className={`h-4 w-4 transition-transform ${expanded ? "rotate-90" : ""}`}
-					fill="none"
-					viewBox="0 0 16 16"
-					stroke="currentColor"
-				>
-					<path
-						strokeLinecap="round"
-						strokeLinejoin="round"
-						strokeWidth={2}
-						d="M6 4l4 4-4 4"
-					/>
-				</svg>
-			</button>
-
-			{expanded && (
-				<div
-					id="version-history-menu"
-					className="absolute right-0 top-full z-50 mt-2 w-64 rounded-xl border border-[var(--border-subtle)] bg-(--bg-card) p-2 shadow-xl space-y-1 max-h-96 overflow-y-auto"
-				>
-					{hasHistoryAccess ? (
-						versions.map((v) => (
-							<div
-								key={v.id}
-								className={cn(
-									"group flex flex-col rounded-lg transition-colors overflow-hidden",
-									selected === v.version
-										? "btn-primary"
-										: "hover:bg-(--bg-surface) dark:hover:bg-[#161616] text-(--text-secondary)",
-								)}
-							>
-								<button
-									type="button"
-									onClick={() => handleSelect(v)}
-									className="w-full px-3 py-2 text-left text-sm"
-								>
-									<div className="flex items-center justify-between">
-										<span className="font-medium">v{v.version}</span>
-										<span className="text-xs opacity-60">
-											{new Date(v.created_at).toLocaleDateString("id-ID")}
-										</span>
-									</div>
-								</button>
-							</div>
-						))
-					) : (
-						<div className="rounded-lg bg-(--bg-surface) p-3 text-center">
-							<p className="text-xs text-(--text-secondary)">
-								Upgrade ke Pro untuk melihat history revisi
-							</p>
-						</div>
+		<DropdownMenu>
+			<DropdownMenuTrigger asChild>
+				<button
+					ref={triggerRef}
+					type="button"
+					disabled={disabled}
+					title={disabled ? "Nonaktif saat PRD masih dibuat" : undefined}
+					aria-label={`Riwayat versi PRD, versi aktif ${currentVersion}`}
+					className={cn(
+						"flex min-h-11 items-center gap-1.5 rounded-md border border-iron/40 bg-charcoal/60 px-2.5 font-inter text-xs font-[510] text-fog transition-colors md:min-h-8",
+						"hover:border-iron/70 hover:text-snow focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo",
+						"disabled:cursor-not-allowed disabled:opacity-50",
+						className,
 					)}
-				</div>
-			)}
-		</div>
+				>
+					<Icon icon={HistoryIcon} size={14} aria-hidden="true" />
+					<span>Versi {currentVersion}</span>
+					<Icon icon={ChevronDownIcon} size={14} aria-hidden="true" />
+				</button>
+			</DropdownMenuTrigger>
+
+			<DropdownMenuContent align="end" className="w-60">
+				<DropdownMenuLabel className="px-3 py-2 text-xs font-[510] text-fog">
+					Riwayat versi
+				</DropdownMenuLabel>
+				<DropdownMenuSeparator />
+
+				{hasHistoryAccess ? (
+					orderedVersions.map((version) => (
+						<DropdownMenuItem
+							key={version.id}
+							role="menuitemradio"
+							aria-checked={currentVersion === version.version}
+							onSelect={() => onSelectVersion(version.content, version.version)}
+							className="flex items-center justify-between gap-2"
+						>
+							<span className="flex items-center gap-2">
+								<Icon
+									icon={Tick01Icon}
+									size={14}
+									aria-hidden="true"
+									className={
+										currentVersion === version.version
+											? "text-snow"
+											: "text-transparent"
+									}
+								/>
+								Versi {version.version}
+							</span>
+							{version.version === latestVersion && (
+								<span className="text-xs text-fog">(Terbaru)</span>
+							)}
+						</DropdownMenuItem>
+					))
+				) : (
+					<p className="px-3 py-2 text-xs text-fog">
+						Upgrade ke Pro untuk melihat history revisi
+					</p>
+				)}
+
+				{hasHistoryAccess && (
+					<>
+						<DropdownMenuSeparator />
+						<DropdownMenuItem
+							disabled={!canCompare}
+							onSelect={() => onCompare?.()}
+							className="flex items-center gap-2"
+						>
+							<Icon icon={ArrowLeftRightIcon} size={14} aria-hidden="true" />
+							Bandingkan perubahan
+						</DropdownMenuItem>
+					</>
+				)}
+			</DropdownMenuContent>
+		</DropdownMenu>
 	);
 }

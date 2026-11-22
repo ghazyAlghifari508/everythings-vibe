@@ -162,6 +162,7 @@ export function PrdDetail({
 							versions={mappedVersions}
 							currentVersion={selectedVersionNum}
 							onSelectVersion={handleVersionSelect}
+							isGenerating={isGeneratingPRD}
 							className="flex-1 overflow-hidden"
 						/>
 						{plan === "free" && latestVersion && (

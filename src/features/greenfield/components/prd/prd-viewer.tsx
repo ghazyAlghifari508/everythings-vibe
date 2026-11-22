@@ -1,9 +1,11 @@
 "use client";
 
+import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
 import {
 	lazy,
 	memo,
 	Suspense,
+	useCallback,
 	useEffect,
 	useMemo,
 	useRef,
@@ -13,8 +15,6 @@ import type { Components } from "react-markdown";
 import Markdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
-import { PrdDiffViewer } from "./prd-diff-viewer";
-import { TableOfContents } from "./table-of-contents";
 
 // ponytail: lazy-load Mermaid so the ~2-3MB mermaid library (layout engines,
 // flowchart/sequence/class parsers) stays out of the main PRD chunk. Only
@@ -24,9 +24,16 @@ const Mermaid = lazy(() =>
 	import("./mermaid").then((m) => ({ default: m.Mermaid })),
 );
 
+import { Icon } from "@/components/ui/icon";
 import { usePanelResize } from "@/features/greenfield/hooks/use-panel-resize";
+import {
+	type ComparePair,
+	resolveComparePair,
+} from "@/features/greenfield/utils/diff-utils";
 import { cn } from "@/lib/utils";
 import type { Plan } from "@/types/database";
+import { PrdDiffViewer } from "./prd-diff-viewer";
+import { TableOfContents } from "./table-of-contents";
 import { VersionHistory } from "./version-history";
 
 // ponytail: extracted to module scope so react-markdown re-parses only once
@@ -119,6 +126,7 @@ interface PrdViewerProps {
 	versions?: PrdVersion[];
 	currentVersion?: number;
 	onSelectVersion?: (content: string, version: number) => void;
+	isGenerating?: boolean;
 }
 
 export const PrdViewer = memo(function PrdViewer({
@@ -128,28 +136,51 @@ export const PrdViewer = memo(function PrdViewer({
 	versions,
 	currentVersion,
 	onSelectVersion,
+	isGenerating = false,
 }: PrdViewerProps) {
 	const { leftWidth, onStartDragLeft, isDraggingLeft } = usePanelResize();
 	const scrollRef = useRef<HTMLDivElement>(null);
-	const [activeTab, setActiveTab] = useState<"preview" | "diff">("preview");
+	const versionTriggerRef = useRef<HTMLButtonElement>(null);
+	const returnFocusRef = useRef(false);
+	const [comparePair, setComparePair] = useState<ComparePair | null>(null);
 
-	// Diff always compares the previous version against the current one —
-	// clicking the Diff tab shows the latest changes immediately. Version
-	// switching lives in Version History; no extra picker here.
-	const hasDiff = !!versions && versions.length > 1;
-	const previousVersion = useMemo(() => {
-		if (!versions || versions.length <= 1 || currentVersion === undefined)
-			return undefined;
-		const strictlyEarlier = versions
-			.filter((v) => v.version < currentVersion)
-			.sort((a, b) => b.version - a.version);
-		if (strictlyEarlier.length > 0) return strictlyEarlier[0]?.version;
-		// Fallback when viewing v1: diff against the nearest available revision
-		const others = versions
-			.filter((v) => v.version !== currentVersion)
-			.sort((a, b) => a.version - b.version);
-		return others[0]?.version;
+	// Compare is a temporary mode pinned to persisted records at the moment it
+	// is opened: the live/streaming canvas is never a diff side, and later
+	// version changes cannot silently swap the pair being read.
+	const isComparing = comparePair !== null;
+
+	const openCompare = useCallback(() => {
+		const pair = resolveComparePair(versions ?? [], currentVersion);
+		if (pair) setComparePair(pair);
 	}, [versions, currentVersion]);
+
+	const closeCompare = useCallback((restoreFocus = false) => {
+		returnFocusRef.current = restoreFocus;
+		setComparePair(null);
+	}, []);
+
+	// A new generation/revision reclaims the canvas. Leave the temporary
+	// compare view so live content is never hidden behind a stale snapshot;
+	// version actions stay disabled until the stream settles.
+	useEffect(() => {
+		if (isGenerating) closeCompare();
+	}, [isGenerating, closeCompare]);
+
+	useEffect(() => {
+		if (!isComparing) return;
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (event.key === "Escape") closeCompare(true);
+		};
+		document.addEventListener("keydown", handleKeyDown);
+		return () => document.removeEventListener("keydown", handleKeyDown);
+	}, [isComparing, closeCompare]);
+
+	useEffect(() => {
+		if (!isComparing && returnFocusRef.current) {
+			returnFocusRef.current = false;
+			versionTriggerRef.current?.focus();
+		}
+	}, [isComparing]);
 
 	// Auto-scroll logic when new content arrives
 	// biome-ignore lint/correctness/useExhaustiveDependencies: intentional re-scroll on content change
@@ -229,70 +260,48 @@ export const PrdViewer = memo(function PrdViewer({
 				/>
 			</div>
 
-			{/* Content area: single toolbar header + scrollable content */}
+			{/* Document is the default view. Controls appear only for multiple
+			    persisted versions; compare is an explicit temporary mode. */}
 			<div className="flex-1 flex flex-col min-w-0">
-				{/* Toolbar: segmented view switch (left) · version history (right) */}
-				<div className="shrink-0 flex items-center gap-2 border-b border-graphite bg-charcoal/20 px-4 py-2">
-					<div
-						role="tablist"
-						aria-label="Tampilan PRD"
-						className="flex items-center gap-0.5 rounded-md bg-charcoal p-1 shadow-[var(--shadow-inset)]"
-					>
+				{isComparing && comparePair && (
+					<div className="shrink-0 flex items-center justify-between gap-3 border-b border-graphite bg-charcoal/20 px-4 py-2">
+						<p className="font-inter text-xs font-[510] text-fog">
+							Versi {comparePair.oldVersion} → Versi {comparePair.newVersion}
+						</p>
 						<button
 							type="button"
-							role="tab"
-							aria-selected={activeTab === "preview"}
-							onClick={() => setActiveTab("preview")}
-							className={cn(
-								"rounded px-3 py-1 font-inter text-xs font-[510] transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]",
-								activeTab === "preview"
-									? "border border-iron/50 bg-iron text-snow"
-									: "border border-transparent text-fog hover:text-snow",
-							)}
+							onClick={() => closeCompare(true)}
+							className="flex min-h-11 items-center gap-1.5 rounded-md px-2 font-inter text-xs font-[510] text-fog transition-colors hover:text-snow focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo md:min-h-8"
 						>
-							Pratinjau
+							<Icon icon={ArrowLeft01Icon} size={14} aria-hidden="true" />
+							Kembali ke dokumen
 						</button>
-						{hasDiff && (
-							<button
-								type="button"
-								role="tab"
-								aria-selected={activeTab === "diff"}
-								onClick={() => setActiveTab("diff")}
-								className={cn(
-									"rounded px-3 py-1 font-inter text-xs font-[510] transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]",
-									activeTab === "diff"
-										? "border border-iron/50 bg-iron text-snow"
-										: "border border-transparent text-fog hover:text-snow",
-								)}
-							>
-								Diff
-							</button>
-						)}
 					</div>
-					<div className="ml-auto flex items-center gap-2">
-						{versions && versions.length > 1 && (
-							<VersionHistory
-								versions={versions}
-								currentVersion={currentVersion || 1}
-								onSelectVersion={onSelectVersion || (() => {})}
-								plan={plan}
-							/>
-						)}
+				)}
+
+				{onSelectVersion && versions && versions.length > 1 && !isComparing && (
+					<div className="shrink-0 flex justify-end border-b border-graphite bg-charcoal/20 px-4 py-1.5">
+						<VersionHistory
+							versions={versions}
+							currentVersion={currentVersion ?? 1}
+							onSelectVersion={onSelectVersion}
+							onCompare={openCompare}
+							triggerRef={versionTriggerRef}
+							disabled={isGenerating}
+							plan={plan}
+						/>
 					</div>
-				</div>
+				)}
 
 				<div
 					ref={scrollRef}
 					className="flex-1 overflow-y-auto relative scroll-smooth"
 				>
-					{activeTab === "diff" ? (
+					{isComparing && comparePair ? (
 						<div className="mx-auto max-w-3xl px-4 py-4">
 							<PrdDiffViewer
-								oldContent={
-									versions?.find((v) => v.version === previousVersion)
-										?.content ?? ""
-								}
-								newContent={content}
+								oldContent={comparePair.oldContent}
+								newContent={comparePair.newContent}
 							/>
 						</div>
 					) : (
