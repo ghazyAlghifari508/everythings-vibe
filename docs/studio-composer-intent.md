@@ -56,7 +56,7 @@ clarifications never reach the model with a destructive default.
 
 - project ownership (`WHERE user_id = ?`, re-read `FOR UPDATE`),
 - frame membership for revision targets,
-- new-screen count (`STUDIO_MAX_PAGE_COUNT` per request),
+- new-screen count (`STUDIO_ADD_SCREEN_LIMIT` per follow-up request),
 - duplicate names within the request and against existing screens
   (`STUDIO_DUPLICATE_SCREEN`, HTTP 409),
 - job idempotency: `${requestId}:add:${index}` and `${requestId}:${frameId}`,
@@ -127,6 +127,24 @@ deliberately.
 
 The backend ability to create a frame is not removed: it moved into the
 composer-driven `add_screen` operation.
+
+## Adaptive initial planning
+
+`POST /api/studio/generate` accepts the brief, platform and optional PRD or design
+reference, not a page count. A queued launch returns `frameIds: []` and
+`pageCount: null`. An active duplicate can return the already planned slots.
+
+The shared planner selects up to five initial screens and returns their scope,
+including any deferred requirements. A lease-fenced transaction saves the
+blueprint, actual count and named initial slots together. The original request
+survives planning failure. Recovering an already-planned job reuses its slots.
+Follow-up adds keep their own frame IDs and wait for the blueprint; they do not
+contribute to initial progress. Deferred scope appears in the initial chat turn.
+
+The same planning call proposes a workspace title, separate from the UI brand.
+Only automatic titles can be updated. Existing fixed-count projects and their
+exports remain readable. Studio does not reserve or deduct account credits for
+this workflow; provider concurrency and retry limits remain in place.
 
 ## Verification
 
