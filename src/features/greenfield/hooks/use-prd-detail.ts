@@ -2,6 +2,7 @@
 
 import { useRouter } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useWorkspaceSync } from "@/features/greenfield/hooks/use-workspace-sync";
 import { GENERATION_STATUS_POLL_INTERVAL_MS } from "@/features/greenfield/types/greenfield-constants";
 import { getPendingPrdPrompt } from "@/lib/prompt-handoff";
 import { useChatStore, useUIStore } from "@/store";
@@ -33,6 +34,7 @@ export function usePrdDetail({
 }: UsePrdDetailParams) {
 	const router = useRouter();
 	const openPaywallModal = useUIStore((s) => s.openPaywallModal);
+	useWorkspaceSync(projectId, "hasPrd", Boolean(latestVersion?.content));
 	const [currentContent, setCurrentContent] = useState(
 		latestVersion?.content || "",
 	);
