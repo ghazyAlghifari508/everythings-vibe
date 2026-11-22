@@ -276,11 +276,13 @@ const NON_BLOCK_TAGS: Record<string, true> = {
  * no composition — the reported "website made of plain cards" failure.
  *
  * The unit of analysis is the content region's own children, so a wall built
- * from plain divs is caught as well as one built from sections. It is
- * deliberately narrow: it needs a public-website intent, at least three
- * blocks, and every block boxed, text-only and free of media, links, lists and
- * controls. A page with any real composition element cannot trip it, and it is
- * only ever reported as a single bounded repair, never as an aesthetic verdict.
+ * from plain divs is caught as well as one built from sections.
+ *
+ * Evidence is deliberately structural: an explicit card marker, a border, or a
+ * shadow. A background colour alone is a legitimate editorial device (full-width
+ * colour-block sections), so it is not card evidence here; JSDOM cannot measure
+ * containment either. A page with any media, link, list or control in a block
+ * cannot trip this, and it is only ever a single bounded repair.
  */
 function hasCardOnlyComposition(
 	html: string,
@@ -302,12 +304,8 @@ function hasCardOnlyComposition(
 			if (block.querySelector(TEXT_ONLY_CARD_CONTENT)) return false;
 			if (block.hasAttribute("data-card")) return true;
 			const style = dom.window.getComputedStyle(block);
-			const border = Number.parseFloat(style.borderTopWidth);
 			return (
-				border > 0 ||
-				(!!style.backgroundColor &&
-					style.backgroundColor !== "transparent" &&
-					style.backgroundColor !== "rgba(0, 0, 0, 0)") ||
+				Number.parseFloat(style.borderTopWidth) > 0 ||
 				(!!style.boxShadow && style.boxShadow !== "none")
 			);
 		});
