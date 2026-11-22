@@ -55,6 +55,7 @@ export const studioProviderMock = {
 					projectTitle: "Sample",
 					screens,
 					blueprint: {
+						compositionOwner: "model",
 						productIdentity: {
 							productName: "Sample",
 							targetAudience: "General",
@@ -104,6 +105,7 @@ export const studioProviderMock = {
 							role: screen.description,
 							order: screen.order,
 							navigationRole: "primary",
+							destinationId: destinations[screen.order],
 							composition: {
 								primaryTask: screen.description,
 								layout: "workspace",
@@ -122,10 +124,11 @@ export const studioProviderMock = {
 			/SCREEN TO BUILD: "([^"]+)"/.exec(messages[1]?.content ?? "")?.[1] ?? "";
 		const frameFailure = studioProvider.frameError?.(screenName);
 		if (frameFailure) throw frameFailure;
+		const logoUrl = /official application brand logo at: "([^"]+)"/.exec(
+			messages[1]?.content ?? "",
+		)?.[1];
 		return {
-			firstChunk: `<html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><nav>${studioProvider.labels
-				.map((label) => `<a href="#">${label}</a>`)
-				.join("")}</nav><main>Konten</main></body></html>`,
+			firstChunk: `<html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body>${logoUrl ? `<img src="${logoUrl.replaceAll("&", "&amp;")}" alt="Logo">` : ""}<main data-studio-content>Konten</main></body></html>`,
 			generator: (async function* () {})(),
 		};
 	},

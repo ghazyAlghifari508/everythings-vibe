@@ -38,6 +38,7 @@ vi.mock("@/lib/services/ai-orchestrator", () => ({
 						projectTitle: "Sample",
 						screens,
 						blueprint: {
+							compositionOwner: "model",
 							productIdentity: {
 								productName: "Sample",
 								targetAudience: "General",
@@ -87,6 +88,7 @@ vi.mock("@/lib/services/ai-orchestrator", () => ({
 								role: s.description,
 								order: s.order,
 								navigationRole: "primary",
+								destinationId: destinations[s.order],
 								composition: {
 									primaryTask: s.description,
 									layout: "workspace",
