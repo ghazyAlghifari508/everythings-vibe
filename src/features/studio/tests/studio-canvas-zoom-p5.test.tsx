@@ -17,11 +17,12 @@ import { computeCanvasFit } from "@/features/studio/utils/studio-canvas-fit";
 
 vi.mock("@/features/studio/hooks/use-studio-frame-visual", () => ({
 	useStudioFrameVisual: () => ({
-		visualUrl: null,
-		hasVisual: false,
-		isLoading: false,
-		error: null,
-		reload: vi.fn(),
+		visual: null,
+		visualError: "",
+		markVisualLoaded: vi.fn(),
+		setVisualError: vi.fn(),
+		retryVisual: vi.fn(),
+		artboardRef: { current: null },
 		frameHeight: 844,
 	}),
 }));
