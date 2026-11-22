@@ -122,7 +122,7 @@ export function ScrapeHistoryRow({
 				</span>
 			</span>
 			<span className="truncate font-mono text-[11px] text-fog">
-				{item.domain} ·{" "}
+				{item.domain},{" "}
 				<time dateTime={item.createdAt}>{formatDate(item.createdAt)}</time>
 			</span>
 			{item.imageCounts && (
