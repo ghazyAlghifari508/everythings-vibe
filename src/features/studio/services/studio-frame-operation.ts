@@ -11,7 +11,6 @@ import {
 	selectModels,
 	tryStreamWithFallback,
 } from "@/lib/services/ai-orchestrator";
-import type { StudioFramePreservationPolicy } from "../types/studio-service";
 import {
 	classifyStudioScreenRole,
 	extendStudioBlueprintWithScreen,
@@ -29,19 +28,22 @@ import { validateStudioDesignMode } from "./studio-prompt-validation";
 import { buildStudioFramePrompt } from "./studio-screen-prompts";
 
 /**
- * Which preservation policy a frame operation gets. A committed document is
- * the only evidence that counts: an added screen, an initial frame, or a retry
- * of a screen that never produced HTML may start fresh, while anything holding
- * HTML must be repaired. Frame status is deliberately not an input — a failed
- * or generating row can still own the user's last valid design.
+ * Corrections and prompts must agree on what this operation may touch, so both
+ * come from one decision. Committed HTML is the only evidence that counts: a
+ * frame holding a document is preserved no matter which job type reached it,
+ * and a recovered or legacy add can never discard the user's committed design.
+ * Frame status is deliberately not an input.
  */
-export function studioFramePreservation(
-	frame: { htmlCode: string | null },
-	jobType: string,
-): StudioFramePreservationPolicy {
-	return jobType === "add" || !frame.htmlCode
-		? "new-frame"
-		: "preserve-existing";
+export function studioFrameOperationContext(frame: {
+	htmlCode: string | null;
+}) {
+	const previousHtml = frame.htmlCode ?? undefined;
+	return {
+		preservation: previousHtml
+			? ("preserve-existing" as const)
+			: ("new-frame" as const),
+		previousHtml,
+	};
 }
 
 export async function runStudioFrameOperation(
@@ -195,6 +197,7 @@ export async function runStudioFrameOperation(
 	const activeBlueprint = project.designBlueprint
 		? mergeBlueprint(project.designBlueprint)
 		: null;
+	const operation = studioFrameOperationContext(frame);
 
 	const prompt = buildStudioFramePrompt({
 		screenName: name,
@@ -206,10 +209,10 @@ export async function runStudioFrameOperation(
 		designMode: validateStudioDesignMode(frame.viewport),
 		designMd: project.designMd,
 		logoUrl,
-		// Retry reuses the frame's last HTML so a failed revision keeps its
-		// last-good content instead of restarting from nothing.
-		previousHtml:
-			job.jobType === "add" ? undefined : (frame.htmlCode ?? undefined),
+		// Committed HTML always travels with the request: a retry keeps its
+		// last-good content, and a recovered add never discards a design it
+		// unexpectedly already owns.
+		previousHtml: operation.previousHtml,
 		blueprint: activeBlueprint,
 		activeScreen: name,
 		prdContent: project.prdContent,
@@ -220,7 +223,7 @@ export async function runStudioFrameOperation(
 			? "Regenerate this screen so it satisfies the shared contract. Preserve the approved theme and all valid content."
 			: job.prompt;
 	const dsTokens = extractDesignSystemTokens(project.designMd);
-	const preservation = studioFramePreservation(frame, job.jobType);
+	const preservation = operation.preservation;
 	const htmlCode = await generateValidatedFrameHtml({
 		framePrompt: `${prompt}\n\nUSER CHANGE INSTRUCTION: ${changeInstruction}\nPreserve unaffected content, layout and identity. Modify only the requested screen.`,
 		activeScreen: name,

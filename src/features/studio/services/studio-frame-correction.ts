@@ -2,7 +2,10 @@ import {
 	STUDIO_CORRECTION_PROMPT_MAX_CHARS,
 	STUDIO_PREVIOUS_HTML_MAX_CHARS,
 } from "../types/studio-constants";
-import type { ValidatedFrameInput } from "../types/studio-service";
+import type {
+	StudioFramePreservationPolicy,
+	ValidatedFrameInput,
+} from "../types/studio-service";
 import { StudioFrameError } from "./studio-frame-errors";
 import { sanitizeStudioPrd } from "./studio-prd-helpers";
 import { studioJobTiming } from "./studio-timing";
@@ -18,12 +21,23 @@ import { studioJobTiming } from "./studio-timing";
  * stays intact. Only a frame with no committed design may fall back to a
  * bounded fresh regeneration.
  */
+/**
+ * Runtime guard for the mandatory policy. Anything that is not an explicit
+ * `new-frame` is treated as preserving committed work: an untyped or legacy
+ * caller can never silently unlock document-free regeneration.
+ */
+export function studioPreservationPolicy(
+	value: unknown,
+): StudioFramePreservationPolicy {
+	return value === "new-frame" ? "new-frame" : "preserve-existing";
+}
+
 export function buildStudioFrameCorrection(
 	input: ValidatedFrameInput,
 	issues: string[],
 	html: string,
 ) {
-	const preservation = input.preservation ?? "new-frame";
+	const preservation = studioPreservationPolicy(input.preservation);
 	const repairRules =
 		"Repair only reported structural defects: full essential labels, atomic price/quantity groups, proportional controls, media sized to its declared frame, and intentional contained carousels. Keep valid crop ratios and distinct screen composition. Never mask a canonical assembly defect with !important or width hacks.";
 	const instruction =

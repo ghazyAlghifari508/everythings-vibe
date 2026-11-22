@@ -41,8 +41,8 @@ export interface ValidatedFrameInput {
 	logoUrl: string | null;
 	signal?: AbortSignal;
 	contentContext?: { brief: string; prdContent?: string | null };
-	/** Defaults to `new-frame` when a caller has no committed design to protect. */
-	preservation?: StudioFramePreservationPolicy;
+	/** Required: the operation must state whether it may discard a design. */
+	preservation: StudioFramePreservationPolicy;
 	/** The user's actual modification, kept scoped through correction. */
 	requestedChange?: string;
 	timing?: { jobId: string; projectId: string; frameId: string };
