@@ -99,3 +99,27 @@ Click-problem investigation. Two hypotheses, tested separately:
 Component exploration (checked for Button/IconButton, Sheet/Drawer, InputGroup/Textarea, Collapsible/Resizable): shadcn InputGroup uses an addon `onClick` that focuses the input unless the target is a `button`, which is the same guard used here; adopting it would add a primitive that needs `lucide`/token rework for one wrapper. HeroUI (Textarea, Drawer), React Bits, AffectUI, TuffUI and SakaniUI index pages were fetched and keyword-scanned; they list chat, prompt or sheet pieces, but individual components were not installed or evaluated. Magic UI, CUI and ThinkingOrbs index pages had no relevant control (ThinkingOrbs matched only "prompt"). Nothing was adopted: the existing `Icon`, the `PromptBar` mousedown guard pattern and the existing tablet bottom-sheet container already cover the behavior, and the others would add a dependency or ornamental styling.
 
 Not verified / for P8 (browser): hit testing at 360/768/1280px, overlap with the dev-only TanStack devtools button at bottom-right, resize hitbox and `z-40` sheet stacking, Stop reachable at the bottom of the viewport. Not done: a modal focus trap and backdrop for the tablet sheet. The sheet stays non-modal as before (document remains interactive); changing it to a modal drawer is a behavior change deferred to the P8 decision.
+
+## P4: shared chrome, five-stage stepper, neutral progress
+
+Workspace header. `GreenfieldWorkspace` no longer renders the `VibePlan <projectName>` bar. The `<section aria-label="VibePlan workspace">` stays as the flex/`min-h-0`/`overflow-hidden` parent, so child content starts directly under the Navbar. Last-route reporting, active-project reset, drawer/modal cleanup and the `activeProjectId` gate are unchanged. No replacement label or breadcrumb. Project name still appears in History, the Feature Tree root and documents.
+
+Stepper. `FlowStepNav` `STEPS` is exactly Ask, Fitur, PRD, AC, Task. Kanban is a view of the Task stage: `view === "kanban"` maps to `task` for the current-stage marker (`aria-current="step"`). Completion is still read from `availability` (`hasHandoff`, `hasFeatures`, `hasPrd`, `hasAc`, `hasTasks`), never from the URL, so opening Kanban does not mark Task done. The `/vibeplan/$id/kanban` route, guard (`accessibleWorkspaceView`), History resume and the Kanban board are untouched. The indicator stays non-clickable.
+
+Neutral status language (tokens `snow`, `onyx`, `fog`, `graphite`, which swap per light/dark theme):
+
+| State | Marker | Extra signal |
+| --- | --- | --- |
+| Completed | outlined circle, `Tick01Icon`, `text-snow`, `border-fog` | sr-only `(Selesai)` |
+| Active | filled `bg-snow text-onyx` circle with step number | `aria-current="step"`, sr-only `(Tahap saat ini)` |
+| Pending | `border-graphite text-fog` circle with number | none |
+
+The connector line colour still follows `stepRank`; it is not a status carrier. `bg-emerald` was removed from this component only. `CodebaseStepNav` and other `emerald` usages (diff, success toast, billing) are not touched.
+
+PRD section progress (`ChatStreamStatus`). Rows are now a `<ul>`; the current row has `aria-current="step"`. Completed: neutral check (`text-mist`), label `text-mist`. Current: existing spinner in `text-snow`, label `text-snow` weight 510. Pending: `text-slate`. Each row has sr-only `(selesai)`, `(sedang diproses)` or `(menunggu)`. The eight sections and completion data still come from `ALL_PRD_SECTIONS` and the stream, nothing hardcoded. The heading `✅ PRD selesai digenerate` is now `PRD selesai`.
+
+Component evaluation. Fetched: HeroUI component index (Stepper exists only as HeroUI Pro, paid; no free Stepper) and Magic UI component index (no stepper; `Animated Circular Progress Bar` and `Scroll Progress` do not fit a stage indicator). Not fetched or evaluated in P4: shadcn/ui, React Bits, AffectUI, ThinkingOrbs, TuffUI, CUI, SakaniUI. Decision: refine the existing `FlowStepNav` and shared `Icon`/`Tick01Icon`; no new component, no new dependency, no decorative dots, glow, gradient or motion.
+
+Tests: `workspace-progress.test.tsx` (five stages, no Kanban label, Kanban maps to Task without inventing completion, status exposed without colour classes), `chat-stream-status.test.tsx` (differentiated rows, no `emerald`, no emoji), `workspace-router.test.tsx` (no title bar in the shell, shell identity preserved).
+
+Not verified / for P8 (browser): contrast of the neutral markers in light and dark, 360px width with five indicators, and the layout of the Task/Kanban/AC/PRD documents without the removed header bar.
