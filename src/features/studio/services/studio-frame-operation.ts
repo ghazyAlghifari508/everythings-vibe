@@ -237,6 +237,7 @@ export async function runStudioFrameOperation(
 			prdContent: project.prdContent,
 		},
 		preservation,
+		previousHtml: operation.previousHtml,
 		requestedChange: changeInstruction,
 		signal,
 		timing: { jobId: job.id, projectId: project.id, frameId: frame.id },

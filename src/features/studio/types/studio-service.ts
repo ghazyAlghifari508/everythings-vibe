@@ -40,6 +40,7 @@ export interface ValidatedFrameInput {
 	dsTokens: ReturnType<typeof extractDesignSystemTokens>;
 	logoUrl: string | null;
 	signal?: AbortSignal;
+	previousHtml?: string | null;
 	contentContext?: { brief: string; prdContent?: string | null };
 	/** Required: the operation must state whether it may discard a design. */
 	preservation: StudioFramePreservationPolicy;

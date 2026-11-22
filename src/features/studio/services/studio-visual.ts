@@ -10,6 +10,7 @@ import {
 } from "@/features/studio/types/studio-constants";
 import { createBrowserSession } from "@/lib/browser-session";
 import { fetchAsset } from "@/lib/fetch-html";
+import { fetchPexelsImage } from "@/lib/pexels-photos";
 import { isBlockedRequestUrl } from "@/lib/url-validator";
 import { extractDesignSystemTokens } from "./studio-design-tokens";
 
@@ -147,7 +148,17 @@ export async function captureStudioVisual(
 			)
 				return route.abort();
 			try {
-				const asset = await fetchAsset(request.url());
+				const source = request.url();
+				const asset =
+					new URL(source).origin === "https://images.pexels.com"
+						? (
+								await fetchPexelsImage(
+									source,
+									AbortSignal.timeout(STUDIO_CAPTURE_TIMEOUT_MS),
+								)
+							)?.asset
+						: await fetchAsset(source);
+				if (!asset) throw new Error("Invalid provider photo response.");
 				await route.fulfill({
 					body: asset.body,
 					status: asset.status,

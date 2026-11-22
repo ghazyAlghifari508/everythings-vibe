@@ -5,7 +5,7 @@ export const mediaAndImagery: EvvibeDesignReference = {
 	title: "Imagery and the asset contract",
 	body: `When the content needs photographs, use photographs: destinations, products, food, covers, interiors, project work. A gradient, emoji, geometric shape or coloured block is not a photograph and never stands in for one.
 
-Source contract, fixed: every image source is an https URL to a real licensed asset, a data:image URI, or a Studio asset route beginning /api/studio/asset? with a capability token. Never invent a URL, never reference a file that does not exist, never point at an unverified host. An unknown source is a hard defect, not a style choice. Alt text describes the subject; adjacent content stays useful when an image cannot load.
+Source contract: use only supplied assets and verified photo slots. Keep the full supplied /api/studio/asset? URL for local assets. Never invent a URL, encode a substitute image, or use CSS/SVG as photography. Use descriptive alt text and keep nearby content useful when a photo is unavailable.
 
 SVG remains right for icons, genuine vector logos, charts, diagrams and explicitly requested illustrations.
 

@@ -1,11 +1,14 @@
 import { JSDOM } from "jsdom";
 import { STUDIO_VISUAL_WIDTH } from "@/features/studio/types/studio-constants";
 import type { StudioDesignBlueprint } from "./studio-design-blueprint";
+import { validateStudioSemanticNavigation } from "./studio-semantic-navigation";
 
 export interface ValidateGeneratedHtmlOptions {
 	blueprint: StudioDesignBlueprint | null;
 	viewport: "web" | "mobile";
 	expectTokens: boolean;
+	screen?: string;
+	logoUrl?: string | null;
 }
 
 /**
@@ -335,7 +338,16 @@ export function validateGeneratedHtml(
 	if (opts.expectTokens && !html.includes("studio-design-tokens")) {
 		issues.push("Token design system hilang.");
 	}
-	if (opts.blueprint) {
+	if (opts.blueprint?.compositionOwner === "model") {
+		issues.push(
+			...validateStudioSemanticNavigation(
+				html,
+				opts.blueprint,
+				opts.screen,
+				opts.logoUrl,
+			),
+		);
+	} else if (opts.blueprint) {
 		const structure = extractNavigationStructure(html, opts.blueprint);
 		const expected = opts.blueprint.navigationContract.labels;
 		for (const label of expected) {
@@ -355,6 +367,8 @@ export function validateGeneratedHtml(
 		if (structure.fullNavCount > 1) {
 			issues.push("Navigasi ganda terdeteksi.");
 		}
+	}
+	if (opts.blueprint) {
 		if (hasCardOnlyComposition(html, opts.blueprint)) {
 			issues.push(
 				"Komposisi halaman publik hanya berupa kartu teks; gunakan hero, karya, editorial, atau galeri sesuai isi.",

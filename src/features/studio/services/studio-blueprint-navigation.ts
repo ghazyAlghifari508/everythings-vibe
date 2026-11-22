@@ -231,6 +231,18 @@ export function extendStudioBlueprintWithScreen(input: {
 					: "Layar kontekstual aplikasi"),
 			order: nextOrder,
 			navigationRole: screenRole.role,
+			...(blueprint.compositionOwner === "model"
+				? screenRole.role === "primary"
+					? {
+							destinationId:
+								screenRole.suggestedDestinationId ||
+								normalizeDestinationId(
+									name,
+									blueprint.navigationContract.destinations,
+								),
+						}
+					: { parentDestinationId: screenRole.parentDestinationId ?? null }
+				: {}),
 		},
 	];
 
@@ -280,6 +292,7 @@ export function extendStudioBlueprintWithScreen(input: {
 	if (
 		lastItem &&
 		/settings|pengaturan|profil|profile/i.test(lastItem) &&
+		blueprint.compositionOwner !== "model" &&
 		!/settings|pengaturan|profil|profile/i.test(destinationId)
 	) {
 		ordering = [...currentOrdering.slice(0, -1), destinationId, lastItem];

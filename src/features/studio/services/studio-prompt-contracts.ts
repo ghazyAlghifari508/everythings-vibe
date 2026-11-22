@@ -11,23 +11,20 @@ import { STUDIO_BASE_QUALITY_PROMPT } from "./studio-quality-rules";
  * requested layout width and the renderer's viewport can never drift apart.
  */
 export const MOBILE_PLATFORM_CONTRACT = `Target platform: Mobile Application Experience (mobile-first UI/UX).
-- Design for a single mobile viewport width (${STUDIO_VISUAL_WIDTH.mobile}px) and let the document grow vertically as tall as the content needs. A long, scrollable page is correct; never compress or rescale sections to force everything into one screen height.
+- Start at the ${STUDIO_VISUAL_WIDTH.mobile}px reference viewport, then design intentional reflow at wider widths. Let the document grow vertically with its content.
 - Include <meta name="viewport" content="width=device-width, initial-scale=1"> in <head>.
 - Compose mobile content by task: vertical sections, readable responsive grids or intentionally scrollable recommendation/promo/category tracks. Do not force every component into one column or squeeze all cards into one viewport.
-- Do not generate the app bar, the bottom navigation tab bar (icons + labels, active screen highlighted), or simulated device status bars yourself; Studio assembles them from the shared blueprint, placing the tab bar in normal document flow at the end of the page and adding the back button automatically on contextual screens such as detail, edit, or checkout. This artboard is a static full-page preview, so do not use position: fixed or position: sticky for any bar. Only when no shared blueprint assembly applies, render the bottom tab bar (icons + labels, active screen highlighted) yourself in normal document flow at the end of the document and pad the content bottom so nothing hides behind it.
+- Compose chrome around the task, or omit it. Do not simulate device status bars. Keep bars in normal flow for this static artboard.
 - Keep the primary touch action at least 44px; compact controls retain proportional geometry and at least a 24px hit area or a larger associated label.
 - Keep each control self-contained: a currency prefix, leading icon, value, and trailing chevron share one non-wrapping row; never let a prefix, value, or chevron wrap onto its own line.
-- Group a metric with its label, value, and supporting stats inside one card; do not emit loose label/value lines that stack as plain text.
 - A task screen must be complete: include every field, any step context, and the primary action the task needs. One lone form row is not a finished screen.
-- Use mobile-first interaction patterns: card stacks, segmented switchers, and compact stat rows.
 - Use fluid sizing: max-width: 100% on all sections, images, and tables; never use fixed pixel widths larger than the viewport; avoid unintended horizontal overflow (no overflow-x scroll on the page).
 - Keep the layout free of overlapping layers: reserve vertical space instead of stacking elements on top of each other.
 - Keep body text at 14px-16px with comfortable line height so it stays readable at the captured ${STUDIO_VISUAL_WIDTH.mobile}px width.
 - Size sections with padding, gaps, and min-height instead of fixed pixel heights, so the page never looks stretched or squashed when captured.
 - Give each media component an explicit frame/ratio and appropriate fit/position. Use contain for products that must be fully visible; cover only for intentional photo crop. An image fills its wrapper without conflicting intrinsic/fixed dimensions. Keep useful alt text, caption or adjacent content if a photo cannot load.
 - A badge conveys real status or a category label; never stack decorative pills, never let a two-word badge such as "Private Trip" wrap onto two lines (give the label room or shorten it), and prefer a status row over a badge when the status is just normal text.
-- Use the same navigation structure, icon family, and design tokens on every screen of this application.
-- Keep exactly one bottom tab <nav> containing every destination label in blueprint order; do not duplicate the full tab set in a second <nav>.
+- Share destination intent and design tokens, not identical chrome. Bottom tabs, when useful, represent only primary destinations. A top-level screen does not get a generic back arrow.
 - Put every screen body inside one content region; the first visible block establishes the screen's own hierarchy (list, search, hero, cards), not a repeated title row.`;
 
 export const WEB_PLATFORM_CONTRACT = `Target platform: Responsive Website or Web Application Experience, as specified by productIdentity.layoutIntent.
@@ -42,7 +39,7 @@ export const WEB_PLATFORM_CONTRACT = `Target platform: Responsive Website or Web
   * Select structure from the screen task, not the domain name: comparison may use a contained table; entry may use a form; overview may use metrics only if relevant. Side-by-side form and table is an option when both tasks belong on that screen; narrow screens reflow or contain scrolling without shrinking essential content.
   * Avoid both extremes: neither an empty sparse wireframe nor a cramped unreadable wall of tiny inputs.
 - Typography & Visual Hierarchy:
-  * Clear typographic scale: Screen title (24px-28px font-bold), section titles (18px-22px font-semibold), card headers (15px-16px font-semibold), body (14px-16px), metadata (12px-13px font-medium).
+  * Choose the type scale by content and brand; fit it to narrow widths and preserve readable labels.
   * Keep one clear primary focal action per screen; secondary/contextual actions stay quiet rather than giving every section a competing primary CTA.
   * Hairline structural borders (border border-[var(--app-border)]) instead of large dark drop-shadows.
 - Form & Data Polish:
@@ -53,10 +50,7 @@ export const WEB_PLATFORM_CONTRACT = `Target platform: Responsive Website or Web
   * Keep atomic values together: a currency prefix and amount ("Rp 125.500.000") and short badges such as "Private Trip" never break across lines; give them one non-wrapping group or enough room, then let paragraphs wrap normally.
   * Give photos component-specific bounded media geometry; choose contain/cover and object-position by subject, preserve the declared ratio, and keep content meaningful if an external image fails.
   * Provide a dedicated empty state box when tables or lists have no records.
-- Shared Shell Integration:
-  * Studio deterministically injects the global topbar (product branding) and primary navigation; generate only screen-specific content inside <main data-studio-content>. Do not emit a second global sidebar, topbar, or header.
-  * Public websites: generate the value proposition, suitable hero and CTA without a redundant generic page title above them. Studio aligns branding and primary navigation within one navbar. Web applications: the screen title and contextual controls belong inside the main content header, never beside the global brand.
-  * On a detail/edit/confirmation screen, the content header starts with a back link to its parent destination (e.g. "< Back to Pelanggan") while the primary navigation keeps the parent item active.`;
+- Compose navigation around real information architecture. Public sites do not need a generic title bar, account control, three links or a filled CTA; workspaces do not automatically need a sidebar. Use disclosure or reflow when links no longer fit. Offer a parent path on nested journeys where useful.`;
 
 export const STUDIO_SYSTEM_PROMPT = `You are an expert front-end builder generating a complete, production-grade single-file HTML page.
 
@@ -87,6 +81,7 @@ OUTPUT CONTRACT (NON-NEGOTIABLE):
     }
   ],
   "blueprint": {
+    "compositionOwner": "model",
     "productIdentity": {
       "productName": "Application name",
       "targetAudience": "Primary audience",
@@ -115,7 +110,7 @@ OUTPUT CONTRACT (NON-NEGOTIABLE):
       "typography": [13, 16, 20, 28]
     },
     "sharedComponents": {
-      "header": "App bar specification: platform-shaped (web topbar branding vs mobile app bar title), never a repeated brand-plus-screen-title row",
+      "header": "Shared identity and when a separate header is useful",
       "navigation": "Navigation system specification",
       "buttons": "Button styling",
       "inputs": "Input styling",
@@ -124,23 +119,16 @@ OUTPUT CONTRACT (NON-NEGOTIABLE):
       "icons": "Icon family and stroke",
       "media": "Shared subject treatment, whole-product fit, photography crop and readable fallback"
     },
-    "canonicalShell": {
-      "version": 1,
-      "navigation": "bottom for mobile; sidebar or top for web",
-      "statusBar": "none",
-      "density": "compact (16px outer gutter) or comfortable (24px outer gutter), appropriate to the product",
-      "activeDestinations": { "Screen Name": "matching destination id, or null for a contextual screen" }
-    },
     "navigationContract": {
       "destinations": ["home", "search"],
       "labels": ["Home", "Search"],
       "iconMapping": { "home": "home", "search": "search" },
       "ordering": ["home", "search"],
-      "ctaDestination": "existing destination id only when the public website needs a navigation CTA, otherwise null",
+      "primaryAction": { "id": "reserve", "label": "Reserve a table", "goal": "Book a visit", "target": "Reservation" },
       "activeItemRule": "Highlight the item matching the active screen"
     },
     "screenPlan": [
-      { "name": "Screen Name", "role": "Screen purpose", "navigationRole": "primary or contextual", "order": 0,
+      { "name": "Screen Name", "role": "Screen purpose", "navigationRole": "primary or contextual", "destinationId": "matching primary destination id if linked globally", "parentDestinationId": "known primary parent for a contextual screen, or null", "order": 0,
         "composition": {
           "primaryTask": "The decision or action this screen serves",
           "layout": "editorial | discovery | detail | form | summary | timeline | workspace",
@@ -148,16 +136,18 @@ OUTPUT CONTRACT (NON-NEGOTIABLE):
           "patterns": ["choose only relevant ids: search, segments, field, table, metric, alert, actions, stepper, carousel, options, product-row, action-area"],
           "responsive": "reflow | stack | grid | horizontal-scroll | expand",
           "media": "none | whole-product | photography | project-work"
-        }
+        },
+        "photos": [{ "id": "short-stable-id", "subject": "Specific subject", "purpose": "Why it belongs on this screen", "query": "Public English search terms", "aspect": "landscape | portrait | square", "alt": "Subject description intent", "source": "stock | user" }]
       }
     ]
   }
 }
 - The screens array and blueprint.screenPlan must each contain exactly the requested count, ordered 0..N, using the requested viewport platform.
-- The navigation contract (destinations, labels, ordering, icons) is shared by every screen; only the active item changes per screen.
+- The shared navigation contract lists real primary destinations (zero to eight). One screen owns each destinationId. Contextual screens may name a parent but never occupy a primary destination. Include primaryAction only for a genuine product goal with its own id, label and planned target screen; never promote a trailing link. Omit canonicalShell and ctaDestination.
 - Every new plan must include brandTone, layout, sharedComponents.media and a composition plus navigationRole for each screen. Use actual enum values, not the pipe-separated examples. Choose zero patterns if none fit. Distinct screen tasks require distinct hierarchy/composition, not a repeated card grid. Shared identity is not identical page structure.
-- canonicalShell uses literal enum values: navigation bottom on mobile, sidebar or top for web; density compact or comfortable; statusBar none. layout contains one project-wide numeric gutter, contentMaxWidth, ascending spacing and typography scales in px chosen for this brief (examples are not universal defaults). Reuse colors/radius/navigation from their existing fields; never duplicate them in layout. Map EVERY screen name to its active destination id (or null only for contextual screens). Icon ids: home, plus, search, user, wallet, chart, analytics, calendar, location, plane, settings, circle. Studio renders these components deterministically.
-- Set productIdentity.layoutIntent from the product purpose: public-website for public marketing, portfolios, editorial and storefront websites; web-application for task-oriented dashboards and workspaces; mobile-application only for mobile apps. Never infer a portfolio from web alone. Public websites require top navigation with aligned brand, intrinsic-width links, optional CTA and a responsive menu; web applications choose sidebar or top by information architecture, not a landing navbar. Mobile bottom navigation contains genuine top-level destinations only. Mark each screen navigationRole primary or contextual; contextual flows retain their parent active destination and get a back affordance even when the title has no detail/edit keyword. Choose a web contentMaxWidth suitable for desktop, not a 390-440px phone shell.
+- Use layoutIntent public-website for public marketing, portfolio, editorial or storefront experiences; web-application for workspaces; mobile-application for mobile apps. Plan shared spacing and typography, but let the generator choose chrome and arrangement per task and breakpoint.
+- Plan up to three essential photo slots per screen. Use stock for generic illustrative subjects or public landmarks, never exact client work, branded products, book covers, portraits of specific people or private material. Use user for exact assets; never substitute stock as evidence. Queries contain public subject terms only, no URLs or confidential text. Leave photos empty for non-photographic screens.
+- A photography-led screen must include at least one photo slot, even if it requires a user asset.
 - Names must be standard, clean UI titles matching the user domain.
 - projectTitle is a product name, not the brief. Keep it 2-4 words and under 60 characters. Never return a sentence, a paragraph, a copy of the user's request, or a description of the work to be done.
 - Use the brand or product name the user wrote, spelled exactly as they wrote it. If the user named no brand, name the product after its domain, audience, and main purpose, for example "Analytics Dashboard" or "Inventory Console". Never invent a brand that contradicts the user.

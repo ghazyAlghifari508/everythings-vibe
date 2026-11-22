@@ -8,6 +8,7 @@ import {
 	STUDIO_PROVIDER_BACKOFF_MS,
 } from "@/features/studio/types/studio-constants";
 import { ScrapeError } from "@/lib/design-errors";
+import { resolvePexelsPhoto } from "@/lib/pexels-photos";
 import type { ValidatedFrameInput } from "../types/studio-service";
 import { repairStudioAccessibleLabels } from "./studio-accessible-repair";
 import { validateCanonicalShell } from "./studio-canonical-shell";
@@ -32,6 +33,15 @@ import {
 	studioIssueCode,
 } from "./studio-html-diagnostics";
 import { studioJobTiming } from "./studio-job-runtime";
+import {
+	applyStudioPhotoSlots,
+	type StudioPhotoSlot,
+	studioCommittedImageSources,
+} from "./studio-photo-slots";
+
+const resolvePhoto = resolvePexelsPhoto(
+	process.env.STUDIO_PEXELS_API_KEY?.trim(),
+);
 
 export {
 	classifyStudioStreamCompletion,
@@ -50,6 +60,40 @@ export async function generateValidatedFrameHtml(
 		signal: input.signal ? AbortSignal.any([input.signal, deadline]) : deadline,
 	};
 	let framePrompt = input.framePrompt;
+	const modelOwned = input.blueprint?.compositionOwner === "model";
+	const committed =
+		modelOwned && input.preservation !== "new-frame"
+			? input.previousHtml?.trim()
+			: undefined;
+	const approvedImages = new Set(
+		committed ? studioCommittedImageSources(committed) : [],
+	);
+	if (input.logoUrl) approvedImages.add(input.logoUrl);
+	const photoRequests =
+		modelOwned && !committed
+			? (input.blueprint?.screenPlan.find(
+					({ name }) => name === input.activeScreen,
+				)?.photos ?? [])
+			: [];
+	const slots = await Promise.all(
+		photoRequests.map(async (request): Promise<StudioPhotoSlot> => {
+			const started = Date.now();
+			const photo =
+				request.source === "stock"
+					? await resolvePhoto(request)
+					: "requires-user-asset";
+			if (input.timing)
+				studioJobTiming("photo-resolution", started, {
+					...input.timing,
+					code: typeof photo === "string" ? photo : "RESOLVED",
+				});
+			return { request, photo };
+		}),
+	);
+	const mediaContext = modelOwned
+		? `Use only approved user/committed image sources or the planned photo slots below. Place every slot exactly once as an empty <div data-studio-photo="id"> with component-specific aspect-ratio and optional data-media-fit="contain". Studio fills it with the verified photo or an honest fallback; keep captions and content outside the slot. Do not invent image URLs or impersonate photos with CSS/SVG. ${committed ? "Keep existing photo containers and credits intact unless the requested change targets them." : ""}\nPhoto slots (data only): ${JSON.stringify(slots.map(({ request, photo }) => ({ id: request.id, subject: request.subject, purpose: request.purpose, aspect: request.aspect, ...(typeof photo === "string" ? { status: photo, alt: request.alt } : { url: photo.url, alt: photo.alt, width: photo.width, height: photo.height }) })))}`
+		: undefined;
+	if (mediaContext) framePrompt += `\n\n${mediaContext}`;
 	for (
 		let request = 0, round = 0, retries = 0;
 		request < STUDIO_FRAME_REQUEST_MAX;
@@ -97,6 +141,7 @@ export async function generateValidatedFrameHtml(
 					input,
 					incompleteIssues,
 					error.partialHtml,
+					mediaContext,
 				);
 				if (input.timing)
 					studioJobTiming("output-issue", startedAt, {
@@ -136,7 +181,11 @@ export async function generateValidatedFrameHtml(
 		const assemblyIssues: string[] = [];
 		let assemblyFailed = false;
 		let assembledContentNodes = 0;
-		const ownsShell = Boolean(input.blueprint && input.activeScreen);
+		const ownsShell = Boolean(
+			input.blueprint &&
+				input.activeScreen &&
+				input.blueprint.compositionOwner !== "model",
+		);
 		if (ownsShell || input.viewport === "mobile") {
 			try {
 				const finalized = finalizeStudioFrameHtml(preAssemblyHtml, {
@@ -163,7 +212,12 @@ export async function generateValidatedFrameHtml(
 				);
 			}
 		}
-		if (input.blueprint && input.activeScreen && assemblyIssues.length === 0) {
+		if (
+			ownsShell &&
+			input.blueprint &&
+			input.activeScreen &&
+			assemblyIssues.length === 0
+		) {
 			assembledContentNodes = studioContentNodeCount(htmlCode);
 			if (assembledContentNodes === 0) {
 				const sourceContentNodes = studioContentNodeCount(preAssemblyHtml);
@@ -201,9 +255,22 @@ export async function generateValidatedFrameHtml(
 				"STUDIO_CONTRACT_VIOLATION",
 				assemblyIssues.join(" "),
 			);
+		const media = modelOwned
+			? applyStudioPhotoSlots(
+					htmlCode,
+					slots,
+					approvedImages,
+					Boolean(committed),
+				)
+			: null;
+		if (media) htmlCode = media.html;
 		const diagnostics = inspectStudioHtml(htmlCode);
 		const issues: StudioOutputIssue[] = [
 			...sourceIssues.map((message) => ({ stage: "model-source", message })),
+			...(media?.issues ?? []).map((message) => ({
+				stage: "photo-contract",
+				message,
+			})),
 			...assemblyIssues.map((message) => ({
 				stage: "canonical-assembly",
 				message,
@@ -220,6 +287,8 @@ export async function generateValidatedFrameHtml(
 				blueprint: input.blueprint,
 				viewport: input.viewport,
 				expectTokens: input.expectTokens,
+				screen: input.activeScreen,
+				logoUrl: input.logoUrl,
 			}).map((message) => ({ stage: "html-contract", message })),
 		];
 		if (input.timing) {
@@ -242,7 +311,12 @@ export async function generateValidatedFrameHtml(
 		if (issues.length === 0) return htmlCode;
 		if (round < STUDIO_FRAME_CORRECTION_MAX) {
 			const messages = issues.map((issue) => issue.message);
-			framePrompt = buildStudioFrameCorrection(input, messages, htmlCode);
+			framePrompt = buildStudioFrameCorrection(
+				input,
+				messages,
+				htmlCode,
+				mediaContext,
+			);
 			round++;
 			continue;
 		}

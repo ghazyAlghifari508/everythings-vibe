@@ -43,7 +43,8 @@ export async function finalizeStudioFrameDetail(
 		repairCount: 0,
 		source: "persisted",
 	};
-	if (!persisted) return base;
+	if (!persisted || project.designBlueprint?.compositionOwner === "model")
+		return base;
 	const [approved] = await db
 		.select()
 		.from(studioElementRevisions)

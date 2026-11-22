@@ -11,10 +11,9 @@ Public marketing site: value proposition, proof, supporting detail, one way to a
 Public site rules:
 - The navbar is a purposeful subset of the real pages. Two links and six links are both valid; three is not a quota.
 - Never promote the last link into a filled button by default. A CTA exists only when the site has a real primary action, and it reads as that action.
-- Brand, links and the responsive disclosure share one row; on narrow screens links collapse, the brand stays.
-- A hero earns its size: value proposition, one supporting line, one action, and a visual when it helps. No generic title bar above it.
+- Arrange brand and navigation around content; use disclosure or reflow when links no longer fit. A hero is optional; a generic title bar adds no hierarchy above it.
 - Vary section composition with the content: editorial column, feature rows, image-led showcase, gallery, timeline, comparison, FAQ, closing action. A stack of identical bordered cards holding a heading and a paragraph is not a composition.
 - Use placed photography or product imagery when it contributes. Do not shrink an image-led site into text blocks; long pages are fine, filler is not.
 
-Application rules: choose sidebar or top navigation from destinations and vocabulary, not from a landing template. Dense screens may use a contained table, an entry form, a detail panel or a split workspace — whichever the task needs.`,
+Application rules: choose navigation, if needed, from destinations and vocabulary. Use a contained table, form, detail panel or split workspace when it serves the task.`,
 };

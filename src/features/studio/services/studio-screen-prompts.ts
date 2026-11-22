@@ -29,15 +29,16 @@ OVERALL APPLICATION PURPOSE: "${opts.projectPrompt.trim()}"`,
 	if (opts.allScreens && opts.allScreens.length > 0) {
 		sections.push(
 			`Application screens in this project: ${opts.allScreens.join(", ")}.
-Maintain exact visual continuity (colors, header/footer layout, typography, components) with other screens in this application.
-- If this screen has a navigation bar or tab bar, ensure "${opts.screenName}" is marked as the active/selected item.`,
+Keep product identity, typography and recurring design conventions coherent. Match navigation state to the screen's planned destination or contextual parent.`,
 		);
 	}
 
-	// Shared design blueprint: the single authoritative specification every
-	// frame in this project must follow. Screen content must not redefine
-	// these shared decisions; only the active navigation item may differ.
-	if (opts.blueprint) {
+	if (opts.blueprint?.compositionOwner === "model") {
+		const { screenPlan, ...shared } = opts.blueprint;
+		const name = opts.activeScreen ?? opts.screenName;
+		sections.push(`Shared identity and navigation intent: ${JSON.stringify({ ...shared, screenPlan: screenPlan.map(({ name: screen, destinationId, parentDestinationId, composition, navigationRole }) => ({ name: screen, destinationId, parentDestinationId, navigationRole, ...(screen === name ? { composition } : {}) })) })}
+Design the entire responsive document yourself. Use shared --app-* tokens; Studio injects tokens, not chrome. Use one nonempty <main data-studio-content>. If present, mark the single project header with data-studio-header and the named primary navigation landmark with data-studio-navigation. Use data-destination="id" with href="#id" for planned destinations, aria-current="page" on the current primary link or contextual parent, and data-studio-back only on a contextual link to its planned parent. Use data-studio-action="id" with href="#id" for the distinct planned primary action if appropriate. Local section links must match real anchors. Use no simulated device chrome or generated JavaScript.`);
+	} else if (opts.blueprint) {
 		const activeScreen = opts.activeScreen ?? opts.screenName;
 		const { labels, destinations, iconMapping } =
 			opts.blueprint.navigationContract;
@@ -69,10 +70,6 @@ ${sanitizeStudioPrd(opts.prdContent.trim())}
 	}
 
 	// Platform instructions
-	if (opts.blueprint)
-		sections.push(
-			"Assembly overrides shared component instructions below: Studio inserts the platform app bar/navigation. Generate only marked main content; no independent app shell or device chrome.",
-		);
 	if (opts.designMode === "mobile") {
 		sections.push(MOBILE_PLATFORM_CONTRACT);
 	} else {
@@ -128,7 +125,7 @@ Strict styling integration rules:
 
 	// Logo
 	if (opts.logoUrl && opts.logoUrl.trim().length > 0) {
-		if (opts.blueprint) {
+		if (opts.blueprint && opts.blueprint.compositionOwner !== "model") {
 			// Assembly injects the logo into the platform app bar; asking the model
 			// to render it again duplicates brand chrome inside the screen body.
 			sections.push(
@@ -140,9 +137,7 @@ Studio renders the official application logo "${opts.logoUrl.trim()}" in the ass
 			sections.push(
 				`<APPLICATION_LOGO_REFERENCE>
 The user has provided an official application brand logo at: "${opts.logoUrl.trim()}".
-You MUST include this exact logo in the top navigation bar or app header:
-<img src="${opts.logoUrl.trim()}" alt="Logo" class="h-8 w-auto object-contain" />
-Do NOT replace this logo with text initials or placeholder shapes.
+Use this exact asset with meaningful alt text where brand identity belongs; do not fabricate a substitute.
 </APPLICATION_LOGO_REFERENCE>`,
 			);
 		}

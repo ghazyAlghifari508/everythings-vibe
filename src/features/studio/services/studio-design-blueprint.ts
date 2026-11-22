@@ -57,12 +57,23 @@ export const studioCanonicalShellSchema = z.object({
 });
 
 export const studioNavigationContractSchema = z.object({
-	destinations: z.array(z.string().min(1)).min(1).max(8),
-	labels: z.array(z.string().min(1)).min(1).max(8),
+	destinations: z.array(z.string().min(1)).max(8),
+	labels: z.array(z.string().min(1)).max(8),
 	iconMapping: z.record(z.string(), z.string()),
-	ordering: z.array(z.string().min(1)).min(1).max(8),
+	ordering: z.array(z.string().min(1)).max(8),
 	activeItemRule: z.string().min(1).max(300),
 	ctaDestination: z.string().min(1).nullable().optional(),
+	primaryAction: z
+		.object({
+			id: z
+				.string()
+				.regex(/^[a-z0-9-]+$/)
+				.max(48),
+			label: z.string().trim().min(1).max(80),
+			goal: z.string().trim().min(1).max(180),
+			target: z.string().min(1).max(100),
+		})
+		.optional(),
 });
 
 const orderedScale = (minimum: number, maximum: number) =>
@@ -158,6 +169,7 @@ export const studioDesignBlueprintSchema = z.object({
 	}),
 	navigationContract: studioNavigationContractSchema,
 	canonicalShell: studioCanonicalShellSchema.optional(),
+	compositionOwner: z.literal("model").optional(),
 	// Persisted blueprints without layout keep FIX 02 defaults.
 	layout: z
 		.object({
@@ -174,8 +186,28 @@ export const studioDesignBlueprintSchema = z.object({
 				name: z.string().min(1).max(100),
 				role: z.string().min(1).max(500),
 				navigationRole: z.enum(["primary", "contextual"]).optional(),
+				destinationId: z.string().optional(),
+				parentDestinationId: z.string().nullable().optional(),
 				// Persisted legacy screens and deterministic additions can retain role-only intent.
 				composition: screenCompositionSchema.optional(),
+				photos: z
+					.array(
+						z.object({
+							id: z.string().regex(/^[a-z0-9-]{1,40}$/),
+							subject: z.string().trim().min(1).max(100),
+							purpose: z.string().trim().min(1).max(120),
+							query: z.string().trim().min(1).max(100),
+							aspect: z.enum(["landscape", "portrait", "square"]),
+							alt: z.string().trim().min(1).max(120),
+							source: z.enum(["stock", "user"]),
+						}),
+					)
+					.max(3)
+					.refine(
+						(photos) =>
+							new Set(photos.map(({ id }) => id)).size === photos.length,
+					)
+					.optional(),
 				order: z.number().int().nonnegative(),
 			}),
 		)
@@ -259,6 +291,68 @@ export function validateBlueprint(
 	const names = blueprint.screenPlan.map((screen) => screen.name);
 	if (new Set(names).size !== names.length)
 		return { ok: false, error: "Nama layar harus unik." };
+	if (blueprint.compositionOwner === "model") {
+		if (shell || cta)
+			return {
+				ok: false,
+				error:
+					"Model composition cannot request a fixed shell or promote a navigation link.",
+			};
+		if (
+			blueprint.screenPlan.some(
+				(screen) =>
+					screen.composition?.media === "photography" && !screen.photos?.length,
+			)
+		)
+			return {
+				ok: false,
+				error: "Photography requires at least one planned photo slot.",
+			};
+		const destinationIds = blueprint.screenPlan.flatMap((screen) =>
+			screen.destinationId ? [screen.destinationId] : [],
+		);
+		if (
+			destinations.some((id) => !/^[a-z0-9-]{1,48}$/.test(id)) ||
+			destinationIds.length !== destinations.length ||
+			new Set(destinationIds).size !== destinations.length ||
+			!destinations.every((id) => destinationIds.includes(id)) ||
+			blueprint.screenPlan.some(
+				(screen) =>
+					!screen.navigationRole ||
+					(screen.destinationId && screen.navigationRole !== "primary") ||
+					(screen.parentDestinationId &&
+						(screen.navigationRole !== "contextual" ||
+							!destinations.includes(screen.parentDestinationId))),
+			)
+		)
+			return {
+				ok: false,
+				error: "Invalid screen-to-destination or parent relationship.",
+			};
+		const action = blueprint.navigationContract.primaryAction;
+		if (
+			action &&
+			(destinations.includes(action.id) ||
+				!names.includes(action.target) ||
+				blueprint.navigationContract.labels.some(
+					(label) => label.trim().toLowerCase() === action.label.toLowerCase(),
+				))
+		)
+			return {
+				ok: false,
+				error:
+					"Primary action requires a separate label, id and a known target screen.",
+			};
+		return {
+			ok: true,
+			blueprint: {
+				...blueprint,
+				productIdentity: { ...blueprint.productIdentity, layoutIntent },
+			},
+		};
+	}
+	if (destinations.length === 0)
+		return { ok: false, error: "Legacy navigation requires a destination." };
 	const activeDestinations = Object.fromEntries(
 		names.map((name) => {
 			const index = blueprint.navigationContract.labels.findIndex(

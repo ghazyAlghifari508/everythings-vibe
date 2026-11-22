@@ -1,5 +1,6 @@
 import { JSDOM } from "jsdom";
 import { escapeStudioHtml } from "./studio-canonical-chrome";
+import { canonicalGutter, canonicalPalette } from "./studio-canonical-style";
 import type { StudioDesignBlueprint } from "./studio-design-blueprint";
 import type { CanonicalDesignSystem } from "./studio-design-tokens";
 
@@ -125,6 +126,21 @@ export function enforceDesignSystemOnHtml(
 			const style = document.createElement("style");
 			style.id = "studio-blueprint-tokens";
 			style.textContent = `:root{--bp-primary:${bp.primary};--bp-secondary:${bp.secondary};--bp-background:${bp.background};--bp-surface:${bp.surface};--bp-font:${bp.fontFamily};--bp-radius:${bp.radius}px;--bp-border:${bp.border};--bp-elevation:${bp.elevation};}`;
+			if (blueprint.compositionOwner === "model") {
+				const palette = canonicalPalette(blueprint, tokens);
+				const layout = blueprint.layout;
+				const scale = (prefix: string, values?: number[]) =>
+					(values ?? [])
+						.map((value, index) => `--app-${prefix}-${index}:${value}px;`)
+						.join("");
+				style.textContent += `:root{--app-primary:${palette.primary};--app-secondary:${bp.secondary};--app-on-primary:${palette.onPrimary};--app-canvas:${palette.canvas};--app-surface:${palette.surface};--app-ink:${palette.ink};--app-muted:${palette.muted};--app-border:${palette.border};--app-font:${palette.font};--app-radius:${tokens?.shapes.borderRadius.cards ?? `${bp.radius}px`};--app-gutter:${canonicalGutter(blueprint)}px;--app-content-width:${layout?.contentMaxWidth ?? 1440}px;${scale("space", layout?.spacing)}${scale("type", layout?.typography)}}
+:where(html){box-sizing:border-box}
+:where(*, *::before, *::after){box-sizing:inherit}
+:where(body){margin:0;background:var(--app-canvas);color:var(--app-ink);font-family:var(--app-font);overflow-wrap:break-word}
+:where(main,[data-studio-navigation]){min-inline-size:0}
+:where(img,video){max-inline-size:100%;block-size:auto}
+:where(a,button,summary,input,select,textarea):focus-visible{outline:2px solid currentColor;outline-offset:2px}`;
+			}
 			document.head.appendChild(style);
 		}
 		const links = new Set<string>();
