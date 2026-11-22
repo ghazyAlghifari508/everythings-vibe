@@ -1,57 +1,66 @@
 import { describe, expect, it } from "vitest";
+import { statusIcons } from "@/components/ui/status-indicator";
 import { getPaymentStatusInfo } from "../utils/payment-status";
 
 describe("Payment status presentation mapping", () => {
 	it("maps success and gateway settlement statuses to Berhasil", () => {
-		expect(getPaymentStatusInfo("success").label).toBe("Berhasil");
-		expect(getPaymentStatusInfo("settlement").label).toBe("Berhasil");
-		expect(getPaymentStatusInfo("capture").label).toBe("Berhasil");
-		expect(getPaymentStatusInfo("success").className).toContain("text-emerald");
+		for (const status of ["success", "settlement", "capture", "paid"]) {
+			const info = getPaymentStatusInfo(status);
+			expect(info.label).toBe("Berhasil");
+			expect(info.tone).toBe("success");
+			expect(info.icon).toBe(statusIcons.success);
+		}
 	});
 
-	it("preserves pending as Menunggu", () => {
-		expect(getPaymentStatusInfo("pending").label).toBe("Menunggu");
-		expect(getPaymentStatusInfo("pending").className).toContain("text-amber");
+	it("preserves pending as Menunggu without treating it as failure", () => {
+		const info = getPaymentStatusInfo("pending");
+		expect(info.label).toBe("Menunggu");
+		expect(info.tone).toBe("warning");
+		expect(info.icon).toBe(statusIcons.pending);
 	});
 
 	it("distinguishes cancelled from failed", () => {
-		expect(getPaymentStatusInfo("cancel").label).toBe("Dibatalkan");
-		expect(getPaymentStatusInfo("cancelled").label).toBe("Dibatalkan");
-		expect(getPaymentStatusInfo("cancel").className).toContain("text-zinc");
+		for (const status of ["cancel", "cancelled"]) {
+			expect(getPaymentStatusInfo(status).label).toBe("Dibatalkan");
+			expect(getPaymentStatusInfo(status).tone).toBe("neutral");
+			expect(getPaymentStatusInfo(status).icon).toBe(statusIcons.released);
+		}
+		expect(getPaymentStatusInfo("failed").tone).toBe("danger");
 	});
 
 	it("distinguishes expired from failed", () => {
-		expect(getPaymentStatusInfo("expire").label).toBe("Kedaluwarsa");
-		expect(getPaymentStatusInfo("expired").label).toBe("Kedaluwarsa");
-		expect(getPaymentStatusInfo("expire").className).toContain("text-zinc");
+		for (const status of ["expire", "expired"]) {
+			expect(getPaymentStatusInfo(status).label).toBe("Kedaluwarsa");
+			expect(getPaymentStatusInfo(status).tone).toBe("neutral");
+		}
 	});
 
-	it("distinguishes refunds and chargebacks", () => {
+	it("keeps refunds neutral and chargebacks distinct", () => {
 		expect(getPaymentStatusInfo("refund").label).toBe("Dikembalikan");
 		expect(getPaymentStatusInfo("partial_refund").label).toBe(
 			"Dikembalikan sebagian",
 		);
+		expect(getPaymentStatusInfo("refund").tone).toBe("neutral");
 		expect(getPaymentStatusInfo("chargeback").label).toBe(
 			"Sengketa pembayaran",
 		);
-		expect(getPaymentStatusInfo("partial_chargeback").label).toBe(
-			"Sengketa pembayaran",
-		);
-		expect(getPaymentStatusInfo("refund").className).toContain("text-blue");
-		expect(getPaymentStatusInfo("chargeback").className).toContain(
-			"text-purple",
-		);
+		expect(getPaymentStatusInfo("chargeback").tone).toBe("warning");
+		expect(getPaymentStatusInfo("chargeback").icon).toBe(statusIcons.alert);
 	});
 
 	it("maps failed and deny to Gagal", () => {
-		expect(getPaymentStatusInfo("failed").label).toBe("Gagal");
-		expect(getPaymentStatusInfo("deny").label).toBe("Gagal");
-		expect(getPaymentStatusInfo("failed").className).toContain("text-rose");
+		for (const status of ["failed", "deny"]) {
+			const info = getPaymentStatusInfo(status);
+			expect(info.label).toBe("Gagal");
+			expect(info.tone).toBe("danger");
+			expect(info.icon).toBe(statusIcons.failed);
+		}
 	});
 
 	it("safely falls back for unknown statuses", () => {
 		expect(getPaymentStatusInfo("custom_status").label).toBe("custom_status");
 		expect(getPaymentStatusInfo(null).label).toBe("Gagal");
 		expect(getPaymentStatusInfo(undefined).label).toBe("Gagal");
+		expect(getPaymentStatusInfo(null).tone).toBe("neutral");
 	});
 });

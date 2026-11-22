@@ -10,6 +10,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import * as React from "react";
+import { Badge } from "@/components/ui/badge";
 import { Icon } from "@/components/ui/icon";
 import { useUserPlan } from "@/features/billing/hooks/use-user-plan";
 import {
@@ -201,11 +202,7 @@ export function TopUpModal({ open, onOpenChange }: TopUpModalProps) {
 													<span className="text-sm font-semibold text-snow">
 														{pkg.name} ({pkg.credits} Kredit)
 													</span>
-													{pkg.recommended && (
-														<span className="rounded border border-fog/30 bg-white/10 px-1.5 py-0.2 text-[10px] font-medium text-snow">
-															Rekomendasi
-														</span>
-													)}
+													<Badge>Rekomendasi</Badge>
 												</div>
 												<p className="mt-1 text-xs text-fog leading-relaxed">
 													{pkg.description}

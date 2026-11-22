@@ -8,6 +8,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { useState } from "react";
 import { Icon } from "@/components/ui/icon";
+import { StatusIndicator } from "@/components/ui/status-indicator";
 import type { CreditOperationStage } from "@/db/schema";
 import {
 	type StageFilter,
@@ -24,7 +25,7 @@ import {
 	getStatusBadge,
 	getStatusLabel,
 } from "@/features/billing/utils/credit-usage-status";
-import { cn, formatDate } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 import { CreditUsageDetail } from "./credit-usage-detail";
 
 export type { CreditOperationItem, StageFilter, StatusFilter };
@@ -235,15 +236,13 @@ export function CreditUsageSection(props: CreditUsageProps) {
 													: "-"}
 											</td>
 											<td className="whitespace-nowrap px-5 py-3.5">
-												<span
-													className={cn(
-														"inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium",
-														badge.className,
-													)}
+												<StatusIndicator
+													tone={badge.tone}
+													icon={badge.icon}
+													emphasize={badge.tone === "danger"}
 												>
-													{badge.icon}
 													{badge.label}
-												</span>
+												</StatusIndicator>
 											</td>
 											<td className="whitespace-nowrap px-5 py-3.5 text-right">
 												<button

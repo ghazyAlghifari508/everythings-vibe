@@ -6,6 +6,7 @@ import {
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Icon } from "@/components/ui/icon";
+import { StatusIndicator } from "@/components/ui/status-indicator";
 import { useUserPlan } from "@/features/billing/hooks/use-user-plan";
 import { cancelSubscription } from "@/features/billing/services/payment.functions";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
@@ -197,11 +198,12 @@ export function BillingPage({
 												</div>
 											</div>
 											<div className="shrink-0">
-												<span
-													className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusInfo.className}`}
+												<StatusIndicator
+													tone={statusInfo.tone}
+													icon={statusInfo.icon}
 												>
 													{statusInfo.label}
-												</span>
+												</StatusIndicator>
 											</div>
 										</div>
 									);

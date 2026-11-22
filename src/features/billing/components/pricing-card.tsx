@@ -2,6 +2,7 @@
 
 import { Cancel01Icon, Tick01Icon } from "@hugeicons/core-free-icons";
 import type * as React from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -102,11 +103,7 @@ export const PricingComponent: React.FC<PricingComponentProps> = ({
 								<CardTitle className="text-2xl font-normal">
 									{plan.name}
 								</CardTitle>
-								{isFeatured && (
-									<span className="rounded-[2px] bg-indigo/20 px-3 py-1 font-inter text-xs font-[510] text-mist shadow-[inset_0_0_0_1px_rgba(94,106,210,0.45)]">
-										Paling Laris
-									</span>
-								)}
+								<Badge variant="secondary">Paling Laris</Badge>
 							</div>
 							<CardDescription className="text-sm mt-1">
 								{plan.description}

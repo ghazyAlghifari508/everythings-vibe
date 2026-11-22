@@ -1,17 +1,15 @@
-import {
-	Alert01Icon,
-	CancelCircleIcon,
-	CheckmarkCircle01Icon,
-	Clock01Icon,
-	RefreshIcon,
-	ShieldAlertIcon,
-	Undo02Icon,
-} from "@hugeicons/core-free-icons";
-import { Icon } from "@/components/ui/icon";
+import type { IconProps } from "@/components/ui/icon";
+import { type StatusTone, statusIcons } from "@/components/ui/status-indicator";
 import type {
 	CreditOperationKind,
 	CreditOperationState,
 } from "@/features/billing/services/adaptive-credit";
+
+export interface CreditStatusPresentation {
+	label: string;
+	tone: StatusTone;
+	icon: IconProps["icon"];
+}
 
 export function getActivityLabel(kind: CreditOperationKind): string {
 	switch (kind) {
@@ -28,91 +26,78 @@ export function getActivityLabel(kind: CreditOperationKind): string {
 	}
 }
 
-export function getStatusLabel(state: CreditOperationState): string {
-	switch (state) {
-		case "settled":
-			return "Berhasil";
-		case "released":
-			return "Dilepas";
-		case "failed":
-			return "Gagal";
-		case "reserved":
-			return "Direservasi";
-		case "running":
-			return "Diproses";
-		case "settling":
-			return "Menyelesaikan";
-		case "quarantined":
-			return "Dikarantina";
-		case "refunded":
-			return "Dikembalikan";
-		case "quoted":
-			return "Dikutip";
-		default:
-			return state;
-	}
-}
-
-export function getStatusBadge(state: CreditOperationState) {
+/**
+ * Credit operation domain. Released is a credit reversal, never a paid charge;
+ * quoted and reserved are not failures. Payment status has its own mapping.
+ */
+function getPresentation(
+	state: CreditOperationState,
+): CreditStatusPresentation {
 	switch (state) {
 		case "settled":
 			return {
 				label: "Berhasil",
-				className: "bg-emerald/10 text-emerald border-emerald/20",
-				icon: (
-					<Icon icon={CheckmarkCircle01Icon} size={12} className="h-3 w-3" />
-				),
+				tone: "success",
+				icon: statusIcons.success,
 			};
 		case "released":
 			return {
 				label: "Dilepas",
-				className: "bg-steel/20 text-fog border-steel/30",
-				icon: <Icon icon={Undo02Icon} size={12} className="h-3 w-3" />,
+				tone: "neutral",
+				icon: statusIcons.released,
 			};
 		case "failed":
 			return {
 				label: "Gagal",
-				className: "bg-crimson/10 text-crimson border-crimson/20",
-				icon: <Icon icon={CancelCircleIcon} size={12} className="h-3 w-3" />,
+				tone: "danger",
+				icon: statusIcons.failed,
 			};
 		case "reserved":
 			return {
 				label: "Direservasi",
-				className: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-				icon: <Icon icon={Clock01Icon} size={12} className="h-3 w-3" />,
+				tone: "warning",
+				icon: statusIcons.pending,
 			};
 		case "running":
 		case "settling":
 			return {
-				label: "Diproses",
-				className: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
-				icon: (
-					<Icon icon={RefreshIcon} size={12} className="h-3 w-3 animate-spin" />
-				),
+				label: state === "running" ? "Diproses" : "Menyelesaikan",
+				tone: "neutral",
+				icon: statusIcons.processing,
 			};
 		case "quarantined":
 			return {
 				label: "Dikarantina",
-				className: "bg-indigo/10 text-indigo border-indigo/20",
-				icon: <Icon icon={ShieldAlertIcon} size={12} className="h-3 w-3" />,
+				tone: "danger",
+				icon: statusIcons.alert,
 			};
 		case "refunded":
 			return {
 				label: "Dikembalikan",
-				className: "bg-indigo/10 text-indigo border-indigo/20",
-				icon: <Icon icon={Undo02Icon} size={12} className="h-3 w-3" />,
+				tone: "neutral",
+				icon: statusIcons.released,
 			};
 		case "quoted":
 			return {
 				label: "Dikutip",
-				className: "bg-steel/10 text-fog border-steel/20",
-				icon: <Icon icon={Clock01Icon} size={12} className="h-3 w-3" />,
+				tone: "neutral",
+				icon: statusIcons.pending,
 			};
 		default:
 			return {
 				label: state,
-				className: "bg-steel/10 text-fog border-steel/20",
-				icon: <Icon icon={Alert01Icon} size={12} className="h-3 w-3" />,
+				tone: "neutral",
+				icon: statusIcons.alert,
 			};
 	}
+}
+
+export function getStatusLabel(state: CreditOperationState): string {
+	return getPresentation(state).label;
+}
+
+export function getStatusBadge(
+	state: CreditOperationState,
+): CreditStatusPresentation {
+	return getPresentation(state);
 }

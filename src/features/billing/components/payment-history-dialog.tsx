@@ -15,6 +15,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Icon } from "@/components/ui/icon";
+import { StatusIndicator } from "@/components/ui/status-indicator";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 import {
 	loadPaymentHistory,
@@ -168,11 +169,12 @@ export function PaymentHistoryDialog({
 											</div>
 										</div>
 										<div className="shrink-0">
-											<span
-												className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusInfo.className}`}
+											<StatusIndicator
+												tone={statusInfo.tone}
+												icon={statusInfo.icon}
 											>
 												{statusInfo.label}
-											</span>
+											</StatusIndicator>
 										</div>
 									</div>
 								);
