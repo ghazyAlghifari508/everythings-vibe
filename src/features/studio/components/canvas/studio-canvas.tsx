@@ -20,6 +20,7 @@ import {
 	STUDIO_CANVAS_INITIAL_ZOOM,
 	STUDIO_CANVAS_MAX_ZOOM,
 	STUDIO_CANVAS_MIN_ZOOM,
+	STUDIO_CANVAS_OVERLAY_EDGE_PX,
 } from "@/features/studio/types/studio-constants";
 import { isCanvasControlTarget } from "@/features/studio/utils/studio-canvas-gesture";
 import { deriveStudioLifecycle } from "@/features/studio/utils/studio-lifecycle";
@@ -288,7 +289,12 @@ export const StudioCanvas = memo(function StudioCanvas({
 				) : null}
 			</div>
 			{lifecycle.inconsistent && (
-				<output className="absolute left-3 top-20 z-20 max-w-md rounded-xl border border-graphite bg-obsidian p-4 text-sm text-fog">
+				<output
+					className="absolute top-20 z-20 max-w-md rounded-xl border border-graphite bg-obsidian p-4 text-sm text-fog"
+					style={{
+						left: `${(leftInsetPx ?? 0) + STUDIO_CANVAS_OVERLAY_EDGE_PX}px`,
+					}}
+				>
 					<p>Proses selesai, tetapi sebagian data desain belum tersedia.</p>
 					{onRefreshStatus && (
 						<button
@@ -302,7 +308,12 @@ export const StudioCanvas = memo(function StudioCanvas({
 				</output>
 			)}
 
-			{activeJob && <StudioCanvasQueueReadout activeJob={activeJob} />}
+			{activeJob && (
+				<StudioCanvasQueueReadout
+					activeJob={activeJob}
+					leftInsetPx={leftInsetPx ?? 0}
+				/>
+			)}
 
 			{/* Selection rectangle. Painted imperatively during a drag so a
 			    pointermove never re-renders the canvas; it only appears once the

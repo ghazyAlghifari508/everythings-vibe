@@ -8,6 +8,7 @@ import { Icon } from "@/components/ui/icon";
 import { ZoomControls } from "@/components/ui/zoom-controls";
 import type { StudioJobRow } from "@/db/schema";
 import { StudioFrameRetryButton } from "@/features/studio/components/canvas/studio-frame-error";
+import { STUDIO_CANVAS_OVERLAY_EDGE_PX } from "@/features/studio/types/studio-constants";
 import { resolveStudioQueueHealth } from "@/features/studio/types/studio-status";
 import { canvasZoomRowBottomCss } from "@/features/studio/utils/studio-canvas-layout";
 
@@ -115,11 +116,20 @@ export function StudioCanvasZoomCorner({
  * never from a timer or an invented stage sequence. Kept in the bottom-left
  * corner, clear of the composer and zoom controls.
  */
-function StudioCanvasPlanningStatus({ label }: { label: string }) {
+function StudioCanvasPlanningStatus({
+	label,
+	leftInsetPx,
+}: {
+	label: string;
+	leftInsetPx: number;
+}) {
 	return (
 		<output
-			className="pointer-events-none absolute left-3 z-20 max-w-md rounded-full border border-graphite bg-obsidian px-3 py-1 text-xs text-fog"
-			style={{ bottom: canvasZoomRowBottomCss() }}
+			className="pointer-events-none absolute z-20 max-w-md rounded-full border border-graphite bg-obsidian px-3 py-1 text-xs text-fog"
+			style={{
+				bottom: canvasZoomRowBottomCss(),
+				left: `${leftInsetPx + STUDIO_CANVAS_OVERLAY_EDGE_PX}px`,
+			}}
 		>
 			{label}
 		</output>
@@ -128,6 +138,8 @@ function StudioCanvasPlanningStatus({ label }: { label: string }) {
 
 interface StudioCanvasQueueReadoutProps {
 	activeJob: StudioJobRow;
+	/** Width the floating chat panel covers, so the readout stays visible beside it. */
+	leftInsetPx?: number;
 }
 
 /**
@@ -139,10 +151,13 @@ interface StudioCanvasQueueReadoutProps {
  */
 export function StudioCanvasQueueReadout({
 	activeJob,
+	leftInsetPx = 0,
 }: StudioCanvasQueueReadoutProps) {
 	const queueHealth = resolveStudioQueueHealth(activeJob);
 	if (!queueHealth) return null;
-	return <StudioCanvasPlanningStatus label={queueHealth} />;
+	return (
+		<StudioCanvasPlanningStatus label={queueHealth} leftInsetPx={leftInsetPx} />
+	);
 }
 
 interface StudioCanvasPlanningFailureProps {

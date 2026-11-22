@@ -105,6 +105,8 @@ export const STUDIO_CANVAS_VIEW_SAVE_DELAY_MS = 400;
 export const STUDIO_CANVAS_MARQUEE_DRAG_THRESHOLD_PX = 4;
 
 export const STUDIO_CANVAS_ZOOM_BOTTOM_PX = 16;
+// Gap between a canvas overlay and the edge (or the chat panel) it sits beside.
+export const STUDIO_CANVAS_OVERLAY_EDGE_PX = 12;
 
 // Floating chat panel geometry. The same rule sizes the panel and insets the
 // opening canvas view, so frames never open underneath it.
