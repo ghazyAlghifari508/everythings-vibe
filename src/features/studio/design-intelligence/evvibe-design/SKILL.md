@@ -81,12 +81,32 @@ place:
 
 ## Correction policy
 
-No skill text is added to a repair request. If the previous document cannot fit
-beside the reported issues within `STUDIO_CORRECTION_PROMPT_MAX_CHARS`, the
-document is dropped whole — never truncated — and the repair regenerates the
-screen from the approved blueprint while fixing every listed defect. If even
-that exceeds the budget the frame fails explicitly. Correction attempts stay
-bounded at `STUDIO_FRAME_CORRECTION_MAX`.
+No skill text is added to a repair request. Correction attempts stay bounded at
+`STUDIO_FRAME_CORRECTION_MAX`, and the policy depends on what the operation has
+to preserve:
+
+| Operation | Committed design | Oversized candidate |
+| --- | --- | --- |
+| Initial frame, added screen, retry of a never-successful frame | none | bounded fresh regeneration from the blueprint (`NEW_FRAME_BOUNDED_REGENERATION`) |
+| Revision or retry of a frame with committed HTML | yes | repair refused with `STUDIO_REVISION_TOO_LARGE`; the committed design is kept (`REVISION_CONTEXT_TOO_LARGE`) |
+
+The policy is passed explicitly from the call site (`new-frame` /
+`preserve-existing`) and never inferred from prompt wording, frame status or
+metadata completeness: a frame is disposable only when it has no committed
+HTML. A repair that fits always proceeds in place (`FULL_DOCUMENT_REPAIR`) and
+carries the user's requested change as a scoped instruction, so the repair
+cannot widen into a redesign.
+
+## Large-document revision
+
+Revision prompts never truncate an existing document. The complete document is
+sent when it fits `STUDIO_PREVIOUS_HTML_MAX_CHARS`. Above that limit, only
+lossless compaction is attempted — HTML comments and inter-tag whitespace,
+never inside `pre`, `textarea`, `script` or `style` — and it is used only when
+the parsed structure, attributes and text are identical before and after.
+Anything that cannot be reduced safely fails as `STUDIO_REVISION_TOO_LARGE`,
+which keeps the last committed revision and costs no provider request. Scoped
+patch application is P8 work.
 
 ## Enforcement
 
@@ -100,9 +120,23 @@ structural check was added:
 | advisory | Reported, never triggers regeneration | sparse body, repeated status label, oversized nested padding, decorative cursor |
 
 `CARD_ONLY_COMPOSITION` inspects the content region's own children: on a
-`public-website` intent, three or more boxed, text-only blocks with no media,
-link, list or control. It is a bounded repair signal, not proof that a design
-has no slop; subjective aesthetics stay advisory.
+`public-website` intent, three or more text-only blocks, each carrying an
+explicit card marker, a border or a shadow, with no media, link, list or
+control. A background colour alone is not card evidence — full-width editorial
+colour-block sections are a legitimate composition — and the check never
+demands photography, a hero, a CTA or a fixed section count. It stays a bounded
+repair signal, not proof that a design has no slop; subjective aesthetics stay
+advisory.
+
+## Remaining limitations
+
+- Background-only card walls are not detected; JSDOM offers no layout geometry,
+  so containment cannot be measured, and guessing would misfire on editorial
+  sections.
+- Existing frames have no generic scoped patcher; an oversized preserved repair
+  fails instead of being applied partially. P8 owns scoped element application.
+- Provider input tokens are not observable in the mocked suites; prompt sizes
+  are reported in characters.
 
 ## Review ledger
 
