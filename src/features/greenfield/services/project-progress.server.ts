@@ -191,7 +191,12 @@ export async function handleProjectStepRequest(
 	request: Request,
 	params: { id: string },
 ): Promise<Response> {
-	const user = await requireUser(request.headers);
+	let user: { id: string };
+	try {
+		user = await requireUser(request.headers);
+	} catch {
+		return Response.json({ error: "Unauthorized" }, { status: 401 });
+	}
 	const { id: projectId } = params;
 	if (!projectId)
 		return Response.json({ error: "Project ID is required" }, { status: 400 });
