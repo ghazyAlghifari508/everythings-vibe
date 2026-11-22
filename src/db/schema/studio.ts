@@ -59,7 +59,11 @@ export const studioProjects = pgTable(
 			.defaultNow()
 			.notNull(),
 	},
-	(t) => [index("studio_projects_user_id_idx").on(t.userId)],
+	(t) => [
+		index("studio_projects_user_id_idx").on(t.userId),
+		// FK target for credit_operations (resource ownership); id stays first.
+		unique("studio_projects_user_id_id_unique").on(t.id, t.userId),
+	],
 );
 
 export const studioAssets = pgTable(
@@ -139,6 +143,12 @@ export const studioJobs = pgTable(
 		index("studio_jobs_project_id_idx").on(t.projectId),
 		index("studio_jobs_user_id_idx").on(t.userId),
 		index("studio_jobs_status_idx").on(t.status),
+		// FK target for credit_operations: job, owning project and user agree.
+		unique("studio_jobs_id_project_id_user_id_unique").on(
+			t.id,
+			t.projectId,
+			t.userId,
+		),
 	],
 );
 

@@ -8,6 +8,7 @@ import {
 	pgTable,
 	text,
 	timestamp,
+	unique,
 	uniqueIndex,
 } from "drizzle-orm/pg-core";
 import type {
@@ -209,6 +210,8 @@ export const scrapes = pgTable(
 	(t) => [
 		index("scrapes_user_id_idx").on(t.userId),
 		index("scrapes_job_queue_idx").on(t.status, t.leaseExpiresAt, t.createdAt),
+		// FK target for credit_operations (resource ownership); id stays first.
+		unique("scrapes_user_id_id_unique").on(t.id, t.userId),
 	],
 );
 

@@ -224,7 +224,11 @@ export type AdminFeedbackSearchParams = z.infer<
 >;
 
 export type AdminUserItem = typeof users.$inferSelect;
-export type AdminSubscriptionItem = typeof subscriptions.$inferSelect;
+// allocationEpoch is billing-internal reservation bookkeeping, not admin data.
+export type AdminSubscriptionItem = Omit<
+	typeof subscriptions.$inferSelect,
+	"allocationEpoch"
+>;
 
 export interface AdminUserRow {
 	user: AdminUserItem;
