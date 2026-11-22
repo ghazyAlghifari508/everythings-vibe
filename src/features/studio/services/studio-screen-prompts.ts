@@ -34,10 +34,14 @@ Keep product identity, typography and recurring design conventions coherent. Mat
 	}
 
 	if (opts.blueprint?.compositionOwner === "model") {
-		const { screenPlan, ...shared } = opts.blueprint;
+		const { screenPlan, initialScope, ...shared } = opts.blueprint;
 		const name = opts.activeScreen ?? opts.screenName;
 		sections.push(`Shared identity and navigation intent: ${JSON.stringify({ ...shared, screenPlan: screenPlan.map(({ name: screen, destinationId, parentDestinationId, composition, navigationRole }) => ({ name: screen, destinationId, parentDestinationId, navigationRole, ...(screen === name ? { composition } : {}) })) })}
 Design the entire responsive document yourself. Use shared --app-* tokens; Studio injects tokens, not chrome. Use one nonempty <main data-studio-content>. If present, mark the single project header with data-studio-header and the named primary navigation landmark with data-studio-navigation. Use data-destination="id" with href="#id" for planned destinations, aria-current="page" on the current primary link or contextual parent, and data-studio-back only on a contextual link to its planned parent. Use data-studio-action="id" with href="#id" for the distinct planned primary action if appropriate. Local section links must match real anchors. Use no simulated device chrome or generated JavaScript.`);
+		if (initialScope?.deferred.length)
+			sections.push(
+				"The brief includes future work. Render only the requested screen and use the shared navigation contract for actual destinations. Do not render or link to unplanned screens.",
+			);
 	} else if (opts.blueprint) {
 		const activeScreen = opts.activeScreen ?? opts.screenName;
 		const { labels, destinations, iconMapping } =

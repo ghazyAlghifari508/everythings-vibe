@@ -2,8 +2,10 @@ import { z } from "zod";
 import {
 	type StudioDesignMode,
 	type StudioScreenPlan,
+	studioInitialScopeSchema,
 	studioScreenPlanSchema,
 } from "@/features/studio/types/studio-prompts";
+import { STUDIO_INITIAL_SCREEN_LIMIT } from "../types/studio-constants";
 import {
 	type StudioDesignBlueprint,
 	validateBlueprint,
@@ -125,12 +127,11 @@ export function parseStudioPlanningWithBlueprint(
 ):
 	| { ok: true; plan: StudioScreenPlan; blueprint: StudioDesignBlueprint }
 	| { ok: false; error: string } {
-	const planParsed = parseStudioScreenPlan(
-		raw,
-		fallbackViewport,
-		expectedCount,
-	);
-	if (!planParsed.ok) return planParsed;
+	const adaptive = expectedCount === null;
+	const legacy = adaptive
+		? null
+		: parseStudioScreenPlan(raw, fallbackViewport, expectedCount);
+	if (legacy && !legacy.ok) return legacy;
 	let parsedJson: unknown;
 	try {
 		const clean = raw
@@ -160,6 +161,9 @@ export function parseStudioPlanningWithBlueprint(
 			ok: false,
 			error: "Blueprint desain bersama tidak ditemukan pada output perencana.",
 		};
+	const planResult = legacy ?? parseAdaptivePlan(parsedJson, fallbackViewport);
+	if (!planResult.ok) return planResult;
+	const plan = planResult.plan;
 	// New plans must choose their family; legacy normalization must not silently choose it for them.
 	const hasPlannedLayoutIntent = z
 		.object({ productIdentity: z.object({ layoutIntent: z.string() }) })
@@ -197,13 +201,13 @@ export function parseStudioPlanningWithBlueprint(
 			ok: false,
 			error: `Blueprint harus menargetkan platform ${fallbackViewport}.`,
 		};
-	if (validated.blueprint.screenPlan.length !== planParsed.plan.screens.length)
+	if (blueprint.screenPlan.length !== plan.screens.length)
 		return {
 			ok: false,
 			error: "Jumlah screen pada blueprint harus sama dengan rencana layar.",
 		};
 	if (
-		planParsed.plan.screens.some((screen, index) => {
+		plan.screens.some((screen, index) => {
 			const shared = validated.blueprint.screenPlan[index];
 			return shared.name !== screen.name || shared.order !== screen.order;
 		})
@@ -214,7 +218,59 @@ export function parseStudioPlanningWithBlueprint(
 		};
 	return {
 		ok: true,
-		plan: planParsed.plan,
-		blueprint: validated.blueprint,
+		plan,
+		blueprint: adaptive
+			? { ...blueprint, initialScope: plan.scope }
+			: blueprint,
 	};
+}
+
+function parseAdaptivePlan(
+	raw: unknown,
+	platform: StudioDesignMode,
+): { ok: true; plan: StudioScreenPlan } | { ok: false; error: string } {
+	const result = studioScreenPlanSchema
+		.extend({ scope: studioInitialScopeSchema })
+		.safeParse(raw);
+	if (!result.success)
+		return {
+			ok: false,
+			error:
+				"Return named screens and a scope with requestedCount, rationale and deferred items.",
+		};
+	const plan = result.data;
+	const count = plan.screens.length;
+	const requested = plan.scope.requestedCount;
+	const names = new Set(
+		plan.screens.map((screen) => screen.name.trim().toLowerCase()),
+	);
+	if (count > STUDIO_INITIAL_SCREEN_LIMIT)
+		return {
+			ok: false,
+			error: `Initial batch must contain at most ${STUDIO_INITIAL_SCREEN_LIMIT} screens.`,
+		};
+	if (
+		names.size !== count ||
+		plan.screens.some(
+			(screen, index) =>
+				!screen.name.trim() ||
+				!screen.description.trim() ||
+				screen.order !== index ||
+				screen.viewport !== platform,
+		)
+	)
+		return {
+			ok: false,
+			error: `Use unique named ${platform} screens with nonempty descriptions and sequential order starting at 0.`,
+		};
+	if (
+		requested !== null &&
+		(count !== Math.min(requested, STUDIO_INITIAL_SCREEN_LIMIT) ||
+			(requested > count && !plan.scope.deferred.length))
+	)
+		return {
+			ok: false,
+			error: `Honor the explicit count up to ${STUDIO_INITIAL_SCREEN_LIMIT}; list concrete deferred scope if it exceeds the batch.`,
+		};
+	return { ok: true, plan };
 }

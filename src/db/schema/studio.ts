@@ -28,11 +28,7 @@ export const studioProjects = pgTable(
 			.notNull()
 			.references(() => users.id, { onDelete: "cascade" }),
 		title: text("title").notNull(),
-		// Provenance of `title`: "auto" is a system-chosen name (the provisional
-		// title cut from the brief, then the planner's product name), "user" is a
-		// name a person typed through the rename dialog. Planning only replaces a
-		// title still marked "auto", so a rename is never overwritten. Defaults to
-		// "user" so a writer that forgets the column is protected.
+		// Planning can replace auto titles only. Default to user to protect older writers.
 		titleSource: text("title_source")
 			.$type<StudioTitleSource>()
 			.notNull()
@@ -47,6 +43,7 @@ export const studioProjects = pgTable(
 		 * gain; see docs/prompt-design-studio/p7-implementation.md.
 		 */
 		designSkillId: text("design_skill_id").notNull().default("none"),
+		/** Null until adaptive planning commits; historical jobs may have a preselected count. */
 		initialPageCount: integer("initial_page_count"),
 		designReference:
 			jsonb("design_reference").$type<StudioDesignReferenceMetadata>(),

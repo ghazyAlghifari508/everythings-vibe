@@ -28,6 +28,7 @@ export const studioMessageProgressSchema = z.object({
 	total: z.int().nonnegative(),
 	failed: z.int().nonnegative(),
 	screenNames: z.array(z.string()),
+	deferred: z.array(z.string()).optional(),
 	recovery: z.enum(["planning", "frames", "resubmit"]).nullable(),
 });
 export type StudioMessageStatus = z.infer<typeof studioMessageStatusSchema>;

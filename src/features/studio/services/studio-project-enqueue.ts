@@ -2,7 +2,6 @@ import { and, asc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
 	type InsertStudioAssetRow,
-	type InsertStudioFrameRow,
 	type InsertStudioJobRow,
 	type InsertStudioProjectRow,
 	type StudioFrameRow,
@@ -98,9 +97,9 @@ export async function createStudioProjectWithJob(
 				and(
 					eq(studioJobs.userId, userId),
 					eq(studioJobs.prompt, checked.prompt),
+					eq(studioJobs.jobType, "initial"),
 					eq(studioProjects.userId, userId),
 					eq(studioProjects.designMode, designMode),
-					eq(studioProjects.initialPageCount, options.initialPageCount),
 					cleanDesignMd === null
 						? isNull(studioProjects.designMd)
 						: eq(studioProjects.designMd, cleanDesignMd),
@@ -123,7 +122,12 @@ export async function createStudioProjectWithJob(
 			const recentFrames = await tx
 				.select()
 				.from(studioFrames)
-				.where(eq(studioFrames.projectId, recentJob.project.id))
+				.where(
+					and(
+						eq(studioFrames.projectId, recentJob.project.id),
+						eq(studioFrames.originJobId, recentJob.job.id),
+					),
+				)
 				.orderBy(asc(studioFrames.order));
 			return {
 				project: recentJob.project,
@@ -132,7 +136,6 @@ export async function createStudioProjectWithJob(
 			};
 		}
 
-		// Project, initial job, slots and conversation share one commit.
 		let logoAssetId: string | null = null;
 		if (validatedLogo) {
 			const [asset] = await tx
@@ -157,7 +160,6 @@ export async function createStudioProjectWithJob(
 				designMode,
 				designMd: cleanDesignMd,
 				logoAssetId,
-				initialPageCount: options.initialPageCount,
 				designReference: resolved.designReference,
 				prdContent: cleanPrdContent,
 				prdFilename: cleanPrdFilename,
@@ -197,34 +199,6 @@ export async function createStudioProjectWithJob(
 			);
 		}
 
-		const slotCount = options.initialPageCount;
-		const slots = await tx
-			.insert(studioFrames)
-			.values(
-				Array.from(
-					{ length: slotCount },
-					(_, index) =>
-						({
-							projectId: newProject.id,
-							originJobId: newJob.id,
-							initialSlot: index,
-							name: `Layar ${index + 1}`,
-							description: "",
-							viewport: designMode,
-							order: index,
-							status: "queued",
-						}) satisfies InsertStudioFrameRow,
-				),
-			)
-			.returning();
-
-		if (slots.length !== slotCount) {
-			throw new ScrapeError(
-				"STORAGE_FAILED",
-				"Gagal menyiapkan slot layar studio.",
-			);
-		}
-
 		await appendStudioConversation(tx, {
 			projectId: newProject.id,
 			userId,
@@ -232,6 +206,6 @@ export async function createStudioProjectWithJob(
 			prompt: input.prompt,
 			jobs: [newJob],
 		});
-		return { project: newProject, job: newJob, frames: slots };
+		return { project: newProject, job: newJob, frames: [] };
 	});
 }

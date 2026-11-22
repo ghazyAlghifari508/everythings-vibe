@@ -8,6 +8,7 @@ import {
 	studioProjects,
 } from "@/db/schema";
 import { ScrapeError } from "@/lib/design-errors";
+import { STUDIO_ADD_SCREEN_LIMIT } from "../types/studio-constants";
 import {
 	STUDIO_ADD_FRAME_PLACEHOLDER_NAME,
 	type StudioIntentDecision,
@@ -15,7 +16,6 @@ import {
 import { resolveStudioOperationIntent } from "./studio-composer-intent.server";
 import { appendStudioConversation } from "./studio-conversation";
 import { StudioFrameError } from "./studio-frame-errors";
-import { STUDIO_MAX_PAGE_COUNT } from "./studio-generation-options";
 import {
 	ensureStudioInitialOwnership,
 	findStudioInitialJob,
@@ -43,7 +43,7 @@ function assertNewScreenNames(
 	decision: StudioIntentDecision,
 	frames: StudioFrameRow[],
 ) {
-	if (decision.screens.length > STUDIO_MAX_PAGE_COUNT)
+	if (decision.screens.length > STUDIO_ADD_SCREEN_LIMIT)
 		throw new StudioFrameError("STUDIO_SCREEN_LIMIT");
 	const names = decision.screens.map((name) => name.trim());
 	const keys = names.map((name) => name.toLowerCase());

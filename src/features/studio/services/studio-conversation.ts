@@ -126,12 +126,20 @@ export async function synchronizeStudioConversation(
 			),
 		)
 		.orderBy(asc(studioFrames.order));
+	const [project] = await tx
+		.select({ blueprint: studioProjects.designBlueprint })
+		.from(studioProjects)
+		.where(
+			and(eq(studioProjects.id, projectId), eq(studioProjects.userId, userId)),
+		);
+	const deferred = project?.blueprint?.initialScope?.deferred;
 	for (const message of messages) {
 		if (!message.jobIds.length) continue;
 		const progress = resolveStudioMessageProgress(
 			message,
 			jobs,
 			frames.map((row) => row.studio_frames),
+			deferred,
 		);
 		const content = describeStudioMessageProgress(progress);
 		if (

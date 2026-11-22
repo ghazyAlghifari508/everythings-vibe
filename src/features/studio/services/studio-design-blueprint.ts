@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { studioInitialScopeSchema } from "../types/studio-prompts";
 import { STUDIO_COMPONENT_PATTERNS } from "./studio-component-patterns";
 
 const canonicalIconIds = new Set([
@@ -109,8 +110,8 @@ const screenCompositionSchema = z.object({
 	]),
 	media: z.enum(["none", "whole-product", "photography", "project-work"]),
 });
-
 export const studioDesignBlueprintSchema = z.object({
+	initialScope: studioInitialScopeSchema.optional(),
 	explicitColorOverrides: z
 		.array(
 			z.enum(["primary", "background", "surface", "ink", "muted", "border"]),
@@ -170,7 +171,6 @@ export const studioDesignBlueprintSchema = z.object({
 	navigationContract: studioNavigationContractSchema,
 	canonicalShell: studioCanonicalShellSchema.optional(),
 	compositionOwner: z.literal("model").optional(),
-	// Persisted blueprints without layout keep FIX 02 defaults.
 	layout: z
 		.object({
 			gutter: z.number().min(0).max(64),

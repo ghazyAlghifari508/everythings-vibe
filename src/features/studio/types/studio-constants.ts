@@ -1,5 +1,4 @@
-// A project name is a product name, not the brief. The character budget keeps a
-// header readable; the word budget rejects a paragraph that happens to be short.
+// Workspace titles must fit the history list without becoming brief excerpts.
 export const STUDIO_PROJECT_TITLE_MAX_CHARS = 60;
 export const STUDIO_PROJECT_TITLE_MAX_WORDS = 8;
 export const STUDIO_PROJECT_TITLE_FALLBACK = "Project Studio";
@@ -20,6 +19,10 @@ export const STUDIO_PROJECT_TITLE_PLACEHOLDERS = [
 	"aplikasi prototipe",
 	"project studio",
 	"studio tanpa judul",
+	"website modern",
+	"aplikasi mobile",
+	"modern website",
+	"mobile app",
 ];
 
 // Words that introduce the audience or a clause ("untuk Nadia", "yang dipakai
@@ -51,6 +54,9 @@ export const STUDIO_PROJECT_TITLE_OWNER_CONNECTORS = [
 	"punya",
 	"for",
 ];
+
+export const STUDIO_INITIAL_SCREEN_LIMIT = 5;
+export const STUDIO_ADD_SCREEN_LIMIT = 5;
 
 export const STUDIO_LOGO_MAX_BYTES = 2 * 1024 * 1024;
 export const STUDIO_DESIGN_MD_MAX_CHARS = 100_000;

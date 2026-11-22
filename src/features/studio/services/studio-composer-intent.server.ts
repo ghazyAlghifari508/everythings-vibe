@@ -4,13 +4,13 @@ import {
 	tryStreamWithFallback,
 } from "@/lib/services/ai-orchestrator";
 import { extractJson } from "@/lib/services/json-extract";
+import { STUDIO_ADD_SCREEN_LIMIT } from "../types/studio-constants";
 import {
 	resolveStudioIntentFromContext,
 	STUDIO_CLARIFY_MESSAGE,
 	STUDIO_INTENT_MAX_TOKENS,
 	type StudioIntentDecision,
 } from "./studio-composer-intent";
-import { STUDIO_MAX_PAGE_COUNT } from "./studio-generation-options";
 
 // Bounded classification: the model only has to pick one of three labels and
 // may name requested screens. Everything else is validated here, so a
@@ -19,7 +19,7 @@ const aiIntentSchema = z.object({
 	intent: z.enum(["add_screen", "revise_project", "clarify"]),
 	screens: z
 		.array(z.string().trim().min(1).max(60))
-		.max(STUDIO_MAX_PAGE_COUNT)
+		.max(STUDIO_ADD_SCREEN_LIMIT)
 		.optional(),
 });
 

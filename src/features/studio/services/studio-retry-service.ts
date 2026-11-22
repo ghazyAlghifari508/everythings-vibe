@@ -104,7 +104,15 @@ export async function retryStudioFrame(
 			operation?.errorCode === "STUDIO_IDEMPOTENCY_CONFLICT"
 		)
 			throw new StudioFrameError("STUDIO_STALE_REVISION");
-		if (operation?.errorCode === "STUDIO_DEPENDENCY_FAILED")
+		if (
+			operation?.errorCode === "STUDIO_DEPENDENCY_FAILED" &&
+			!(
+				operation.jobType === "add" &&
+				initial?.planningCompletedAt &&
+				operation.blueprintJobId === initial.id &&
+				!operation.dependsOnJobId
+			)
+		)
 			throw new StudioFrameError("STUDIO_DEPENDENCY_FAILED");
 		if (operation) {
 			await tx

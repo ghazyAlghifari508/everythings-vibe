@@ -6,7 +6,6 @@ import { requireUser } from "@/lib/session";
 import { StudioReferenceError } from "./studio-design-reference.server";
 import {
 	studioDesignReferenceSchema,
-	studioInitialPageCountSchema,
 	studioPrdAttachmentSchema,
 } from "./studio-generation-options";
 import { validateStudioPrdFilename } from "./studio-prd-helpers";
@@ -77,7 +76,6 @@ export const studioGenerateBodySchema = z.object({
 	title: z.string().optional(),
 	projectId: z.string().optional(),
 	designMode: z.enum(["web", "mobile"]).optional(),
-	initialPageCount: studioInitialPageCountSchema.optional(),
 	designReference: studioDesignReferenceSchema.nullable().optional(),
 	designMd: z.string().max(STUDIO_DESIGN_MD_MAX_CHARS).nullable().optional(),
 	prdAttachment: studioPrdAttachmentSchema.nullable().optional(),
@@ -172,7 +170,6 @@ export async function POST({
 			designMode: body.designMode,
 			designMd: body.designMd,
 			logo: body.logo,
-			initialPageCount: body.initialPageCount,
 			designReference: body.designReference,
 			prdAttachment: validatedPrd,
 		});
@@ -183,7 +180,7 @@ export async function POST({
 				jobId: job.id,
 				status: job.status,
 				frameIds: frames.map((frame) => frame.id),
-				pageCount: frames.length,
+				pageCount: job.planningCompletedAt ? frames.length : null,
 			},
 			{ status: 201 },
 		);

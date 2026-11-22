@@ -12,6 +12,7 @@ export function resolveStudioMessageProgress(
 	message: StudioMessageRow,
 	jobs: StudioJobRow[],
 	frames: StudioFrameRow[],
+	deferred?: string[],
 ): StudioMessageProgress {
 	const related = jobs.filter((job) => message.jobIds.includes(job.id));
 	const initial = related.find((job) => job.jobType === "initial");
@@ -65,6 +66,7 @@ export function resolveStudioMessageProgress(
 		ready,
 		total,
 		failed,
+		...(initial && planned && deferred?.length ? { deferred } : {}),
 		screenNames:
 			initial && !planned
 				? []
@@ -89,15 +91,19 @@ export function describeStudioMessageProgress(
 	const plan = screenNames.length
 		? `Rencana layar: ${screenNames.join(", ")}.\n`
 		: "";
+	const scope = progress.deferred?.length
+		? `\nBatch awal: ${total} layar. Belum tercakup: ${progress.deferred.join("; ")}. Minta layar tambahan lewat chat.`
+		: "";
 	if (phase === "queued")
-		return `${plan}Permintaan diterima dan menunggu giliran. Pekerjaan yang sedang berjalan tetap dilanjutkan.`;
+		return `${plan}Permintaan diterima dan menunggu giliran. Pekerjaan yang sedang berjalan tetap dilanjutkan.${scope}`;
 	if (phase === "planning") return "Sedang menyusun rencana layar.";
 	if (phase === "generating")
-		return `${plan}${ready} dari ${total} halaman tersedia.`;
-	if (phase === "completed") return `${plan}${ready} halaman selesai diproses.`;
+		return `${plan}${ready} dari ${total} halaman tersedia.${scope}`;
+	if (phase === "completed")
+		return `${plan}${ready} halaman selesai diproses.${scope}`;
 	if (phase === "partial")
-		return `${plan}${ready} halaman tersedia. ${Math.max(failed, total - ready)} halaman belum berhasil diproses.`;
+		return `${plan}${ready} halaman tersedia. ${Math.max(failed, total - ready)} halaman belum berhasil diproses.${scope}`;
 	return progress.recovery === "planning"
 		? "Rencana layar belum berhasil disusun. Pulihkan perencanaan di canvas."
-		: `${plan}Permintaan belum berhasil diproses. ${progress.recovery === "frames" ? "Pulihkan halaman yang gagal di canvas." : "Pilih layar terbaru lalu kirim ulang instruksi."}`;
+		: `${plan}Permintaan belum berhasil diproses. ${progress.recovery === "frames" ? "Pulihkan halaman yang gagal di canvas." : "Pilih layar terbaru lalu kirim ulang instruksi."}${scope}`;
 }

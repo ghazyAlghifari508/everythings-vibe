@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import {
 	type StudioFrameRow,
 	type StudioJobRow,
@@ -97,6 +97,24 @@ export async function persistStudioPlannedFrames(
 			"STORAGE_FAILED",
 			"Slot perencanaan tidak konsisten.",
 		);
+	// Reserve the first positions for the initial batch, keeping IDs of adds queued during planning.
+	if (existing.length === 0) {
+		const tail = await tx
+			.select({ id: studioFrames.id, order: studioFrames.order })
+			.from(studioFrames)
+			.where(eq(studioFrames.projectId, projectId))
+			.orderBy(desc(studioFrames.order));
+		for (const frame of tail)
+			await tx
+				.update(studioFrames)
+				.set({ order: frame.order + planned.length })
+				.where(
+					and(
+						eq(studioFrames.projectId, projectId),
+						eq(studioFrames.id, frame.id),
+					),
+				);
+	}
 	const updated: StudioFrameRow[] = [];
 	for (const screen of planned) {
 		const slot = existing.find((frame) => frame.initialSlot === screen.order);
@@ -138,7 +156,12 @@ export async function persistStudioPlannedFrames(
 	}
 	await tx
 		.update(studioJobs)
-		.set({ planningCompletedAt: new Date(), updatedAt: new Date() })
+		.set({
+			status: "generating",
+			planningCompletedAt: new Date(),
+			error: null,
+			updatedAt: new Date(),
+		})
 		.where(and(eq(studioJobs.id, jobId), eq(studioJobs.userId, userId)));
 	return updated;
 }

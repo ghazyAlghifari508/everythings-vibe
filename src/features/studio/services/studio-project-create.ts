@@ -125,7 +125,6 @@ export async function createStudioProject(
 			designMode,
 			designMd: cleanDesignMd,
 			logoAssetId,
-			initialPageCount: options.initialPageCount,
 			designReference: resolved.designReference,
 			prdContent: cleanPrdContent,
 			prdFilename: cleanPrdFilename,

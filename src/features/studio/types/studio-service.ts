@@ -78,7 +78,6 @@ export interface CreateStudioProjectInput {
 	designMode?: StudioDesignMode;
 	designMd?: string | null;
 	logo?: StudioLogoInput | null;
-	initialPageCount?: number;
 	designReference?: StudioDesignReference | null;
 	prdAttachment?: { filename: string; content: string } | null;
 }

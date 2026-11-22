@@ -34,7 +34,12 @@ export function deriveStudioLifecycle({
 		planningJob?.jobType === "initial" &&
 		planningJob.status === "failed" &&
 		!project.designBlueprint &&
-		frames.every(isTemporarySlot);
+		!planningJob.planningCompletedAt &&
+		frames
+			.filter(
+				(frame) => frame.originJobId === planningJob.id || !frame.originJobId,
+			)
+			.every(isTemporarySlot);
 	const inconsistent =
 		!!activeJob &&
 		!isProcessing &&

@@ -121,6 +121,7 @@ export async function runStudioJobPipeline(
 							.update(studioProjects)
 							.set({
 								designBlueprint: planning.designBlueprint,
+								initialPageCount: planning.screenPlan.screens.length,
 								updatedAt: new Date(),
 							})
 							.where(
@@ -152,19 +153,22 @@ export async function runStudioJobPipeline(
 						);
 					});
 					studioJobTiming("planning", planningStartedAt, { jobId, projectId });
+				} else {
+					await withStudioJobWrite(claim, async (tx) => {
+						await tx
+							.update(studioJobs)
+							.set({
+								status: "generating",
+								planningCompletedAt: job.planningCompletedAt ?? new Date(),
+								error: null,
+								updatedAt: new Date(),
+							})
+							.where(
+								and(eq(studioJobs.id, jobId), eq(studioJobs.userId, userId)),
+							);
+					});
 				}
 				sharedPlanningCompleted = true;
-				await withStudioJobWrite(claim, async (tx) => {
-					await tx
-						.update(studioJobs)
-						.set({
-							status: "generating",
-							planningCompletedAt: new Date(),
-							error: null,
-							updatedAt: new Date(),
-						})
-						.where(eq(studioJobs.id, jobId));
-				});
 				execution?.notify();
 				const frameStartedAt = Date.now();
 				const allScreenNames = frames.map((frame) => frame.name);
