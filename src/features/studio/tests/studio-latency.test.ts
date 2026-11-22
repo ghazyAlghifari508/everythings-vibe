@@ -141,6 +141,7 @@ it("measures mocked stream TTFT and output duration through the production gener
 			expectTokens: false,
 			dsTokens: null,
 			logoUrl: null,
+			preservation: "new-frame",
 			timing: {
 				jobId: "synthetic",
 				projectId: "synthetic",

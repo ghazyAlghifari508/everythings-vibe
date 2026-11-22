@@ -304,6 +304,7 @@ describe("the repair request stays defect-specific and bounded", () => {
 		expectTokens: false,
 		dsTokens: null,
 		logoUrl: null,
+		preservation: "new-frame" as const,
 	};
 	const issue = "Essential control/option text has an ellipsis clipping rule.";
 

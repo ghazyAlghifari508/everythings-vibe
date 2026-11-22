@@ -2,7 +2,8 @@ import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { db } from "@/db";
 import { studioProjects, studioRevisions, users } from "@/db/schema";
-import { studioFramePreservation } from "../services/studio-frame-operation";
+import { studioPreservationPolicy } from "../services/studio-frame-correction";
+import { studioFrameOperationContext } from "../services/studio-frame-operation";
 import { prepareStudioExistingDocument } from "../services/studio-html-preservation";
 import { reviseStudioProject } from "../services/studio-revision-service";
 import {
@@ -31,112 +32,147 @@ beforeEach(() => {
 
 const TAIL = `<section id="preserve-this-section"><h2>Karya terpilih</h2><p>Konten pengguna yang harus dipertahankan.</p></section><footer id="original-footer"><p>Original footer</p></footer>`;
 
-/** A trailing-marker document padded with removable comments and whitespace. */
-function realisticDocument(padChars: number, marker = "x"): string {
-	const head = `<html><head><style>body{margin:0}</style></head><body><main data-studio-content><header><h1>Studio</h1></header><p>Awal halaman.</p>`;
-	const padding = `<!--${marker.repeat(Math.max(0, padChars))}-->`;
-	return `${head}\n${padding}\n${TAIL}</main></body></html>`;
+/**
+ * Mixed inline content where the inter-tag space is a rendered space, plus
+ * whitespace-sensitive, SVG, CSS and template content. Compacted away, these
+ * all change what the user sees.
+ */
+const WHITESPACE_HTML = `<html><head><style>.label::after{content:" "}</style></head><body><main data-studio-content>
+<span>Total</span> <span>Rp150.000</span>
+<p>Hello <strong>world</strong> again.</p>
+<p>Read <a href="#details">more</a> here.</p>
+<div style="white-space: pre-wrap">
+    Preserve this spacing
+</div>
+<svg viewBox="0 0 10 10"><text x="1" y="5">A B</text></svg>
+<template><p>Template  text</p></template>
+${TAIL}
+</main></body></html>`;
+
+/** The same document pushed past the budget with a large removable comment. */
+function oversizedWhitespaceDocument(): string {
+	return WHITESPACE_HTML.replace(
+		"<main data-studio-content>",
+		`<main data-studio-content><!--${"x".repeat(70_000)}-->`,
+	);
 }
 
-/** A document that has nothing safe to remove, used for the refusal path. */
+/** A document with nothing safe to remove, used for the refusal path. */
 function denseDocument(chars: number): string {
 	const head = `<html><body><main data-studio-content><p>`;
 	const body = "a".repeat(Math.max(0, chars));
 	return `${head}${body}</p>${TAIL}</main></body></html>`;
 }
 
-describe("existing documents are prepared, never truncated", () => {
-	it("sends a document that fits unchanged", () => {
-		const html = realisticDocument(200);
-		expect(prepareStudioExistingDocument(html)).toBe(html.trim());
+describe("existing documents are preserved exactly, never rewritten", () => {
+	it("keeps every meaningful text node when the document fits", () => {
+		const prepared = prepareStudioExistingDocument(WHITESPACE_HTML);
+		expect(prepared).toBe(WHITESPACE_HTML.trim());
+		expect(prepared).toContain("</span> <span>");
+		expect(prepared).toContain("<p>Hello <strong>world</strong> again.</p>");
+		expect(prepared).toContain('Read <a href="#details">more</a> here.');
+		expect(prepared).toContain("\n    Preserve this spacing\n");
+		expect(prepared).toContain('content:" "');
+		expect(prepared).toContain("Template  text");
+		expect(prepared).toContain('<text x="1" y="5">A B</text>');
+		expect(prepared).toContain('id="preserve-this-section"');
+		expect(prepared).toContain('id="original-footer"');
 	});
 
-	it("accepts a document exactly at the boundary without compacting it", () => {
-		const base = realisticDocument(0);
-		const html = base.padEnd(STUDIO_PREVIOUS_HTML_MAX_CHARS, " ");
+	it("accepts a document exactly at the boundary", () => {
+		const html = WHITESPACE_HTML.padEnd(STUDIO_PREVIOUS_HTML_MAX_CHARS, " ");
 		expect(html.length).toBe(STUDIO_PREVIOUS_HTML_MAX_CHARS);
 		expect(prepareStudioExistingDocument(html)).toBe(html.trim());
 	});
 
-	it("compacts only removable markup and keeps every structural element", () => {
-		const html = realisticDocument(70_000);
-		expect(html.length).toBeGreaterThan(STUDIO_PREVIOUS_HTML_MAX_CHARS);
-		const prepared = prepareStudioExistingDocument(html);
-		expect(prepared.length).toBeLessThanOrEqual(STUDIO_PREVIOUS_HTML_MAX_CHARS);
-		expect(prepared).toContain('id="preserve-this-section"');
-		expect(prepared).toContain('id="original-footer"');
-		expect(prepared).not.toContain("xx");
+	it("refuses an oversized document instead of compacting or truncating it", () => {
+		const oversized = oversizedWhitespaceDocument();
+		expect(oversized.length).toBeGreaterThan(STUDIO_PREVIOUS_HTML_MAX_CHARS);
+		let message = "";
+		try {
+			prepareStudioExistingDocument(oversized);
+		} catch (error) {
+			message = error instanceof Error ? error.message : "";
+		}
+		// No compaction: even a removable comment does not buy context here.
+		expect(message).toContain("terlalu besar untuk direvisi");
+		expect(message).not.toContain("<span>");
 	});
 
-	it("refuses a document it cannot reduce safely instead of cutting it", () => {
-		const html = denseDocument(80_000);
-		expect(() => prepareStudioExistingDocument(html)).toThrow(
+	it("refuses a dense document it cannot reduce safely", () => {
+		expect(() => prepareStudioExistingDocument(denseDocument(80_000))).toThrow(
 			/terlalu besar untuk direvisi/,
 		);
 	});
 
-	it("keeps the tail of a large document in both revision prompt builders", () => {
-		const html = realisticDocument(70_000);
+	it("carries the exact markup into both revision prompt builders", () => {
 		const framePrompt = buildStudioFramePrompt({
 			screenName: "Karya",
 			projectPrompt: "Portfolio fotografer",
 			designMode: "web",
 			blueprint: null,
-			previousHtml: html,
+			previousHtml: WHITESPACE_HTML,
 		});
 		const userPrompt = buildStudioUserPrompt("Ubah warna tombol kontak", {
 			designMode: "web",
-			previousHtml: html,
+			previousHtml: WHITESPACE_HTML,
 		});
 		for (const prompt of [framePrompt, userPrompt]) {
+			expect(prompt).toContain("</span> <span>Rp150.000</span>");
+			expect(prompt).toContain("\n    Preserve this spacing\n");
 			expect(prompt).toContain('id="preserve-this-section"');
 			expect(prompt).toContain('id="original-footer"');
 		}
 	});
 
-	it("rejects an irreducible revision prompt", () => {
-		const html = denseDocument(80_000);
+	it("rejects an oversized document in both revision prompt builders", () => {
+		const oversized = oversizedWhitespaceDocument();
 		expect(() =>
 			buildStudioFramePrompt({
 				screenName: "Karya",
 				projectPrompt: "Portfolio fotografer",
 				designMode: "web",
 				blueprint: null,
-				previousHtml: html,
+				previousHtml: oversized,
 			}),
 		).toThrow(/terlalu besar untuk direvisi/);
 		expect(() =>
 			buildStudioUserPrompt("Ubah warna tombol kontak", {
 				designMode: "web",
-				previousHtml: html,
+				previousHtml: oversized,
 			}),
 		).toThrow(/terlalu besar untuk direvisi/);
 	});
 });
 
-describe("preservation policy follows committed HTML, not frame status", () => {
-	it("treats an added screen or a never-successful frame as new", () => {
-		for (const jobType of ["add", "initial", "retry"])
-			expect(studioFramePreservation({ htmlCode: null }, jobType)).toBe(
-				"new-frame",
-			);
+describe("preservation follows committed HTML, not job type or status", () => {
+	it("treats any frame without committed HTML as new", () => {
+		expect(studioFrameOperationContext({ htmlCode: null })).toEqual({
+			preservation: "new-frame",
+			previousHtml: undefined,
+		});
 	});
 
-	it("preserves any frame that already owns HTML", () => {
-		// The decision reads only the committed document, so a row whose status is
-		// failed or generating is still preserved. A complete redesign is a user
-		// instruction, never an inference from a failed candidate.
-		for (const jobType of ["revision", "revise", "retry"])
-			expect(
-				studioFramePreservation({ htmlCode: "<html></html>" }, jobType),
-			).toBe("preserve-existing");
-		// A frame row that also carries status: "failed" still preserves its HTML.
-		const failedFrame: { htmlCode: string | null } = {
-			htmlCode: "<html></html>",
-		};
-		expect(studioFramePreservation(failedFrame, "retry")).toBe(
+	it("preserves committed HTML for every job type, including add", () => {
+		const html = "<html><body><main>Committed</main></body></html>";
+		expect(studioFrameOperationContext({ htmlCode: html })).toEqual({
+			preservation: "preserve-existing",
+			previousHtml: html,
+		});
+		// The decision never reads job type or status: a recovered, resumed or
+		// legacy add that already owns a design must still preserve it.
+		const failedFrame: { htmlCode: string | null } = { htmlCode: html };
+		expect(studioFrameOperationContext(failedFrame).preservation).toBe(
 			"preserve-existing",
 		);
+	});
+});
+
+describe("the preservation policy is explicit and fails closed", () => {
+	it("only an explicit new-frame unlocks document-free regeneration", () => {
+		expect(studioPreservationPolicy("new-frame")).toBe("new-frame");
+		for (const value of [undefined, null, "", "preserve-existing", "legacy"])
+			expect(studioPreservationPolicy(value)).toBe("preserve-existing");
 	});
 });
 

@@ -271,6 +271,7 @@ describe("strategi koreksi terbatas", () => {
 			expectTokens: false,
 			dsTokens: null,
 			logoUrl: null,
+			preservation: "new-frame",
 		});
 		expect(html).toContain("Konten valid");
 		expect(mocked).toHaveBeenCalledTimes(2);
@@ -290,6 +291,7 @@ describe("strategi koreksi terbatas", () => {
 				expectTokens: false,
 				dsTokens: null,
 				logoUrl: null,
+				preservation: "new-frame",
 			}),
 		).rejects.toMatchObject({ code: "STUDIO_CONTRACT_VIOLATION" });
 		expect(mocked).toHaveBeenCalledTimes(2);
@@ -368,6 +370,7 @@ describe("klasifikasi error studio", () => {
 			expectTokens: false,
 			dsTokens: null,
 			logoUrl: null,
+			preservation: "new-frame",
 		}).catch((error: unknown) => error);
 		const report = studioFrameErrorReport(failure);
 		expect(report.code).toBe("STUDIO_CONTRACT_VIOLATION");

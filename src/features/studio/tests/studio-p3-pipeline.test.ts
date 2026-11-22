@@ -172,6 +172,7 @@ describe("P3 Mandatory Pipeline & Benchmark Requirements", () => {
 			expectTokens: false,
 			dsTokens: null,
 			logoUrl: null,
+			preservation: "new-frame",
 			activeScreen: "Home",
 		});
 		expect(result).toContain('aria-label="Aksi"');

@@ -23,6 +23,7 @@ const input = {
 	expectTokens: false,
 	dsTokens: null,
 	logoUrl: null,
+	preservation: "new-frame",
 } as const;
 const page = (body: string) =>
 	`<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><main data-studio-content>${body}</main></body></html>`;

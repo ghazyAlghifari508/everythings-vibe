@@ -143,6 +143,7 @@ describe("structured output diagnostics", () => {
 			expectTokens: false,
 			dsTokens: null,
 			logoUrl: null,
+			preservation: "new-frame",
 		});
 		expect(mocked).toHaveBeenCalledTimes(1);
 		expect(html).toContain("Sample content");
@@ -162,6 +163,7 @@ describe("structured output diagnostics", () => {
 			expectTokens: false,
 			dsTokens: null,
 			logoUrl: null,
+			preservation: "new-frame",
 		});
 		expect(html).toContain('aria-label="Open menu"');
 		expect(mocked).toHaveBeenCalledTimes(1);
@@ -177,6 +179,7 @@ describe("structured output diagnostics", () => {
 				expectTokens: false,
 				dsTokens: null,
 				logoUrl: null,
+				preservation: "new-frame",
 				timing: timing(),
 			});
 		} catch {
@@ -214,6 +217,7 @@ describe("structured output diagnostics", () => {
 				expectTokens: false,
 				dsTokens: null,
 				logoUrl: null,
+				preservation: "new-frame",
 				timing: timing(),
 			});
 			expect(html).toContain("Konten asli");
@@ -255,6 +259,7 @@ describe("incomplete provider output", () => {
 				expectTokens: false,
 				dsTokens: null,
 				logoUrl: null,
+				preservation: "new-frame",
 				timing: timing(),
 			});
 			const events = log.mock.calls.map(([line]) => JSON.parse(String(line)));
@@ -296,6 +301,7 @@ describe("incomplete provider output", () => {
 				expectTokens: false,
 				dsTokens: null,
 				logoUrl: null,
+				preservation: "new-frame",
 				timing: timing(),
 			});
 			expect(html).toContain("Konten lengkap");
@@ -335,6 +341,7 @@ describe("incomplete provider output", () => {
 			expectTokens: false,
 			dsTokens: null,
 			logoUrl: null,
+			preservation: "new-frame",
 		});
 		const correctionMessages = mocked.mock.calls[1]?.[1];
 		expect(
@@ -357,6 +364,7 @@ describe("incomplete provider output", () => {
 				expectTokens: false,
 				dsTokens: null,
 				logoUrl: null,
+				preservation: "new-frame",
 			}),
 		).rejects.toThrow();
 	});

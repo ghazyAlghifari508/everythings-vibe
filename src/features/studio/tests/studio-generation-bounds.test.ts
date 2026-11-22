@@ -18,6 +18,7 @@ const input = {
 	designSkillId: "none" as const,
 	dsTokens: null,
 	logoUrl: null,
+	preservation: "new-frame" as const,
 	timing: { jobId: "job", projectId: "project", frameId: "frame" },
 };
 const document = (content: string, css = "") =>

@@ -113,6 +113,7 @@ describe("generateValidatedFrameHtml recovery", () => {
 			expectTokens: false,
 			dsTokens: null,
 			logoUrl: null,
+			preservation: "new-frame",
 		});
 		expect(html).toContain("Konten valid");
 		expect(mocked).toHaveBeenCalledTimes(2);
@@ -131,6 +132,7 @@ describe("generateValidatedFrameHtml recovery", () => {
 			expectTokens: false,
 			dsTokens: null,
 			logoUrl: null,
+			preservation: "new-frame",
 		});
 		const correctionMessages = mocked.mock.calls[1]?.[1];
 		const forwarded = correctionMessages?.find((message) =>
@@ -215,6 +217,7 @@ describe("generateValidatedFrameHtml recovery", () => {
 				expectTokens: false,
 				dsTokens: null,
 				logoUrl: null,
+				preservation: "new-frame",
 				timing: { jobId: "job", projectId: "project", frameId: "frame" },
 			});
 			const corrections = log.mock.calls
@@ -241,6 +244,7 @@ describe("generateValidatedFrameHtml recovery", () => {
 				expectTokens: false,
 				dsTokens: null,
 				logoUrl: null,
+				preservation: "new-frame",
 			}),
 		).rejects.toThrow();
 	});
