@@ -155,7 +155,7 @@ export function CodebaseResyncModal({
 					<DialogDescription className="mt-1 text-xs leading-relaxed text-fog">
 						{resolvedRepositoryName}
 						{creditMaximum !== null && creditMaximum > 0 && !creditFree
-							? ` · Analisis: maksimal ${creditMaximum} kredit`
+							? `, Analisis: maksimal ${creditMaximum} kredit`
 							: null}
 					</DialogDescription>
 				</DialogHeader>

@@ -70,15 +70,12 @@ export function CodebaseFileCard({
 						{artifact.description || "Dokumen siap"}
 					</span>
 					{hasRealSize ? (
-						<>
-							<span aria-hidden="true">•</span>
-							<span
-								data-testid="codebase-file-size"
-								className="font-mono text-[10px]"
-							>
-								{formatFileSize(artifact.fileSizeBytes as number)}
-							</span>
-						</>
+						<span
+							data-testid="codebase-file-size"
+							className="font-mono text-[10px]"
+						>
+							{formatFileSize(artifact.fileSizeBytes as number)}
+						</span>
 					) : null}
 				</div>
 			</div>

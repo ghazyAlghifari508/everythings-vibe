@@ -37,7 +37,7 @@ function resolveCreditNote(status: AnalysisCreditStatus | null): string | null {
 	if (!status || status.billingExempt) return null;
 	if (status.code === "FREE_ALLOWANCE_AVAILABLE")
 		return "Analisis awal gratis, sekali per akun.";
-	return `Analisis hingga ${status.maximumCredits} kredit · ${status.availableCredits} kredit tersedia.`;
+	return `Analisis hingga ${status.maximumCredits} kredit, ${status.availableCredits} kredit tersedia.`;
 }
 
 export function PlanCodebasePage({

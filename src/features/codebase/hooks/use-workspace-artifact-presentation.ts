@@ -44,7 +44,7 @@ export function useWorkspaceArtifactPresentation({
 		if (featureTree)
 			list.push({
 				id: `feature-${resolvedFeature.id}`,
-				title: `Spesifikasi Fitur · ${resolvedFeature.name}`,
+				title: `Spesifikasi Fitur: ${resolvedFeature.name}`,
 				fileName: `feature-${featureSlug}.json`,
 				fileSizeBytes: new TextEncoder().encode(
 					JSON.stringify(featureTree, null, 2),
@@ -55,7 +55,7 @@ export function useWorkspaceArtifactPresentation({
 		if (prdContent)
 			list.push({
 				id: `prd-${resolvedFeature.id}`,
-				title: `PRD · ${resolvedFeature.name}`,
+				title: `PRD: ${resolvedFeature.name}`,
 				fileName: `PRD-${featureSlug}.md`,
 				fileSizeBytes: new TextEncoder().encode(
 					stripInternalSectionMarkers(prdContent),
@@ -66,7 +66,7 @@ export function useWorkspaceArtifactPresentation({
 		if (acContent)
 			list.push({
 				id: `ac-${resolvedFeature.id}`,
-				title: `Acceptance Criteria · ${resolvedFeature.name}`,
+				title: `Acceptance Criteria: ${resolvedFeature.name}`,
 				fileName: `AC-${featureSlug}.md`,
 				fileSizeBytes: new TextEncoder().encode(
 					stripInternalSectionMarkers(acContent),
@@ -77,7 +77,7 @@ export function useWorkspaceArtifactPresentation({
 		if (hasTasksInDb)
 			list.push({
 				id: `tasks-${resolvedFeature.id}`,
-				title: `Task · ${resolvedFeature.name}`,
+				title: `Task: ${resolvedFeature.name}`,
 				fileName: `tasks-${featureSlug}.json`,
 				fileSizeBytes: taskTree
 					? new TextEncoder().encode(JSON.stringify(taskTree, null, 2)).length
@@ -132,7 +132,7 @@ export function useWorkspaceArtifactPresentation({
 							value: null,
 							label: "Salin isi sumber",
 							unavailableReason:
-								"Pratinjau dipotong — buka file di repository lokal untuk menyalin isi lengkap.",
+								"Pratinjau dipotong. Buka file di repository lokal untuk menyalin isi lengkap.",
 						}
 					: { value: sourcePreview.content, label: "Salin isi sumber" };
 			return { value: null };

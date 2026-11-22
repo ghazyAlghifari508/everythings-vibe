@@ -280,7 +280,7 @@ describe("CodebaseAdaptiveQuestion Component", () => {
 
 			// Completed line text
 			expect(container.textContent).toContain(
-				"Q1 · Bagaimana filter kategori bekerja?",
+				"Q1: Bagaimana filter kategori bekerja?",
 			);
 			expect(container.textContent).toContain(
 				"Jawaban: Satu kategori sekaligus",

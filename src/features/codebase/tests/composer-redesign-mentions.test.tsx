@@ -9,7 +9,7 @@ afterEach(cleanup);
 
 const prdArtifact = {
 	id: "prd-proj-1",
-	title: "PRD · Pencarian Artikel",
+	title: "PRD: Pencarian Artikel",
 	fileName: "PRD-pencarian-artikel.md",
 	fileSizeBytes: 2048,
 	badge: "MARKDOWN",
@@ -18,7 +18,7 @@ const prdArtifact = {
 
 const featureArtifact = {
 	id: "feature-proj-1",
-	title: "Spesifikasi Fitur · Pencarian Artikel",
+	title: "Spesifikasi Fitur: Pencarian Artikel",
 	fileName: "feature-pencarian-artikel.json",
 	fileSizeBytes: 1024,
 	badge: "FITUR",

@@ -320,7 +320,7 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 										? sourcePreviewPath
 										: (activeArtifact?.title ??
 											(isTasksArtifactActive
-												? `Task · ${resolvedFeature?.name ?? codebase.name}`
+												? `Task: ${resolvedFeature?.name ?? codebase.name}`
 												: (activeArtifact?.fileName ?? "Preview artefak")))
 								}
 								badge={

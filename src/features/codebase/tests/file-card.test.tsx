@@ -32,7 +32,7 @@ afterEach(() => {
 
 const sampleArtifact: CodebaseArtifactRef = {
 	id: "prd-sample-1",
-	title: "PRD · Pencarian Artikel",
+	title: "PRD: Pencarian Artikel",
 	fileName: "PRD-pencarian-artikel.md",
 	fileSizeBytes: null,
 	badge: "MARKDOWN",
@@ -145,7 +145,7 @@ describe("CodebaseFileCard", () => {
 		renderCard({
 			...sampleArtifact,
 			fileName: longFileName,
-			title: "PRD · Multi-Tenant Auth",
+			title: "PRD: Multi-Tenant Auth",
 		});
 
 		const nameElement = container.querySelector(

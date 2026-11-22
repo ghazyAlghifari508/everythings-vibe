@@ -75,7 +75,7 @@ export function CodebaseReviewActions({
 				<span>
 					ID: <span className="font-mono text-snow">{snapshotId}</span>
 				</span>
-				<span>· {formatTimestamp(snapshotCreatedAt)}</span>
+				<span>{formatTimestamp(snapshotCreatedAt)}</span>
 			</div>
 
 			{/* Prev/next navigation: previous aligns left, primary aligns

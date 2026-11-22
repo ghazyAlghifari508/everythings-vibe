@@ -98,7 +98,7 @@ export function CodebasePlanSwitcher({
 					const readiness = describePlanReadiness(plan);
 					const status =
 						plan.hasArtifacts && updated
-							? `${readiness} · ${updated}`
+							? `${readiness}, ${updated}`
 							: readiness;
 					return (
 						<DropdownMenuItem

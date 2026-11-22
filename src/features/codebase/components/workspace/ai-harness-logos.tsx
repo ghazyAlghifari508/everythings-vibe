@@ -145,7 +145,7 @@ export function AiHarnessLogos({ className = "" }: { className?: string }) {
 					key={harness.name}
 					data-testid={`ai-harness-${harness.name.toLowerCase().replace(/\s+/g, "-")}`}
 					className="group flex flex-col items-center gap-1.5 transition-transform duration-200 hover:-translate-y-0.5"
-					title={`${harness.name} (${harness.brand}) — Buka di terminal repositori`}
+					title={`${harness.name} (${harness.brand}). Buka di terminal repositori`}
 				>
 					<div
 						className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border ${harness.badgeBg} ${harness.badgeBorder} shadow-sm transition-all duration-200 group-hover:scale-105 group-hover:shadow-md`}

@@ -99,9 +99,12 @@ export function formatArtifactChipLabel(
 ): string {
 	const meta = ARTIFACT_META[targetKind];
 	const rawTitle = artifact.title?.trim();
-	if (rawTitle?.includes("·")) {
-		const [, suffix] = rawTitle.split("·").map((part) => part.trim());
-		if (suffix) return `@${meta.shortPrefix} · ${suffix}`;
+	if (rawTitle) {
+		const separatorIndex = rawTitle.indexOf(":");
+		if (separatorIndex > -1) {
+			const suffix = rawTitle.slice(separatorIndex + 1).trim();
+			if (suffix) return `@${meta.shortPrefix}: ${suffix}`;
+		}
 	}
 	const cleanFeature = featureName?.trim();
 	if (
@@ -109,9 +112,9 @@ export function formatArtifactChipLabel(
 		cleanFeature.toLowerCase() !== "repository lokal" &&
 		cleanFeature.toLowerCase() !== "demo-repo"
 	) {
-		return `@${meta.shortPrefix} · ${cleanFeature}`;
+		return `@${meta.shortPrefix}: ${cleanFeature}`;
 	}
-	return `@${meta.shortPrefix} · ${artifact.fileName}`;
+	return `@${meta.shortPrefix}: ${artifact.fileName}`;
 }
 
 export function normalizeRepositoryFileList(

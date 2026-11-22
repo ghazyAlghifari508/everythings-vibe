@@ -160,7 +160,7 @@ export function CodebaseComposerReferenceChips({
 								data-testid={`composer-reference-stale-${idSuffix}`}
 								className="shrink-0 text-[10px] font-medium text-crimson"
 							>
-								· {ref.staleReason}
+								({ref.staleReason})
 							</span>
 						) : null}
 						<button

@@ -96,9 +96,9 @@ export function CodebaseLibraryItemCard({
 				</span>
 			) : null}
 			{stack.length > 0 ? (
-				<span className="text-xs text-slate">{stack.join(" · ")}</span>
+				<span className="text-xs text-slate">{stack.join(", ")}</span>
 			) : null}
-			<span className="text-[11px] text-slate">{metaParts.join(" · ")}</span>
+			<span className="text-[11px] text-slate">{metaParts.join(", ")}</span>
 			{selectionActive ? null : (
 				<span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-snow">
 					{action.label}

@@ -82,7 +82,7 @@ export function CodebaseReviewImpactSections({
 						Keterbatasan:
 					</span>
 					{analysis.limitations.map((lim) => (
-						<span key={lim}>• {lim}</span>
+						<span key={lim}>{lim}</span>
 					))}
 				</div>
 			)}

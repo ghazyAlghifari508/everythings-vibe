@@ -27,8 +27,8 @@ export function CodebaseChatWorkspaceHeader({
 	const resolvedRepoName = resolveCodebaseDisplayName(codebaseName);
 	const resolvedFeatureName = resolveCodebaseDisplayName(featureName);
 	const headerTitle = resolvedRepoName
-		? `Workspace · ${resolvedRepoName}`
-		: "Workspace · Perencanaan codebase";
+		? `Workspace: ${resolvedRepoName}`
+		: "Workspace: Perencanaan codebase";
 	const hasLiveData = kanbanProgress !== null && kanbanProgress.total > 0;
 
 	return (
@@ -48,7 +48,7 @@ export function CodebaseChatWorkspaceHeader({
 							</p>
 						) : resolvedFeatureName ? (
 							<p className="truncate text-[11px] text-fog">
-								{`Perencanaan · ${resolvedFeatureName}`}
+								{`Perencanaan: ${resolvedFeatureName}`}
 							</p>
 						) : null}
 					</div>
@@ -72,7 +72,7 @@ export function CodebaseChatWorkspaceHeader({
 				>
 					<span>
 						Repository sudah disinkronkan ulang setelah planning ini dibuat.
-						Planning lama tetap tersimpan — tinjau apakah masih sesuai.
+						Planning lama tetap tersimpan. Tinjau apakah masih sesuai.
 					</span>
 					{onReviewPlan ? (
 						<button

@@ -19,7 +19,7 @@ afterEach(() => {
 
 const prdArtifact = {
 	id: "prd-proj-1",
-	title: "PRD · Pencarian Artikel",
+	title: "PRD: Pencarian Artikel",
 	fileName: "PRD-pencarian-artikel.md",
 	fileSizeBytes: 2048,
 	badge: "MARKDOWN",
@@ -63,7 +63,7 @@ describe("Phase 07 Composer Redesign — Plan/Revise Modes & Workflow Separation
 		expect(onSendMessage).not.toHaveBeenCalled();
 
 		const targetChip = screen.getByTestId("composer-target-artifact-chip");
-		expect(targetChip.textContent).toContain("@PRD · Pencarian Artikel");
+		expect(targetChip.textContent).toContain("@PRD: Pencarian Artikel");
 	});
 
 	it("3. requires a valid target artifact in Revise mode and disables submit when target is missing", () => {

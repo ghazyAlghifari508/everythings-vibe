@@ -27,7 +27,7 @@ export function CodebaseAdaptiveQuestionAnswered({
 					<Icon icon={Tick01Icon} size={11} aria-hidden="true" />
 				</span>
 				<span className="font-medium text-snow/90 shrink-0">
-					Q{index} · {question.title}:
+					Q{index}: {question.title}
 				</span>
 				<span className="truncate text-mist font-normal">
 					Jawaban: {submitted}

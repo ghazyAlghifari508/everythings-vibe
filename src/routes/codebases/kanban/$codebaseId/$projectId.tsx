@@ -31,7 +31,7 @@ export const Route = createFileRoute(
 	head: ({ loaderData }) => ({
 		meta: [
 			{
-				title: `${loaderData?.projectName ?? "Kanban"} · ${loaderData?.codebaseName ?? "Repository"}`,
+				title: `${loaderData?.projectName ?? "Kanban"}, ${loaderData?.codebaseName ?? "Repository"}`,
 			},
 		],
 	}),

@@ -43,7 +43,7 @@ export function CodebaseReview({
 			<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 				<div>
 					<div className="text-[11px] font-mono tracking-widest uppercase text-fog mb-2">
-						CODEBASE ANALYSIS · REVIEW BEFORE GENERATE
+						CODEBASE ANALYSIS: REVIEW BEFORE GENERATE
 					</div>
 					<h1 className="font-inter text-2xl sm:text-3xl font-[620] tracking-tight text-snow leading-tight">
 						Kami menemukan konteks aplikasimu.
@@ -101,7 +101,7 @@ export function CodebaseReview({
 						Potential impact areas
 					</h3>
 					<span className="rounded border border-graphite bg-obsidian px-2.5 py-0.5 font-mono text-[10px] text-fog">
-						AI generated · review
+						AI generated, review
 					</span>
 				</div>
 

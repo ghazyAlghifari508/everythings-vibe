@@ -497,7 +497,7 @@ describe("revision source authorization", () => {
 					id: `prd-${projectId}`,
 					projectId,
 					targetKind: "prd",
-					label: "@PRD · Plan",
+					label: "@PRD: Plan",
 					fileName: "PRD.md",
 					versionId: prdId,
 				},
@@ -521,7 +521,7 @@ describe("revision source authorization", () => {
 				id: "prd-other",
 				projectId: crypto.randomUUID(),
 				targetKind: "prd" as const,
-				label: "@PRD · Other",
+				label: "@PRD: Other",
 				fileName: "PRD.md",
 			},
 			{
@@ -543,7 +543,7 @@ describe("revision source authorization", () => {
 				id: `tasks-${projectId}`,
 				projectId,
 				targetKind: "tasks" as const,
-				label: "@Task · Plan",
+				label: "@Task: Plan",
 				fileName: "tasks.json",
 			},
 		]) {

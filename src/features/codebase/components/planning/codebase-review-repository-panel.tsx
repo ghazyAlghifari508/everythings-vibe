@@ -42,8 +42,8 @@ export function CodebaseReviewRepositoryPanel({
 						Repository map
 					</h3>
 					<span className="font-mono text-[11px] text-fog">
-						{fileCount === undefined ? "—" : fileCount} files indexed (
-						{excludedCount === undefined ? "—" : excludedCount} excluded)
+						{fileCount === undefined ? "-" : fileCount} files indexed (
+						{excludedCount === undefined ? "-" : excludedCount} excluded)
 					</span>
 				</div>
 				<div className="p-4 sm:p-5 flex-1 flex flex-col gap-4 text-xs">
