@@ -11,14 +11,15 @@ import {
 	StudioFrameStatusStrip,
 } from "@/features/studio/components/canvas/studio-frame-error";
 import { StudioFrameShimmer } from "@/features/studio/components/canvas/studio-frame-shimmer";
+import { useStudioFrameRenderer } from "@/features/studio/hooks/use-studio-frame-renderer";
 import { useStudioFrameVisual } from "@/features/studio/hooks/use-studio-frame-visual";
 import { studioJobTiming } from "@/features/studio/services/studio-timing";
-import { STUDIO_VISUAL_WIDTH } from "@/features/studio/types/studio-constants";
 import { extractCleanHtml } from "@/features/studio/utils/clean-html";
 import { resolveFrameArtboardMode } from "@/features/studio/utils/studio-frame-artboard";
 import { resolveStudioFrameStatus } from "@/features/studio/utils/studio-lifecycle";
 import type { StudioElementTarget } from "../../types/studio-element";
-import { StudioElementSurface } from "./studio-element-surface";
+import type { StudioDevice } from "../../types/studio-renderer";
+import { StudioLiveSurface } from "./studio-live-surface";
 
 export type { StudioFrameArtboardMode } from "@/features/studio/utils/studio-frame-artboard";
 export {
@@ -41,7 +42,14 @@ export interface StudioFrameProps {
 	isCanvasPanning?: boolean;
 	className?: string;
 	onMeasure?: (id: string, width: number, height: number) => void;
+	/** Element inspection is active for this frame. */
 	inspectElement?: boolean;
+	/** The frame may hold a live document (bounded pool membership). */
+	liveEnabled?: boolean;
+	/** Presentation-only device preset; never part of the design revision. */
+	device?: StudioDevice;
+	/** Reports whether the artboard is near the viewport. */
+	onVisibilityChange?: (frameId: string, visible: boolean) => void;
 	elementTarget?: StudioElementTarget | null;
 	onSelectElement?: (target: StudioElementTarget | null) => void;
 }
@@ -81,15 +89,15 @@ export const StudioFrame = memo(function StudioFrame({
 	className = "",
 	onMeasure,
 	inspectElement = false,
+	liveEnabled = false,
+	device,
+	onVisibilityChange,
 	elementTarget,
 	onSelectElement,
 }: StudioFrameProps) {
 	const visibleUrl = useRef<string | null>(null);
 	const status = resolveStudioFrameStatus(frame, job);
 	const isMobile = frame.viewport === "mobile";
-	const frameWidth = isMobile
-		? STUDIO_VISUAL_WIDTH.mobile
-		: STUDIO_VISUAL_WIDTH.web;
 	const {
 		visual,
 		visualError,
@@ -115,6 +123,22 @@ export const StudioFrame = memo(function StudioFrame({
 	const showsPreview =
 		(artboardMode === "preview" || artboardMode === "last-good") &&
 		visual !== null;
+
+	const { live, presentation, liveNotice } = useStudioFrameRenderer({
+		frame,
+		status,
+		hasRenderableHtml,
+		cleanHtml,
+		artboardMode,
+		artboardRef,
+		visual,
+		frameHeight,
+		liveEnabled,
+		inspectElement,
+		device,
+		onMeasure,
+		onVisibilityChange,
+	});
 
 	return (
 		<article
@@ -169,19 +193,9 @@ export const StudioFrame = memo(function StudioFrame({
 						? "border-blue-600 outline-2 outline-offset-2 outline-blue-600"
 						: "border-graphite hover:border-steel"
 				} bg-obsidian`}
-				style={{ width: visual?.width ?? frameWidth, height: frameHeight }}
+				style={{ width: presentation.width, height: presentation.height }}
 			>
-				{inspectElement ? (
-					<StudioElementSurface
-						projectId={frame.projectId}
-						frameId={frame.id}
-						baseRevision={frame.revision}
-						name={frame.name}
-						target={elementTarget}
-						onSelect={onSelectElement}
-						suspended={isCanvasPanning}
-					/>
-				) : showsPreview && visual ? (
+				{showsPreview && visual ? (
 					<button
 						type="button"
 						data-canvas-gesture-surface=""
@@ -256,6 +270,28 @@ export const StudioFrame = memo(function StudioFrame({
 				) : (
 					<StudioFrameShimmer viewport={frame.viewport} status={status} />
 				)}
+
+				<StudioLiveSurface
+					state={live.state}
+					dispatch={live.dispatch}
+					title={`Tampilan langsung: ${frame.name}`}
+					width={presentation.width}
+					height={presentation.height}
+					visible={presentation.showLive}
+					interactive={presentation.showLive && inspectElement}
+					suspended={isCanvasPanning}
+					target={elementTarget}
+					onSelect={onSelectElement}
+				/>
+
+				{liveNotice && artboardMode !== "last-good" ? (
+					<StudioFrameStatusStrip
+						message={liveNotice.message}
+						tone={liveNotice.tone}
+						actionLabel={liveNotice.retry ? "Muat ulang tampilan" : undefined}
+						onAction={liveNotice.retry ? live.retry : undefined}
+					/>
+				) : null}
 
 				{artboardMode === "last-good" ? (
 					<StudioFrameStatusStrip

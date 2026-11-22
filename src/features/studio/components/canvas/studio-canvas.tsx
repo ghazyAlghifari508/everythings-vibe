@@ -16,6 +16,7 @@ import { StudioFrame } from "@/features/studio/components/canvas/studio-frame";
 import { useStudioCanvasInput } from "@/features/studio/hooks/use-studio-canvas-input";
 import { useStudioCanvasMarquee } from "@/features/studio/hooks/use-studio-canvas-marquee";
 import { useStudioCanvasView } from "@/features/studio/hooks/use-studio-canvas-view";
+import { useStudioLivePool } from "@/features/studio/hooks/use-studio-live-pool";
 import {
 	STUDIO_CANVAS_INITIAL_ZOOM,
 	STUDIO_CANVAS_MAX_ZOOM,
@@ -26,6 +27,7 @@ import { isCanvasControlTarget } from "@/features/studio/utils/studio-canvas-ges
 import { deriveStudioLifecycle } from "@/features/studio/utils/studio-lifecycle";
 import { useCanvasZoom } from "@/hooks/use-canvas-zoom";
 import type { StudioElementTarget } from "../../types/studio-element";
+import type { StudioDevice } from "../../types/studio-renderer";
 
 export type {
 	StudioCanvasFitInput,
@@ -54,6 +56,8 @@ export interface StudioCanvasProps {
 	frameRetryErrors?: Record<string, string>;
 	elementTarget?: StudioElementTarget | null;
 	onSelectElement?: (target: StudioElementTarget | null) => void;
+	/** Presentation-only device per frame id; absent means the native device. */
+	frameDevices?: Readonly<Record<string, StudioDevice>>;
 	/** Left band covered by the floating chat panel; `null` until its layout is known. */
 	leftInsetPx?: number | null;
 	className?: string;
@@ -75,6 +79,7 @@ export const StudioCanvas = memo(function StudioCanvas({
 	frameRetryErrors,
 	elementTarget,
 	onSelectElement,
+	frameDevices,
 	leftInsetPx = 0,
 	className = "",
 }: StudioCanvasProps) {
@@ -123,6 +128,13 @@ export const StudioCanvas = memo(function StudioCanvas({
 			frame.htmlCode &&
 			frame.status === "ready",
 	);
+
+	const { pool: livePool, reportVisibility } = useStudioLivePool({
+		frames,
+		selectedFrameId,
+		selectedFrameIds,
+		inspectFrameId: tool === "element" ? (inspectFrame?.id ?? null) : null,
+	});
 
 	const { measureFrame, fitAll } = useStudioCanvasView({
 		projectId: project.id,
@@ -277,6 +289,9 @@ export const StudioCanvas = memo(function StudioCanvas({
 								elementTarget?.frameId === frame.id ? elementTarget : null
 							}
 							onSelectElement={onSelectElement}
+							liveEnabled={livePool.includes(frame.id)}
+							device={frameDevices?.[frame.id]}
+							onVisibilityChange={reportVisibility}
 						/>
 					))
 				) : lifecycle.planningFailed ? (

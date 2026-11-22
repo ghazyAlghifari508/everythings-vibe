@@ -8,7 +8,10 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import type { useStudioElementEditing } from "../../hooks/use-studio-element-editing";
-import { STUDIO_VISUAL_WIDTH } from "../../types/studio-constants";
+import {
+	STUDIO_DEVICE_PRESETS,
+	studioNativeDevice,
+} from "../../types/studio-renderer";
 import { StudioElementSurface } from "../canvas/studio-element-surface";
 
 export function StudioElementPreview({
@@ -21,7 +24,8 @@ export function StudioElementPreview({
 	viewport: string;
 }) {
 	const row = editing.preview;
-	const width = STUDIO_VISUAL_WIDTH[viewport === "mobile" ? "mobile" : "web"];
+	const device = studioNativeDevice(viewport);
+	const width = STUDIO_DEVICE_PRESETS[device].width;
 	return (
 		<Dialog
 			open={Boolean(row)}
@@ -69,6 +73,7 @@ export function StudioElementPreview({
 												name={row.frameName}
 												revisionId={row.id}
 												side={side}
+												device={device}
 											/>
 										</div>
 									</div>
