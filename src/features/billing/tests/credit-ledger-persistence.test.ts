@@ -51,6 +51,7 @@ describe("credit ledger persistence contracts", () => {
 		await createCreditOperation(persistence, {
 			userId: "user-1",
 			projectId: "project-1",
+			product: "vibeplan_greenfield",
 			subscriptionId: "subscription-1",
 			operation: "prd_generation",
 			stage: "prd",
@@ -83,6 +84,7 @@ describe("credit ledger persistence contracts", () => {
 				{
 					userId: "user-1",
 					projectId: "project-1",
+					product: "vibeplan_greenfield",
 					subscriptionId: "subscription-1",
 					operation: "prd_generation",
 					stage: "prd",
@@ -234,6 +236,7 @@ describe("credit ledger persistence contracts", () => {
 		const base: Parameters<typeof createCreditOperation>[1] = {
 			userId: "user-1",
 			projectId: "project-1",
+			product: "vibeplan_greenfield",
 			subscriptionId: "subscription-1",
 			operation: "prd_generation" as const,
 			stage: "prd" as const,
