@@ -139,11 +139,9 @@ export function StudioShortcutCarousel({
 									</span>
 									<span className="mt-auto flex flex-wrap items-center gap-1.5 pt-1 font-mono text-[10px] uppercase tracking-wider text-fog">
 										<span>{shortcut.category}</span>
-										<span aria-hidden>·</span>
 										<span>
 											{shortcut.designMode === "mobile" ? "Mobile" : "Web"}
 										</span>
-										<span aria-hidden>·</span>
 										<span>{shortcut.initialPageCount} halaman</span>
 									</span>
 								</button>

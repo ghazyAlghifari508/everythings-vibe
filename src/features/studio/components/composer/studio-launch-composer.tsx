@@ -182,7 +182,7 @@ export function StudioLaunchComposer({
 									{prd.filename}
 								</span>
 								<span className="text-[11px] text-fog">
-									Product requirements · Ready
+									Product requirements, Ready
 								</span>
 							</div>
 							<span className="flex items-center gap-1">
@@ -234,7 +234,7 @@ export function StudioLaunchComposer({
 										className="max-w-36 truncate text-[11px] text-fog"
 										title={reference.logoFilename}
 									>
-										· Logo ({reference.logoFilename})
+										Logo ({reference.logoFilename})
 									</span>
 								) : null}
 							</div>

@@ -54,7 +54,7 @@ export function StudioDesignThemePanel({
 								) : null}
 							</span>
 							<span className="text-xs text-fog">
-								{preset.description} · {preset.font}
+								{preset.description}, {preset.font}
 							</span>
 						</button>
 					);

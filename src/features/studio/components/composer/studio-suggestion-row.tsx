@@ -138,7 +138,7 @@ export function StudioSuggestionRow({
 								className="flex max-w-52 items-center rounded-full border border-iron bg-obsidian px-3 py-1.5 text-xs text-mist transition-colors hover:border-snow hover:text-snow focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-snow disabled:cursor-not-allowed disabled:opacity-40"
 							>
 								<span className="min-w-0 truncate">{suggestion.label}</span>
-								<span className="sr-only"> — {suggestion.prompt}</span>
+								<span className="sr-only">, {suggestion.prompt}</span>
 							</button>
 						</li>
 					))}

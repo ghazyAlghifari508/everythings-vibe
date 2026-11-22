@@ -191,7 +191,6 @@ export function StudioSidebar({
 														},
 													)}
 												</span>
-												<span>·</span>
 												<span className="uppercase tracking-wider">
 													{isMobile ? "Mobile" : "Web"}
 												</span>

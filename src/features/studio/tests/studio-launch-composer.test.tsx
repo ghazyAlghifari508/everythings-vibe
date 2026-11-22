@@ -156,7 +156,7 @@ describe("StudioLaunchComposer", () => {
 		});
 
 		expect(screen.getByText("PRD-CatatDompet.md")).toBeDefined();
-		expect(screen.getByText(/Product requirements · Ready/i)).toBeDefined();
+		expect(screen.getByText(/Product requirements, Ready/i)).toBeDefined();
 		expect(screen.getByText("MD")).toBeDefined();
 
 		const removeBtn = screen.getByRole("button", {
