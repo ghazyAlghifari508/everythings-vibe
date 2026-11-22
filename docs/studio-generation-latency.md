@@ -72,7 +72,7 @@ The 60-second target is **not met and not claimed**. Frame generation is the onl
 
 - Overlap: four frames start at concurrency 3; the fourth starts when a slot frees. This is retained, not raised, because no measurement of the gateway's rate/token limits is available.
 - Perceived latency: a frame is persisted and exposed as soon as it is ready, independently of its siblings, so the first frame becomes usable before the project completes.
-- Correction cost: one contract-driven round, without the original full prompt, within a shared request/deadline budget. Oversize documents fail explicitly rather than being truncated.
+- Correction cost: one contract-driven round carrying only the reported defects, within a shared request/deadline budget. A previous document that cannot fit beside those defects is dropped whole — never truncated into an invalid document — and the repair regenerates from the approved blueprint; a prompt that still cannot fit fails explicitly.
 - Deterministic repairs run before any model correction: design-system token enforcement and canonical shell assembly are applied, so only genuine contract violations reach the provider.
 - Planning is shared once per project and reused for every frame and for recovery; ready frames are skipped.
 
