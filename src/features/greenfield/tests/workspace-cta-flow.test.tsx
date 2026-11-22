@@ -298,7 +298,7 @@ it("switching projects never shows the previous project's eligibility", async ()
 it("on /ac, Generate Task stays disabled until the AC is persisted", async () => {
 	seed("p1", { hasAc: false, step: "prd", freshFromCall: 1 });
 	mount("/vibeplan/p1/ac");
-	const button = await cta(/Menyusun AC/i);
+	const button = await cta(/Generate Task/i);
 	expect(button.hasAttribute("disabled")).toBe(true);
 	fireEvent.click(button);
 	expect(fetchMock).not.toHaveBeenCalled();

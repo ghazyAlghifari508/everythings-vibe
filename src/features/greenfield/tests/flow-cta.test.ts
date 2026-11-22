@@ -96,7 +96,6 @@ describe("deriveWorkspaceCta on /ac", () => {
 			kind: "generate",
 			label: "Generate Task",
 			disabled: true,
-			busyLabel: "Menyusun AC...",
 		});
 	});
 
@@ -137,8 +136,9 @@ describe("deriveWorkspaceCta on /fitur", () => {
 			disabled: false,
 		});
 		expect(cta("fitur", { featuresStatus: "generating" })).toMatchObject({
+			kind: "generate",
+			label: "Generate PRD",
 			disabled: true,
-			busyLabel: "Menyusun fitur...",
 		});
 	});
 

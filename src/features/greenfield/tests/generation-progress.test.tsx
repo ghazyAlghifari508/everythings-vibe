@@ -31,25 +31,17 @@ function renderProgress(
 }
 
 describe("GenerationProgress", () => {
-	it("renders label, a live elapsed timer, and natural waiting message without reasoning", () => {
+	it("renders one compact status with a spinner, not steps or a waiting paragraph", () => {
 		const c = renderProgress({ label: "PRD" });
-		expect(c.textContent).toContain("Menyusun PRD");
-		// The timer is a real elapsed clock, so assert the format rather than a
-		// frozen reading that depends on how long the render took.
-		const timer = c.querySelector('[role="timer"]')?.textContent ?? "";
-		expect(timer).toMatch(/^\d+\.\ds$/);
-		expect(c.textContent).toContain(
-			"Sedang menganalisis kebutuhan dan menyusun dokumen",
-		);
+		expect(c.textContent).toContain("Menyusun PRD...");
+		expect(c.querySelector('[data-testid="spinner"]')).not.toBeNull();
+		expect(c.querySelector("output")).not.toBeNull();
+		expect(c.textContent).not.toContain("Menganalisis kebutuhan");
+		expect(c.textContent).not.toContain("Sedang menganalisis");
 	});
 
-	it("renders streamed reasoning log when thinkingText is provided", () => {
-		const c = renderProgress({
-			label: "Acceptance Criteria",
-			thinkingText: "Analyzing requirements for watchlist and favorites...",
-		});
-		expect(c.textContent).toContain("Menyusun Acceptance Criteria");
-		expect(c.textContent).toContain("Proses Berpikir Model");
-		expect(c.textContent).toContain("Analyzing requirements for watchlist");
+	it("uses only the document label, with no reasoning props", () => {
+		const c = renderProgress({ label: "Acceptance Criteria" });
+		expect(c.textContent).toBe("Menyusun Acceptance Criteria...");
 	});
 });
