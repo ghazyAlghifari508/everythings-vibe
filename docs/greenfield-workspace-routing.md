@@ -123,3 +123,26 @@ Component evaluation. Fetched: HeroUI component index (Stepper exists only as He
 Tests: `workspace-progress.test.tsx` (five stages, no Kanban label, Kanban maps to Task without inventing completion, status exposed without colour classes), `chat-stream-status.test.tsx` (differentiated rows, no `emerald`, no emoji), `workspace-router.test.tsx` (no title bar in the shell, shell identity preserved).
 
 Not verified / for P8 (browser): contrast of the neutral markers in light and dark, 360px width with five indicators, and the layout of the Task/Kanban/AC/PRD documents without the removed header bar.
+
+## P5: refined generation UX (Fitur, PRD, AC, Task)
+
+One loader primitive: `src/components/ui/spinner.tsx` (installed HeroUI `Spinner` wrapper, `motion-safe`/`motion-reduce`). No new dependency, no orb/glow/sparkle component. `GenerationProgress` is now one semantic `<output>` with `Spinner` and `Menyusun {label}...`; its `thinkingText`, `isStreaming`, `steps` and `activeStep` props are gone.
+
+| View | Before | After |
+| --- | --- | --- |
+| Fitur | Dynamic `AI sedang menyusun daftar fitur...` title, `ThoughtLine`, three tutorial cards, verbose error | Static `Feature Tree`; one topbar `Menyusun daftar fitur...`; existing `FeatureMapCanvas` skeleton/connectors/dots preserved; short empty/error copy |
+| PRD | Center `GenerationProgress` with fake steps, waiting paragraph and typing dots even beside the section checklist | Eight-section checklist in Chat is the primary indicator; one compact fallback only when chat is closed / mobile document tab and before the first token; heading shortened to `Menyusun PRD` |
+| AC | Animated six-bar TOC skeleton plus reasoning card | Real `TableOfContents` from streamed/saved headings; one pre-token loader inside `AcViewer`; saved/retry/error/paywall paths intact |
+| Task | Title followed raw SSE reasoning, animated dots and a `thinking-title` helper | Static `Task Breakdown`; one topbar `Menyusun task...`; `WhiteboardCanvas` skeleton preserved; reasoning events ignored in the UI |
+| Chat | Raw `<details>` reasoning and three blinking dots | One compact `Menunggu balasan...` / `Menyusun revisi...` status for non-document replies; document generation uses the checklist only |
+| Navbar | Disabled CTA flipped to `Menyusun fitur...` / `Menyusun AC...` | Disabled forward CTA keeps `Generate PRD` / `Generate Task`; P2 readiness rules and hints unchanged |
+
+Removed copy/symbols in Greenfield: `AI sedang menyusun daftar fitur`, `PRD sedang di-generate oleh AI`, `Menganalisis kebutuhan`, `Menulis dokumen`, the long waiting paragraph, `animate-typing-dot`, `Menyusun fitur...`, `Menyusun AC...`, `ThoughtLine`, `TypingIndicator`, `thinking-title.ts` and its test. `ThoughtLine` in Codebase and the internal reasoning state in the AC/chat hooks are untouched: neither renders in these views. Both canvases now expose `aria-busy` so the skeleton state is observable without inspecting CSS.
+
+Preserved: skeleton nodes and dotted canvases, PRD live Markdown from the first token, Chat ownership/toggle (no remount), AC streaming/save-recovery/retry/credit/paywall, Task handoff/Kanban/drawers, credit atomicity and tenant scoping. No generation request is re-issued by a status change; the disabled CTA is still driven by real artifact state.
+
+Component exploration: HeroUI `Spinner` was adopted from the existing wrapper; HeroUI docs were checked. Magic UI, React Bits, AffectUI, Thinking Orbs, TuffUI, CUI, SakaniUI and shadcn catalogs were evaluated at index level and rejected for decorative motion or missing fit. The existing skeleton canvases were reused instead of a new loading canvas.
+
+Checks: touched-file Biome clean (18 files); targeted Vitest 10 files / 75 tests passed, including new `p5-status-contract.test.tsx` and `p5-view-generation.test.tsx` (static titles, one semantic status, `aria-busy` skeleton → real nodes, PRD fallback visibility/toggle/first token/abort, AC one loader and real TOC, disabled CTA labels). `pnpm exec tsc --noEmit` still reports only the pre-existing Studio `Promise.withResolvers` mismatch, outside P5.
+
+Not verified / for P8 (browser, not authorized here): contrast and reduced-motion behaviour in light/dark, 360/768/1280px layout, real SSE timing, real credit/paywall interactions, and visual confirmation that the skeleton diagram remains unobstructed on each device.
