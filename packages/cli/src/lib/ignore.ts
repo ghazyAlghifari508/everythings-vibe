@@ -40,7 +40,7 @@ export const LEGACY_IGNORE_FILENAME = ".prdfyignore";
  * binaries, and an active pattern here would silently change which files get
  * uploaded.
  */
-export const CODEBASE_IGNORE_TEMPLATE = `# .everythingsvibeignore — exclusions untuk sync codebase everythings-vibe.
+export const CODEBASE_IGNORE_TEMPLATE = `# .everythingsvibeignore: exclusions untuk sync codebase everythings-vibe.
 #
 # File ini bersifat lokal. JANGAN commit ke repositori.
 #
