@@ -24,6 +24,13 @@ export interface InitialFrameContext {
 	signal: AbortSignal;
 }
 
+/**
+ * Whether a frame already owns a committed design. A correction may never
+ * regenerate a preserved design from the blueprint just because its candidate
+ * did not fit the repair budget.
+ */
+export type StudioFramePreservationPolicy = "new-frame" | "preserve-existing";
+
 export interface ValidatedFrameInput {
 	framePrompt: string;
 	activeScreen?: string;
@@ -34,6 +41,10 @@ export interface ValidatedFrameInput {
 	logoUrl: string | null;
 	signal?: AbortSignal;
 	contentContext?: { brief: string; prdContent?: string | null };
+	/** Defaults to `new-frame` when a caller has no committed design to protect. */
+	preservation?: StudioFramePreservationPolicy;
+	/** The user's actual modification, kept scoped through correction. */
+	requestedChange?: string;
 	timing?: { jobId: string; projectId: string; frameId: string };
 }
 

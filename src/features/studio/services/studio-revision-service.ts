@@ -46,6 +46,10 @@ export async function reviseStudioProject(
 		dsTokens,
 		logoUrl: detail.logoUrl,
 		contentContext: { brief: revisionRequest, prdContent: detail.prdContent },
+		// A project revision always edits committed HTML. If that document cannot
+		// be revised safely, the request fails and the previous revision stays.
+		preservation: previousHtml ? "preserve-existing" : "new-frame",
+		requestedChange: checked.prompt,
 	});
 	const nextVersion = (detail.latest?.version ?? 0) + 1;
 

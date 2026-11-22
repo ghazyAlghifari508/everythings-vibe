@@ -113,6 +113,7 @@ export async function createStudioProject(
 		dsTokens,
 		logoUrl,
 		contentContext: { brief: checked.prompt, prdContent: cleanPrdContent },
+		preservation: "new-frame",
 	});
 
 	const [project] = await db

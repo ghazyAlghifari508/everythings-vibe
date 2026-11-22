@@ -70,6 +70,7 @@ export async function generateInitialFrame(
 			dsTokens: ctx.dsTokens,
 			logoUrl: ctx.logoUrl,
 			contentContext: { brief: ctx.jobPrompt, prdContent: ctx.prdContent },
+			preservation: "new-frame",
 			signal: ctx.signal,
 			timing: {
 				jobId: ctx.lease.jobId,

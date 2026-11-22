@@ -11,6 +11,7 @@ import {
 	selectModels,
 	tryStreamWithFallback,
 } from "@/lib/services/ai-orchestrator";
+import type { StudioFramePreservationPolicy } from "../types/studio-service";
 import {
 	classifyStudioScreenRole,
 	extendStudioBlueprintWithScreen,
@@ -26,6 +27,22 @@ import { studioJobTiming } from "./studio-job-runtime";
 import { buildStudioAssetUrl } from "./studio-logo-service";
 import { validateStudioDesignMode } from "./studio-prompt-validation";
 import { buildStudioFramePrompt } from "./studio-screen-prompts";
+
+/**
+ * Which preservation policy a frame operation gets. A committed document is
+ * the only evidence that counts: an added screen, an initial frame, or a retry
+ * of a screen that never produced HTML may start fresh, while anything holding
+ * HTML must be repaired. Frame status is deliberately not an input — a failed
+ * or generating row can still own the user's last valid design.
+ */
+export function studioFramePreservation(
+	frame: { htmlCode: string | null },
+	jobType: string,
+): StudioFramePreservationPolicy {
+	return jobType === "add" || !frame.htmlCode
+		? "new-frame"
+		: "preserve-existing";
+}
 
 export async function runStudioFrameOperation(
 	job: StudioJobRow,
@@ -203,6 +220,7 @@ export async function runStudioFrameOperation(
 			? "Regenerate this screen so it satisfies the shared contract. Preserve the approved theme and all valid content."
 			: job.prompt;
 	const dsTokens = extractDesignSystemTokens(project.designMd);
+	const preservation = studioFramePreservation(frame, job.jobType);
 	const htmlCode = await generateValidatedFrameHtml({
 		framePrompt: `${prompt}\n\nUSER CHANGE INSTRUCTION: ${changeInstruction}\nPreserve unaffected content, layout and identity. Modify only the requested screen.`,
 		activeScreen: name,
@@ -215,6 +233,8 @@ export async function runStudioFrameOperation(
 			brief: `${original?.prompt ?? project.title}\n${changeInstruction}`,
 			prdContent: project.prdContent,
 		},
+		preservation,
+		requestedChange: changeInstruction,
 		signal,
 		timing: { jobId: job.id, projectId: project.id, frameId: frame.id },
 	});
