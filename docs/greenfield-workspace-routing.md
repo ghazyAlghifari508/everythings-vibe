@@ -146,3 +146,26 @@ Component exploration: HeroUI `Spinner` was adopted from the existing wrapper; H
 Checks: touched-file Biome clean (18 files); targeted Vitest 10 files / 75 tests passed, including new `p5-status-contract.test.tsx` and `p5-view-generation.test.tsx` (static titles, one semantic status, `aria-busy` skeleton → real nodes, PRD fallback visibility/toggle/first token/abort, AC one loader and real TOC, disabled CTA labels). `pnpm exec tsc --noEmit` still reports only the pre-existing Studio `Promise.withResolvers` mismatch, outside P5.
 
 Not verified / for P8 (browser, not authorized here): contrast and reduced-motion behaviour in light/dark, 360/768/1280px layout, real SSE timing, real credit/paywall interactions, and visual confirmation that the skeleton diagram remains unobstructed on each device.
+
+## P6: one contextual PRD version control
+
+Toolbar removed. `prd-viewer.tsx` no longer renders the always-visible `Pratinjau` segmented control or the `Diff` tab. The document is the default view. With 0/1 persisted version (or on the public share route, which passes no `versions`) the pane has no control bar at all; no replacement title bar was introduced.
+
+Single control. `version-history.tsx` reuses the installed shadcn/Radix `DropdownMenu` (`src/components/ui/dropdown-menu.tsx`). One compact `Versi {n}` trigger sits at the right of the document pane. The menu lists actual persisted version numbers as `menuitemradio` items sorted newest first, checks the selected version and marks `(Terbaru)` from the maximum version number — not from array position — so stale and non-contiguous lists stay honest. Version selection calls the existing `onSelectVersion(content, version)` callback; nothing is written. The existing plan gate is unchanged: `FEATURES[plan].versionHistory === false` shows only the upgrade message, with no version records and no compare action.
+
+| Compare case | Persisted pair (old → new) |
+| --- | --- |
+| Selected vN with an earlier revision | closest earlier version → vN |
+| Earliest version selected (incl. v1) | v1 → next available version |
+| Selected version missing from the list | closest earlier version → newest persisted version |
+| Fewer than two usable records | compare unavailable |
+
+`resolveComparePair` in `diff-utils.ts` owns that policy. Both diff sides are persisted records: the live/streaming canvas is never a diff side. Direction is always old → new, so `+`/`-` semantics are preserved. `PrdDiffViewer` and `computeDiff` are unchanged. Compare is a temporary mode entered from the same menu; a compact header shows `Versi X → Versi Y` with `Kembali ke dokumen`, Escape closes, focus returns to the version trigger, and starting a generation/revision leaves compare mode so live content is never hidden behind a stale snapshot. Version actions are disabled while generating.
+
+State. `use-prd-detail.ts` only replaces the canvas when a genuinely newer persisted version appears; a loader revalidation with the same version no longer yanks the document back to latest while an older version is being read. A route param change resets the locally refreshed version list, content and selection to that project, preventing cross-project leakage. `prd-detail.tsx` passes `isGeneratingPRD` to the viewer. Append-only persistence, revisions via `:::UPDATE_SECTION[...]:::`, entitlement, read-only lock, chat toggle, TOC/Markdown/Mermaid and public share are untouched.
+
+Component exploration (links checked, no Tavily): shadcn Dropdown Menu (`https://ui.shadcn.com/docs/components/dropdown-menu`) — adopted via the already-installed Radix wrapper, gives `aria-haspopup`/`aria-expanded`, roving keyboard focus, Escape, focus return and viewport collision handling with zero new dependency; Radix Dropdown Menu docs (`https://www.radix-ui.com/primitives/docs/components/dropdown-menu`) and the W3C APG menu-button pattern (`https://www.w3.org/WAI/ARIA/apg/patterns/menu-button/`) match the interaction. HeroUI Dropdown (`https://www.heroui.com/en/docs/react/components/dropdown`) was evaluated but its React Aria-based v3 API would introduce a second menu convention for one control. Magic UI, React Bits, Thinking Orbs, AffectUI, TuffUI, CUI and SakaniUI catalogs were checked at index level: decorative/motion-oriented, no fit for a compact history control. No component was built from scratch and no package was added.
+
+Checks: `diff-utils.test.ts` (pair direction, non-contiguous versions, v1 fallback, stale selection, invalid list) and `prd-viewer.test.tsx` (no toolbar for 0/1 versions, one labelled control, selected/latest markers, selection callback, compare from the same menu, old → new labels, back/Escape/focus return, plan gate, disabled actions during generation). Biome clean on touched files; targeted Vitest 2 files / 22 tests passed. `pnpm exec tsc --noEmit` still reports only the pre-existing Studio `Promise.withResolvers` mismatch, outside P6.
+
+Not verified / for P8 (browser QA not authorized in P6): visual density at 360/768/1280px, real dropdown collision near viewport edges, and screen-reader announcement of the radio-style version items.
