@@ -1,3 +1,4 @@
+import { buildEvvibeDesignContext } from "@/features/studio/design-intelligence/evvibe-design";
 import { STUDIO_VISUAL_WIDTH } from "@/features/studio/types/studio-constants";
 import type { StudioDesignMode } from "@/features/studio/types/studio-prompts";
 import { sanitizeStudioPrd } from "./studio-prd-helpers";
@@ -17,6 +18,14 @@ export function buildStudioPlanningPrompt(
 				: `Web (desktop responsive screens, ${STUDIO_VISUAL_WIDTH.web}px and below)`
 		}`,
 	];
+
+	// The planning system prefix stays platform-neutral so it can be cached, and
+	// the platform's own design guidance arrives with the request that names the
+	// platform. Only the matching platform is described, never both.
+	const platformGuidance = buildEvvibeDesignContext("planning-platform", {
+		viewport: designMode,
+	});
+	if (platformGuidance) sections.push(platformGuidance);
 	if (initialPageCount != null)
 		sections.push(
 			`Initial screen count: exactly ${initialPageCount}. Return exactly ${initialPageCount} connected initial screen slots; do not add or remove slots based on the brief or reference.`,
