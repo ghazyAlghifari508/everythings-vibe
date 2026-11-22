@@ -73,7 +73,7 @@ The 60-second target is **not met and not claimed**. Frame generation is the onl
 - Overlap: four frames start at concurrency 3; the fourth starts when a slot frees. This is retained, not raised, because no measurement of the gateway's rate/token limits is available.
 - Perceived latency: a frame is persisted and exposed as soon as it is ready, independently of its siblings, so the first frame becomes usable before the project completes.
 - Correction cost: one contract-driven round carrying only the reported defects, within a shared request/deadline budget. A new frame whose candidate cannot fit may take one bounded fresh regeneration; a frame that already owns committed HTML refuses the repair instead, so the committed design is never silently redesigned.
-- Large-document revision: the existing document is never truncated. It is sent whole when it fits, compacted losslessly (comments and inter-tag whitespace, verified by parsed-structure equality) when it can be, and otherwise the revision fails with `STUDIO_REVISION_TOO_LARGE` before any provider request, leaving the last committed revision untouched.
+- Large-document revision: the existing document is never truncated and never rewritten. Its exact text nodes are sent when it fits, and a document above the budget fails with `STUDIO_REVISION_TOO_LARGE` before any provider request, leaving the last committed revision untouched. There is no whitespace compaction: inter-element spaces are rendered content.
 - Deterministic repairs run before any model correction: design-system token enforcement and canonical shell assembly are applied, so only genuine contract violations reach the provider.
 - Planning is shared once per project and reused for every frame and for recovery; ready frames are skipped.
 

@@ -91,22 +91,25 @@ to preserve:
 | Revision or retry of a frame with committed HTML | yes | repair refused with `STUDIO_REVISION_TOO_LARGE`; the committed design is kept (`REVISION_CONTEXT_TOO_LARGE`) |
 
 The policy is passed explicitly from the call site (`new-frame` /
-`preserve-existing`) and never inferred from prompt wording, frame status or
-metadata completeness: a frame is disposable only when it has no committed
-HTML. A repair that fits always proceeds in place (`FULL_DOCUMENT_REPAIR`) and
+`preserve-existing`) and is a required field; the correction builder has no
+implicit default and treats anything other than an explicit `new-frame` as
+preserving. It is never inferred from prompt wording, frame status or metadata:
+a frame is disposable only when it holds no committed HTML, so a recovered or
+inconsistent *add* that already owns a document is preserved like a revision.
+A repair that fits always proceeds in place (`FULL_DOCUMENT_REPAIR`) and
 carries the user's requested change as a scoped instruction, so the repair
 cannot widen into a redesign.
 
 ## Large-document revision
 
-Revision prompts never truncate an existing document. The complete document is
-sent when it fits `STUDIO_PREVIOUS_HTML_MAX_CHARS`. Above that limit, only
-lossless compaction is attempted — HTML comments and inter-tag whitespace,
-never inside `pre`, `textarea`, `script` or `style` — and it is used only when
-the parsed structure, attributes and text are identical before and after.
-Anything that cannot be reduced safely fails as `STUDIO_REVISION_TOO_LARGE`,
-which keeps the last committed revision and costs no provider request. Scoped
-patch application is P8 work.
+Revision prompts never truncate and never rewrite an existing document. The
+exact text nodes are sent when the document fits
+`STUDIO_PREVIOUS_HTML_MAX_CHARS`; the only normalisation is trimming outer
+whitespace. There is no compaction: a space between inline elements is rendered
+content, and no DOM comparison can prove that removing it keeps the page
+intact. A document above the budget fails as `STUDIO_REVISION_TOO_LARGE`, which
+keeps the last committed revision and costs no provider request. Scoped patch
+application is P8 work.
 
 ## Enforcement
 
