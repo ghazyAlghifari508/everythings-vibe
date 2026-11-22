@@ -118,8 +118,8 @@ function PanelBody({
 					onRemoveElement={elementEditing?.clearTarget}
 					onValueChange={draft.setPrompt}
 					selectedFrames={workspace.selectedFrames}
+					onSelectTargetFrame={workspace.selectTargetFrameByName}
 					onRemoveFrame={workspace.removeSelectedFrame}
-					onClearFrames={workspace.clearSelectedFrames}
 					onSubmit={
 						elementEditing?.target
 							? elementEditing.submit

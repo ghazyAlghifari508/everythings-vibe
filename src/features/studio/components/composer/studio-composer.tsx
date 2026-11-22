@@ -46,8 +46,10 @@ export interface StudioComposerProps {
 	onClearFrames?: () => void;
 	referenceLabel?: string | null;
 	referenceColors?: readonly string[] | null;
-	/** Next-screen cards derived from the project's own structure. */
+	/** Next-action cards derived from the project's own structure. */
 	suggestions?: readonly StudioScreenSuggestion[];
+	/** Selects the exact live frame a card targets; null clears the attachment. */
+	onSelectTargetFrame?: (frameName: string | null) => void;
 	elementTarget?: StudioElementTarget | null;
 	onRemoveElement?: () => void;
 }
@@ -64,6 +66,7 @@ export function StudioComposer({
 	referenceLabel,
 	referenceColors,
 	suggestions = [],
+	onSelectTargetFrame,
 	elementTarget,
 	onRemoveElement,
 }: StudioComposerProps) {
@@ -145,10 +148,11 @@ export function StudioComposer({
 		void submit();
 	}
 
-	// A suggestion only fills the composer: the user still reviews and submits,
-	// so clicking a card never spends a generation credit on its own.
+	// A suggestion only fills the composer and attaches its exact target frame:
+	// the user still reviews and submits, so no card click spends a credit.
 	function insertSuggestion(suggestion: StudioScreenSuggestion) {
 		setPrompt(suggestion.prompt);
+		onSelectTargetFrame?.(suggestion.targetFrameName ?? null);
 		setClarify("");
 		inputRef.current?.focus();
 	}

@@ -17,6 +17,8 @@ export function useStudioScreenSuggestions(
 	project: StudioProjectRow,
 	frames: readonly StudioFrameRow[],
 	conversation = "",
+	selectedFrameNames: readonly string[] = [],
+	recentRequest = "",
 ): StudioScreenSuggestion[] {
 	return getStudioScreenSuggestions({
 		projectId: project.id,
@@ -29,5 +31,7 @@ export function useStudioScreenSuggestions(
 		frameNames: frames.map((frame) => frame.name),
 		frameDescriptions: frames.map((frame) => frame.description ?? ""),
 		projectBrief: conversation,
+		selectedFrameNames,
+		recentRequest,
 	});
 }

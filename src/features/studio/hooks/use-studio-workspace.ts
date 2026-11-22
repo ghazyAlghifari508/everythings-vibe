@@ -50,6 +50,8 @@ export interface StudioWorkspaceState {
 	storedReferenceColors: readonly string[] | null;
 	/** Empty while work is in flight; a new screen is already on its way. */
 	suggestions: readonly StudioScreenSuggestion[];
+	/** Attaches exactly one live frame by name; null clears composer targets. */
+	selectTargetFrameByName: (frameName: string | null) => void;
 	selectFrame: (id: string | null, additive?: boolean) => void;
 	selectFrames: (ids: string[]) => void;
 	removeSelectedFrame: (id: string) => void;
@@ -153,10 +155,25 @@ export function useStudioWorkspace(
 		() => (messages ?? []).map((message) => message.content).join("\n"),
 		[messages],
 	);
+	const recentRequest = useMemo(() => {
+		const rows = messages ?? [];
+		for (let index = rows.length - 1; index >= 0; index--)
+			if (rows[index]?.role === "user") return rows[index]?.content ?? "";
+		return "";
+	}, [messages]);
+	const selectedFrameNames = useMemo(
+		() =>
+			frames
+				.filter((frame) => selectedFrameIds.includes(frame.id))
+				.map((frame) => frame.name),
+		[frames, selectedFrameIds],
+	);
 	const projectSuggestions = useStudioScreenSuggestions(
 		project,
 		frames,
 		conversationText,
+		selectedFrameNames,
+		recentRequest,
 	);
 	// While a job is running the project is mid-plan, and a next-screen request
 	// would race the planning step that rewrites the frame list. Suggestions
@@ -179,6 +196,21 @@ export function useStudioWorkspace(
 		setSelectedFrameIds([]);
 		setSelectedFrameId(null);
 	}, []);
+
+	// A card may only attach a frame that actually exists. An unknown name
+	// clears the attachment instead of sending a stale target to the server.
+	const selectTargetFrameByName = useCallback(
+		(frameName: string | null) => {
+			if (!frameName) {
+				clearSelectedFrames();
+				return;
+			}
+			const frame = frames.find((entry) => entry.name === frameName);
+			if (frame) selectFrame(frame.id);
+			else clearSelectedFrames();
+		},
+		[clearSelectedFrames, frames, selectFrame],
+	);
 
 	// A frame row can be replaced (planning rewrites its slots) or deleted while
 	// its id is still selected. The operation endpoint refuses an unknown target,
@@ -277,6 +309,7 @@ export function useStudioWorkspace(
 		storedReferenceLabel,
 		storedReferenceColors,
 		suggestions,
+		selectTargetFrameByName,
 		selectFrame,
 		selectFrames,
 		removeSelectedFrame,
