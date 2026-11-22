@@ -1,7 +1,10 @@
 "use client";
 
 import { Cancel01Icon, Shield01Icon } from "@hugeicons/core-free-icons";
+import { Badge } from "@/components/ui/badge";
 import { Icon } from "@/components/ui/icon";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { StatusIndicator } from "@/components/ui/status-indicator";
 import {
 	resetUserCredit,
 	setUserAdmin,
@@ -51,17 +54,9 @@ export function AdminUserRowItem({
 
 			{/* Plan Badge */}
 			<td className="px-4 py-3">
-				<span
-					className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
-						plan === "hengker"
-							? "bg-amber-400/10 text-amber-300 border border-amber-400/20"
-							: plan === "pro"
-								? "bg-indigo-400/10 text-indigo-300 border border-indigo-400/20"
-								: "bg-white/5 text-fog border border-graphite"
-					}`}
-				>
-					{plan}
-				</span>
+				<Badge>
+					{plan === "hengker" ? "Hengker" : plan === "pro" ? "Pro" : plan}
+				</Badge>
 			</td>
 
 			{/* Credits */}
@@ -73,21 +68,18 @@ export function AdminUserRowItem({
 						</span>
 						<span className="text-[11px]"> / {sub?.credits ?? 0}</span>
 					</div>
-					{Boolean(user.billingExempt) && (
-						<span
-							title={`Bebas Biaya: ${user.billingExemptionReason ?? "internal"}`}
-							className="inline-flex w-fit items-center rounded bg-teal-400/10 px-1.5 py-0.2 text-[9px] font-semibold text-teal-300 border border-teal-400/20"
-						>
-							Exempt
-						</span>
-					)}
+					<span
+						title={`Bebas Biaya: ${user.billingExemptionReason ?? "internal"}`}
+					>
+						<Badge>Exempt</Badge>
+					</span>
 				</div>
 			</td>
 
 			{/* Role */}
 			<td className="px-4 py-3">
 				{isAdmin ? (
-					<span className="inline-flex items-center gap-1 text-[11px] font-[510] text-indigo-300">
+					<span className="inline-flex items-center gap-1 text-[11px] font-[510] text-fog">
 						<Icon icon={Shield01Icon} size={12} />
 						Admin
 					</span>
@@ -99,14 +91,11 @@ export function AdminUserRowItem({
 			{/* Status */}
 			<td className="px-4 py-3">
 				{isBanned ? (
-					<span className="inline-flex items-center gap-1 rounded bg-rose-500/10 px-2 py-0.5 text-[10px] font-[510] text-rose-300 border border-rose-500/20">
-						<Icon icon={Cancel01Icon} size={10} />
+					<StatusBadge tone="danger" icon={Cancel01Icon}>
 						Banned
-					</span>
+					</StatusBadge>
 				) : (
-					<span className="inline-flex items-center rounded-md bg-emerald-500/10 px-2 py-0.5 text-[10px] font-[510] text-emerald-400 border border-emerald-500/20">
-						Aktif
-					</span>
+					<StatusIndicator tone="success">Aktif</StatusIndicator>
 				)}
 			</td>
 

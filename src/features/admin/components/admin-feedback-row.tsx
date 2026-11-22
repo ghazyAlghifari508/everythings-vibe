@@ -6,6 +6,7 @@ import {
 	Bug02Icon,
 	SparklesIcon,
 } from "@hugeicons/core-free-icons";
+import { Badge } from "@/components/ui/badge";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -15,6 +16,12 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Icon } from "@/components/ui/icon";
+import {
+	type StatusIconName,
+	StatusIndicator,
+	type StatusTone,
+	statusIcons,
+} from "@/components/ui/status-indicator";
 import type {
 	AdminErrorReportItem,
 	AdminFeedbackItem,
@@ -44,24 +51,19 @@ export function AdminFeedbackRowItem({
 	return (
 		<tr className="transition-colors hover:bg-white/[0.02]">
 			<td className="px-4 py-3 whitespace-nowrap">
-				<span
-					className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
-						type === "bug"
-							? "bg-rose-500/10 text-rose-300 border border-rose-500/20"
-							: type === "feature"
-								? "bg-indigo-500/10 text-indigo-300 border border-indigo-500/20"
-								: "bg-white/5 text-fog border border-graphite"
-					}`}
-				>
-					{type === "bug" ? (
-						<Icon icon={Bug02Icon} size={10} />
-					) : type === "feature" ? (
-						<Icon icon={SparklesIcon} size={10} />
-					) : (
-						<Icon icon={BubbleChatIcon} size={10} />
-					)}
+				<Badge variant="secondary">
+					<Icon
+						icon={
+							type === "bug"
+								? Bug02Icon
+								: type === "feature"
+									? SparklesIcon
+									: BubbleChatIcon
+						}
+						size={11}
+					/>
 					{type}
-				</span>
+				</Badge>
 			</td>
 
 			<td className="px-4 py-3">
@@ -164,6 +166,16 @@ export function AdminErrorReportRowItem({
 	);
 }
 
+const statusPresentation: Record<
+	FeedbackHandlingStatus | "archived",
+	{ label: string; tone: StatusTone; icon: StatusIconName }
+> = {
+	new: { label: "Baru", tone: "neutral", icon: "neutral" },
+	in_progress: { label: "Diproses", tone: "warning", icon: "processing" },
+	resolved: { label: "Selesai", tone: "success", icon: "success" },
+	archived: { label: "Diarsipkan", tone: "neutral", icon: "neutral" },
+};
+
 function StatusBadge({
 	status = "new",
 	isArchived = false,
@@ -171,31 +183,14 @@ function StatusBadge({
 	status?: FeedbackHandlingStatus;
 	isArchived?: boolean;
 }) {
-	if (isArchived) {
-		return (
-			<span className="inline-flex items-center rounded-md border border-graphite/60 bg-white/5 px-2 py-0.5 text-[10px] font-[510] text-fog">
-				Diarsipkan
-			</span>
-		);
-	}
-	if (status === "resolved") {
-		return (
-			<span className="inline-flex items-center rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-[510] text-emerald-400">
-				Selesai
-			</span>
-		);
-	}
-	if (status === "in_progress") {
-		return (
-			<span className="inline-flex items-center rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-[510] text-amber-300">
-				Diproses
-			</span>
-		);
-	}
+	const presentation = statusPresentation[isArchived ? "archived" : status];
 	return (
-		<span className="inline-flex items-center rounded-md border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 text-[10px] font-[510] text-sky-300">
-			Baru
-		</span>
+		<StatusIndicator
+			tone={presentation.tone}
+			icon={statusIcons[presentation.icon]}
+		>
+			{presentation.label}
+		</StatusIndicator>
 	);
 }
 

@@ -11,74 +11,43 @@ import {
 } from "@hugeicons/core-free-icons";
 import { Link } from "@tanstack/react-router";
 import { useRef, useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Icon } from "@/components/ui/icon";
+import { StatusIndicator } from "@/components/ui/status-indicator";
+import { getPaymentStatusInfo } from "@/features/billing/utils/payment-status";
 import { formatCurrency } from "@/lib/utils";
 import { getAdminTrendMetrics } from "../services";
 import type { AdminDashboardMetrics, DailyTrendPoint } from "../types";
 import { AdminMetricCard } from "./admin-metric-card";
 import { TrendLineChart } from "./trend-line-chart";
 
-function getStatusBadge(status: string) {
-	const normalized = status.toLowerCase();
-	if (["success", "settlement", "paid"].includes(normalized)) {
-		return (
-			<span className="inline-flex items-center rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-400">
-				Selesai
-			</span>
-		);
-	}
-	if (["pending", "challenge"].includes(normalized)) {
-		return (
-			<span className="inline-flex items-center rounded border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-amber-300">
-				Pending
-			</span>
-		);
-	}
+function PaymentStatusLabel({ status }: { status: string }) {
+	const info = getPaymentStatusInfo(status);
 	return (
-		<span className="inline-flex items-center rounded border border-rose-500/20 bg-rose-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-rose-300">
-			{status}
-		</span>
+		<StatusIndicator tone={info.tone} icon={info.icon}>
+			{info.label}
+		</StatusIndicator>
 	);
 }
 
-function getPlanBadge(plan: string) {
-	const p = plan.toLowerCase();
-	if (p === "hengker") {
-		return (
-			<span className="inline-flex items-center rounded border border-amber-400/20 bg-amber-400/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-300">
-				Hengker
-			</span>
-		);
-	}
-	if (p === "pro") {
-		return (
-			<span className="inline-flex items-center rounded border border-indigo-400/20 bg-indigo-400/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-indigo-300">
-				Pro
-			</span>
-		);
-	}
-	return (
-		<span className="inline-flex items-center rounded border border-graphite bg-white/5 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-mist">
-			{plan}
-		</span>
-	);
+function PlanBadge({ plan }: { plan: string }) {
+	const labels: Record<string, string> = {
+		hengker: "Hengker",
+		pro: "Pro",
+	};
+	return <Badge>{labels[plan.toLowerCase()] ?? plan}</Badge>;
 }
 
-function getStepBadge(step: string | null) {
-	const s = (step || "draft").toLowerCase();
-	const labelMap: Record<string, string> = {
+function StepBadge({ step }: { step: string | null }) {
+	const labels: Record<string, string> = {
 		idea: "Ide",
 		questions: "Tanya Jawab",
 		prd: "PRD",
 		ac: "AC",
 		kanban: "Kanban",
 	};
-	const label = labelMap[s] || s;
-	return (
-		<span className="rounded border border-graphite bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-mist">
-			{label}
-		</span>
-	);
+	const value = (step ?? "draft").toLowerCase();
+	return <Badge>{labels[value] ?? value}</Badge>;
 }
 
 function formatShortDate(date: Date | string | null | undefined): string {
@@ -216,7 +185,7 @@ export function AdminDashboardView({
 					</div>
 				)}
 				{trendError && !isLoadingTrend && (
-					<div className="absolute right-6 top-6 flex items-center gap-2 rounded-full border border-crimson/60 bg-obsidian/80 px-3 py-1 text-[11px] text-snow backdrop-blur">
+					<div className="absolute right-6 top-6 flex items-center gap-2 rounded-full border border-graphite bg-obsidian/80 px-3 py-1 text-[11px] text-snow backdrop-blur">
 						Gagal memuat rentang grafik.
 						<button
 							type="button"
@@ -268,7 +237,7 @@ export function AdminDashboardView({
 												<span className="font-mono text-xs font-medium text-snow">
 													{tx.orderId}
 												</span>
-												{getPlanBadge(tx.plan)}
+												<PlanBadge plan={tx.plan} />
 											</div>
 											<p className="mt-1 truncate text-xs text-fog">
 												{tx.userName || tx.userEmail || "Anonymous"}
@@ -279,7 +248,7 @@ export function AdminDashboardView({
 										</div>
 
 										<div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
-											{getStatusBadge(tx.status)}
+											<PaymentStatusLabel status={tx.status} />
 											<span className="font-mono text-xs font-medium text-snow">
 												{formatCurrency(tx.amount)}
 											</span>
@@ -335,7 +304,7 @@ export function AdminDashboardView({
 										</div>
 
 										<div className="flex items-center gap-2.5 shrink-0">
-											{getStepBadge(p.step)}
+											<StepBadge step={p.step} />
 											<Link
 												to="/prd/$id"
 												params={{ id: p.id }}
