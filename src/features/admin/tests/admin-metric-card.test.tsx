@@ -58,7 +58,7 @@ describe("AdminMetricCard", () => {
 
 		expect(container.textContent).toContain("Pendapatan");
 		expect(container.textContent).toContain("299.700");
-		expect(container.textContent).not.toContain("••••••••");
+		expect(container.textContent).not.toContain("********");
 	});
 
 	it("supports custom function component icons for backward compatibility", () => {

@@ -82,7 +82,7 @@ function getStepBadge(step: string | null) {
 }
 
 function formatShortDate(date: Date | string | null | undefined): string {
-	if (!date) return "—";
+	if (!date) return "-";
 	const d = new Date(date);
 	return d.toLocaleDateString("id-ID", {
 		day: "numeric",
@@ -167,13 +167,13 @@ export function AdminDashboardView({
 				<AdminMetricCard
 					label="Total Pengguna"
 					value={metrics.usersCount}
-					subtext={`${hengkerCount} Hengker · ${proCount} Pro`}
+					subtext={`${hengkerCount} Hengker, ${proCount} Pro`}
 					icon={UserGroupIcon}
 				/>
 				<AdminMetricCard
 					label="Status Pipeline"
 					value={totalPipelineOutputs}
-					subtext={`${metrics.prdCount} PRD · ${metrics.acCount} AC · ${metrics.tasksCount} Task`}
+					subtext={`${metrics.prdCount} PRD, ${metrics.acCount} AC, ${metrics.tasksCount} Task`}
 					icon={Layers01Icon}
 				/>
 				<AdminMetricCard
@@ -185,7 +185,7 @@ export function AdminDashboardView({
 				<AdminMetricCard
 					label="Tiket Terbuka"
 					value={openTicketsCount}
-					subtext={`${metrics.feedbackCount} Saran · ${metrics.errorCount} Error`}
+					subtext={`${metrics.feedbackCount} Saran, ${metrics.errorCount} Error`}
 					icon={BubbleChatIcon}
 				/>
 				<AdminMetricCard
@@ -271,7 +271,9 @@ export function AdminDashboardView({
 												{getPlanBadge(tx.plan)}
 											</div>
 											<p className="mt-1 truncate text-xs text-fog">
-												{tx.userName || tx.userEmail || "Anonymous"} ·{" "}
+												{tx.userName || tx.userEmail || "Anonymous"}
+											</p>
+											<p className="truncate text-xs text-fog">
 												{formatShortDate(tx.createdAt)}
 											</p>
 										</div>
@@ -325,7 +327,9 @@ export function AdminDashboardView({
 												{p.name}
 											</p>
 											<p className="mt-0.5 truncate text-xs text-fog">
-												{p.userName || p.userEmail} ·{" "}
+												{p.userName || p.userEmail}
+											</p>
+											<p className="truncate text-xs text-fog">
 												{formatShortDate(p.createdAt)}
 											</p>
 										</div>

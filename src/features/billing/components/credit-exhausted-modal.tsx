@@ -174,7 +174,7 @@ export function CreditExhaustedModal({
 							onClick={() =>
 								selectedPackage && handlePlanSelect(selectedPackage.id)
 							}
-							aria-label={`Beli ${selectedPackage?.credits ?? 0} Kredit — Rp ${selectedPackage ? selectedPackage.priceIdr.toLocaleString("id-ID") : 0}`}
+							aria-label={`Beli ${selectedPackage?.credits ?? 0} Kredit, Rp ${selectedPackage ? selectedPackage.priceIdr.toLocaleString("id-ID") : 0}`}
 							className="btn-primary flex h-10 w-full items-center justify-center gap-2 rounded-lg font-inter text-sm font-[510] transition-all hover:brightness-105 active:scale-[0.99] disabled:opacity-50 cursor-pointer"
 						>
 							{loading ? (
@@ -189,7 +189,7 @@ export function CreditExhaustedModal({
 								</>
 							) : (
 								<span>
-									Beli {selectedPackage?.credits} Kredit — Rp{" "}
+									Beli {selectedPackage?.credits} Kredit, Rp{" "}
 									{selectedPackage?.priceIdr.toLocaleString("id-ID")}
 								</span>
 							)}

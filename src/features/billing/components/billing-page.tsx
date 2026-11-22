@@ -59,7 +59,7 @@ export function BillingPage({
 		periodEndDate.getTime() < Date.now();
 	const statusText = isPaidPlan
 		? isPaused
-			? "Pause — masa aktif habis"
+			? "Pause, masa aktif habis"
 			: periodEndDate
 				? `Aktif s.d. ${formatDate(periodEndDate.toISOString())}`
 				: "Aktif (paket lama, tanpa masa aktif)"
@@ -149,7 +149,7 @@ export function BillingPage({
 						</div>
 						<p className="mt-2 text-xs text-(--text-secondary)">
 							{isPaused
-								? "Masa aktif habis — sisa kredit periode lama hangus. Perpanjang untuk dapat kredit segar."
+								? "Masa aktif habis. Sisa kredit periode lama hangus. Perpanjang untuk dapat kredit segar."
 								: remaining > 0
 									? `Sisa ${remaining} kredit periode ini.${creditsReserved > 0 ? ` (${creditsReserved} sedang direservasi).` : ""} Kredit reset setiap 30 hari.`
 									: "Kredit periode ini habis. Perpanjang atau tunggu reset berikutnya."}
@@ -193,7 +193,7 @@ export function BillingPage({
 													{formatCurrency(p.amount ?? 0)}
 												</div>
 												<div className="mt-0.5 text-xs text-(--text-secondary)">
-													{p.createdAt ? formatDateTime(p.createdAt) : "—"}
+													{p.createdAt ? formatDateTime(p.createdAt) : "-"}
 												</div>
 											</div>
 											<div className="shrink-0">

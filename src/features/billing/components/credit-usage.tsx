@@ -218,7 +218,7 @@ export function CreditUsageSection(props: CreditUsageProps) {
 											className="hover:bg-(--bg-surface)/50 transition-colors"
 										>
 											<td className="whitespace-nowrap px-5 py-3.5 text-xs text-(--text-secondary)">
-												{op.createdAt ? formatDate(op.createdAt) : "—"}
+												{op.createdAt ? formatDate(op.createdAt) : "-"}
 											</td>
 											<td className="whitespace-nowrap px-5 py-3.5 font-medium text-snow">
 												{getActivityLabel(op.kind)}
@@ -232,7 +232,7 @@ export function CreditUsageSection(props: CreditUsageProps) {
 											<td className="whitespace-nowrap px-5 py-3.5 text-xs font-mono font-medium text-snow">
 												{op.finalCharge !== null && op.finalCharge !== undefined
 													? `${op.finalCharge} kr`
-													: "—"}
+													: "-"}
 											</td>
 											<td className="whitespace-nowrap px-5 py-3.5">
 												<span
@@ -268,7 +268,6 @@ export function CreditUsageSection(props: CreditUsageProps) {
 					<div className="p-4 border-t border-(--border-subtle) flex flex-wrap items-center justify-between gap-3 bg-(--bg-surface)/30">
 						<div className="flex items-center gap-2 text-xs text-(--text-secondary)">
 							<span>{pageSize} baris per halaman</span>
-							<span className="hidden sm:inline text-fog/40">•</span>
 							<span className="tabular-nums">
 								Halaman {currentPage} dari {totalPages}
 							</span>

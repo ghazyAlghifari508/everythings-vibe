@@ -6,9 +6,9 @@ export const HOME_PROJECT_MODE_OPTIONS = [
 export type HomeProjectMode = (typeof HOME_PROJECT_MODE_OPTIONS)[number]["id"];
 
 export const GREENFIELD_PLACEHOLDER_ID =
-	"Deskripsikan ide produk Anda — target pengguna, fitur utama, dan alur kerja yang diinginkan...";
+	"Deskripsikan ide produk Anda: target pengguna, fitur utama, dan alur kerja yang diinginkan...";
 export const GREENFIELD_PLACEHOLDER_EN =
-	"Describe your product idea — target users, key features, and the desired workflow...";
+	"Describe your product idea: target users, key features, and the desired workflow...";
 
 export type HomePostCreationTarget =
 	| { to: "/ask/$id"; params: { id: string } }

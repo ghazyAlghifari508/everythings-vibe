@@ -164,7 +164,7 @@ export function PaymentHistoryDialog({
 												)}
 											</div>
 											<div className="mt-0.5 text-xs text-fog">
-												{item.createdAt ? formatDateTime(item.createdAt) : "—"}
+												{item.createdAt ? formatDateTime(item.createdAt) : "-"}
 											</div>
 										</div>
 										<div className="shrink-0">

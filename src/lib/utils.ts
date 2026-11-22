@@ -14,7 +14,7 @@ export function cn(
 export function formatDate(date: string | Date): string {
 	const d = date instanceof Date ? date : new Date(date);
 	// Invalid inputs must not render a user-visible "Invalid Date" string.
-	if (!Number.isFinite(d.getTime())) return "—";
+	if (!Number.isFinite(d.getTime())) return "-";
 	return d.toLocaleDateString("id-ID", {
 		year: "numeric",
 		month: "long",
@@ -26,7 +26,7 @@ export function formatDate(date: string | Date): string {
 /** Date plus local time of day, both in the product timezone. */
 export function formatDateTime(date: string | Date): string {
 	const d = date instanceof Date ? date : new Date(date);
-	if (!Number.isFinite(d.getTime())) return "—";
+	if (!Number.isFinite(d.getTime())) return "-";
 	const day = d.toLocaleDateString("id-ID", {
 		year: "numeric",
 		month: "long",
