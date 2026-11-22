@@ -86,22 +86,32 @@ export function NavbarFlowActions({
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ step }),
 			});
+			if (res.status === 403) {
+				// Server entitlement is authoritative: a stale client plan opens the paywall.
+				useUIStore.getState().openPaywallModal(step);
+				return;
+			}
 			if (res.status === 409) {
-				// Client snapshot was ahead of persisted data: resync, do not advance.
+				// Client snapshot was ahead of persisted data: resync, never advance.
 				void router.invalidate();
-				throw new Error("Tahap sebelumnya belum tersimpan.");
+				showToast(
+					"Tahap sebelumnya belum tersimpan. Menyegarkan data.",
+					"error",
+				);
+				return;
+			}
+			if (res.status === 401) {
+				showToast("Sesi berakhir. Masuk kembali untuk melanjutkan.", "error");
+				return;
 			}
 			if (!res.ok) throw new Error("Gagal memperbarui tahap proyek");
 			goTo(step);
 		} catch (err) {
 			console.error(`Step to ${step} failed:`, err);
 			showToast(
-				err instanceof Error &&
-					err.message === "Tahap sebelumnya belum tersimpan."
-					? err.message
-					: step === "ac"
-						? "Gagal lanjut ke Acceptance Criteria."
-						: "Gagal lanjut ke Task.",
+				step === "ac"
+					? "Gagal lanjut ke Acceptance Criteria."
+					: "Gagal lanjut ke Task.",
 				"error",
 			);
 		} finally {
