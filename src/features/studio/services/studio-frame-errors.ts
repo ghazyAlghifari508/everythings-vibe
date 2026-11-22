@@ -21,6 +21,7 @@ export type StudioFrameErrorCode =
 	| "STUDIO_STALE_REVISION"
 	| "STUDIO_DEPENDENCY_FAILED"
 	| "STUDIO_IDEMPOTENCY_CONFLICT"
+	| "STUDIO_REVISION_TOO_LARGE"
 	| "STUDIO_UNAUTHORIZED";
 
 interface StudioFrameErrorDescriptor {
@@ -123,6 +124,11 @@ export const STUDIO_FRAME_ERRORS: Record<
 		status: 409,
 		message: "Identitas permintaan sudah dipakai untuk operasi lain.",
 	},
+	STUDIO_REVISION_TOO_LARGE: {
+		status: 413,
+		message:
+			"Halaman ini terlalu besar untuk direvisi dengan aman. Desain sebelumnya tetap tersimpan; coba perubahan yang lebih kecil.",
+	},
 };
 
 /**
@@ -139,6 +145,7 @@ export type StudioFrameFailureCategory =
 	| "lease-loss"
 	| "planning-required"
 	| "resource-missing"
+	| "context-budget"
 	| "cancelled"
 	| "unknown";
 
@@ -174,6 +181,7 @@ const FAILURE_CATEGORY_BY_CODE: Record<
 	STUDIO_STALE_REVISION: "unknown",
 	STUDIO_DEPENDENCY_FAILED: "planning-required",
 	STUDIO_IDEMPOTENCY_CONFLICT: "unknown",
+	STUDIO_REVISION_TOO_LARGE: "context-budget",
 };
 
 const RECOVERY_BY_CATEGORY: Record<
@@ -188,6 +196,7 @@ const RECOVERY_BY_CATEGORY: Record<
 	"lease-loss": "wait-for-recovery",
 	"planning-required": "retry-planning",
 	"resource-missing": "none",
+	"context-budget": "none",
 	cancelled: "retry-generation",
 	unknown: "retry-generation",
 };

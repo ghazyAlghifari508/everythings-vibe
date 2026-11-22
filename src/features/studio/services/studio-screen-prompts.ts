@@ -1,5 +1,4 @@
 import { buildEvvibeDesignContext } from "@/features/studio/design-intelligence/evvibe-design";
-import { STUDIO_PREVIOUS_HTML_MAX_CHARS } from "@/features/studio/types/studio-constants";
 import type {
 	StudioFramePromptOptions,
 	StudioPromptOptions,
@@ -8,6 +7,7 @@ import {
 	getDomainQualityContract,
 	getStudioComponentGuidance,
 } from "./studio-component-guidance";
+import { prepareStudioExistingDocument } from "./studio-html-preservation";
 import { sanitizeStudioPrd } from "./studio-prd-helpers";
 import {
 	MOBILE_PLATFORM_CONTRACT,
@@ -153,7 +153,7 @@ Do NOT replace this logo with text initials or placeholder shapes.
 		sections.push(
 			`Revise the existing screen below according to the request:
 <EXISTING_HTML>
-${opts.previousHtml.trim().slice(0, STUDIO_PREVIOUS_HTML_MAX_CHARS)}
+${prepareStudioExistingDocument(opts.previousHtml)}
 </EXISTING_HTML>
 
 Return the FULL revised single-file HTML document for "${opts.screenName}".`,
@@ -251,7 +251,7 @@ Do NOT replace this logo with text initials, generic SVG shapes, or external pla
 			`Revise the existing page below according to this request: ${prompt}
 
 <EXISTING_HTML>
-${opts.previousHtml.trim().slice(0, STUDIO_PREVIOUS_HTML_MAX_CHARS)}
+${prepareStudioExistingDocument(opts.previousHtml)}
 </EXISTING_HTML>
 
 Return the FULL revised single-file HTML document.`,
