@@ -313,6 +313,19 @@ Persiapan lokal pada Inisiatif 12 dikerjakan melalui `docs/prompt-random/p4.md`;
 
 ---
 
+### Inisiatif 13: Universal Multi-Product Credits (VibePlan, Studio, Scrape)
+
+- **Status:** `In Progress` (TASK 06 selesai: fondasi ledger dan registry; rollout belum selesai)
+- **Dokumen:** `docs/universal-credit-ledger.md`
+- [x] TASK 06: ledger `credit_operations` mendukung resource Studio/Scrape, `product`, `funding_source`, `allocation_epoch`, migrasi 0045, registry operasi dengan harga `unconfigured`.
+- [ ] Terapkan migrasi 0045 ke staging dan production (hentikan writer web dan worker selama migrasi).
+- [ ] TASK 07/09: benchmark dan tarif Studio/Scrape. Tidak ada tarif aktif; jangan isi 0 sebagai placeholder.
+- [ ] TASK 10: trial satu kali per akun Free (`funding_source = 'trial'` sudah representable, belum diaktifkan).
+- [ ] TASK 11/12: integrasi Studio dan Scrape, termasuk tombstone untuk project/job/scrape yang sudah ditagih (FK menolak hard delete).
+- [ ] TASK 13/08: UI billing dan Admin Kredit multi-produk.
+
+---
+
 ## 2. Deferred Work
 
 ### Inisiatif 1: Architectural Backlog — Greenfield Workspace Routing Architecture Refactor
