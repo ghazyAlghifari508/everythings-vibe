@@ -63,7 +63,7 @@ function resolveViewActivity(activity: string): string | null {
 		index >= 1 &&
 		index <= total;
 	return counted
-		? `Memuat tampilan ${device} · ${index} dari ${total}`
+		? `Memuat tampilan ${device}, ${index} dari ${total}`
 		: `Memuat tampilan ${device}`;
 }
 

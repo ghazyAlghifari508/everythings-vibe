@@ -221,8 +221,8 @@ describe("buildWebsiteBlueprint navigation grouping", () => {
 		});
 		const shared = sectionOf(markdown, "### Shared Navigation");
 		expect(shared).toContain("Home");
-		expect(shared).not.toContain("Blog —");
-		expect(shared).not.toContain("Pricing —");
+		expect(shared).not.toContain("Blog:");
+		expect(shared).not.toContain("Pricing:");
 	});
 
 	it("labels shared navigation as repeated links, not a verified component", () => {
@@ -433,9 +433,9 @@ describe("buildWebsiteBlueprint coverage honesty", () => {
 			scope: { maxPages: 10, maxDepth: 2 },
 		});
 		const section = sectionOf(markdown, "### Failed & Skipped Pages");
-		expect(section).toContain("failed: https://example.test/gagal — HTTP 500");
+		expect(section).toContain("failed: https://example.test/gagal, HTTP 500");
 		expect(section).toContain(
-			"skipped: https://example.test/dilewati — Dibatasi robots.txt.",
+			"skipped: https://example.test/dilewati, Dibatasi robots.txt.",
 		);
 		expect(markdown).toContain("- Gagal: 1");
 		expect(markdown).toContain("- Dilewati: 1");

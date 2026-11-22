@@ -105,7 +105,7 @@ export function describeComponentProperties(
 		properties["font-size"] ?? "",
 		fontWeight ? weightLabel(fontWeight) : "",
 	].filter(Boolean);
-	push("Typography", fontParts.join(" · "));
+	push("Typography", fontParts.join(", "));
 	push("Line height", properties["line-height"] ?? "");
 	push("Tracking", properties["letter-spacing"] ?? "");
 	push("Layout", properties.display ?? "");

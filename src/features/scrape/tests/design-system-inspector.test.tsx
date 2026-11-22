@@ -269,7 +269,7 @@ describe("DesignSystemInspector", () => {
 				siteName="Acme"
 				sourceUrl="https://acme.example/"
 				model={MODEL}
-				contextLabel="Mobile 390x844 · tema terang"
+				contextLabel="Mobile 390x844, tema terang"
 			/>,
 		);
 		expect(screen.getByText(/konteks terukur: mobile 390x844/i)).toBeDefined();
@@ -280,7 +280,7 @@ describe("DesignSystemInspector", () => {
 		renderInspector();
 		expect(screen.getByRole("heading", { name: /type scale/i })).toBeDefined();
 		expect(screen.getByText("Display")).toBeDefined();
-		expect(screen.getByText("48px · w700 · lh 1.1 · ls -2px")).toBeDefined();
+		expect(screen.getByText("48px, w700, lh 1.1, ls -2px")).toBeDefined();
 	});
 
 	it("renders a display specimen at its measured size instead of flattening it", () => {
@@ -721,9 +721,9 @@ describe("task E inspector composition", () => {
 				{ value: "#eeeeee", level: 2, frequency: 1, roles: ["card"] },
 			],
 		});
-		expect(screen.queryByText(/kanvas ·/i)).toBeNull();
-		expect(screen.queryByText(/sekunder ·/i)).toBeNull();
-		expect(screen.queryByText(/komponen ·/i)).toBeNull();
+		expect(screen.queryByText(/kanvas,/i)).toBeNull();
+		expect(screen.queryByText(/sekunder,/i)).toBeNull();
+		expect(screen.queryByText(/komponen,/i)).toBeNull();
 		expect(screen.getByText(/level 0/i)).toBeDefined();
 	});
 
@@ -762,7 +762,7 @@ describe("task E inspector composition", () => {
 			"The quick brown fox jumps over the lazy dog.",
 		);
 		expect((specimen as HTMLElement).style.letterSpacing).toBe("");
-		expect(screen.getByText("48px · w700 · lh 1.1 · ls -2px")).toBeDefined();
+		expect(screen.getByText("48px, w700, lh 1.1, ls -2px")).toBeDefined();
 	});
 });
 

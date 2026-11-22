@@ -20,7 +20,7 @@ export function imageResultCounts(
 }
 
 export function imageCountsLabel(counts: ReturnType<typeof imageResultCounts>) {
-	return `${counts.discovered} ditemukan · ${counts.persisted} tersimpan · ${counts.linked} tautan terverifikasi · ${counts.failed} gagal · ${counts.pending} tertunda`;
+	return `${counts.discovered} ditemukan, ${counts.persisted} tersimpan, ${counts.linked} tautan terverifikasi, ${counts.failed} gagal, ${counts.pending} tertunda`;
 }
 
 // How a page-level image capture ended. Kept explicit so the UI never presents

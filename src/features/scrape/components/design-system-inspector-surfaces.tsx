@@ -26,8 +26,8 @@ export function SurfaceList({
 							{surface.value}
 						</p>
 						<p className="break-words text-[11px] text-fog">
-							Level {surface.level} · {surface.frequency} elemen
-							{surface.roles.length > 0 ? ` · ${surface.roles.join(", ")}` : ""}
+							Level {surface.level}, {surface.frequency} elemen
+							{surface.roles.length > 0 ? `, ${surface.roles.join(", ")}` : ""}
 						</p>
 					</div>
 				</div>
@@ -59,8 +59,8 @@ export function ElevationList({
 					</p>
 					<p className="mt-1 text-[11px] leading-4 text-fog">
 						{token.frequency > 0 ? `${token.frequency} elemen` : null}
-						{token.roles.length > 0 ? ` · ${token.roles.join(", ")}` : null}
-						{token.usageNote ? ` · ${token.usageNote}` : null}
+						{token.roles.length > 0 ? `, ${token.roles.join(", ")}` : null}
+						{token.usageNote ? `, ${token.usageNote}` : null}
 					</p>
 				</div>
 			))}
@@ -113,7 +113,7 @@ export function ComponentPatternList({
 							{component.variants.map((variant) => (
 								<div key={variant.label}>
 									<p className="text-[11px] font-medium text-snow">
-										{variant.label} · {variant.samples} elemen
+										{variant.label}, {variant.samples} elemen
 									</p>
 									{variant.characteristics.length > 0 ? (
 										<CharacteristicRows entries={variant.characteristics} />
@@ -140,7 +140,7 @@ export function ComponentPatternList({
 						<ul className="mt-2 flex flex-col gap-1">
 							{component.guidance.map((rule) => (
 								<li key={rule} className="text-[11px] leading-4 text-mist">
-									• {rule}
+									{rule}
 								</li>
 							))}
 						</ul>

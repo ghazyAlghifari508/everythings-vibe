@@ -41,19 +41,19 @@ describe("public activity copy", () => {
 				activity: "Menunggu resource halaman: 390x844, light (2/2)",
 				mode: "design",
 			}),
-		).toBe("Memuat tampilan mobile · 2 dari 2");
+		).toBe("Memuat tampilan mobile, 2 dari 2");
 		expect(
 			resolveScrapeActivity({
 				activity: "Mengambil tampilan 834x1112, dark (1/3)",
 				mode: "design",
 			}),
-		).toBe("Memuat tampilan tablet · 1 dari 3");
+		).toBe("Memuat tampilan tablet, 1 dari 3");
 		expect(
 			resolveScrapeActivity({
 				activity: "Menangkap DOM hasil render: 1440x900, dark (2/2)",
 				mode: "design",
 			}),
-		).toBe("Memuat tampilan desktop · 2 dari 2");
+		).toBe("Memuat tampilan desktop, 2 dari 2");
 	});
 
 	it("omits a view counter that would be misleading", () => {

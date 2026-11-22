@@ -291,8 +291,8 @@ export function CrawlResult({
 											</span>
 											<span className="mt-1 block text-xs text-fog">
 												{statusText(row.status)}
-												{row.httpStatus ? ` · HTTP ${row.httpStatus}` : ""}
-												{` · depth ${row.depth}`}
+												{row.httpStatus ? `, HTTP ${row.httpStatus}` : ""}
+												{`, depth ${row.depth}`}
 											</span>
 										</button>
 									</li>

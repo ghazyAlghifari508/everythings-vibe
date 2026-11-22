@@ -51,7 +51,7 @@ describe("inspectorFromEvidence curation", () => {
 	it("never exposes a raw property dump as a spacing row", () => {
 		const model = inspectorFromEvidence(ctaEvidence());
 		for (const token of model?.spacing ?? [])
-			expect(token.label).not.toMatch(/^padding · \d+ elemen$/);
+			expect(token.label).not.toMatch(/^padding, \d+ elemen$/);
 	});
 
 	it("preserves repeated action fill without inventing primary hierarchy", () => {

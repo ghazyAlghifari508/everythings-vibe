@@ -188,7 +188,7 @@ export function PageDetail({ page }: { page: Page }) {
 						<h4 className="text-sm font-semibold text-snow">UI Elements</h4>
 						<p className="mt-2 text-sm text-fog">
 							{content.patterns.length > 0
-								? content.patterns.join(" · ")
+								? content.patterns.join(", ")
 								: "Tidak ada pola teramati."}{" "}
 							Elemen teramati, bukan klaim fungsionalitas produk.
 						</p>

@@ -51,7 +51,7 @@ describe("ImagesResult gallery", () => {
 		expect(screen.getByText("1 gambar tidak berhasil diambil")).toBeDefined();
 		// The result area never repeats the counters the progress card owns.
 		expect(screen.queryByText("Ditemukan")).toBeNull();
-		expect(screen.queryByText(/ditemukan ·/)).toBeNull();
+		expect(screen.queryByText(/ditemukan,/)).toBeNull();
 	});
 
 	it("filters by format and kind independently with a reset", () => {

@@ -141,9 +141,9 @@ export function ImageCard({
 				<p className="text-xs text-fog">
 					{image.format ?? "Format belum diketahui"}
 					{image.width && image.height
-						? ` · ${image.width} × ${image.height}`
+						? `, ${image.width} × ${image.height}`
 						: ""}
-					{image.classification ? ` · ${image.classification}` : ""}
+					{image.classification ? `, ${image.classification}` : ""}
 				</p>
 				<details className="min-w-0 text-xs text-fog">
 					<summary

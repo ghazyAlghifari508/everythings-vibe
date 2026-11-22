@@ -33,7 +33,7 @@ export function SpacingRow({ token }: { token: InspectorToken }) {
 				<span
 					role="img"
 					aria-label={`${token.label} nol, tidak ada jarak`}
-					title="0px — tidak ada jarak"
+					title="0px, tidak ada jarak"
 					className="inline-flex h-5 w-8 shrink-0 items-center justify-center rounded-sm border border-dashed border-slate font-mono text-[10px] text-slate"
 				>
 					0

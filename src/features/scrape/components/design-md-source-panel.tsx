@@ -93,7 +93,7 @@ export function DesignMdSourcePanel({
 		theme ? THEME_LABELS[theme] : null,
 	]
 		.filter((part): part is string => Boolean(part))
-		.join(" · ");
+		.join(", ");
 	const copiedTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
 		undefined,
 	);

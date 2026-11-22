@@ -93,7 +93,6 @@ export function ImagesFailureSummary({
 									key={group.category.key}
 									className="flex items-baseline gap-2"
 								>
-									<span aria-hidden>•</span>
 									<span className="min-w-0 flex-1">{group.category.label}</span>
 									<span className="font-mono font-medium text-snow tabular-nums">
 										{group.count}
@@ -139,7 +138,7 @@ export function ImagesFailureSummary({
 								</Badge>
 								{group.category.actionHint && (
 									<span className="text-xs text-fog">
-										• {group.category.actionHint}
+										{group.category.actionHint}
 									</span>
 								)}
 							</div>

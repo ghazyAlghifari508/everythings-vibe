@@ -48,8 +48,8 @@ export function deriveEvidenceGuidelines(
 		const weight = element.properties["font-weight"];
 		if (font && size && weight)
 			ctaTypography.set(
-				`${font} · ${size} · ${weight}`,
-				(ctaTypography.get(`${font} · ${size} · ${weight}`) ?? 0) + 1,
+				`${font} | ${size} | ${weight}`,
+				(ctaTypography.get(`${font} | ${size} | ${weight}`) ?? 0) + 1,
 			);
 	}
 	const repeatedRadius = [...ctaRadii.entries()]
@@ -67,10 +67,10 @@ export function deriveEvidenceGuidelines(
 			`Gunakan border-radius ${repeatedRadius[0]} untuk tombol aksi; pola ini terukur pada ${repeatedRadius[1]} dari ${ctaElements.length} tombol.`,
 		);
 	if (ctaElements.length >= RULE_FREQUENCY_MINIMUM && repeatedType) {
-		const [stack, size, weight] = repeatedType[0].split(" · ");
+		const [stack, size, weight] = repeatedType[0].split(" | ");
 		const family = primaryFamily(stack ?? "");
 		dos.push(
-			`Pertahankan tipografi tombol${family ? ` ${family}` : ""} · ${size} · ${weight}; kombinasi ini berulang pada ${repeatedType[1]} tombol terukur.`,
+			`Pertahankan tipografi tombol${family ? ` ${family}` : ""}, ${size}, ${weight}; kombinasi ini berulang pada ${repeatedType[1]} tombol terukur.`,
 		);
 	}
 	if (ctaElements.length >= RULE_FREQUENCY_MINIMUM && repeatedBackground)

@@ -158,7 +158,7 @@ describe("CrawlResult async page arrival", () => {
 
 		// Verify sitemap graph button for Second is selected
 		const sitemapButtons = screen.getAllByRole("button", {
-			name: /Second — Berhasil/,
+			name: /Second, Berhasil/,
 		});
 		expect(sitemapButtons[0].getAttribute("aria-pressed")).toBe("true");
 	});
@@ -188,7 +188,7 @@ describe("CrawlResult async page arrival", () => {
 		render(<CrawlResult pages={pages} sourceUrl="https://example.test/" />);
 
 		const sitemapNode = screen.getAllByRole("button", {
-			name: /Second — Berhasil/,
+			name: /Second, Berhasil/,
 		})[0];
 		fireEvent.click(sitemapNode);
 
@@ -257,7 +257,6 @@ describe("CrawlResult summary and clean copy", () => {
 		expect(
 			screen.queryByText(/Jumlah ditemukan adalah halaman yang teramati/i),
 		).toBeNull();
-		expect(container.textContent).not.toContain("Â·");
 		expect(container.textContent).not.toContain("Â");
 	});
 

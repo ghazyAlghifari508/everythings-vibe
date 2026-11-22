@@ -160,7 +160,7 @@ function resolveScrapeErrorBase(
 					"Website tujuan sedang membatasi permintaan otomatis. Karena itu, gambar belum berhasil diambil. Permintaan berikutnya dapat dicoba setelah waktu tunggu dari website berakhir.",
 				retryable: true,
 				retryHint,
-				technicalDetail: `Detail teknis: HTTP 429 · Retry-After: ${remaining} dtk`,
+				technicalDetail: `Detail teknis: HTTP 429, Retry-After: ${remaining} dtk`,
 				...base,
 			};
 		}
