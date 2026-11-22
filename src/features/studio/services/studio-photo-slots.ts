@@ -1,5 +1,5 @@
 import { JSDOM } from "jsdom";
-import type { PexelsFailure, PexelsPhoto } from "@/lib/pexels-photos";
+import type { PhotoAsset, PhotoFailure } from "@/lib/photo-asset";
 import type { StudioDesignBlueprint } from "./studio-design-blueprint";
 
 type Request = NonNullable<
@@ -7,7 +7,7 @@ type Request = NonNullable<
 >[number];
 export type StudioPhotoSlot = {
 	request: Request;
-	photo: PexelsPhoto | PexelsFailure | "requires-user-asset";
+	photo: PhotoAsset | PhotoFailure | "requires-user-asset";
 };
 const RATIOS = { landscape: "3 / 2", portrait: "2 / 3", square: "1 / 1" };
 
@@ -60,7 +60,9 @@ export function applyStudioPhotoSlots(
 				continue;
 			}
 			next.setAttribute("src", photo.url);
-			next.setAttribute("alt", photo.alt);
+			// The plan's alt intent describes the subject for a reader; a provider
+			// title is often a filename-like slug and only a fallback.
+			next.setAttribute("alt", request.alt || photo.alt);
 			next.setAttribute("width", String(photo.width));
 			next.setAttribute("height", String(photo.height));
 			const fit = frame.dataset.mediaFit === "contain" ? "contain" : "cover";
@@ -73,9 +75,21 @@ export function applyStudioPhotoSlots(
 			resolvedImages.add(next);
 			const credit = document.createElement("a");
 			credit.href = photo.source;
-			credit.textContent = `Foto: ${photo.photographer} · Pexels`;
-			credit.setAttribute("data-studio-photo-credit", "");
-			frame.after(credit);
+			credit.textContent = `Foto: ${photo.creator} · ${photo.provider}`;
+			// One wrapper so a later pass replaces the whole credit block.
+			const creditWrap = document.createElement("span");
+			creditWrap.setAttribute("data-studio-photo-credit", "");
+			creditWrap.append(credit);
+			// CC BY requires naming the licence, and Openverse requires a visible
+			// notice that it was used; the credit block carries both.
+			if (photo.license) {
+				const license = document.createElement("a");
+				license.href = photo.license.url;
+				license.textContent = photo.license.name;
+				license.setAttribute("data-studio-photo-license", "");
+				creditWrap.append(document.createTextNode(" — "), license);
+			}
+			frame.after(creditWrap);
 		}
 		for (const { request } of slots)
 			if (!ids.has(request.id))

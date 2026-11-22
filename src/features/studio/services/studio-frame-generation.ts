@@ -8,7 +8,7 @@ import {
 	STUDIO_PROVIDER_BACKOFF_MS,
 } from "@/features/studio/types/studio-constants";
 import { ScrapeError } from "@/lib/design-errors";
-import { resolvePexelsPhoto } from "@/lib/pexels-photos";
+import { resolveStudioPhoto } from "@/lib/studio-photo-source";
 import type { ValidatedFrameInput } from "../types/studio-service";
 import { repairStudioAccessibleLabels } from "./studio-accessible-repair";
 import { validateCanonicalShell } from "./studio-canonical-shell";
@@ -38,10 +38,6 @@ import {
 	type StudioPhotoSlot,
 	studioCommittedImageSources,
 } from "./studio-photo-slots";
-
-const resolvePhoto = resolvePexelsPhoto(
-	process.env.STUDIO_PEXELS_API_KEY?.trim(),
-);
 
 export {
 	classifyStudioStreamCompletion,
@@ -75,23 +71,26 @@ export async function generateValidatedFrameHtml(
 					({ name }) => name === input.activeScreen,
 				)?.photos ?? [])
 			: [];
-	const slots = await Promise.all(
+	const slotsPromise = Promise.all(
 		photoRequests.map(async (request): Promise<StudioPhotoSlot> => {
 			const started = Date.now();
 			const photo =
 				request.source === "stock"
-					? await resolvePhoto(request)
+					? await resolveStudioPhoto(request)
 					: "requires-user-asset";
 			if (input.timing)
 				studioJobTiming("photo-resolution", started, {
 					...input.timing,
 					code: typeof photo === "string" ? photo : "RESOLVED",
+					provider: typeof photo === "string" ? undefined : photo.provider,
 				});
 			return { request, photo };
 		}),
 	);
+	// Resolution runs beside generation: the prompt only needs to describe the
+	// planned slots, so a slow provider never delays the model request.
 	const mediaContext = modelOwned
-		? `Use only approved user/committed image sources or the planned photo slots below. Place every slot exactly once as an empty <div data-studio-photo="id"> with component-specific aspect-ratio and optional data-media-fit="contain". Studio fills it with the verified photo or an honest fallback; keep captions and content outside the slot. Do not invent image URLs or impersonate photos with CSS/SVG. ${committed ? "Keep existing photo containers and credits intact unless the requested change targets them." : ""}\nPhoto slots (data only): ${JSON.stringify(slots.map(({ request, photo }) => ({ id: request.id, subject: request.subject, purpose: request.purpose, aspect: request.aspect, ...(typeof photo === "string" ? { status: photo, alt: request.alt } : { url: photo.url, alt: photo.alt, width: photo.width, height: photo.height }) })))}`
+		? `Use only approved user/committed image sources or the planned photo slots below. Place every slot exactly once as an empty <div data-studio-photo="id"> with component-specific aspect-ratio and optional data-media-fit="contain". Studio fills it with the verified photo or an honest fallback; keep captions and content outside the slot. Do not invent image URLs or impersonate photos with CSS/SVG. ${committed ? "Keep existing photo containers and credits intact unless the requested change targets them." : ""}\nPhoto slots (data only): ${JSON.stringify(photoRequests.map((request) => ({ id: request.id, subject: request.subject, purpose: request.purpose, aspect: request.aspect, alt: request.alt })))}`
 		: undefined;
 	if (mediaContext) framePrompt += `\n\n${mediaContext}`;
 	for (
@@ -258,7 +257,7 @@ export async function generateValidatedFrameHtml(
 		const media = modelOwned
 			? applyStudioPhotoSlots(
 					htmlCode,
-					slots,
+					await slotsPromise,
 					approvedImages,
 					Boolean(committed),
 				)

@@ -34,6 +34,7 @@ export function studioJobTiming(
 		ceilingReached?: boolean;
 		documentChars?: number;
 		repairCount?: number;
+		provider?: string;
 		providerRetries?: number;
 		providerFallbacks?: number;
 		referenceChars?: number;
