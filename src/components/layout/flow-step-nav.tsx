@@ -18,7 +18,6 @@ const STEPS = [
 	{ id: "prd", label: "PRD" },
 	{ id: "ac", label: "AC" },
 	{ id: "task", label: "Task" },
-	{ id: "kanban", label: "Kanban" },
 ] as const;
 
 /**
@@ -32,6 +31,8 @@ export function FlowStepNav(props?: {
 }) {
 	const pathname = useLocation({ select: (l) => l.pathname });
 	const view = workspaceView(pathname);
+	// Kanban is a view of the Task stage, not a sixth stage.
+	const currentStep = view === "kanban" ? "task" : view;
 	const dbRank = stepRank(props?.step ?? "question");
 	const completed = {
 		ask: Boolean(
@@ -45,7 +46,6 @@ export function FlowStepNav(props?: {
 		prd: Boolean(props?.availability?.hasPrd),
 		ac: Boolean(props?.availability?.hasAc),
 		task: Boolean(props?.availability?.hasTasks),
-		kanban: false,
 	};
 
 	return (
@@ -54,7 +54,7 @@ export function FlowStepNav(props?: {
 			className="flex items-center gap-1.5 md:gap-2 select-none"
 		>
 			{STEPS.map((s, idx) => {
-				const isCurrentRoute = s.id === view;
+				const isCurrentRoute = s.id === currentStep;
 				const isCompleted = completed[s.id];
 				const isActive = isCurrentRoute;
 				const isLocked = !isCompleted && !isActive;
@@ -79,8 +79,8 @@ export function FlowStepNav(props?: {
 							<span
 								className={cn(
 									"flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-[510] transition-colors duration-300",
-									isCompleted && "bg-emerald text-charcoal",
-									isActive && "bg-indigo text-white",
+									isActive && "bg-snow text-onyx",
+									!isActive && isCompleted && "border border-fog text-snow",
 									isLocked && "border border-graphite text-fog",
 								)}
 								aria-hidden="true"
