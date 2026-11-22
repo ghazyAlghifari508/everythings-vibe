@@ -8,6 +8,7 @@ import { useRef, useState, useTransition } from "react";
 import { Icon } from "@/components/ui/icon";
 import { loadAsk } from "@/features/greenfield/services/ask-loader.functions";
 import type { WorkspaceProject } from "@/features/greenfield/services/workspace-project.server";
+import { PRD_CHAT_PANEL_ID } from "@/features/greenfield/types/greenfield-constants";
 import { deriveWorkspaceCta } from "@/features/greenfield/utils/flow-cta";
 import {
 	type FlowStep,
@@ -57,6 +58,8 @@ export function NavbarFlowActions({
 	const isGeneratingPRD = useChatStore((s) => s.isGeneratingPRD);
 	const isGeneratingAC = useChatStore((s) => s.isGeneratingAC);
 	const showToast = useUIStore((s) => s.showToast);
+	const isChatOpen = useUIStore((s) => s.isChatPanelOpen);
+	const toggleChatPanel = useUIStore((s) => s.toggleChatPanel);
 	const cta = deriveWorkspaceCta({
 		route: routeStep,
 		projectId: projectId ?? "",
@@ -159,9 +162,10 @@ export function NavbarFlowActions({
 			{routeStep === "prd" && (
 				<button
 					type="button"
-					onClick={() => useUIStore.getState().toggleChatPanel()}
+					onClick={toggleChatPanel}
 					className="hidden md:flex items-center gap-1.5 rounded-md bg-charcoal px-3 py-1.5 text-xs font-[510] text-fog shadow-[var(--shadow-inset)] transition-colors hover:bg-white/5 hover:text-snow"
-					aria-label="Buka/tutup chat"
+					aria-expanded={isChatOpen}
+					aria-controls={PRD_CHAT_PANEL_ID}
 				>
 					<Icon icon={MessageSquareIcon} size={14} />
 					<span>Chat</span>

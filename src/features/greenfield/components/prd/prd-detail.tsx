@@ -9,6 +9,7 @@ import { ChatPanel } from "@/features/greenfield/components/chat/chat-panel";
 import { GenerationProgress } from "@/features/greenfield/components/generation-progress";
 import { usePanelResize } from "@/features/greenfield/hooks/use-panel-resize";
 import { usePrdDetail } from "@/features/greenfield/hooks/use-prd-detail";
+import { PRD_CHAT_PANEL_ID } from "@/features/greenfield/types/greenfield-constants";
 import { isPrdLocked } from "@/lib/flow-progress";
 import { cn } from "@/lib/utils";
 import { useChatStore, useUIStore } from "@/store";
@@ -64,7 +65,7 @@ export function PrdDetail({
 	const toggleChat = useUIStore((s) => s.toggleChatPanel);
 
 	// ── Hooks ──
-	const { rightWidth, onStartDragRight, isDraggingRight } = usePanelResize();
+	const { rightWidth, onStartDragRight } = usePanelResize();
 	const chatStyle: CSSProperties & { "--chat-width": string } = {
 		"--chat-width": `${rightWidth}px`,
 		background: "var(--bg-elevated)",
@@ -183,15 +184,18 @@ export function PrdDetail({
 					</div>
 				</div>
 
-				<div
-					id="print-hide-chat"
+				<aside
+					id={PRD_CHAT_PANEL_ID}
+					aria-label="Chat PRD"
+					data-state={isChatOpen ? "open" : "closed"}
 					style={chatStyle}
 					className={cn(
-						"flex min-h-0 flex-1 flex-col border-l border-graphite print:hidden md:fixed md:inset-x-0 md:bottom-0 md:z-40 md:h-[60vh] md:rounded-t-xl xl:relative xl:inset-auto xl:z-auto xl:h-auto xl:rounded-none xl:flex-none xl:w-[var(--chat-width)]",
-						activeTab !== "chat" && "hidden md:flex",
-						!isChatOpen &&
-							"md:hidden xl:flex xl:w-0 xl:overflow-hidden xl:border-none",
-						!isDraggingRight && "xl:transition-[width]",
+						"min-h-0 flex-1 flex-col border-l border-graphite print:hidden md:fixed md:inset-x-0 md:bottom-0 md:z-40 md:h-[60vh] md:rounded-t-xl xl:relative xl:inset-auto xl:z-auto xl:h-auto xl:rounded-none xl:flex-none xl:w-[var(--chat-width)]",
+						// Mobile (<md) follows the Dokumen/Chat tab; md+ follows the store.
+						// Exactly one display utility per breakpoint: a closed panel is
+						// display:none (no width, border, hitbox or tab stops).
+						activeTab === "chat" ? "flex" : "hidden",
+						isChatOpen ? "md:flex" : "md:hidden",
 					)}
 				>
 					{isChatOpen && (
@@ -225,7 +229,7 @@ export function PrdDetail({
 						userPlan={plan}
 						selectedVersionNum={selectedVersionNum}
 					/>
-				</div>
+				</aside>
 			</div>
 
 			<CreditExhaustedModal
