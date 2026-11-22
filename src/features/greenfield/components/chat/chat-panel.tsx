@@ -82,7 +82,6 @@ export const ChatPanel = memo(function ChatPanel({
 		stream.messages,
 		stream.streamingContent,
 		stream.currentSection,
-		stream.thinkingText,
 		scrollToBottom,
 	]);
 
@@ -119,7 +118,6 @@ export const ChatPanel = memo(function ChatPanel({
 				messages={stream.messages}
 				isStreaming={stream.isStreaming}
 				streamingContent={stream.streamingContent}
-				thinkingText={stream.thinkingText}
 				currentSection={stream.currentSection}
 				completedSections={stream.completedSections}
 				isGeneratingPRD={stream.isGeneratingPRD}

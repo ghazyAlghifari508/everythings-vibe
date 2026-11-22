@@ -52,7 +52,6 @@ export function deriveWorkspaceCta(input: {
 			label: "Generate PRD",
 			target: "prd",
 			disabled: generating || op.advancing,
-			busyLabel: generating ? "Menyusun fitur..." : undefined,
 			hint: generating
 				? "Daftar fitur masih disusun. Tunggu hingga selesai."
 				: undefined,
@@ -88,11 +87,6 @@ export function deriveWorkspaceCta(input: {
 			label: "Generate Task",
 			target: "task",
 			disabled: !acReady || op.advancing,
-			busyLabel: !acReady
-				? "Menyusun AC..."
-				: op.advancing
-					? "Memuat..."
-					: undefined,
 			hint: acReady ? undefined : "AC belum tersimpan. Tunggu hingga selesai.",
 		};
 	}

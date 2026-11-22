@@ -144,17 +144,18 @@ export function PrdDetail({
 				>
 					{/* Default: PRD content (streaming or saved) */}
 					<div className="flex flex-1 flex-col overflow-hidden relative">
-						{/* Mobile-only spinner — keeps the full-page blocker for small screens
-                where the chat progress card isn't visible. Desktop users see the
-                empty PrdViewer + the section progress card in the chat panel. */}
-						{/* Pre-stream / waiting-for-first-token: plain load first
-						    (desktop+mobile), then rotating thinking steps once the model
-						    has been silent a few seconds. Real content replaces it. */}
-						{isGeneratingPRD && !streamingPRDContent && !latestVersion && (
-							<div className="absolute inset-0 z-10 overflow-y-auto bg-onyx">
-								<GenerationProgress label="PRD" isStreaming={isGeneratingPRD} />
-							</div>
-						)}
+						{/* The section checklist in Chat is the single indicator while it
+						    is visible. This is the one compact fallback for chat-closed
+						    and mobile document views before the first token. */}
+						{isGeneratingPRD &&
+							!streamingPRDContent &&
+							!latestVersion &&
+							activeTab !== "chat" &&
+							!isChatOpen && (
+								<div className="absolute inset-0 z-10 overflow-y-auto bg-onyx">
+									<GenerationProgress label="PRD" />
+								</div>
+							)}
 						<PrdViewer
 							content={streamingForView ? streamingForView : currentContent}
 							plan={plan}

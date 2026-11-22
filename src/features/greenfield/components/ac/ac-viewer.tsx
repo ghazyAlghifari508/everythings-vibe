@@ -53,7 +53,6 @@ interface AcViewerProps {
 	streamingContent?: string;
 	isStreaming?: boolean;
 	hasError?: boolean;
-	thinkingText?: string;
 	onGenerate?: () => void;
 	projectName: string;
 	plan?: Plan;
@@ -70,7 +69,6 @@ export const AcViewer = memo(function AcViewer({
 	streamingContent,
 	isStreaming = false,
 	hasError = false,
-	thinkingText,
 	onGenerate,
 	projectName: _projectName,
 	plan: _plan = "free",
@@ -126,11 +124,7 @@ export const AcViewer = memo(function AcViewer({
 	if (isStreaming && !streamingContent) {
 		return (
 			<div ref={scrollRef} className={cn("h-full overflow-y-auto", className)}>
-				<GenerationProgress
-					label="Acceptance Criteria"
-					thinkingText={thinkingText}
-					isStreaming={isStreaming}
-				/>
+				<GenerationProgress label="Acceptance Criteria" />
 			</div>
 		);
 	}
@@ -181,11 +175,9 @@ export const AcViewer = memo(function AcViewer({
 		}
 		return (
 			<div className={cn("h-full overflow-y-auto", className)}>
-				<GenerationProgress
-					label="Acceptance Criteria"
-					thinkingText={thinkingText}
-					isStreaming={isStreaming}
-				/>
+				<p className="px-4 py-8 text-center text-sm text-fog">
+					Acceptance Criteria belum tersedia.
+				</p>
 			</div>
 		);
 	}

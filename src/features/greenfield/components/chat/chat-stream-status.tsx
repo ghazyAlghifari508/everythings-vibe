@@ -14,21 +14,22 @@ export function ChatStreamStatus({
 	isGeneratingPRD,
 	isRevising,
 }: ChatStreamStatusProps) {
-	if (!currentSection && completedSections.length === 0 && !isGeneratingPRD) {
+	if (
+		isRevising ||
+		(!currentSection && completedSections.length === 0 && !isGeneratingPRD)
+	) {
 		return null;
 	}
 
 	return (
 		<div>
-			{!isRevising && (
-				<div className="mb-1.5 text-xs font-[510] uppercase tracking-wide text-mist">
-					{isGeneratingPRD
-						? "PRD sedang di-generate oleh AI"
-						: completedSections.length >= ALL_PRD_SECTIONS.length
-							? "PRD selesai"
-							: "Proses generate PRD"}
-				</div>
-			)}
+			<div className="mb-1.5 text-xs font-[510] uppercase tracking-wide text-mist">
+				{isGeneratingPRD
+					? "Menyusun PRD"
+					: completedSections.length >= ALL_PRD_SECTIONS.length
+						? "PRD selesai"
+						: "Proses generate PRD"}
+			</div>
 			<div className="rounded-lg border border-graphite bg-charcoal/40 px-4 py-3">
 				<ul className="space-y-2">
 					{ALL_PRD_SECTIONS.map((section) => {

@@ -325,6 +325,7 @@ export const FeatureMapCanvas = memo(function FeatureMapCanvas({
 			}}
 			onKeyDown={handleKeyDown}
 			aria-label={`Kanvas peta fitur ${productName}`}
+			aria-busy={!hasContent}
 		>
 			{!hasContent ? (
 				<div

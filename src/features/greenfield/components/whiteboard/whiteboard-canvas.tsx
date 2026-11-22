@@ -171,6 +171,7 @@ export const WhiteboardCanvas = memo(function WhiteboardCanvas({
 			onWheel={handleWheel}
 			onKeyDown={handleKeyDown}
 			aria-label="Kanvas diagram task"
+			aria-busy={isEmpty}
 		>
 			{isEmpty ? (
 				<div

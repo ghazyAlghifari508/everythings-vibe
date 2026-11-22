@@ -8,6 +8,7 @@ import {
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { Icon } from "@/components/ui/icon";
+import { Spinner } from "@/components/ui/spinner";
 import type { ProjectFeatureTree } from "@/db/schema";
 import { CreditExhaustedModal } from "@/features/billing/components/credit-exhausted-modal";
 import { DocumentReviewModal } from "@/features/greenfield/components/documents/document-review-modal";
@@ -19,7 +20,6 @@ import { cn } from "@/lib/utils";
 import { useChatStore, useUIStore } from "@/store";
 import { ImplementationOptions } from "./implementation-options";
 import { TaskMobileTree } from "./task-mobile-tree";
-import { IDLE_GENERATING_TITLE, thinkingTitleText } from "./thinking-title";
 
 interface TaskDetailProps {
 	projectId: string;
@@ -31,12 +31,6 @@ interface TaskDetailProps {
 	latestPrdContent?: string | null;
 	latestAcContent?: string | null;
 }
-
-// ponytail: honest status per no-hardcode.md Rule 7 â€” while generating, the
-// topbar title shows the model's REAL streamed reasoning (SSE `thinking`
-// events) via thinkingTitleText; one neutral static label (IDLE_GENERATING_TITLE)
-// is the fallback while nothing has streamed. The board shows the skeleton.
-
 /**
  * Task detail container - orchestrates generate flow, canvas, mobile fallback.
  */
@@ -73,7 +67,6 @@ export function TaskDetail({
 		hasError,
 		isGenerating,
 		revealCount,
-		thinkingText,
 	} = useTaskGeneration({
 		projectId,
 		hasAc,
@@ -121,35 +114,21 @@ export function TaskDetail({
 		),
 	);
 
-	// Title: the model's real streamed reasoning while generating (tail of the
-	// latest line), neutral static label before any thinking arrives, project
-	// name when done.
-	const generatingTitle = thinkingText
-		? thinkingTitleText(thinkingText)
-		: IDLE_GENERATING_TITLE;
-	const displayTitle = isGenerating ? generatingTitle : "Task Breakdown";
-
 	return (
 		<>
 			<div className="flex h-full flex-col bg-onyx text-snow">
 				{/* Topbar */}
 				<div className="flex items-center justify-between border-b border-graphite bg-obsidian px-4 py-3">
-					<h1
-						className={cn(
-							"truncate font-inter text-lg font-[510]",
-							isGenerating && "text-fog",
-						)}
-					>
-						{displayTitle}
-						{isGenerating && (
-							<span aria-hidden="true">
-								<span className="animate-pulse">.</span>
-								<span className="animate-pulse animate-delay-200">.</span>
-								<span className="animate-pulse animate-delay-400">.</span>
-							</span>
-						)}
+					<h1 className="truncate font-inter text-lg font-[510]">
+						Task Breakdown
 					</h1>
 					<div className="flex items-center gap-3">
+						{isGenerating && !hasContent ? (
+							<output className="flex items-center gap-2 text-xs text-fog">
+								<Spinner size={14} />
+								<span>Menyusun task...</span>
+							</output>
+						) : null}
 						<Link
 							to="/vibeplan/$id/kanban"
 							params={{ id: projectId }}
@@ -166,10 +145,8 @@ export function TaskDetail({
 					</div>
 				</div>
 
-				{/* Canvas / generate */}
-				{/* ponytail: no opaque overlay while generating â€” the board's
-				    skeleton diagram stays visible; progress lives in the
-				    topbar title (rotating phrases), distinct from PRD/AC. */}
+				{/* Canvas: the existing skeleton diagram stays visible while the
+				    single inline status above is the only generation indicator. */}
 				<div className="relative flex-1 overflow-hidden">
 					{/* Mobile: stacked accordion <md */}
 					{visibleTaskTree && hasContent && (
