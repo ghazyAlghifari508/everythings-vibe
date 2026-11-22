@@ -324,6 +324,13 @@ it.each([
 		});
 		for (const item of deferred)
 			expect(after.messages?.[1].content).toContain(item);
+		// The explanation is composed from the persisted plan and frame results:
+		// it names the planned product and every planned screen, and costs no
+		// model call beyond planning plus one request per frame.
+		const reply = after.messages?.[1].content ?? "";
+		expect(reply).toContain("Sample");
+		for (const frame of after.frames) expect(reply).toContain(frame.name);
+		expect(provider.messages).toHaveLength(1 + count);
 	} finally {
 		await db.delete(subscriptions).where(eq(subscriptions.userId, userId));
 		await db.delete(users).where(eq(users.id, userId));
