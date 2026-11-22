@@ -19,7 +19,6 @@ import { StudioLandingProfile } from "@/features/studio/components/workspace/stu
 import { StudioMobileHistoryDrawer } from "@/features/studio/components/workspace/studio-mobile-history-drawer";
 import { StudioSidebar } from "@/features/studio/components/workspace/studio-sidebar";
 import { useStudioHistoryActions } from "@/features/studio/hooks/use-studio-history-actions";
-import { STUDIO_DEFAULT_PAGE_COUNT } from "@/features/studio/services/studio-generation-options";
 import {
 	getStudioPresetDesignMd,
 	STUDIO_DESIGN_PRESETS,
@@ -65,7 +64,6 @@ export function StudioLandingPage({
 	const [prompt, setPrompt] = useState(search.prompt ?? "");
 	const [config, setConfig] = useState<LaunchComposerConfig>({
 		designMode: "web",
-		initialPageCount: STUDIO_DEFAULT_PAGE_COUNT,
 	});
 	const [stagedReference, setStagedReference] =
 		useState<StagedReference | null>(null);
@@ -100,11 +98,7 @@ export function StudioLandingPage({
 	function applyShortcut(shortcut: StudioPromptShortcut) {
 		setPrompt(shortcut.prompt);
 		setSelectedShortcutId(shortcut.id);
-		setConfig((previous) => ({
-			...previous,
-			designMode: shortcut.designMode,
-			initialPageCount: shortcut.initialPageCount,
-		}));
+		setConfig({ designMode: shortcut.designMode });
 		setError("");
 		textareaRef.current?.focus();
 	}
@@ -172,7 +166,6 @@ export function StudioLandingPage({
 				body: JSON.stringify({
 					prompt,
 					designMode: config.designMode,
-					initialPageCount: config.initialPageCount,
 					designReference: stagedReference
 						? stagedReference.kind === "theme"
 							? { kind: "theme", id: stagedReference.id }

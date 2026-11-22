@@ -8,7 +8,6 @@ import {
 
 const baseConfig: LaunchComposerConfig = {
 	designMode: "web",
-	initialPageCount: 3,
 };
 
 function renderComposer(
@@ -94,8 +93,11 @@ describe("StudioLaunchComposer", () => {
 		expect(screen.getByText(/brand\.png/)).toBeDefined();
 	});
 
-	it("forwards platform and page count changes without submitting", () => {
+	it("keeps the platform switch without exposing an initial page-count selector", () => {
 		const { onSubmit, onConfigChange } = renderComposer();
+		expect(
+			screen.queryByRole("button", { name: /Jumlah halaman awal/i }),
+		).toBeNull();
 		fireEvent.click(screen.getByRole("button", { name: /Mobile/i }));
 		expect(onConfigChange).toHaveBeenCalledWith({ designMode: "mobile" });
 		expect(onSubmit).not.toHaveBeenCalled();

@@ -178,7 +178,6 @@ describe("StudioPage UI & Workflow", () => {
 					body: JSON.stringify({
 						prompt: "Aplikasi mobile fitness tracking dengan kalender",
 						designMode: "mobile",
-						initialPageCount: 3,
 						designReference: null,
 						designMd: null,
 						prdAttachment: null,

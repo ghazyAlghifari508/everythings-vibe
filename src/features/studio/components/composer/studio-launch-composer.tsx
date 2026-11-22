@@ -25,11 +25,9 @@ import {
 import { STUDIO_PRD_FILE_MAX_BYTES } from "@/features/studio/types/studio-constants";
 import type { StudioDesignMode } from "@/features/studio/types/studio-prompts";
 import { shouldSubmitComposerEvent } from "@/features/studio/utils/composer-keyboard";
-import { StudioPageCountSelect } from "./studio-page-count-select";
 
 export interface LaunchComposerConfig {
 	designMode: StudioDesignMode;
-	initialPageCount: number;
 }
 
 export interface LaunchComposerReference {
@@ -42,8 +40,6 @@ export interface StudioPrdAttachmentState {
 	content: string;
 }
 
-// Initial-project composer for the Studio landing workspace. Page count only
-// appears here: revision composers must not offer it.
 export function StudioLaunchComposer({
 	prompt,
 	onPromptChange,
@@ -284,12 +280,6 @@ export function StudioLaunchComposer({
 						<span>Mobile</span>
 					</button>
 				</fieldset>
-
-				<StudioPageCountSelect
-					value={config.initialPageCount}
-					onChange={(initialPageCount) => onConfigChange({ initialPageCount })}
-					disabled={loading}
-				/>
 
 				<span className="ml-auto flex items-center gap-2">
 					<div className="group relative">
