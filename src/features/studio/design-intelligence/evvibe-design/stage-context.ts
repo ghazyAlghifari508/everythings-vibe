@@ -21,9 +21,9 @@ const REFERENCE_BY_ID = new Map(
 );
 
 /**
- * Delivery order per stage, highest priority first. A stage that does not need
- * a reference does not list it; the frame prompt is sent once per screen plus
- * once per repair round, so nothing ships "just in case".
+ * Delivery order per stage, highest priority first. A stage lists only what it
+ * genuinely adds: `revision` does not repeat the generation standard that the
+ * frame system prompt already carries, and `correction` repeats nothing at all.
  */
 export const EVVIBE_DESIGN_STAGE_REFERENCES: Record<
 	EvvibeDesignStage,
@@ -32,37 +32,41 @@ export const EVVIBE_DESIGN_STAGE_REFERENCES: Record<
 	planning: [
 		"design-reasoning",
 		"navigation-patterns",
-		"web-design",
-		"mobile-design",
 		"media-and-imagery",
 		"anti-slop",
 		"accessibility",
 	],
+	"planning-platform": ["web-design", "mobile-design"],
 	generation: [
 		"typography-and-layout",
-		"anti-slop",
 		"component-library",
 		"media-and-imagery",
+		"anti-slop",
 	],
 	initial: [
 		"web-design",
 		"mobile-design",
 		"website-patterns",
 		"mobile-patterns",
-		"media-and-imagery",
 		"good-vs-bad",
 	],
-	"add-screen": [
-		"navigation-patterns",
-		"web-design",
-		"mobile-design",
-		"website-patterns",
-		"mobile-patterns",
-		"good-vs-bad",
-	],
-	revision: ["typography-and-layout", "anti-slop", "good-vs-bad"],
-	correction: ["typography-and-layout"],
+	"add-screen": ["navigation-patterns", "web-design", "mobile-design"],
+	revision: ["revision-scope", "good-vs-bad"],
+	correction: [],
 };
+
+function applicable(
+	reference: EvvibeDesignReference,
+	options: EvvibeDesignContextOptions,
+): boolean {
+	if (reference.viewport && reference.viewport !== options.viewport)
+		return false;
+	if (reference.intents)
+		return Boolean(
+			options.layoutIntent && reference.intents.includes(options.layoutIntent),
+		);
+	return true;
+}
 
 function contextHeader(stage: EvvibeDesignStage): string {
 	return `<EVVIBE_DESIGN_INTELLIGENCE id="${EVVIBE_DESIGN_INTERNAL_ID}" stage="${stage}" scope="internal">
@@ -88,11 +92,11 @@ export function planEvvibeDesignContext(
 	for (const id of EVVIBE_DESIGN_STAGE_REFERENCES[stage]) {
 		const reference = REFERENCE_BY_ID.get(id);
 		if (!reference) throw new Error(`Unknown EvVibe design reference: ${id}`);
-		if (reference.viewport && reference.viewport !== options.viewport) continue;
+		if (!applicable(reference, options)) continue;
 		const section = `\n\n## ${reference.title}\n${reference.body}`;
 		if (
 			chars + section.length >
-			budgetChars - `\n</EVVIBE_DESIGN_INTELLIGENCE>`.length
+			budgetChars - "\n</EVVIBE_DESIGN_INTELLIGENCE>".length
 		) {
 			omittedIds.push(id);
 			continue;

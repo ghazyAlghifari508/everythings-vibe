@@ -2,27 +2,17 @@ import type { EvvibeDesignReference } from "../skill-contract";
 
 export const typographyAndLayout: EvvibeDesignReference = {
 	id: "typography-and-layout",
-	title: "Responsive layout, intrinsic sizing and atomic values",
+	title: "Layout and type technique",
+	body: `The universal rules already state the boundaries (no page overflow, atomic price groups, 44px primary targets, no forced breaks). These are the techniques that satisfy them.
 
-	body: `Layout technique, beyond the universal quality rules:
+- Flow first: block layout carries most screens; flex for one axis, grid for two. Do not wrap a single child in a flex container to align it.
+- Contain tracks: min-width: 0 on flex and grid children holding text or scrollable content, width: auto and max-width: 100% on media.
+- Intrinsic sizing: prefer min-content, max-content, fit-content and auto-fill over fixed pixel widths. A card that must stay readable uses a min-width inside a contained horizontal track, not a shrunken basis.
+- Reflow before shrink: stack, wrap or give the row its own line. Never ellipsize essential text to keep a row.
+- Tables: overflow-x: auto container with max-width: 100% and min-width: 0 on its parent; the table may keep a min-width, the page may not.
+- Media: an explicit frame with a declared ratio; contain for whole products, cover only for a deliberate crop with a chosen object-position; caption outside the ratio box.
+- Mobile action areas stay in flow and account for the bottom inset; nothing important hides behind the home indicator.
+- Type: one project scale. Body 14-16px on mobile and 16-18px at desktop reading width, line-height near 1.5 for body and tighter for display; headings step by role. Cap the reading measure at 60-75 characters.
 
-- Flow first: block layout and normal document flow carry most screens. Reach for flex when items share one axis, grid when they share two. Do not wrap a single child in a flex container for alignment alone.
-- Contain tracks: min-width: 0 on flex and grid children that contain text or scrollable content, so a long label cannot blow out its parent. width: auto and max-width: 100% on media.
-- Intrinsic sizing: prefer min-content, max-content, fit-content, auto-fill and auto-fit over fixed pixel widths. A card that must keep a readable width uses a min-width plus a contained horizontal track, not a shrunken flex basis.
-- Reflow, not shrink: when a row no longer fits, stack it, wrap it, or give it its own row. Never let essential text become an ellipsis to preserve a row.
-- Bounded tables: a multi-column table lives inside an overflow-x: auto container with max-width: 100%, and its parent carries min-width: 0. The table may keep a min-width larger than the viewport; the page may not.
-- Intentional wrapping: allow natural wrapping with a comfortable measure. Avoid break-all, forced line tracks inside prices, and letter-spacing tricks that split words.
-- Atomic groups: currency prefix, amount, unit and short action labels stay in one non-wrapping group. Descriptions wrap. When space is tight, move the price to its own row instead of hiding the option label.
-- Media owns its ratio: an explicit frame with a declared aspect ratio; contain for whole products, cover only for deliberate photography crops with a chosen object-position. A caption sits outside the ratio frame.
-- Tap targets: primary actions at least 44px; compact controls keep proportional geometry plus at least a 24px hit area or a larger associated label. Do not bolt padding onto every button to fake this.
-- Safe areas: an in-flow action area at the end of the mobile content accounts for the bottom inset; nothing important sits under the home indicator in the static composition.
-- Responsive navigation: desktop shows the link row, narrow screens collapse to disclosure. Do not rely on hover for anything essential.
-- Typography: one scale for the whole project. Body text holds 14-16px at mobile width and a restrained 16-18px at desktop reading width, with line-height around 1.5 for body and tighter for display sizes. Headings step by role, not by guess.
-
-BAD → GOOD:
-- "3" on one line and "Item" below → "3 Item" in one atomic group.
-- [Oat Milk…] [Description…] [Price] in one squeezed row → [Radio] Oat Milk / Plant-based milk wrapping beneath / +Rp8.000 in its own non-wrapping track.
-- A fixed 1200px container inside a card → width: 100%; max-width: var(--app-content-width).
-- A carousel whose cards shrink to fit the viewport → cards with flex-shrink: 0 at a readable minimum width inside a contained scroller.
-- Truncated option names to protect a price column → full names with wrapping, price moved to its own row on narrow widths.`,
+Contrasts: "3" then "Item" on the next line → "3 Item" in one group. [Label…][Description…][Price] squeezed into one row → control, label over description, price in its own track; on narrow widths the price drops to its own line. A fixed 1200px container → width: 100% with the shared content width. Shrinking carousel cards → flex-shrink: 0 at a readable minimum inside a contained scroller. Truncated option names → full names that wrap.`,
 };

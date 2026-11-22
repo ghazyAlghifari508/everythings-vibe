@@ -1,3 +1,4 @@
+export { EVVIBE_ELEMENT_REVISION_GUIDANCE } from "./element-revision";
 export type {
 	EvvibeDesignComposition,
 	EvvibeDesignContextOptions,

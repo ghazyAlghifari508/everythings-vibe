@@ -1,97 +1,97 @@
 # evvibe-design — internal design intelligence
 
-This package is VibeDesign Studio's own design intelligence. It is consumed by
-Studio's engine at runtime through `buildEvvibeDesignContext(stage, options)`,
-not by a coding agent, and it is not user-selectable: there is no design-skill
-picker, no per-project version column and no optional alternative standard.
+VibeDesign Studio's own design intelligence, consumed by Studio's engine at
+runtime through `buildEvvibeDesignContext(stage, options)`. Not for a coding
+agent, not user-selectable: no picker, no version column, no competing
+standard. Every planning, frame, add-screen and revision request gets the
+stage context it needs and nothing more.
 
-It is deliberately not a copy of the universal quality rules. Those live in
-`src/features/studio/services/studio-quality-rules.ts` and are already composed
-into every planning and frame system prompt. This package supplies what the
-baseline does not: product-family reasoning, website and mobile composition
-families, navigation justification, component anatomy, imagery contracts, and
-the reasoning test that rejects decoration.
+## Responsibility split
 
-## Precedence
+| Owner | Owns | Never does |
+| --- | --- | --- |
+| `studio-quality-rules.ts` (universal contract) | Non-negotiable generation and safety boundaries | Choose a layout |
+| `evvibe-design` core (`references/`) | Design reasoning and general UI/UX knowledge | Impose a fixed composition |
+| Platform/context addendum | What the current screen's platform and family need | Repeat the universal contract |
+| User / project context | PRD, brief, DESIGN.md, theme, blueprint | Yield to skill guidance |
+| Correction context | Only the reported defects | Carry general design guidance |
 
-```
-security and HTML safety
-  > explicit user requirements
-  > valid PRD / product constraints
-  > selected DESIGN.md / theme reference
-  > existing shared project blueprint
-  > EvVibe design intelligence   <- this package
-  > default product guidance
-```
+Precedence: security and HTML safety > explicit user requirements > PRD >
+DESIGN.md / theme > shared blueprint > this intelligence > default guidance.
 
-Nothing here may override a validated design token, a user colour choice or a
-PRD fact. `EVVIBE_DESIGN_PRECEDENCE` states the same chain inside the prompt.
+Fixed visual composition is prohibited here: no universal three-link navbar,
+no default hero-plus-three-cards portfolio, no title-only app bar on every
+mobile screen, no mandatory KPI row. The references describe priorities; the
+engine decides section count, hierarchy, navigation, hero, cards, header,
+media placement, controls and density.
 
 ## Files
 
 | File | Role |
 | --- | --- |
-| `skill-contract.ts` | Stage union, per-stage character budgets, reference type, precedence and the reasoning law. No imports, no side effects. |
-| `stage-context.ts` | Per-stage delivery order, budgeted whole-section selection, the `<EVVIBE_DESIGN_INTELLIGENCE>` wrapper. |
-| `index.ts` | Public surface: `buildEvvibeDesignContext`, `planEvvibeDesignContext`, stage map, budgets. |
-| `references/design-reasoning.ts` | The mandatory reasoning sequence and the "say no to this component" list. |
-| `references/web-design.ts` | Website and web-application families, public-navbar composition, section variety. |
-| `references/mobile-design.ts` | Mobile screen classes A–F, app-bar content choice, back-affordance justification. |
-| `references/navigation-patterns.ts` | Navigation models, contextual versus primary screens, controlled assembly. |
-| `references/typography-and-layout.ts` | Intrinsic sizing, `min-width: 0`, bounded tables, atomic values, media frames, tap targets, safe areas. |
-| `references/component-library.ts` | Purpose / use / not-use / anatomy / responsive / a11y for each adopted pattern. |
-| `references/media-and-imagery.ts` | Photograph requirement, SVG boundaries, the fixed image asset contract. |
-| `references/accessibility.ts` | Landmarks, heading order, grouping, state in words, tables, reflow. |
-| `references/anti-slop.ts` | Prohibitions, the "would removing this change anything?" test, and what stays allowed. |
-| `examples/good-vs-bad.ts` | Status, metrics, cards, composition, text, media, density contrasts. |
-| `examples/website-patterns.ts` | Three-link navbar + card wall versus a composed public page. |
-| `examples/mobile-patterns.ts` | Top-level versus detail mobile screens; choice rows that do not squeeze. |
+| `skill-contract.ts` | Stage union, budgets, reference type, precedence, reasoning law. |
+| `stage-context.ts` | Per-stage delivery order, viewport/intent filtering, budgeted whole-section selection, wrapper. |
+| `element-revision.ts` | Compact guidance for a single selected-element edit (P8 consumes it). |
+| `index.ts` | Public surface. |
+| `references/design-reasoning.ts` | Reasoning sequence, domain priorities, when to say no. |
+| `references/web-design.ts` | Website and web-application families, public-navbar and section rules. |
+| `references/mobile-design.ts` | Screen classes A–F, app-bar content choice, back-affordance law. |
+| `references/navigation-patterns.ts` | Navigation models, primary vs contextual screens. |
+| `references/typography-and-layout.ts` | Layout/type technique for the universal boundaries. |
+| `references/component-library.ts` | Component anatomy worth reusing, and what was rejected. |
+| `references/media-and-imagery.ts` | Photograph requirement, SVG boundaries, image asset contract. |
+| `references/accessibility.ts` | Landmarks, order, semantics, state, reflow, locale. |
+| `references/anti-slop.ts` | Unearned decoration, and what stays allowed. |
+| `references/revision-scope.ts` | What a revision may touch and what must survive. |
+| `examples/website-patterns.ts` | Card wall versus composed public page (public-website only). |
+| `examples/mobile-patterns.ts` | Discovery vs detail vs settings; a choice row that fits. |
+| `examples/good-vs-bad.ts` | Status, metrics, cards, shape, text, media, density contrasts. |
 
-## Stage budgets
+## Stages
 
-`EVVIBE_DESIGN_STAGE_BUDGET_CHARS` — hard ceilings in characters, not goals. A
-section that does not fit is dropped whole and reported in
-`plan.omittedIds`; text is never cut mid-rule.
+| Stage | Budget | Delivered with | Why |
+| --- | --- | --- | --- |
+| `planning` | 14 000 | planning system prompt (platform-neutral, cacheable) | reasoning, navigation, media, anti-slop, accessibility |
+| `planning-platform` | 4 000 | planning user prompt, viewport-gated | the matching website *or* mobile family, never both |
+| `generation` | 9 000 | frame system prompt, byte-identical per frame | layout technique, component anatomy, media, anti-slop |
+| `initial` | 5 000 | first frame prompt | platform family plus the matching worked example |
+| `add-screen` | 5 000 | added-screen frame prompt | navigation + platform family only |
+| `revision` | 4 000 | revision user prompt | change scope + contrasts; the system prompt already holds the standard |
+| `correction` | 0 | — | the system prompt and the reported defects already cover a bounded repair |
 
-| Stage | Budget | Sent with |
-| --- | --- | --- |
-| `planning` | 20 000 | `STUDIO_PLANNING_SYSTEM_PROMPT`, once per plan |
-| `generation` | 17 000 | `STUDIO_FRAME_SYSTEM_PROMPT`, byte-identical for every frame |
-| `initial` | 9 000 | first frame prompt for a screen |
-| `add-screen` | 9 000 | added-screen frame prompt |
-| `revision` | 8 800 | revision user prompt |
-| `correction` | 4 400 | single repair round |
+Platform and intent filtering is the adaptivity mechanism: `web-design` only in
+web stages, `mobile-design` only in mobile stages, `website-patterns` only for
+`public-website`. A web-application frame receives the contrasts example
+instead; a marketing page receives the website example. No mapping from intent
+to a fixed page layout exists anywhere in the package.
 
-## Integration points
+## Consolidation
 
-- `services/studio-prompt-contracts.ts` — composes `planning` and `generation`
-  into the two mandatory system prompts.
-- `services/studio-screen-prompts.ts` — `initial` / `add-screen` (viewport
-  aware) and `revision` (previous HTML present) addenda.
-- `services/studio-frame-correction.ts` — `correction` addendum carrying only
-  the layout-fix rules next to the reported issues.
+P1 repeated media sizing, text wrapping, atomic values, hit areas and status
+rules in both the universal contract and the skill. P1.1 keeps each rule in one
+place:
 
-## Review ledger
+- Boundaries (no page overflow, atomic price groups, 44px targets, no forced
+  breaks) stay in `STUDIO_BASE_QUALITY_INVARIANTS` and are referenced, not
+  restated.
+- The skill kept only the technique that satisfies them, the design decisions
+  the contract does not make, and the image asset contract the validators
+  enforce.
+- Component knowledge is educational anatomy, not a runtime catalog.
 
-Reviewed for the component reference. Only patterns that can be expressed as
-static HTML/CSS are adopted; no runtime source is copied.
+## Correction policy
 
-| Source | Licence | Verdict |
-| --- | --- | --- |
-| [shadcn/ui](https://ui.shadcn.com/) | MIT | Adopted: Field/choice-row anatomy, bounded data table, card structure. |
-| [HeroUI v3](https://www.heroui.com/) | Apache-2.0 | Adopted: choice hierarchy with separate control/label/description/price tracks. |
-| [Magic UI](https://magicui.design/) | MIT free tier, Pro separate | Reference only: unequal grids; no mosaic default, no motion runtime. |
-| [React Bits](https://reactbits.dev/) | MIT + Commons Clause | Rejected: script-driven motion, redistribution restrictions. |
-| [Thinking Orbs](https://www.thinkingorbs.com/) | MIT | Rejected: canvas/WebGL indicator, no static equivalent needed. |
-| [affectUI](https://www.affectui.com/components) | Mixed free + Pro | Reference only: empty state, status pill, stat card taxonomy; no Pro source copied. |
-| [TUFFUI](https://tuffui.com/) | MIT, 88 components | Adopted: status pill tones, segmented control, result carousel, empty state, disclosure. |
-| [CUI](https://yappologistic.github.io/CUI/) | — | Rejected: native C toolkit, no web surface to reuse. |
-| [SakaniUI](https://www.sakaniui.com/) | MIT, React | Adopted: stepper and command-menu anatomy; rejected its liquid-glass treatment as a default. |
+No skill text is added to a repair request. If the previous document cannot fit
+beside the reported issues within `STUDIO_CORRECTION_PROMPT_MAX_CHARS`, the
+document is dropped whole — never truncated — and the repair regenerates the
+screen from the approved blueprint while fixing every listed defect. If even
+that exceeds the budget the frame fails explicitly. Correction attempts stay
+bounded at `STUDIO_FRAME_CORRECTION_MAX`.
 
 ## Enforcement
 
-Prompt text is not enforcement. The rules above are backed by the existing
-three-tier validator, and only one new deterministic check was needed:
+Prompt text is not enforcement. The validator keeps three tiers, and only one
+structural check was added:
 
 | Tier | Behaviour | Examples |
 | --- | --- | --- |
@@ -99,14 +99,24 @@ three-tier validator, and only one new deterministic check was needed:
 | repairable (high confidence) | One bounded corrective regeneration | ellipsis-clipped essential text, broken atomic price, media frame conflict, shrinking carousel, non-wrapping narrow row, **card-only public composition** |
 | advisory | Reported, never triggers regeneration | sparse body, repeated status label, oversized nested padding, decorative cursor |
 
-`CARD_ONLY_COMPOSITION` lives in `validateGeneratedHtml` because it needs the
-blueprint: on a `public-website` intent, three or more boxed text-only sections
-with no media, control, link or list is a card wall, not a composition. It is
-deliberately narrow so a genuine editorial page cannot trip it.
+`CARD_ONLY_COMPOSITION` inspects the content region's own children: on a
+`public-website` intent, three or more boxed, text-only blocks with no media,
+link, list or control. It is a bounded repair signal, not proof that a design
+has no slop; subjective aesthetics stay advisory.
 
-Subjective visual concerns (a gradient that is too loud, a bespoke illustration
-that is not to taste) stay advisory: they are never a reason to regenerate a
-whole document.
+## Review ledger
+
+| Source | Licence | Verdict |
+| --- | --- | --- |
+| [shadcn/ui](https://ui.shadcn.com/) | MIT | Field/choice-row anatomy, bounded table, card structure. |
+| [HeroUI v3](https://www.heroui.com/) | Apache-2.0 | Choice hierarchy with separate control/label/description/price tracks. |
+| [Magic UI](https://magicui.design/) | MIT free tier, Pro separate | Reference only: unequal grids; no motion runtime. |
+| [React Bits](https://reactbits.dev/) | MIT + Commons Clause | Rejected: script-driven motion, redistribution restrictions. |
+| [Thinking Orbs](https://www.thinkingorbs.com/) | MIT | Rejected: canvas/WebGL indicator. |
+| [affectUI](https://www.affectui.com/components) | Mixed free + Pro | Reference only: empty state, status pill, stat card taxonomy. |
+| [TUFFUI](https://tuffui.com/) | MIT, 88 components | Status pill tones, segmented control, result rail, empty state. |
+| [CUI](https://yappologistic.github.io/CUI/) | — | Rejected: native C toolkit, no web surface. |
+| [SakaniUI](https://www.sakaniui.com/) | MIT, React | Stepper and command-menu anatomy; liquid glass rejected as a default. |
 
 ## Verification
 
@@ -114,6 +124,7 @@ whole document.
 pnpm vitest run src/features/studio/tests/studio-design-intelligence.test.ts
 ```
 
-The suite proves the standard reaches the real pipeline, that each stage gets
-its own bounded context, that web and mobile differ, that DESIGN.md and theme
-precedence survive, and that the image contract rejects fabricated sources.
+Covers the real planning path (web and mobile), stage separation and bounds,
+intent adaptivity, correction near the document limit, the element-edit
+boundary, DESIGN.md precedence, the image contract, and the absence of any
+component-browsing stage.
