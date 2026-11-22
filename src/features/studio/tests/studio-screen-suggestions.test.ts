@@ -182,16 +182,17 @@ describe("deriveStudioScreenSuggestions", () => {
 			}),
 		);
 
-		expect(suggestions.map((suggestion) => suggestion.title)).toEqual([
-			"Buat halaman riwayat perjalanan",
-			"Rancang wishlist paket wisata",
-			"Tambahkan profil traveler",
+		expect(suggestions.map((suggestion) => suggestion.cardCopy)).toEqual([
+			"Simulasikan paket wisata yang kehabisan kuota",
+			"Uji validasi tanggal pulang sebelum tanggal berangkat",
+			"Rancang riwayat perjalanan dengan filter status",
 		]);
-		expect(suggestions.map((suggestion) => suggestion.reason)).toEqual([
+		expect(suggestions.map((suggestion) => suggestion.targetFrameName)).toEqual(
+			["Detail Paket", "Checkout", undefined],
+		);
+		expect(suggestions[2]?.reason).toBe(
 			'Alur aplikasi travel menyebut "wisata"',
-			'Alur aplikasi travel menyebut "wisata"',
-			'Alur aplikasi travel menyebut "wisata"',
-		]);
+		);
 	});
 
 	it("reads a finance project as a finance project, not a travel one", () => {
@@ -446,17 +447,18 @@ describe("contextual bubble suggestions", () => {
 			}),
 		);
 
-		expect(suggestions.map((suggestion) => suggestion.label)).toEqual([
-			"Jelajahi Destinasi",
-			"Temukan Festival",
-			"Bagi Biaya Trip",
+		expect(suggestions.map((suggestion) => suggestion.cardCopy)).toEqual([
+			"Perjelas status pesanan pada riwayat perjalanan",
+			"Buka jelajah destinasi dengan destinasi per wilayah dengan rekomendasi.",
+			"Temukan festival dan acara dengan acara lokal beserta tanggal dan lokasinya.",
 		]);
-		// The visible bubble is short; the prompt behind it stays complete.
-		const split = suggestions[2]?.prompt ?? "";
-		expect(split).toContain("Buat satu halaman Bagi Biaya Trip");
-		expect(split).toContain("siapa yang membayar");
-		expect(split).toContain("status pelunasan");
-		expect(split).toContain("Jangan mengubah halaman lain.");
+		// The card shows a full sentence; the prompt behind it stays complete.
+		const explore = suggestions.find((suggestion) =>
+			suggestion.cardCopy.startsWith("Buka jelajah destinasi"),
+		);
+		expect(explore?.prompt).toContain("Buat satu halaman Jelajahi Destinasi");
+		expect(explore?.prompt).toContain("filter kategori");
+		expect(explore?.prompt).toContain("Jangan mengubah halaman lain.");
 	});
 
 	it("gives a coffee app order history, favourites and promos", () => {
@@ -471,10 +473,10 @@ describe("contextual bubble suggestions", () => {
 			}),
 		);
 
-		expect(suggestions.map((suggestion) => suggestion.label)).toEqual([
-			"Riwayat Pesanan",
-			"Favorit Kopi",
-			"Detail Promo",
+		expect(suggestions.map((suggestion) => suggestion.cardCopy)).toEqual([
+			"Lihat riwayat pesanan dengan status yang jelas",
+			"Simpan favorit kopi dengan menu favorit, catatan rasa, dan pesan cepat.",
+			"Kelola detail promo dengan voucher aktif, syarat, dan masa berlaku.",
 		]);
 	});
 
@@ -490,10 +492,10 @@ describe("contextual bubble suggestions", () => {
 			}),
 		);
 
-		expect(suggestions.map((suggestion) => suggestion.label)).toEqual([
-			"Studi Kasus Proyek",
-			"Pengalaman Kerja",
-			"Form Kontak",
+		expect(suggestions.map((suggestion) => suggestion.cardCopy)).toEqual([
+			"Perbesar visual proyek pada tampilan beranda",
+			"Rancang detail studi kasus yang menonjolkan hasil proyek",
+			"Tambahkan formulir kontak untuk peluang kerja remote",
 		]);
 	});
 
@@ -522,12 +524,12 @@ describe("contextual bubble suggestions", () => {
 		const suggestions = deriveStudioScreenSuggestions(
 			context({ frameNames: ["Katalog"] }),
 		);
-		const labels = suggestions.map((suggestion) => suggestion.label);
+		const copies = suggestions.map((suggestion) => suggestion.cardCopy);
 
 		// "Katalog" alone never says what comes next; the journey gap does.
-		expect(labels.slice(0, 2)).toEqual([
-			"Periksa Keranjang",
-			"Selesaikan Pembayaran",
+		expect(copies.slice(0, 2)).toEqual([
+			"Periksa keranjang sebelum melanjutkan pemesanan",
+			"Selesaikan pembayaran dengan ringkasan yang jelas",
 		]);
 		expect(suggestions[0]?.reason).toBe('Alur lanjutan dari layar "Katalog"');
 	});
@@ -545,14 +547,14 @@ describe("contextual bubble suggestions", () => {
 			}),
 		];
 		for (const input of cases) {
-			const labels = deriveStudioScreenSuggestions(input).map(
-				(suggestion) => suggestion.label,
+			const copies = deriveStudioScreenSuggestions(input).map(
+				(suggestion) => suggestion.cardCopy,
 			);
-			expect(new Set(labels).size).toBe(labels.length);
-			// A bubble is an action phrase, never a bare page noun.
-			for (const label of labels) {
-				expect(label?.trim()).toBeTruthy();
-				expect(label).not.toMatch(/^(Halaman|Buat halaman)\b/i);
+			expect(new Set(copies).size).toBe(copies.length);
+			// A card is an action sentence, never a bare page noun.
+			for (const copy of copies) {
+				expect(copy.trim()).toBeTruthy();
+				expect(copy).not.toMatch(/^(Halaman|Buat halaman)\b/i);
 			}
 		}
 	});
@@ -582,7 +584,9 @@ describe("conversation-aware suggestion cache", () => {
 					"Tolong buatkan aplikasi kedai kopi untuk memesan menu dan menyimpan favorit.",
 			}),
 		);
-		expect(fromBrief[0]?.label).toBe("Riwayat Pesanan");
+		expect(fromBrief[0]?.cardCopy).toBe(
+			"Lihat riwayat pesanan dengan status yang jelas",
+		);
 	});
 
 	it("reuses one list instance while the conversation is unchanged", () => {
