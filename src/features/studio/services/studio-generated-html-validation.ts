@@ -262,13 +262,25 @@ function hasOverflowingFixedWidth(
 
 const TEXT_ONLY_CARD_CONTENT =
 	"img,picture,svg,video,canvas,table,form,input,select,textarea,button,a,ul,ol,dl,figure";
+const NON_BLOCK_TAGS: Record<string, true> = {
+	SCRIPT: true,
+	STYLE: true,
+	TEMPLATE: true,
+	NOSCRIPT: true,
+	LINK: true,
+	META: true,
+};
 
 /**
- * A public page whose every section is a bordered box of heading and paragraph
- * text has no composition at all — the reported "website made of plain cards"
- * failure. Deterministic and narrow on purpose: it needs at least three boxed
- * text-only sections and no other sectioning element to compare against, so a
- * genuine editorial page with links, media or a single card cannot trip it.
+ * A public page whose top-level content is nothing but boxed text blocks has
+ * no composition — the reported "website made of plain cards" failure.
+ *
+ * The unit of analysis is the content region's own children, so a wall built
+ * from plain divs is caught as well as one built from sections. It is
+ * deliberately narrow: it needs a public-website intent, at least three
+ * blocks, and every block boxed, text-only and free of media, links, lists and
+ * controls. A page with any real composition element cannot trip it, and it is
+ * only ever reported as a single bounded repair, never as an aesthetic verdict.
  */
 function hasCardOnlyComposition(
 	html: string,
@@ -281,24 +293,22 @@ function hasCardOnlyComposition(
 		const content =
 			document.querySelector("[data-studio-content]") ?? document.body;
 		if (!content) return false;
-		const selector = "section,article,[data-card]";
-		const sections = Array.from(content.querySelectorAll(selector));
-		const topLevel = sections.filter((section) => {
-			const parent = section.parentElement?.closest(selector) ?? null;
-			return !parent || !content.contains(parent);
-		});
-		if (topLevel.length < 3 || topLevel.length !== sections.length)
-			return false;
-		return topLevel.every((section) => {
-			if (!(section.textContent ?? "").trim()) return false;
-			if (section.querySelector(TEXT_ONLY_CARD_CONTENT)) return false;
-			const style = section.getAttribute("style") ?? "";
+		const blocks = Array.from(content.children).filter(
+			(element) => !NON_BLOCK_TAGS[element.tagName],
+		);
+		if (blocks.length < 3) return false;
+		return blocks.every((block) => {
+			if (!(block.textContent ?? "").trim()) return false;
+			if (block.querySelector(TEXT_ONLY_CARD_CONTENT)) return false;
+			if (block.hasAttribute("data-card")) return true;
+			const style = dom.window.getComputedStyle(block);
+			const border = Number.parseFloat(style.borderTopWidth);
 			return (
-				section.hasAttribute("data-card") ||
-				/(?:^|[\s_-])(?:card|panel|box)(?:[\s_-]|$)/i.test(
-					section.getAttribute("class") ?? "",
-				) ||
-				/(?:^|;)\s*(?:border|background|box-shadow)\s*:/i.test(style)
+				border > 0 ||
+				(!!style.backgroundColor &&
+					style.backgroundColor !== "transparent" &&
+					style.backgroundColor !== "rgba(0, 0, 0, 0)") ||
+				(!!style.boxShadow && style.boxShadow !== "none")
 			);
 		});
 	} finally {
