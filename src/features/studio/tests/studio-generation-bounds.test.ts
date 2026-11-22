@@ -76,13 +76,26 @@ it("corrects only hard failures, without resending the original full prompt", as
 	expect(correction.length).toBeLessThan(72000);
 });
 
-it("fails an oversized correction rather than silently truncating the document", async () => {
+it("refuses an oversized correction for a frame that already owns a design", async () => {
 	vi.mocked(tryStreamWithFallback).mockReset();
 	respond(document(`<main><input>${"content ".repeat(10000)}</main>`));
-	await expect(generateValidatedFrameHtml(input)).rejects.toMatchObject({
-		code: "STUDIO_CONTRACT_VIOLATION",
-	});
+	await expect(
+		generateValidatedFrameHtml({ ...input, preservation: "preserve-existing" }),
+	).rejects.toMatchObject({ code: "STUDIO_REVISION_TOO_LARGE" });
+	// One request only: the committed design is kept instead of redesigned.
 	expect(vi.mocked(tryStreamWithFallback).mock.calls).toHaveLength(1);
+});
+
+it("allows exactly one bounded regeneration when there is no design to lose", async () => {
+	vi.mocked(tryStreamWithFallback).mockReset();
+	respond(document(`<main><input>${"content ".repeat(10000)}</main>`));
+	respond(document("<main><p>Konten valid</p></main>"));
+	const html = await generateValidatedFrameHtml({
+		...input,
+		preservation: "new-frame",
+	});
+	expect(html).toContain("Konten valid");
+	expect(vi.mocked(tryStreamWithFallback).mock.calls).toHaveLength(2);
 });
 
 it("never regenerates valid HTML for advisory aesthetics", async () => {

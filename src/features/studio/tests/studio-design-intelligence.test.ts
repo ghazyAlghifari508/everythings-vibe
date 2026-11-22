@@ -327,7 +327,11 @@ describe("the repair request stays defect-specific and bounded", () => {
 		);
 
 		const oversized = "y".repeat(90_000);
-		const omittedPrompt = buildStudioFrameCorrection(input, [issue], oversized);
+		const omittedPrompt = buildStudioFrameCorrection(
+			{ ...input, preservation: "new-frame" },
+			[issue],
+			oversized,
+		);
 		expect(omittedPrompt.length).toBeLessThanOrEqual(
 			STUDIO_CORRECTION_PROMPT_MAX_CHARS,
 		);
@@ -337,6 +341,37 @@ describe("the repair request stays defect-specific and bounded", () => {
 		// Omitted whole, never truncated into an invalid document.
 		expect(omittedPrompt).not.toContain(oversized.slice(0, 200));
 		expect(omittedPrompt).toContain(issue);
+	});
+
+	it("refuses the repair instead of redesigning a preserved frame", () => {
+		const oversized = "y".repeat(90_000);
+		expect(() =>
+			buildStudioFrameCorrection(
+				{ ...input, preservation: "preserve-existing" },
+				[issue],
+				oversized,
+			),
+		).toThrow(/terlalu besar untuk direvisi/);
+
+		// A candidate that fits is still repaired in place, document included.
+		const candidate = page("<section>Isi</section>");
+		const prompt = buildStudioFrameCorrection(
+			{ ...input, preservation: "preserve-existing" },
+			[issue],
+			candidate,
+		);
+		expect(prompt).toContain(candidate);
+	});
+
+	it("keeps the user's requested change inside the repair scope", () => {
+		const prompt = buildStudioFrameCorrection(
+			{ ...input, requestedChange: "Ubah warna tombol kontak jadi hijau tua" },
+			[issue],
+			page("<section>Isi</section>"),
+		);
+		expect(prompt).toContain(
+			"Requested change (keep exactly this scope; do not restyle anything else): Ubah warna tombol kontak jadi hijau tua",
+		);
 	});
 });
 
@@ -453,6 +488,22 @@ describe("card-only public composition stays a bounded structural signal", () =>
 		expect(studioIssueCode(cardIssue)).toBe("CARD_ONLY_COMPOSITION");
 	});
 
+	it("reports a bordered text wall without any card marker", () => {
+		const bordered = page(
+			[
+				'<div style="border:1px solid #ddd"><h2>Tentang</h2><p>Paragraf.</p></div>',
+				'<div style="border:1px solid #ddd"><h2>Pengalaman</h2><p>Paragraf.</p></div>',
+				'<div style="border:1px solid #ddd"><h2>Keahlian</h2><p>Paragraf.</p></div>',
+			].join(""),
+		);
+		const issues = validateGeneratedHtml(bordered, {
+			blueprint: publicWebsite,
+			viewport: "web",
+			expectTokens: false,
+		});
+		expect(issues).toContain(cardIssue);
+	});
+
 	it("does not report composed pages, applications or text without boxes", () => {
 		const composed = validateGeneratedHtml(
 			page(
@@ -472,6 +523,51 @@ describe("card-only public composition stays a bounded structural signal", () =>
 			expectTokens: false,
 		});
 		expect(app.join(" ")).not.toContain("kartu teks");
+	});
+
+	it("accepts editorial color-block sections and long-form text", () => {
+		const colorBlocks = page(
+			[
+				'<section style="background:#101418;color:#fff"><h1>Studio kami</h1><p>Pembuka editorial yang panjang dan mengalir.</p></section>',
+				'<section style="background:#f4f1ea"><h2>Cerita</h2><p>Narasi panjang tentang proses dan orang di baliknya.</p></section>',
+				'<section style="background:#2f6f4f;color:#fff"><p>Penutup.</p></section>',
+			].join(""),
+		);
+		const blocks = validateGeneratedHtml(colorBlocks, {
+			blueprint: publicWebsite,
+			viewport: "web",
+			expectTokens: false,
+		});
+		expect(blocks.join(" ")).not.toContain("kartu teks");
+
+		const narrative = page(
+			[
+				"<article><h1>Judul</h1><p>Satu paragraf panjang.</p><p>Paragraf kedua.</p></article>",
+				"<article><h2>Bagian</h2><p>Paragraf lain.</p></article>",
+				"<article><h2>Bagian</h2><p>Paragraf lain.</p></article>",
+			].join(""),
+		);
+		const prose = validateGeneratedHtml(narrative, {
+			blueprint: publicWebsite,
+			viewport: "web",
+			expectTokens: false,
+		});
+		expect(prose.join(" ")).not.toContain("kartu teks");
+	});
+
+	it("does not report a small number of ordinary cards", () => {
+		const twoCards = page(
+			[
+				"<section data-card><h2>Satu</h2><p>Paragraf.</p></section>",
+				"<section data-card><h2>Dua</h2><p>Paragraf.</p></section>",
+			].join(""),
+		);
+		const issues = validateGeneratedHtml(twoCards, {
+			blueprint: publicWebsite,
+			viewport: "web",
+			expectTokens: false,
+		});
+		expect(issues.join(" ")).not.toContain("kartu teks");
 	});
 
 	it("leaves subjective aesthetic concerns advisory", () => {

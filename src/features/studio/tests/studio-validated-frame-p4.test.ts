@@ -159,6 +159,48 @@ describe("generateValidatedFrameHtml recovery", () => {
 		expect(mocked).toHaveBeenCalledTimes(2);
 	});
 
+	it("refuses to regenerate a preserved frame whose candidate cannot fit", async () => {
+		const candidate = `<html><head></head><body><main data-studio-content><div id="dup"></div><div id="dup"></div>${"x".repeat(61_000)}</main></body></html>`;
+		const mocked = await mockRawSequence([candidate]);
+		await expect(
+			generateValidatedFrameHtml({
+				framePrompt: "Revise the contact button colour",
+				blueprint: null,
+				viewport: "web",
+				expectTokens: false,
+				dsTokens: null,
+				logoUrl: null,
+				preservation: "preserve-existing",
+				requestedChange: "Ubah warna tombol kontak jadi hijau tua",
+			}),
+		).rejects.toMatchObject({ code: "STUDIO_REVISION_TOO_LARGE" });
+		// No second request: the committed design is kept instead of redesigned.
+		expect(mocked).toHaveBeenCalledTimes(1);
+	});
+
+	it("allows one bounded fresh regeneration for a frame with no committed design", async () => {
+		const candidate = `<html><head></head><body><main data-studio-content><div id="dup"></div><div id="dup"></div>${"x".repeat(61_000)}</main></body></html>`;
+		const mocked = await mockRawSequence([
+			candidate,
+			"<html><head></head><body><p>Konten valid</p></body></html>",
+		]);
+		const html = await generateValidatedFrameHtml({
+			framePrompt: "Bangun layar contoh",
+			blueprint: null,
+			viewport: "web",
+			expectTokens: false,
+			dsTokens: null,
+			logoUrl: null,
+			preservation: "new-frame",
+			requestedChange: "Bangun layar contoh",
+		});
+		expect(html).toContain("Konten valid");
+		const correction = mocked.mock.calls[1]?.[1]?.[1]?.content ?? "";
+		expect(correction).toContain("exceeded the repair budget and was omitted");
+		expect(correction).toContain("Requested change");
+		expect(mocked).toHaveBeenCalledTimes(2);
+	});
+
 	it("separates corrective request duration from initial generation", async () => {
 		await mockRawSequence([
 			"<html><body>Sample",
