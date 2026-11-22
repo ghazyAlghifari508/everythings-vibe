@@ -53,6 +53,11 @@ export const studioProviderMock = {
 			return {
 				firstChunk: JSON.stringify({
 					projectTitle: "Sample",
+					scope: {
+						requestedCount: requested ? count : null,
+						rationale: "Fixture coverage",
+						deferred: [],
+					},
 					screens,
 					blueprint: {
 						compositionOwner: "model",

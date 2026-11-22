@@ -392,8 +392,7 @@ describe("the standard reaches the engine without extra requests", () => {
 		const userId = await createStudioUser();
 		try {
 			const { project, job } = await createStudioProjectWithJob(userId, {
-				prompt: "Build a compact inventory console",
-				initialPageCount: 3,
+				prompt: "Build a compact inventory console with exactly 3 pages",
 			});
 			await runStudioJobPipeline(job.id, project.id, userId);
 

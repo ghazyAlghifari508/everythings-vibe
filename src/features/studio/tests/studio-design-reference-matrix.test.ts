@@ -81,7 +81,6 @@ describe("studio design reference compatibility matrix", () => {
 					: combo.reference;
 			const { project, job } = await createStudioProjectWithJob(userId, {
 				prompt: "Sample application brief",
-				initialPageCount: 2,
 				designReference: reference,
 				designMd: combo.reference.kind === "custom" ? combo.designMd : null,
 			});
@@ -122,8 +121,7 @@ describe("studio design reference compatibility matrix", () => {
 	it("keeps an uploaded logo attached to the persisted project and every frame prompt", async () => {
 		const userId = await createStudioUser();
 		const { project, job } = await createStudioProjectWithJob(userId, {
-			prompt: "Sample application brief",
-			initialPageCount: 1,
+			prompt: "Sample application brief with exactly 1 page",
 			designReference: { kind: "custom", filename: "acme.md" },
 			designMd: CANONICAL,
 			logo: {
@@ -168,8 +166,7 @@ describe("studio design reference compatibility matrix", () => {
 	it("keeps the reference in a retried frame generation", async () => {
 		const userId = await createStudioUser();
 		const { project, job } = await createStudioProjectWithJob(userId, {
-			prompt: "Sample application brief",
-			initialPageCount: 1,
+			prompt: "Sample application brief with exactly 1 page",
 			designReference: { kind: "custom", filename: "acme.md" },
 			designMd: CANONICAL,
 		});

@@ -81,7 +81,6 @@ describe("archived VibeScrape reference", () => {
 
 		const { project, job } = await createStudioProjectWithJob(userId, {
 			prompt: "Sample application brief",
-			initialPageCount: 2,
 			designReference: { kind: "scrape", id: scrapeId },
 		});
 

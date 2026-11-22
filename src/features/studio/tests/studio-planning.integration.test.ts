@@ -1,12 +1,22 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, expect, it, vi } from "vitest";
 import { db } from "@/db";
-import { studioFrames, studioJobs, studioProjects, users } from "@/db/schema";
+import {
+	creditLedgerEntries,
+	studioFrames,
+	studioJobs,
+	studioProjects,
+	subscriptions,
+	users,
+} from "@/db/schema";
 import { runStudioJobPipeline } from "../services/studio-job-pipeline";
+import { getStudioProjectDetail } from "../services/studio-project-detail";
 import { createStudioProjectWithJob } from "../services/studio-project-enqueue";
 
 const provider = vi.hoisted(() => ({
 	counts: [2, 3],
+	requestedCount: null as number | null,
+	deferred: [] as string[],
 	messages: [] as Array<Array<{ role: string; content: string }>>,
 	enabled: true,
 	lastLabels: [] as string[],
@@ -35,7 +45,12 @@ vi.mock("@/lib/services/ai-orchestrator", () => ({
 		return {
 			firstChunk: planning
 				? JSON.stringify({
-						projectTitle: "Sample",
+						projectTitle: "Sample Inventory Workspace",
+						scope: {
+							requestedCount: provider.requestedCount,
+							rationale: "Prioritize the core tasks.",
+							deferred: provider.deferred,
+						},
 						screens,
 						blueprint: {
 							compositionOwner: "model",
@@ -208,15 +223,137 @@ it("does not deduplicate different requested configuration", async () => {
 		.insert(users)
 		.values({ id: userId, email: `${userId}@example.test` });
 	try {
-		const input = { prompt: "Sample application brief", initialPageCount: 1 };
+		const input = {
+			prompt: "Sample application brief",
+			designMode: "web" as const,
+		};
 		const first = await createStudioProjectWithJob(userId, input);
 		const same = await createStudioProjectWithJob(userId, input);
 		expect(same.project.id).toBe(first.project.id);
 		const different = await createStudioProjectWithJob(userId, {
 			...input,
-			initialPageCount: 5,
+			designMode: "mobile",
 		});
 		expect(different.project.id).not.toBe(first.project.id);
+	} finally {
+		await db.delete(users).where(eq(users.id, userId));
+	}
+});
+
+it.each([
+	{
+		prompt: "Design a web login page",
+		count: 1,
+		requested: null,
+		deferred: [],
+	},
+	{
+		prompt:
+			"Design a booking workspace with search, details, booking and tickets",
+		count: 4,
+		requested: null,
+		deferred: [],
+	},
+	{
+		prompt: "Design exactly four inventory pages",
+		count: 4,
+		requested: 4,
+		deferred: [],
+	},
+	{
+		prompt: "Design seven inventory pages",
+		count: 5,
+		requested: 7,
+		deferred: ["Audit history", "Team permissions"],
+	},
+])("persists the planned batch for $prompt", async ({
+	prompt,
+	count,
+	requested,
+	deferred,
+}) => {
+	provider.counts = [count];
+	provider.requestedCount = requested;
+	provider.deferred = deferred;
+	const userId = crypto.randomUUID();
+	await db
+		.insert(users)
+		.values({ id: userId, email: `${userId}@example.test` });
+	try {
+		await db.insert(subscriptions).values({
+			id: crypto.randomUUID(),
+			userId,
+			credits: 10,
+			creditsUsed: 2,
+			creditsReserved: 1,
+		});
+		const { project, job } = await createStudioProjectWithJob(userId, {
+			prompt,
+		});
+		const before = await getStudioProjectDetail(project.id, userId);
+		await runStudioJobPipeline(job.id, project.id, userId);
+		const after = await getStudioProjectDetail(project.id, userId);
+		expect(after.project.initialPageCount).toBe(count);
+		expect(after.project.designBlueprint?.initialScope).toMatchObject({
+			requestedCount: requested,
+			deferred,
+		});
+		const [balance] = await db
+			.select()
+			.from(subscriptions)
+			.where(eq(subscriptions.userId, userId));
+		expect(balance).toMatchObject({
+			credits: 10,
+			creditsUsed: 2,
+			creditsReserved: 1,
+		});
+		expect(
+			await db
+				.select()
+				.from(creditLedgerEntries)
+				.where(eq(creditLedgerEntries.userId, userId)),
+		).toEqual([]);
+		expect(before.frames).toEqual([]);
+		expect(before.messages?.[1].progress?.total).toBe(0);
+		expect(after.frames.map((frame) => frame.initialSlot)).toEqual(
+			Array.from({ length: count }, (_, index) => index),
+		);
+		expect(after.messages?.[1].progress).toMatchObject({
+			total: count,
+			ready: count,
+		});
+		for (const item of deferred)
+			expect(after.messages?.[1].content).toContain(item);
+	} finally {
+		await db.delete(subscriptions).where(eq(subscriptions.userId, userId));
+		await db.delete(users).where(eq(users.id, userId));
+	}
+});
+
+it.each([
+	{ counts: [6, 6], requested: null },
+	{ counts: [2, 2], requested: 4 },
+	{ counts: [5, 5], requested: 7 },
+])("rejects an invalid adaptive batch: %j", async ({ counts, requested }) => {
+	provider.counts = counts;
+	provider.requestedCount = requested;
+	provider.deferred = [];
+	const userId = crypto.randomUUID();
+	await db
+		.insert(users)
+		.values({ id: userId, email: `${userId}@example.test` });
+	try {
+		const { project, job } = await createStudioProjectWithJob(userId, {
+			prompt: "Design an inventory workspace",
+		});
+		await runStudioJobPipeline(job.id, project.id, userId);
+		const detail = await getStudioProjectDetail(project.id, userId);
+		expect(detail.frames).toEqual([]);
+		expect(detail.activeJob).toMatchObject({
+			status: "failed",
+			prompt: job.prompt,
+			planningCompletedAt: null,
+		});
 	} finally {
 		await db.delete(users).where(eq(users.id, userId));
 	}

@@ -100,8 +100,8 @@ describe("StudioPage UI & Workflow", () => {
 		).toBeDefined();
 		expect(screen.getByRole("button", { name: "Kirim prompt" })).toBeDefined();
 		expect(
-			screen.getByRole("button", { name: /Jumlah halaman awal: 3/i }),
-		).toBeDefined();
+			screen.queryByRole("button", { name: /Jumlah halaman awal/i }),
+		).toBeNull();
 		expect(screen.getByText("Mulai dari brief siap pakai")).toBeDefined();
 	});
 
@@ -124,19 +124,18 @@ describe("StudioPage UI & Workflow", () => {
 		expect(mobileBtn.getAttribute("aria-pressed")).toBe("true");
 	});
 
-	it("shows error when submitting empty prompt", () => {
+	it("does not submit an empty prompt", () => {
 		const StudioComponent = (
 			Route as unknown as { component: React.ComponentType }
 		).component;
-		const { container } = render(<StudioComponent />);
-
-		const form = container.querySelector("form");
-		expect(form).not.toBeNull();
-		if (form) fireEvent.submit(form);
-
-		expect(
-			screen.getByText("Ceritakan UI yang mau dibuat dulu."),
-		).toBeDefined();
+		render(<StudioComponent />);
+		const submit = screen.getByRole("button", { name: "Kirim prompt" });
+		expect(submit).toHaveProperty("disabled", true);
+		fireEvent.keyDown(
+			screen.getByRole("textbox", { name: "Prompt Desain UI" }),
+			{ key: "Enter" },
+		);
+		expect(mockNavigate).not.toHaveBeenCalled();
 	});
 
 	it("submits generation with selected designMode and navigates to project on success", async () => {
@@ -207,7 +206,7 @@ describe("StudioPage UI & Workflow", () => {
 		expect(screen.getByRole("tab", { name: "Punya Saya" })).toBeDefined();
 	});
 
-	it("populates an editable brief with platform and page count from a shortcut", () => {
+	it("populates an editable brief and platform without selecting a page count", () => {
 		const StudioComponent = (
 			Route as unknown as { component: React.ComponentType }
 		).component;
@@ -227,8 +226,8 @@ describe("StudioPage UI & Workflow", () => {
 				.getAttribute("aria-pressed"),
 		).toBe("true");
 		expect(
-			screen.getByRole("button", { name: /Jumlah halaman awal: 4/i }),
-		).toBeDefined();
+			screen.queryByRole("button", { name: /Jumlah halaman awal/i }),
+		).toBeNull();
 	});
 
 	it("deletes a history project through the server action and revalidates the loader", async () => {

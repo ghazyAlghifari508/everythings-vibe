@@ -53,7 +53,6 @@ async function seed() {
 		...(await createStudioProjectWithJob(userId, {
 			prompt: `Aplikasi kas usaha nomor ${++seeded} dengan empat layar berbeda`,
 			designMode: "mobile",
-			initialPageCount: 4,
 		})),
 	};
 }
@@ -91,6 +90,9 @@ it("starts accepted adds before initial completion without exceeding aggregate c
 		expect(
 			before.frames.filter((frame) => frame.status === "generating"),
 		).toHaveLength(3);
+		const initialFrames = before.frames.filter(
+			(frame) => frame.originJobId === first.job.id,
+		);
 		const [profile, settings] = await Promise.all([
 			enqueueStudioOperation(first.project.id, first.userId, {
 				prompt: "Tambahkan halaman Profile",
@@ -131,14 +133,14 @@ it("starts accepted adds before initial completion without exceeding aggregate c
 		const ready = await db
 			.select()
 			.from(studioFrames)
-			.where(eq(studioFrames.id, first.frames[0].id));
+			.where(eq(studioFrames.id, initialFrames[0].id));
 		expect(ready[0].revision).toBe(1);
 		const revision = await enqueueStudioOperation(
 			first.project.id,
 			first.userId,
 			{
 				prompt: "Perbaiki padding layar terpilih",
-				frameIds: [first.frames[0].id],
+				frameIds: [initialFrames[0].id],
 				requestId: crypto.randomUUID(),
 			},
 		);
@@ -149,7 +151,7 @@ it("starts accepted adds before initial completion without exceeding aggregate c
 		const final = await getStudioProjectDetail(first.project.id, first.userId);
 		expect(final.frames).toHaveLength(5);
 		expect(final.frames.slice(0, 4).map((frame) => frame.id)).toEqual(
-			first.frames.map((frame) => frame.id),
+			initialFrames.map((frame) => frame.id),
 		);
 		expect(final.frames.map((frame) => frame.status)).toEqual([
 			"ready",

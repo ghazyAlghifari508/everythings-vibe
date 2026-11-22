@@ -1,4 +1,6 @@
 import { eq } from "drizzle-orm";
+import { JSDOM } from "jsdom";
+import JSZip from "jszip";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { db } from "@/db";
 import {
@@ -11,6 +13,8 @@ import {
 } from "@/db/schema";
 import { buildFixtureModel } from "@/lib/design-fixture";
 import { renderDesignMd } from "@/lib/design-md-render";
+import { exportProjectAsZip } from "../services/studio-export";
+import { readStudioFrameDocument } from "../services/studio-frame-document";
 import { runStudioJobPipeline } from "../services/studio-job-pipeline";
 import { getStudioPresetDesignMd } from "../services/studio-presets";
 import { getStudioProjectDetail } from "../services/studio-project-detail";
@@ -111,7 +115,6 @@ describe("new projects no longer carry or send a design skill", () => {
 		try {
 			const { project, job } = await createStudioProjectWithJob(userId, {
 				prompt: "Build a compact inventory console",
-				initialPageCount: 2,
 			});
 			await runStudioJobPipeline(job.id, project.id, userId);
 
@@ -135,7 +138,6 @@ describe("new projects no longer carry or send a design skill", () => {
 		try {
 			const { project, job } = await createStudioProjectWithJob(userId, {
 				prompt: "Build a compact inventory console",
-				initialPageCount: 2,
 			});
 			await runStudioJobPipeline(job.id, project.id, userId);
 
@@ -156,7 +158,6 @@ describe("new projects no longer carry or send a design skill", () => {
 		try {
 			const { project, job } = await createStudioProjectWithJob(userId, {
 				prompt: "Build a compact inventory console",
-				initialPageCount: 1,
 			});
 			await runStudioJobPipeline(job.id, project.id, userId);
 
@@ -175,7 +176,6 @@ describe("new projects no longer carry or send a design skill", () => {
 		try {
 			const { project, job } = await createStudioProjectWithJob(userId, {
 				prompt: "Build a compact inventory console",
-				initialPageCount: 1,
 				designReference: { kind: "theme", id: "workspace" },
 			});
 			await runStudioJobPipeline(job.id, project.id, userId);
@@ -199,7 +199,6 @@ describe("new projects no longer carry or send a design skill", () => {
 		try {
 			const { project, job } = await createStudioProjectWithJob(userId, {
 				prompt: "Build a compact inventory console",
-				initialPageCount: 1,
 				designReference: { kind: "custom", filename: "acme.md" },
 				designMd: CANONICAL,
 			});
@@ -225,7 +224,6 @@ describe("new projects no longer carry or send a design skill", () => {
 			const scrapeId = await insertCompletedScrape(userId, CANONICAL);
 			const { project, job } = await createStudioProjectWithJob(userId, {
 				prompt: "Build a compact inventory console",
-				initialPageCount: 1,
 				designReference: { kind: "scrape", id: scrapeId },
 			});
 			await runStudioJobPipeline(job.id, project.id, userId);
@@ -254,6 +252,7 @@ describe("historic projects stay loadable, revisable, retryable and exportable",
 			const detail = await getStudioProjectDetail(project.id, userId);
 			expect(detail.project.designSkillId).toBe("impeccable");
 			expect(detail.project.designSkillVersion).toBe(3);
+			expect(detail.project.initialPageCount).toBe(1);
 			expect(detail.frames).toHaveLength(1);
 			expect(detail.frames[0]?.status).toBe("ready");
 
@@ -342,14 +341,34 @@ describe("historic projects stay loadable, revisable, retryable and exportable",
 			const { project } = await seedLegacyProject(userId);
 			const detail = await getStudioProjectDetail(project.id, userId);
 
-			// The exporter consumes frame rows only; the historic skill column is
-			// never an input, so a legacy project stays exportable as long as its
-			// frames are ready and carry HTML.
-			const exportable = detail.frames.filter(
-				(frame) => frame.status === "ready" && frame.htmlCode,
+			const dom = new JSDOM();
+			dom.window.document.addEventListener("click", (event) =>
+				event.preventDefault(),
 			);
-			expect(exportable).toHaveLength(1);
-			expect(exportable[0]?.name).toBe("Dashboard");
+			vi.stubGlobal("document", dom.window.document);
+			const download = vi.spyOn(URL, "createObjectURL");
+			const document = await readStudioFrameDocument(
+				project.id,
+				detail.frames[0].id,
+				userId,
+			);
+			vi.stubGlobal(
+				"fetch",
+				vi.fn(async () => Response.json(document)),
+			);
+			try {
+				await exportProjectAsZip(project.title, project.id, detail.frames);
+				const blob = download.mock.calls[0]?.[0];
+				if (!(blob instanceof Blob)) throw new Error("ZIP download missing");
+				const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+				expect(await zip.file("1-dashboard.html")?.async("string")).toBe(
+					document.html,
+				);
+			} finally {
+				download.mockRestore();
+				vi.unstubAllGlobals();
+				dom.window.close();
+			}
 		} finally {
 			await removeUser(userId);
 		}

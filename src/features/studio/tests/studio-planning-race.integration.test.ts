@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { afterEach, expect, it, vi } from "vitest";
 import { db } from "@/db";
-import { studioJobs, users } from "@/db/schema";
+import { studioFrames, studioJobs, users } from "@/db/schema";
 import type * as FrameGeneration from "../services/studio-frame-generation";
 import { claimStudioJob } from "../services/studio-job-lease";
 import { runStudioJobPipeline } from "../services/studio-job-pipeline";
@@ -56,7 +56,6 @@ async function seed() {
 		...(await createStudioProjectWithJob(userId, {
 			prompt: "Aplikasi kas untuk pemilik usaha kecil dengan empat halaman",
 			designMode: "mobile",
-			initialPageCount: 4,
 		})),
 	};
 }
@@ -68,7 +67,7 @@ afterEach(async () => {
 	provider.calls = [];
 });
 
-it("keeps initial slot IDs and plans only their owner after an add commits during planning", async () => {
+it("keeps follow-up slots independent while the initial plan is unknown", async () => {
 	const { userId, project, job, frames } = await seed();
 	const planning = gate();
 	const started = gate();
@@ -83,7 +82,12 @@ it("keeps initial slot IDs and plans only their owner after an add commits durin
 		requestId: crypto.randomUUID(),
 	});
 	try {
+		expect(frames).toEqual([]);
 		expect(added.intent).toBe("add_screen");
+		if (added.intent !== "add_screen") throw new Error("expected add");
+		expect(
+			await claimStudioJob(added.jobs[0].id, userId, "early-worker"),
+		).toBeNull();
 	} finally {
 		planning.release();
 		await running;
@@ -91,10 +95,13 @@ it("keeps initial slot IDs and plans only their owner after an add commits durin
 	const detail = await getStudioProjectDetail(project.id, userId);
 	expect(
 		detail.frames
-			.filter((frame) => frames.some((slot) => slot.id === frame.id))
+			.filter((frame) => frame.originJobId === job.id)
 			.map((frame) => frame.name),
 	).toEqual(financeBlueprint.screenPlan.map((screen) => screen.name));
 	expect(detail.frames).toHaveLength(5);
+	expect(detail.frames.map((frame) => frame.order)).toEqual([0, 1, 2, 3, 4]);
+	if (added.intent !== "add_screen") throw new Error("expected add");
+	expect(detail.frames[4].id).toBe(added.frames[0].id);
 	expect(provider.calls.sort()).toEqual(
 		financeBlueprint.screenPlan.map((screen) => screen.name).sort(),
 	);
@@ -122,13 +129,25 @@ it("cannot claim an accepted add before its required blueprint is committed", as
 });
 
 it("accepts a revision against a pending initial slot without canceling its writer", async () => {
-	const { userId, project, frames, job } = await seed();
+	const { userId, project, job } = await seed();
+	const frames = await db
+		.insert(studioFrames)
+		.values({
+			projectId: project.id,
+			originJobId: job.id,
+			initialSlot: 0,
+			name: "Layar 1",
+		})
+		.returning();
 	const accepted = await enqueueStudioOperation(project.id, userId, {
 		prompt: "Perbaiki padding layar yang dipilih",
 		frameIds: [frames[0].id],
 		requestId: crypto.randomUUID(),
 	});
 	expect(accepted.intent).toBe("revise_selected");
+	if (accepted.intent !== "revise_selected")
+		throw new Error("expected revision");
+	expect(accepted.jobs[0].dependsOnJobId).toBe(job.id);
 	const detail = await getStudioProjectDetail(project.id, userId);
 	expect(detail.frames).toEqual(frames);
 	const [initial] = await db

@@ -75,6 +75,11 @@ vi.mock("@/lib/services/ai-orchestrator", () => ({
 		return {
 			firstChunk: JSON.stringify({
 				projectTitle: planner.projectTitle,
+				scope: {
+					requestedCount: null,
+					rationale: "One screen covers the primary task.",
+					deferred: [],
+				},
 				screens,
 				blueprint: {
 					compositionOwner: "model",
@@ -162,7 +167,6 @@ describe("studio project naming", () => {
 			const { project } = await createStudioProjectWithJob(userId, {
 				prompt: brief,
 				designMode: "web",
-				initialPageCount: 1,
 			});
 			expect(project.title).toBe("Aroma");
 			expect(project.titleSource).toBe("auto");
@@ -179,7 +183,6 @@ describe("studio project naming", () => {
 				title: "Aroma Suite",
 				prompt: BRIEF,
 				designMode: "web",
-				initialPageCount: 1,
 			});
 			expect(project.title).toBe("Aroma Suite");
 			expect(project.titleSource).toBe("user");
@@ -191,7 +194,7 @@ describe("studio project naming", () => {
 		}
 	});
 
-	it("replaces a paragraph-shaped planner title with a short product name", async () => {
+	it("replaces a paragraph-shaped planner title with the brand and purpose", async () => {
 		const userId = await createUser();
 		try {
 			planner.projectTitle =
@@ -199,11 +202,11 @@ describe("studio project naming", () => {
 			const { project, job } = await createStudioProjectWithJob(userId, {
 				prompt: BRIEF,
 				designMode: "web",
-				initialPageCount: 1,
 			});
 			await runStudioJobPipeline(job.id, project.id, userId);
 			const after = await readProject(project.id);
-			expect(after?.title).toBe("Aroma");
+			expect(after?.title).toBe("Aroma: Dasbor penjualan harian");
+			expect(after?.designBlueprint?.productIdentity.productName).toBe("Aroma");
 			expect(after?.titleSource).toBe("auto");
 		} finally {
 			await db.delete(users).where(eq(users.id, userId));
@@ -217,7 +220,6 @@ describe("studio project naming", () => {
 			const { project, job } = await createStudioProjectWithJob(userId, {
 				prompt: BRIEF,
 				designMode: "web",
-				initialPageCount: 1,
 			});
 			const running = runStudioJobPipeline(job.id, project.id, userId);
 			await planner.entered;
@@ -260,7 +262,6 @@ describe("studio project naming", () => {
 			const { project, job } = await createStudioProjectWithJob(userId, {
 				prompt: BRIEF,
 				designMode: "web",
-				initialPageCount: 1,
 			});
 			await runStudioJobPipeline(job.id, project.id, userId);
 			const beforeFrames = await db
@@ -299,12 +300,10 @@ describe("studio project naming", () => {
 			const first = await createStudioProjectWithJob(userId, {
 				prompt: BRIEF,
 				designMode: "web",
-				initialPageCount: 1,
 			});
 			const second = await createStudioProjectWithJob(userId, {
 				prompt: `${BRIEF} untuk cabang kedua`,
 				designMode: "web",
-				initialPageCount: 1,
 			});
 			expect(second.project.id).not.toBe(first.project.id);
 			const renamedFirst = await renameStudioProject(
@@ -331,7 +330,6 @@ describe("studio project naming", () => {
 			const { project } = await createStudioProjectWithJob(owner, {
 				prompt: BRIEF,
 				designMode: "web",
-				initialPageCount: 1,
 			});
 			await expect(
 				renameStudioProject(project.id, intruder, "Hijacked"),

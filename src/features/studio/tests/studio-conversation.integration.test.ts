@@ -23,19 +23,30 @@ vi.mock("@/lib/services/ai-orchestrator", () => ({
 	}),
 }));
 const owners: string[] = [];
-async function launch() {
+async function launch(withLegacySlots = true) {
 	const userId = crypto.randomUUID();
 	owners.push(userId);
 	await db
 		.insert(users)
 		.values({ id: userId, email: `${userId}@example.test` });
-	return {
-		userId,
-		...(await createStudioProjectWithJob(userId, {
-			prompt: "  Buat aplikasi perjalanan keluarga  ",
-			initialPageCount: 2,
-		})),
-	};
+	const launched = await createStudioProjectWithJob(userId, {
+		prompt: "  Buat aplikasi perjalanan keluarga  ",
+	});
+	const frames = withLegacySlots
+		? await db
+				.insert(studioFrames)
+				.values(
+					[0, 1].map((order) => ({
+						projectId: launched.project.id,
+						originJobId: launched.job.id,
+						initialSlot: order,
+						order,
+						name: `Layar ${order + 1}`,
+					})),
+				)
+				.returning()
+		: [];
+	return { ...launched, userId, frames };
 }
 afterEach(async () => {
 	for (const id of owners.splice(0))
@@ -46,7 +57,6 @@ it("persists the original landing prompt once across duplicate launch and histor
 	const { userId, project, job } = await launch();
 	await createStudioProjectWithJob(userId, {
 		prompt: "  Buat aplikasi perjalanan keluarga  ",
-		initialPageCount: 2,
 	});
 	for (let i = 0; i < 2; i++) {
 		const detail = await getStudioProjectDetail(project.id, userId);
@@ -208,7 +218,7 @@ it("rejects cross-user project reads and cross-project frame targeting without m
 });
 
 it("keeps failed planning factual, reuses the initial turn on recovery", async () => {
-	const { userId, project, job } = await launch();
+	const { userId, project, job } = await launch(false);
 	const workerId = crypto.randomUUID();
 	const claim = { jobId: job.id, projectId: project.id, userId, workerId };
 	await claimStudioJob(job.id, userId, workerId);

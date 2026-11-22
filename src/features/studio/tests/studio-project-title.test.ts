@@ -96,6 +96,18 @@ describe("deriveProvisionalStudioTitle", () => {
 });
 
 describe("resolveStudioProjectTitle", () => {
+	it.each([
+		"Ruang Seduh",
+		"Aplikasi Mobile",
+	])("does not use %s as the final title for a branded product", (candidate) => {
+		expect(
+			resolveStudioProjectTitle({
+				candidate,
+				productName: "Ruang Seduh",
+				prompt: 'Aplikasi pemesanan kopi "Ruang Seduh"',
+			}),
+		).toBe("Ruang Seduh: Aplikasi pemesanan kopi");
+	});
 	it("keeps the planner name when it is a product name", () => {
 		expect(
 			resolveStudioProjectTitle({
@@ -106,7 +118,7 @@ describe("resolveStudioProjectTitle", () => {
 		).toBe("Aroma Analytics");
 	});
 
-	it("uses the blueprint product name when the planner name is a paragraph", () => {
+	it("combines brand and purpose when the planner title is a paragraph", () => {
 		expect(
 			resolveStudioProjectTitle({
 				candidate:
@@ -114,7 +126,7 @@ describe("resolveStudioProjectTitle", () => {
 				productName: "Aroma Control",
 				prompt: 'Dasbor penjualan untuk tim growth "Aroma"',
 			}),
-		).toBe("Aroma Control");
+		).toBe("Aroma Control: Dasbor penjualan");
 	});
 
 	it("falls back to the brief when the planner returns a placeholder", () => {
@@ -124,7 +136,7 @@ describe("resolveStudioProjectTitle", () => {
 				productName: "New Design",
 				prompt: 'Dasbor penjualan untuk tim growth "Aroma"',
 			}),
-		).toBe("Aroma");
+		).toBe("Aroma: Dasbor penjualan");
 	});
 
 	it("still produces a name without any brand in the brief", () => {

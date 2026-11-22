@@ -294,6 +294,18 @@ it("terminates failed dependencies explicitly, allows planning recovery with acc
 		status: "failed",
 		errorCode: "STUDIO_DEPENDENCY_FAILED",
 	});
+	const profile = detail.frames.find((frame) => frame.name === "Profile");
+	if (!profile) throw new Error("Missing accepted add");
+	await expect(
+		retryStudioFrame(project.id, userId, profile.id),
+	).rejects.toMatchObject({ code: "STUDIO_DEPENDENCY_FAILED" });
+	await db
+		.update(studioJobs)
+		.set({ status: "completed", planningCompletedAt: new Date() })
+		.where(and(eq(studioJobs.id, initial.id), eq(studioJobs.userId, userId)));
+	await expect(
+		retryStudioFrame(project.id, userId, profile.id),
+	).resolves.toMatchObject({ retry: "queued", frame: { id: profile.id } });
 });
 
 it("recovers a lost writer once, fences stale writes, preserves dependent revision", async () => {
