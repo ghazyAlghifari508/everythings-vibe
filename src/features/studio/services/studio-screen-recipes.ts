@@ -375,15 +375,6 @@ export const DOMAIN_RECIPES: readonly StudioDomainRecipe[] = [
 					"Tampilkan halaman studi kasus satu proyek: konteks dan masalah, proses yang dijalankan, peran yang diambil, hasil dengan angka, serta galeri visual.",
 			},
 			{
-				name: "Pengalaman Kerja",
-				title: "Susun pengalaman kerja",
-				label: "Pengalaman Kerja",
-				aliases: ["experience", "pengalaman", "riwayat kerja", "cv"],
-				description: "Peran, perusahaan, dan pencapaian tiap periode.",
-				focus:
-					"Tampilkan riwayat pengalaman kerja berurutan waktu dengan peran, perusahaan, periode, dan pencapaian utama, dalam tata letak yang mudah dipindai.",
-			},
-			{
 				name: "Form Kontak",
 				title: "Buat formulir kontak",
 				label: "Form Kontak",
@@ -391,6 +382,15 @@ export const DOMAIN_RECIPES: readonly StudioDomainRecipe[] = [
 				description: "Formulir kirim pesan dengan validasi.",
 				focus:
 					"Tampilkan formulir kontak dengan nama, email, kebutuhan proyek, validasi input, status pengiriman, dan konfirmasi berhasil.",
+			},
+			{
+				name: "Pengalaman Kerja",
+				title: "Susun pengalaman kerja",
+				label: "Pengalaman Kerja",
+				aliases: ["experience", "pengalaman", "riwayat kerja", "cv"],
+				description: "Peran, perusahaan, dan pencapaian tiap periode.",
+				focus:
+					"Tampilkan riwayat pengalaman kerja berurutan waktu dengan peran, perusahaan, periode, dan pencapaian utama, dalam tata letak yang mudah dipindai.",
 			},
 		],
 	},
