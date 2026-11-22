@@ -260,6 +260,52 @@ function hasOverflowingFixedWidth(
 	}
 }
 
+const TEXT_ONLY_CARD_CONTENT =
+	"img,picture,svg,video,canvas,table,form,input,select,textarea,button,a,ul,ol,dl,figure";
+
+/**
+ * A public page whose every section is a bordered box of heading and paragraph
+ * text has no composition at all — the reported "website made of plain cards"
+ * failure. Deterministic and narrow on purpose: it needs at least three boxed
+ * text-only sections and no other sectioning element to compare against, so a
+ * genuine editorial page with links, media or a single card cannot trip it.
+ */
+function hasCardOnlyComposition(
+	html: string,
+	blueprint: StudioDesignBlueprint,
+): boolean {
+	if (blueprint.productIdentity.layoutIntent !== "public-website") return false;
+	const dom = new JSDOM(html);
+	try {
+		const document = dom.window.document;
+		const content =
+			document.querySelector("[data-studio-content]") ?? document.body;
+		if (!content) return false;
+		const selector = "section,article,[data-card]";
+		const sections = Array.from(content.querySelectorAll(selector));
+		const topLevel = sections.filter((section) => {
+			const parent = section.parentElement?.closest(selector) ?? null;
+			return !parent || !content.contains(parent);
+		});
+		if (topLevel.length < 3 || topLevel.length !== sections.length)
+			return false;
+		return topLevel.every((section) => {
+			if (!(section.textContent ?? "").trim()) return false;
+			if (section.querySelector(TEXT_ONLY_CARD_CONTENT)) return false;
+			const style = section.getAttribute("style") ?? "";
+			return (
+				section.hasAttribute("data-card") ||
+				/(?:^|[\s_-])(?:card|panel|box)(?:[\s_-]|$)/i.test(
+					section.getAttribute("class") ?? "",
+				) ||
+				/(?:^|;)\s*(?:border|background|box-shadow)\s*:/i.test(style)
+			);
+		});
+	} finally {
+		dom.window.close();
+	}
+}
+
 // Deterministic structural validation for generated HTML. String checks
 // cannot prove visual correctness; they only catch concrete contract
 // violations that warrant one bounded corrective regeneration.
@@ -300,6 +346,11 @@ export function validateGeneratedHtml(
 		}
 		if (structure.fullNavCount > 1) {
 			issues.push("Navigasi ganda terdeteksi.");
+		}
+		if (hasCardOnlyComposition(html, opts.blueprint)) {
+			issues.push(
+				"Komposisi halaman publik hanya berupa kartu teks; gunakan hero, karya, editorial, atau galeri sesuai isi.",
+			);
 		}
 	}
 	if (stripCodeBlocks(html).includes("```")) {

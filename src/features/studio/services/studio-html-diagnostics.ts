@@ -292,6 +292,7 @@ const ISSUE_CODE_PATTERNS: Array<[RegExp, string]> = [
 	[/Label navigasi hilang/, "NAVIGATION_LABEL_MISSING"],
 	[/Urutan navigasi tidak sesuai/, "NAVIGATION_ORDER_MISMATCH"],
 	[/Navigasi ganda/, "DUPLICATE_NAVIGATION"],
+	[/kartu teks/, "CARD_ONLY_COMPOSITION"],
 	[/Artefak markdown/, "MARKDOWN_ARTIFACT"],
 	[/Body HTML tidak lengkap/, "HTML_BODY_INCOMPLETE"],
 	[/Body HTML kosong/, "EMPTY_BODY"],
