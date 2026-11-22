@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
 import { readFile } from "node:fs/promises";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { fireEvent } from "@testing-library/react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PrdViewer } from "@/features/greenfield/components/prd/prd-viewer";
 
-// The viewer imports TanStack Router hooks via VersionHistory; stub them so the
-// component renders in isolation.
+// Stub router hooks pulled in by shared UI helpers so the viewer renders in
+// isolation; the version control itself only uses the installed DropdownMenu.
 vi.mock("@tanstack/react-router", () => ({
 	useNavigate: () => () => {},
 	Link: ({ children }: { children: React.ReactNode }) => children,
@@ -75,6 +76,8 @@ function renderViewer(
 					content="## 1. Ringkasan\n\nVersi kedua"
 					versions={VERSIONS}
 					currentVersion={2}
+					plan="pro"
+					onSelectVersion={() => {}}
 					{...overrides}
 				/>
 			</QueryClientProvider>,
@@ -82,52 +85,190 @@ function renderViewer(
 	});
 }
 
-describe("PrdViewer toolbar", () => {
-	it("renders the preview/diff switch as a single tablist", () => {
-		renderViewer();
-
-		const tablist = container.querySelector('[role="tablist"]');
-		expect(tablist).not.toBeNull();
-
-		const tabs = container.querySelectorAll('[role="tab"]');
-		expect(tabs).toHaveLength(2);
-		expect(tabs[0]?.textContent?.trim()).toBe("Pratinjau");
-		expect(tabs[1]?.textContent?.trim()).toBe("Diff");
+function openVersionMenu() {
+	const trigger = document.querySelector<HTMLButtonElement>(
+		'button[aria-label^="Riwayat versi PRD"]',
+	);
+	if (!trigger) throw new Error("version control trigger missing");
+	act(() => {
+		fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false });
 	});
+	return trigger;
+}
 
-	it("marks the active tab with aria-selected and switches on click", () => {
-		renderViewer();
+function clickMenuItem(label: string) {
+	const item = [
+		...document.querySelectorAll<HTMLElement>(
+			'[role="menuitem"], [role="menuitemradio"]',
+		),
+	].find((candidate) => candidate.textContent?.includes(label));
+	if (!item) throw new Error(`menu item '${label}' missing`);
+	act(() => {
+		fireEvent.click(item);
+	});
+}
 
-		const tabs = container.querySelectorAll<HTMLButtonElement>('[role="tab"]');
-		expect(tabs[0]?.getAttribute("aria-selected")).toBe("true");
-		expect(tabs[1]?.getAttribute("aria-selected")).toBe("false");
-
-		act(() => {
-			tabs[1]?.click();
+describe("PrdViewer version control", () => {
+	it("shows the document with no toolbar for 0/1 versions", () => {
+		renderViewer({
+			versions: [VERSIONS[0]],
+			currentVersion: 1,
+			content: VERSIONS[0]?.content ?? "",
 		});
 
-		expect(tabs[0]?.getAttribute("aria-selected")).toBe("false");
-		expect(tabs[1]?.getAttribute("aria-selected")).toBe("true");
+		expect(container.textContent).toContain("Versi pertama");
+		expect(container.querySelector('[role="tablist"]')).toBeNull();
+		expect(
+			container.querySelector('button[aria-label^="Riwayat versi PRD"]'),
+		).toBeNull();
 	});
 
-	it("omits the Diff tab when there is only one version", () => {
-		renderViewer({ versions: [VERSIONS[0]], currentVersion: 1 });
-
-		const tabs = container.querySelectorAll('[role="tab"]');
-		expect(tabs).toHaveLength(1);
-		expect(tabs[0]?.textContent?.trim()).toBe("Pratinjau");
-	});
-
-	it("no longer offers an Export PDF action", () => {
+	it("renders one control labelled with the active version, no preview tab", () => {
 		renderViewer();
 
-		expect(container.textContent).not.toMatch(/Export PDF/i);
-		expect(container.textContent).not.toMatch(/Mengekspor/i);
+		const triggers = container.querySelectorAll(
+			'button[aria-label^="Riwayat versi PRD"]',
+		);
+		expect(triggers).toHaveLength(1);
+		expect(triggers[0]?.textContent).toContain("Versi 2");
+		expect(container.querySelector('[role="tablist"]')).toBeNull();
+		expect(container.textContent).not.toContain("Pratinjau");
 	});
 
-	it("keeps the preview content rendered", () => {
+	it("marks the selected version and the actual latest version", () => {
+		renderViewer({
+			currentVersion: 1,
+			content: VERSIONS[0]?.content ?? "",
+		});
+		const trigger = openVersionMenu();
+		expect(trigger.getAttribute("aria-expanded")).toBe("true");
+
+		const items = document.querySelectorAll('[role="menuitemradio"]');
+		const checked = [...items].filter(
+			(item) => item.getAttribute("aria-checked") === "true",
+		);
+		expect(items).toHaveLength(2);
+		expect(checked).toHaveLength(1);
+		expect(checked[0]?.textContent).toContain("Versi 1");
+
+		const latest = [...items].filter((item) =>
+			item.textContent?.includes("(Terbaru)"),
+		);
+		expect(latest).toHaveLength(1);
+		expect(latest[0]?.textContent).toContain("Versi 2");
+	});
+
+	it("selects a persisted version without mutating it", () => {
+		const onSelectVersion = vi.fn();
+		renderViewer({ onSelectVersion });
+		openVersionMenu();
+		clickMenuItem("Versi 1");
+
+		expect(onSelectVersion).toHaveBeenCalledWith(VERSIONS[0]?.content, 1);
+	});
+
+	it("opens compare from the same control with explicit old → new direction", () => {
 		renderViewer();
+		openVersionMenu();
+		clickMenuItem("Bandingkan perubahan");
+
+		expect(container.textContent).toContain("Versi 1 → Versi 2");
+		expect(container.textContent).toContain("- Versi pertama");
+		expect(container.textContent).toContain("+ Versi kedua");
+		expect(
+			container.querySelector('button[aria-label^="Riwayat versi PRD"]'),
+		).toBeNull();
+	});
+
+	it("labels the earliest-version fallback as v1 → v2, not reversed", () => {
+		renderViewer({
+			currentVersion: 1,
+			content: VERSIONS[0]?.content ?? "",
+		});
+		openVersionMenu();
+		clickMenuItem("Bandingkan perubahan");
+
+		expect(container.textContent).toContain("Versi 1 → Versi 2");
+		expect(container.textContent).toContain("+ Versi kedua");
+	});
+
+	it("uses real version numbers for non-contiguous history", () => {
+		const versions = [
+			VERSIONS[0],
+			{
+				...VERSIONS[1],
+				id: "v3",
+				version: 3,
+				content: "## 1. Ringkasan\n\nVersi ketiga",
+			},
+		];
+		renderViewer({ versions, currentVersion: 3, content: "Versi ketiga" });
+		openVersionMenu();
+		clickMenuItem("Bandingkan perubahan");
+
+		expect(container.textContent).toContain("Versi 1 → Versi 3");
+	});
+
+	it("returns focus to the control after leaving compare mode", () => {
+		renderViewer();
+		openVersionMenu();
+		clickMenuItem("Bandingkan perubahan");
+		const back = [
+			...container.querySelectorAll<HTMLButtonElement>("button"),
+		].find((button) => button.textContent?.includes("Kembali ke dokumen"));
+		if (!back) throw new Error("back action missing");
+
+		act(() => {
+			fireEvent.click(back);
+		});
+
 		expect(container.textContent).toContain("Versi kedua");
+		const currentTrigger = document.querySelector<HTMLButtonElement>(
+			'button[aria-label^="Riwayat versi PRD"]',
+		);
+		expect(document.activeElement).toBe(currentTrigger);
+	});
+
+	it("closes compare on Escape and restores the document", () => {
+		renderViewer();
+		openVersionMenu();
+		clickMenuItem("Bandingkan perubahan");
+		act(() => {
+			fireEvent.keyDown(document, { key: "Escape" });
+		});
+
+		expect(container.textContent).toContain("Versi kedua");
+		expect(container.textContent).not.toContain("Versi 1 → Versi 2");
+	});
+
+	it("keeps the plan gate without disclosing version records", () => {
+		renderViewer({ plan: "free" });
+		openVersionMenu();
+
+		expect(document.querySelectorAll('[role="menuitemradio"]')).toHaveLength(0);
+		expect(document.body.textContent).toContain(
+			"Upgrade ke Pro untuk melihat history revisi",
+		);
+	});
+
+	it("disables version actions while generation is active", () => {
+		renderViewer({ isGenerating: true });
+		const trigger = container.querySelector<HTMLButtonElement>(
+			'button[aria-label^="Riwayat versi PRD"]',
+		);
+		expect(trigger?.disabled).toBe(true);
+	});
+
+	it("leaves compare mode when a revision starts streaming", () => {
+		renderViewer();
+		openVersionMenu();
+		clickMenuItem("Bandingkan perubahan");
+		expect(container.textContent).toContain("Versi 1 → Versi 2");
+
+		renderViewer({ isGenerating: true, content: "## 1. Ringkasan\n\nLive" });
+
+		expect(container.textContent).not.toContain("Versi 1 → Versi 2");
+		expect(container.textContent).toContain("Live");
 	});
 });
 
