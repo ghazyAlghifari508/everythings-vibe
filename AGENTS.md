@@ -60,6 +60,12 @@ The following non-negotiable rules apply unconditionally from turn 1 of every se
 - **Honest Indicators:** Indicators must be wired to real signals (SSE events, measurable transitions). Never fabricate progress bars, fake timer step sequences, or simulated typing. If no stream exists, display one honest static label.
 - **Language:** Explain to user in **Bahasa Indonesia**; keep code, identifiers, commits, and technical terms in **English**.
 
+### 7. Product Copy Punctuation
+- **Natural Indonesian product copy:** short sentences, layout, commas, or separate lines instead of decorative separators.
+- **Forbidden in developer-authored UI copy:** em dash (`—`, U+2014), bullet separator (`•`, U+2022), and middle dot (`·`, U+00B7), including Unicode or HTML escapes.
+- **Missing values:** use "Tidak ada data" or "Belum tersedia". A plain hyphen is fine in compact tables.
+- **Preserve semantics:** avoid needless jargon, keep business meaning accurate, and never rewrite user-authored, generated, or scraped content to satisfy this rule.
+
 ---
 
 ## 🛠️ Verification & Development Commands
