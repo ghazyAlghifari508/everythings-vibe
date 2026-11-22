@@ -17,6 +17,7 @@ import type {
 	BillingSubscription,
 } from "../services/billing-settings.functions";
 import { getPaymentStatusInfo } from "../utils/payment-status";
+import { CreditMeter } from "./credit-meter";
 import { CreditUsageSection } from "./credit-usage";
 import { PaymentHistoryDialog } from "./payment-history-dialog";
 
@@ -66,10 +67,19 @@ export function BillingPage({
 				: "Aktif (paket lama, tanpa masa aktif)"
 		: "Gratis";
 	const showToast = useUIStore((s) => s.showToast);
-	const credits = subscription?.credits ?? 0;
-	const creditsUsed = subscription?.creditsUsed ?? 0;
-	const creditsReserved = subscription?.creditsReserved ?? 0;
-	const remaining = Math.max(0, credits - creditsUsed - creditsReserved);
+	const allocation = userPlan?.credits ?? subscription?.credits ?? 0;
+	const creditsUsed = userPlan?.creditsUsed ?? subscription?.creditsUsed ?? 0;
+	const creditsReserved = creditUsage.reservedCredits ?? 0;
+	// Canonical remaining from getCreditBalance via /api/user/plan. The loader
+	// value is only the first-render fallback, never a view-only subtraction.
+	const canonicalRemaining = userPlan?.remaining;
+	const available =
+		typeof canonicalRemaining === "number"
+			? canonicalRemaining
+			: creditUsage.availableCredits;
+	const exempt =
+		userPlan?.billingExempt === true || canonicalRemaining === "unlimited";
+	const paused = isPaused || userPlan?.subscriptionState === "paused";
 	// ponytail: preview shows latest 4-5 transactions to prevent card height stretching.
 	const previewPayments = paymentsList.slice(0, 5);
 
@@ -129,34 +139,16 @@ export function BillingPage({
 					</div>
 
 					<div className="mt-6 rounded-lg bg-(--bg-surface) p-4">
-						<div className="mb-2 flex justify-between text-sm">
-							<span className="text-(--text-secondary)">Kredit digunakan</span>
-							<span className="font-medium">
-								{creditsUsed} / {credits}
-								{creditsReserved > 0 && (
-									<span className="ml-1 text-xs text-amber-400 font-normal">
-										({creditsReserved} direservasi)
-									</span>
-								)}
-							</span>
-						</div>
-						<div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-(--bg-card)">
-							<div
-								className="h-full rounded-full bg-indigo transition-all"
-								style={{
-									width: `${credits > 0 ? (creditsUsed / credits) * 100 : 0}%`,
-								}}
-							/>
-						</div>
-						<p className="mt-2 text-xs text-(--text-secondary)">
-							{isPaused
-								? "Masa aktif habis. Sisa kredit periode lama hangus. Perpanjang untuk dapat kredit segar."
-								: remaining > 0
-									? `Sisa ${remaining} kredit periode ini.${creditsReserved > 0 ? ` (${creditsReserved} sedang direservasi).` : ""} Kredit reset setiap 30 hari.`
-									: "Kredit periode ini habis. Perpanjang atau tunggu reset berikutnya."}
-						</p>
-						{!isPaused &&
-							remaining === 0 &&
+						<CreditMeter
+							allocation={allocation}
+							used={creditsUsed}
+							reserved={creditsReserved}
+							available={available}
+							exempt={exempt}
+							paused={paused}
+						/>
+						{!paused &&
+							available <= 0 &&
 							isPaidPlan &&
 							periodEndDate != null && (
 								<p className="mt-1 text-xs text-(--text-secondary)">
