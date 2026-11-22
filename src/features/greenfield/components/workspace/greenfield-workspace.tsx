@@ -32,10 +32,6 @@ export function GreenfieldWorkspace({
 			aria-label="VibePlan workspace"
 			className="flex min-h-0 flex-1 flex-col overflow-hidden"
 		>
-			<header className="shrink-0 border-b border-graphite px-4 py-2 text-sm text-fog">
-				<span className="mr-2">VibePlan</span>
-				<span className="text-snow">{workspace.projectName}</span>
-			</header>
 			{activeProjectId === workspace.projectId ? children : null}
 		</section>
 	);

@@ -15,6 +15,7 @@ import {
 	render,
 	screen,
 	waitFor,
+	within,
 } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -158,6 +159,14 @@ it("keeps the actual workspace shell mounted across child navigation and history
 	expect(screen.getByRole("region", { name: "VibePlan workspace" })).toBe(
 		shell,
 	);
+});
+it("renders no project-title bar inside the workspace shell", async () => {
+	setup(`/vibeplan/${state.projectId}/ask`);
+	await screen.findByText("Ask stage");
+	const shell = screen.getByRole("region", { name: "VibePlan workspace" });
+	expect(within(shell).queryByRole("banner")).toBeNull();
+	expect(within(shell).queryByText("Project A")).toBeNull();
+	expect(within(shell).queryByText("VibePlan")).toBeNull();
 });
 it("normalizes a legacy payment link without forwarding untrusted search", async () => {
 	const router = setup(
