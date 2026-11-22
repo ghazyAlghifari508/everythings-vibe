@@ -1,6 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getPrdDraft, savePrdDraft } from "@/lib/prompt-handoff";
 
+function readDraft(draftKey: string): string {
+	const draft = getPrdDraft(draftKey);
+	if (
+		draft.startsWith("[Platform:") ||
+		draft.includes("Generate PRD lengkap")
+	) {
+		savePrdDraft(draftKey, "");
+		return "";
+	}
+	return draft;
+}
+
 export function useChatDraft(projectId?: string) {
 	const draftKey = projectId ?? "new";
 
