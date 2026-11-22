@@ -16,7 +16,6 @@ import { WhiteboardCanvas } from "@/features/greenfield/components/whiteboard/wh
 import * as facade from "@/features/greenfield/components/whiteboard/whiteboard-canvas-facade";
 import {
 	FeatureIcon,
-	faseBadgeClass,
 	featureIconName,
 } from "@/features/greenfield/components/whiteboard/whiteboard-icons";
 import {
@@ -50,7 +49,6 @@ describe("whiteboard modular compatibility", () => {
 		expect(facade.ContainerModal).toBe(ContainerModal);
 		expect(facade.FeatureIcon).toBe(FeatureIcon);
 		expect(facade.featureIconName).toBe(featureIconName);
-		expect(facade.faseBadgeClass).toBe(faseBadgeClass);
 		expect(facade.getCanvasDotStyle).toBe(getCanvasDotStyle);
 		expect(facade.DOT_BG_IMAGE).toBe(DOT_BG_IMAGE);
 	});

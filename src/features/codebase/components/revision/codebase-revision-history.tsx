@@ -1,4 +1,10 @@
 "use client";
+import {
+	type StatusIconName,
+	StatusIndicator,
+	type StatusTone,
+	statusIcons,
+} from "@/components/ui/status-indicator";
 
 export interface RevisionHistoryEntry {
 	id: string;
@@ -18,10 +24,13 @@ const TARGET_LABELS: Record<string, string> = {
 	tasks: "Task Breakdown",
 };
 
-const STATUS_COPY: Record<string, { label: string; tone: string }> = {
-	approved: { label: "Diterapkan", tone: "text-emerald border-emerald/30" },
-	rejected: { label: "Ditolak", tone: "text-fog border-graphite" },
-	pending: { label: "Menunggu", tone: "text-amber-400 border-amber-500/30" },
+const STATUS_COPY: Record<
+	"pending" | "approved" | "rejected",
+	{ label: string; tone: StatusTone; icon: StatusIconName }
+> = {
+	approved: { label: "Diterapkan", tone: "success", icon: "success" },
+	rejected: { label: "Ditolak", tone: "neutral", icon: "neutral" },
+	pending: { label: "Menunggu", tone: "warning", icon: "pending" },
 };
 
 function formatWhen(value: Date | string | null): string {
@@ -71,11 +80,12 @@ export function CodebaseRevisionHistory({
 								<span className="min-w-0 truncate font-medium text-snow">
 									{TARGET_LABELS[entry.targetKind] ?? entry.targetKind}
 								</span>
-								<span
-									className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[10px] ${status.tone}`}
+								<StatusIndicator
+									tone={status.tone}
+									icon={statusIcons[status.icon]}
 								>
 									{status.label}
-								</span>
+								</StatusIndicator>
 							</div>
 							<p className="truncate text-[11px] text-fog">
 								"{entry.instruction}"

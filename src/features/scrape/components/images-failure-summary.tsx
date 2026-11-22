@@ -8,6 +8,7 @@ import {
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Icon } from "@/components/ui/icon";
+import { NumericBadge } from "@/components/ui/numeric-badge";
 import type { ImageResult } from "@/features/scrape/components/images-result-asset";
 import { shortUrl } from "@/features/scrape/components/images-result-card";
 import {
@@ -133,9 +134,8 @@ export function ImagesFailureSummary({
 					{groups.map((group) => (
 						<div key={group.category.key} className="space-y-2">
 							<div className="flex flex-wrap items-center gap-2">
-								<Badge variant="secondary">
-									{group.category.label} ({group.count})
-								</Badge>
+								<Badge variant="secondary">{group.category.label}</Badge>
+								<NumericBadge count={group.count} label="gambar gagal" />
 								{group.category.actionHint && (
 									<span className="text-xs text-fog">
 										{group.category.actionHint}

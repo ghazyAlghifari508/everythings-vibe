@@ -9,6 +9,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import { StatusIndicator, statusIcons } from "@/components/ui/status-indicator";
 import type { DiffLine } from "@/features/greenfield/utils/diff-utils";
 
 export interface RevisionProposalView {
@@ -193,25 +194,25 @@ export function CodebaseRevisionReviewDialog({
 										<span className="text-snow">
 											Product Requirements (PRD)
 										</span>
-										<span className="text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded font-mono">
+										<StatusIndicator tone="warning" icon={statusIcons.pending}>
 											Perlu ditinjau
-										</span>
+										</StatusIndicator>
 									</div>
 								)}
 								{proposal.impact.ac && (
 									<div className="flex items-center justify-between text-xs">
 										<span className="text-snow">Acceptance Criteria</span>
-										<span className="text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded font-mono">
+										<StatusIndicator tone="warning" icon={statusIcons.pending}>
 											Perlu ditinjau
-										</span>
+										</StatusIndicator>
 									</div>
 								)}
 								{proposal.impact.tasks && (
 									<div className="flex items-center justify-between text-xs">
 										<span className="text-snow">Task Breakdown</span>
-										<span className="text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded font-mono">
+										<StatusIndicator tone="warning" icon={statusIcons.pending}>
 											Perlu ditinjau
-										</span>
+										</StatusIndicator>
 									</div>
 								)}
 							</div>

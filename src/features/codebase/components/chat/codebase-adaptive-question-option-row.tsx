@@ -1,4 +1,5 @@
 "use client";
+import { Badge } from "@/components/ui/badge";
 
 interface CodebaseAdaptiveQuestionOptionRowProps {
 	inputType: "radio" | "checkbox";
@@ -43,11 +44,7 @@ export function CodebaseAdaptiveQuestionOptionRow({
 			/>
 			<span className="min-w-0 flex-1">
 				{label}
-				{recommended ? (
-					<span className="ml-2 inline-flex items-center rounded-full border border-emerald/30 bg-emerald/10 px-2 py-0.5 text-[10px] font-semibold text-emerald">
-						Rekomendasi
-					</span>
-				) : null}
+				{recommended ? <Badge>Rekomendasi</Badge> : null}
 			</span>
 		</label>
 	);
