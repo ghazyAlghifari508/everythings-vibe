@@ -56,3 +56,26 @@ Home and `/plan/new` remain pre-project entry pages. New Greenfield projects ent
 - Final routing/state selection: 10 files, 130 tests passed, including forward history and locked direct entry. Extended persistence/lifecycle selection: 24 unaffected files passed; stale Kanban consumers were corrected separately.
 - Removed source-text/markup pins from the existing Codebase Kanban contract suite; retained input-validation and tenant-access boundary tests. Updated the real full-board URL assertion and replaced obsolete duplicate-project-title waits with task readiness; drawer/navigation assertions remain.
 - Final Kanban selection: 3 files, 36 tests passed. Final touched-source Biome check: 66 files, no fixes or errors. Final full TypeScript diagnostics contain only the Studio `Promise.withResolvers` error above.
+
+## P2: workspace CTA and forward navigation
+
+Root cause: `readWorkspaceProject` built `hasPrd`/`hasAc`/`hasTasks` with raw `exists(select 1 from t where project_id = id)`. Postgres resolves the unqualified `id` to the inner table, so every flag was always false and parent `progress` never left `fitur`. The Navbar then derived its CTA from the persisted step rank and showed `Kembali ke Fitur` after a saved PRD. The subqueries now use drizzle `exists()` with table-qualified columns.
+
+Sources of truth: the viewed route selects the stage; parent loader availability (`hasPrd`, `hasAc`, `hasTasks`) proves artifacts; the persisted step stays monotonic and never gates a forward CTA; chat-store flags and the in-flight advance request disable the CTA. `utils/flow-cta.ts` (`deriveWorkspaceCta`) is the only CTA policy for Fitur, PRD and AC. Ask keeps `getFlowStepCta`.
+
+| Route | State | Primary CTA |
+| --- | --- | --- |
+| PRD | PRD unsaved or streaming | `Generate AC`, disabled |
+| PRD | PRD saved, eligible | `Generate AC` |
+| PRD | AC exists / tasks exist | `Lanjut ke AC` / `Lanjut ke Task` |
+| AC | AC unsaved or generating | `Menyusun AC...`, disabled |
+| AC | AC saved | `Generate Task` |
+| PRD, AC | free plan | `Upgrade ke Pro` |
+
+Invalidation: after a save, `use-workspace-sync` revalidates the parent once per (project, artifact) when the child loader holds the artifact and the parent does not. No per-token invalidation, no polling.
+
+Endpoint contract change: `POST /api/projects/$id/step` now answers 401 when unauthenticated and 409 `PREREQUISITE_MISSING` when `ac` needs a saved PRD or `task` needs a saved AC. Ownership, Greenfield mode and soft-delete are checked on the locked project row. 403 `UPGRADE_REQUIRED` is unchanged; the Navbar opens the paywall on it. The endpoint never reserves or charges credits.
+
+Recovery: a project with no saved PRD and no running generation shows `PrdRetryBar` in the PRD chat panel. It re-reads the persisted Ask handoff, or refreshes if the PRD appeared meanwhile.
+
+Not verified: browser rendering (QA not authorized for P2) and live AI generation.
