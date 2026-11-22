@@ -36,9 +36,9 @@ export function ContainerModal({
 						/>
 						<p className="truncate font-inter text-sm font-[510] text-snow">
 							{node.label}
-							{node.ownerFeature ? ` · ${node.ownerFeature}` : ""}
+							{node.ownerFeature ? `, ${node.ownerFeature}` : ""}
 							{!isTasks && node.subfeatureName
-								? ` · ${node.subfeatureName}`
+								? `, ${node.subfeatureName}`
 								: ""}
 						</p>
 						<span className="ml-auto shrink-0 text-xs tabular-nums text-fog">

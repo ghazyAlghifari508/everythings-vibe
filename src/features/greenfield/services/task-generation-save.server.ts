@@ -140,8 +140,8 @@ export async function persistGeneratedTaskTree(
 			await guards.release("incomplete requirement coverage");
 			await guards.fail(
 				coverage.report.missing.length > 0
-					? `Task tree belum men-cover semua Acceptance Criteria (belum ter-cover: ${coverage.report.missing.join(", ")}). Tidak disimpan — coba generate ulang.`
-					: `Task tree merujuk Acceptance Criteria yang tidak ada (${coverage.report.unknown.join(", ")}). Tidak disimpan — coba generate ulang.`,
+					? `Task tree belum men-cover semua Acceptance Criteria (belum ter-cover: ${coverage.report.missing.join(", ")}). Tidak disimpan. Coba generate ulang.`
+					: `Task tree merujuk Acceptance Criteria yang tidak ada (${coverage.report.unknown.join(", ")}). Tidak disimpan. Coba generate ulang.`,
 			);
 			return;
 		}
@@ -162,7 +162,7 @@ export async function persistGeneratedTaskTree(
 			if (uniqueUnknown.length > 0) {
 				await guards.release("unknown task surfaces");
 				await guards.fail(
-					`Task merujuk halaman yang tidak ada di PRD (${uniqueUnknown.join(", ")}). Tidak disimpan — coba generate ulang.`,
+					`Task merujuk halaman yang tidak ada di PRD (${uniqueUnknown.join(", ")}). Tidak disimpan. Coba generate ulang.`,
 				);
 				return;
 			}

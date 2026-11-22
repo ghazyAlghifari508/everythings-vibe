@@ -65,7 +65,7 @@ export const FeatureNode = memo(function FeatureNode({
 						{node.label}
 					</span>
 					<span className="block text-[11px] leading-tight text-fog">
-						Direncanakan ·{" "}
+						Direncanakan:{" "}
 						<span className="tabular-nums">
 							{done}/{total}
 						</span>

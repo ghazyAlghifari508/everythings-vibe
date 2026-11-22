@@ -162,7 +162,7 @@ export function PrdDetail({
 							<div className="shrink-0 border-t border-graphite bg-charcoal/40 px-4 py-3">
 								<div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3">
 									<p className="text-sm text-fog">
-										Lanjut ke AC butuh Pro — Generate Acceptance Criteria hanya
+										Lanjut ke AC butuh Pro. Generate Acceptance Criteria hanya
 										untuk paket Pro/Hengker.
 									</p>
 									<button

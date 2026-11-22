@@ -61,7 +61,7 @@ export function KanbanHeader({
 					</div>
 					{navigationContext ? (
 						<p className="mt-1 truncate text-xs text-fog">
-							{navigationContext.codebaseName} / {projectName} ·{" "}
+							{navigationContext.codebaseName} / {projectName},{" "}
 							{projectProgress.done}/{projectProgress.total} task selesai (
 							{projectProgress.pct}%)
 						</p>
@@ -78,7 +78,7 @@ export function KanbanHeader({
 									aria-hidden="true"
 								/>
 								<span className="truncate">
-									Koneksi terputus · Pastikan server aktif
+									Koneksi terputus. Pastikan server aktif
 								</span>
 								<button
 									type="button"
@@ -98,7 +98,7 @@ export function KanbanHeader({
 									aria-hidden="true"
 								/>
 								<span className="truncate">
-									Koneksi lambat · Menampilkan data terakhir
+									Koneksi lambat. Menampilkan data terakhir
 								</span>
 								<button
 									type="button"
@@ -118,7 +118,7 @@ export function KanbanHeader({
 									aria-hidden="true"
 								/>
 								<span className="truncate">
-									Belum ada update status · Jalankan everythings-vibe CLI untuk
+									Belum ada update status. Jalankan everythings-vibe CLI untuk
 									update otomatis
 								</span>
 							</output>

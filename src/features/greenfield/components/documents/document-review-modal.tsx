@@ -202,7 +202,7 @@ export const DocumentReviewModal = memo(function DocumentReviewModal({
 									{title}
 								</DialogPrimitive.Title>
 								<DialogPrimitive.Description className="truncate text-xs text-fog">
-									{projectName} · Pratinjau Dokumen
+									{projectName}, Pratinjau Dokumen
 								</DialogPrimitive.Description>
 							</div>
 						</div>
