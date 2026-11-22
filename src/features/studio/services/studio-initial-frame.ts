@@ -57,6 +57,7 @@ export async function generateInitialFrame(
 		blueprint: ctx.blueprint,
 		activeScreen: frame.name,
 		prdContent: ctx.prdContent,
+		screenOrigin: "initial",
 	});
 	try {
 		ctx.signal.throwIfAborted();

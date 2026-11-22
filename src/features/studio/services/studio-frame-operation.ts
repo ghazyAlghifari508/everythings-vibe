@@ -196,6 +196,7 @@ export async function runStudioFrameOperation(
 		blueprint: activeBlueprint,
 		activeScreen: name,
 		prdContent: project.prdContent,
+		screenOrigin: job.jobType === "add" ? "add" : "initial",
 	});
 	const changeInstruction =
 		job.jobType === "retry"

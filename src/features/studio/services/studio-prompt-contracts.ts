@@ -1,3 +1,4 @@
+import { buildEvvibeDesignContext } from "@/features/studio/design-intelligence/evvibe-design";
 import { STUDIO_VISUAL_WIDTH } from "@/features/studio/types/studio-constants";
 import { STUDIO_BASE_QUALITY_PROMPT } from "./studio-quality-rules";
 
@@ -163,7 +164,8 @@ OUTPUT CONTRACT (NON-NEGOTIABLE):
 - Never fall back to a generic placeholder such as "My Project", "Untitled App", "New Design", or "Aplikasi Prototipe". No marketing superlatives, and no technical requirements: those belong in the blueprint, not in the title.`;
 
 // Studio has exactly one internal generation standard. The base quality contract
-// is composed into every planning and frame system prompt here instead of being
-// assembled per request, so no request path can plan or build without it.
-export const STUDIO_PLANNING_SYSTEM_PROMPT = `${STUDIO_PLAN_SYSTEM_PROMPT}\n${STUDIO_BASE_QUALITY_PROMPT}`;
-export const STUDIO_FRAME_SYSTEM_PROMPT = `${STUDIO_SYSTEM_PROMPT}\n${STUDIO_BASE_QUALITY_PROMPT}`;
+// and the stage's EvVibe design intelligence are composed into every planning and
+// frame system prompt here instead of being assembled per request, so no request
+// path can plan or build without them.
+export const STUDIO_PLANNING_SYSTEM_PROMPT = `${STUDIO_PLAN_SYSTEM_PROMPT}\n${STUDIO_BASE_QUALITY_PROMPT}\n${buildEvvibeDesignContext("planning")}`;
+export const STUDIO_FRAME_SYSTEM_PROMPT = `${STUDIO_SYSTEM_PROMPT}\n${STUDIO_BASE_QUALITY_PROMPT}\n${buildEvvibeDesignContext("generation")}`;

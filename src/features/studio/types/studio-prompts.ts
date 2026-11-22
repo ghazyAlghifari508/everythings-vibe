@@ -30,6 +30,8 @@ export interface StudioFramePromptOptions {
 	blueprint?: StudioDesignBlueprint | null;
 	activeScreen?: string;
 	prdContent?: string | null;
+	/** Distinguishes a first-time screen from one added to an existing project. */
+	screenOrigin?: "initial" | "add";
 }
 
 export type StudioPromptValidation =

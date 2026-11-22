@@ -1,3 +1,4 @@
+import { buildEvvibeDesignContext } from "@/features/studio/design-intelligence/evvibe-design";
 import { STUDIO_PREVIOUS_HTML_MAX_CHARS } from "@/features/studio/types/studio-constants";
 import type {
 	StudioFramePromptOptions,
@@ -91,6 +92,23 @@ ${getStudioComponentGuidance(opts.blueprint?.screenPlan.find((screen) => screen.
 </DOMAIN_AWARE_QUALITY_CONTRACT>`,
 	);
 
+	// Stage-scoped design intelligence: the platform family plus the media
+	// contract for a new screen, the continuity contract for an added screen,
+	// and the constraint set for a revision of existing HTML.
+	const stage = opts.previousHtml?.trim()
+		? "revision"
+		: opts.screenOrigin === "add"
+			? "add-screen"
+			: "initial";
+	const intelligence = buildEvvibeDesignContext(stage, {
+		viewport: opts.designMode,
+		layoutIntent: opts.blueprint?.productIdentity.layoutIntent,
+		composition: opts.blueprint?.screenPlan.find(
+			(screen) => screen.name === (opts.activeScreen ?? opts.screenName),
+		)?.composition,
+	});
+	if (intelligence) sections.push(intelligence);
+
 	// Design tokens
 	if (opts.designMd && opts.designMd.trim().length > 0) {
 		const cleanDesignMd = sanitizeStudioDesignMd(opts.designMd.trim());
@@ -178,6 +196,13 @@ ${domainContract}
 ${getStudioComponentGuidance()}
 </DOMAIN_AWARE_QUALITY_CONTRACT>`,
 	);
+
+	// Same stage-scoped intelligence the frame path uses, without a blueprint.
+	const intelligence = buildEvvibeDesignContext(
+		opts.previousHtml?.trim() ? "revision" : "initial",
+		{ viewport: opts.designMode },
+	);
+	if (intelligence) sections.push(intelligence);
 
 	// PRD context
 	if (opts.prdContent && opts.prdContent.trim().length > 0) {
