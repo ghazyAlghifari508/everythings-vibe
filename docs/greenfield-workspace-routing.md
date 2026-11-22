@@ -79,3 +79,23 @@ Endpoint contract change: `POST /api/projects/$id/step` now answers 401 when una
 Recovery: a project with no saved PRD and no running generation shows `PrdRetryBar` in the PRD chat panel. It re-reads the persisted Ask handoff, or refreshes if the PRD appeared meanwhile.
 
 Not verified: browser rendering (QA not authorized for P2) and live AI generation.
+
+## P3: PRD chat toggle, composer focus, Send/Stop
+
+Chat toggle. Navbar trigger (`navbar-flow-actions.tsx`) and the PRD chat container (`prd-detail.tsx`) both read `useUIStore.isChatPanelOpen`. The trigger carries `aria-expanded` and `aria-controls={PRD_CHAT_PANEL_ID}`; the container is an `<aside id={PRD_CHAT_PANEL_ID} data-state>`.
+
+Class conflict found by audit (not a runtime reproduction). The old container combined `hidden md:flex` (tab), `md:hidden` (closed) and `xl:flex xl:w-0` (closed): same-breakpoint display utilities fight, and compiled order (`md:flex` before `md:hidden`, `xl:*` after `md:*`) made the closed panel at `xl` a zero-width `display:flex` box that stayed in the tab order. Now exactly one display utility per breakpoint: `<md` follows the Dokumen/Chat tab, `md+` follows the store (`md:flex` open, `md:hidden` closed). Closed = `display:none`: no width, border, resize hitbox or tab stops. The width transition on `xl` was removed with the `w-0` state.
+
+Stream ownership is unchanged. The panel is hidden, not unmounted, so the `ChatPanel` stream owner, draft and messages survive repeated toggles. Reopen does not autosubmit (the autosubmit guard is untouched).
+
+Draft isolation fix: `useChatDraft` kept the previous project's text when `projectId` changed inside one mounted hook (proved by a failing probe). It now swaps to the new project's draft in the same render and saves the old text under its own key.
+
+Composer. Send/Stop is one button, `justify-end`, same position and size in both states. The press handler on the composer wrapper (`mousedown`) focuses the textarea when idle, enabled and not read-only, with the caret at the end; presses on a button, link, input or textarea are ignored. While streaming the textarea stays `disabled` and Stop still calls `onCancel` once (`useChatStream.handleCancel` aborts the active request). Enter ignores IME composition. Button has an accessible name, `focus-visible` ring and a 44px target below `md`. Icons are Hugeicons `ArrowUp02Icon` / `StopIcon` via the shared `Icon`.
+
+Click-problem investigation. Two hypotheses, tested separately:
+1. Empty composer area does not focus: confirmed by code. The wrapper had no handler and padding is outside the textarea, so a press there focused nothing. Fixed and covered by DOM tests.
+2. Stop does not respond: not reproduced. In DOM tests Stop receives the click while the textarea is disabled and calls cancel once. Whether a real overlay (devtools corner button, `md:fixed` sheet at `z-40`, resize handle `-left-1 z-10`) covers it in a browser is Not Verified.
+
+Component exploration (checked for Button/IconButton, Sheet/Drawer, InputGroup/Textarea, Collapsible/Resizable): shadcn InputGroup uses an addon `onClick` that focuses the input unless the target is a `button`, which is the same guard used here; adopting it would add a primitive that needs `lucide`/token rework for one wrapper. HeroUI (Textarea, Drawer), React Bits, AffectUI, TuffUI and SakaniUI index pages were fetched and keyword-scanned; they list chat, prompt or sheet pieces, but individual components were not installed or evaluated. Magic UI, CUI and ThinkingOrbs index pages had no relevant control (ThinkingOrbs matched only "prompt"). Nothing was adopted: the existing `Icon`, the `PromptBar` mousedown guard pattern and the existing tablet bottom-sheet container already cover the behavior, and the others would add a dependency or ornamental styling.
+
+Not verified / for P8 (browser): hit testing at 360/768/1280px, overlap with the dev-only TanStack devtools button at bottom-right, resize hitbox and `z-40` sheet stacking, Stop reachable at the bottom of the viewport. Not done: a modal focus trap and backdrop for the tablet sheet. The sheet stays non-modal as before (document remains interactive); changing it to a modal drawer is a behavior change deferred to the P8 decision.
