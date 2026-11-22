@@ -7,10 +7,8 @@ import {
 	studioProjects,
 } from "@/db/schema";
 import type { StudioMessageAttachment } from "../types/studio-conversation";
-import {
-	describeStudioMessageProgress,
-	resolveStudioMessageProgress,
-} from "./studio-conversation-progress";
+import { composeStudioAssistantContent } from "./studio-conversation-content";
+import { resolveStudioMessageProgress } from "./studio-conversation-progress";
 import { StudioFrameError } from "./studio-frame-errors";
 import type { StudioJobTransaction } from "./studio-job-lease";
 
@@ -97,17 +95,17 @@ export async function synchronizeStudioConversation(
 	projectId: string,
 	userId: string,
 ) {
-	const messages = await tx
+	const turns = await tx
 		.select()
 		.from(studioMessages)
 		.where(
 			and(
 				eq(studioMessages.projectId, projectId),
 				eq(studioMessages.userId, userId),
-				eq(studioMessages.role, "assistant"),
 			),
 		)
 		.orderBy(asc(studioMessages.order));
+	const messages = turns.filter((turn) => turn.role === "assistant");
 	if (!messages.length) return;
 	const jobs = await tx
 		.select()
@@ -141,7 +139,16 @@ export async function synchronizeStudioConversation(
 			frames.map((row) => row.studio_frames),
 			deferred,
 		);
-		const content = describeStudioMessageProgress(progress);
+		// Composed from persisted plan and frame results only; no model call.
+		const request = turns.find(
+			(turn) =>
+				turn.role === "user" && turn.operationId === message.operationId,
+		);
+		const content = composeStudioAssistantContent({
+			progress,
+			blueprint: project?.blueprint,
+			request: request?.content ?? "",
+		});
 		if (
 			message.status === progress.phase &&
 			message.content === content &&

@@ -61,11 +61,26 @@ export function resolveStudioMessageProgress(
 				: ready > 0
 					? "partial"
 					: "failed";
+	const failedFrames = initial
+		? targets.filter((frame) => !frame.htmlCode && frame.status === "failed")
+		: frames.filter((frame) =>
+				related.some(
+					(job) => job.status === "failed" && job.targetFrameId === frame.id,
+				),
+			);
 	return {
 		phase,
 		ready,
 		total,
 		failed,
+		kind: initial
+			? "initial"
+			: related.some((job) => job.jobType === "add")
+				? "add"
+				: "revise",
+		...(failedFrames.length
+			? { failedScreens: failedFrames.map((frame) => frame.name) }
+			: {}),
 		...(initial && planned && deferred?.length ? { deferred } : {}),
 		screenNames:
 			initial && !planned
@@ -82,28 +97,4 @@ export function resolveStudioMessageProgress(
 						? "frames"
 						: "resubmit",
 	};
-}
-
-export function describeStudioMessageProgress(
-	progress: StudioMessageProgress,
-): string {
-	const { phase, ready, total, failed, screenNames } = progress;
-	const plan = screenNames.length
-		? `Rencana layar: ${screenNames.join(", ")}.\n`
-		: "";
-	const scope = progress.deferred?.length
-		? `\nBatch awal: ${total} layar. Belum tercakup: ${progress.deferred.join("; ")}. Minta layar tambahan lewat chat.`
-		: "";
-	if (phase === "queued")
-		return `${plan}Permintaan diterima dan menunggu giliran. Pekerjaan yang sedang berjalan tetap dilanjutkan.${scope}`;
-	if (phase === "planning") return "Sedang menyusun rencana layar.";
-	if (phase === "generating")
-		return `${plan}${ready} dari ${total} halaman tersedia.${scope}`;
-	if (phase === "completed")
-		return `${plan}${ready} halaman selesai diproses.${scope}`;
-	if (phase === "partial")
-		return `${plan}${ready} halaman tersedia. ${Math.max(failed, total - ready)} halaman belum berhasil diproses.${scope}`;
-	return progress.recovery === "planning"
-		? "Rencana layar belum berhasil disusun. Pulihkan perencanaan di canvas."
-		: `${plan}Permintaan belum berhasil diproses. ${progress.recovery === "frames" ? "Pulihkan halaman yang gagal di canvas." : "Pilih layar terbaru lalu kirim ulang instruksi."}${scope}`;
 }

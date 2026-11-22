@@ -29,6 +29,10 @@ export const studioMessageProgressSchema = z.object({
 	failed: z.int().nonnegative(),
 	screenNames: z.array(z.string()),
 	deferred: z.array(z.string()).optional(),
+	/** Which kind of request this turn answers; absent on rows written before P4. */
+	kind: z.enum(["initial", "add", "revise"]).optional(),
+	/** Screens whose frames or jobs genuinely failed, so partial results can name them. */
+	failedScreens: z.array(z.string()).optional(),
 	recovery: z.enum(["planning", "frames", "resubmit"]).nullable(),
 });
 export type StudioMessageStatus = z.infer<typeof studioMessageStatusSchema>;
