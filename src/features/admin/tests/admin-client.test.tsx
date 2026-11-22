@@ -56,7 +56,7 @@ describe("AdminClient Top-Nav Shell", () => {
 		container?.remove();
 	});
 
-	it("renders a single navigation landmark with compact Admin label, exactly 5 tabs, theme toggle, and exit link", () => {
+	it("renders a single navigation landmark with exactly 5 tabs, theme toggle, and no redundant Admin label", () => {
 		act(() => {
 			root?.render(
 				<AdminClient>
@@ -72,9 +72,10 @@ describe("AdminClient Top-Nav Shell", () => {
 		expect(navElements.length).toBe(1);
 		expect(navElements[0].getAttribute("aria-label")).toBe("Navigasi Admin");
 
-		// Compact "Admin" label, no generic "Admin Panel"
-		expect(container.textContent).toContain("Admin");
+		// No redundant "Admin" label or its separator in the nav
+		expect(container.textContent).not.toContain("Admin");
 		expect(container.textContent).not.toContain("Admin Panel");
+		expect(navElements[0].children.length).toBe(1);
 
 		// Exactly 5 navigation tabs (Pengaturan removed)
 		const navLinks = Array.from(container.querySelectorAll("nav a"));
