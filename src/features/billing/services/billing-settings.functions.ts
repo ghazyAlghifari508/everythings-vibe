@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { and, desc, eq, ne } from "drizzle-orm";
 import type { CreditOperationItem } from "../components/credit-usage";
+import { resolveSubscriptionState } from "./billing";
 import { queryCreditUsageHistory } from "./credit-usage.functions";
 
 export interface BillingSubscription {
@@ -110,13 +111,14 @@ export const loadBilling = createServerFn({ method: "GET" }).handler(
 
 		const operationsList: CreditOperationItem[] = initialUsage.items;
 
-		const credits = subscription?.credits ?? 0;
 		const creditsUsed = subscription?.creditsUsed ?? 0;
 		const creditsReserved = subscription?.creditsReserved ?? 0;
-		const availableCredits = Math.max(
-			0,
-			credits - creditsUsed - creditsReserved,
-		);
+		// Canonical state: a paused period forfeits leftovers, so plain subtraction
+		// would over-report spendable capacity on the first render.
+		const availableCredits = resolveSubscriptionState(
+			subRows[0],
+			new Date(),
+		).remaining;
 
 		const creditUsage: BillingCreditUsage = {
 			availableCredits,
