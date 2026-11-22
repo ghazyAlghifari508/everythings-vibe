@@ -91,6 +91,14 @@ Measured resource cost was not profiled in a browser (out of scope). Decision by
 
 Known cost: a live fetch per pooled frame runs the server inspection build (jsdom + Tailwind compile). It is aborted on deselect and not repeated for mode or device changes.
 
+## Component-first note
+
+P6 adds no new control. The only visible UI is the existing `StudioFrameStatusStrip` and `StudioFrameRetryButton` (design-system `Button`), reused for the live-surface notice and reload action. The lifecycle is infrastructure; shadcn, HeroUI, Magic UI, React Bits, Thinking Orbs, affectUI, TUFFUI, CUI and SakaniUI were not browsed or adopted because nothing new was drawn, and no loading animation was added (no spinner or shimmer for a completed frame entering inspection). The device switcher control is P9 and will evaluate those libraries then.
+
+## Asset invalidation
+
+Frame HTML references assets by id, so an asset swap on a frame changes the HTML stamp and therefore the renderer key. Uploading an unrelated asset does not change the document and correctly does not reload it.
+
 ## Known limitations (reported, not hidden)
 
 - Live Tailwind is the server-compiled v4 build, not the CDN v3 runtime used by capture; brand colours are shared, but pixel parity is unverified until P11.
