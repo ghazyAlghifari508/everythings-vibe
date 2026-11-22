@@ -3,14 +3,14 @@ import type * as React from "react";
 import { cn } from "@/lib/utils";
 
 const badgeVariants = cva(
-	"inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo",
+	"inline-flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-0.5 text-[11px] font-medium leading-4",
 	{
 		variants: {
 			variant: {
-				default: "border-transparent bg-platinum text-charcoal",
-				secondary: "border-graphite bg-iron/30 text-snow",
-				outline: "border-graphite text-fog",
-				subtle: "border-transparent bg-graphite/40 text-fog",
+				default: "bg-surface-tag text-fog",
+				secondary: "bg-graphite/40 text-mist",
+				outline: "border border-graphite text-fog",
+				subtle: "bg-graphite/25 text-fog",
 			},
 		},
 		defaultVariants: {
@@ -20,12 +20,12 @@ const badgeVariants = cva(
 );
 
 export interface BadgeProps
-	extends React.HTMLAttributes<HTMLDivElement>,
+	extends React.HTMLAttributes<HTMLSpanElement>,
 		VariantProps<typeof badgeVariants> {}
 
 function Badge({ className, variant, ...props }: BadgeProps) {
 	return (
-		<div className={cn(badgeVariants({ variant }), className)} {...props} />
+		<span className={cn(badgeVariants({ variant }), className)} {...props} />
 	);
 }
 
