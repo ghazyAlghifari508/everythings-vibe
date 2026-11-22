@@ -17,6 +17,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { Navbar } from "@/components/layout/navbar";
+import { Route as LegacyPrdRoute } from "@/routes/prd/$id";
 import { Route as WorkspaceRoute } from "@/routes/vibeplan/$id/route";
 import { useChatStore, useUIStore } from "@/store";
 import { useWorkspaceSync } from "../hooks/use-workspace-sync";
@@ -115,6 +116,11 @@ const workspace = createRoute({
 	path: "/vibeplan/$id",
 	getParentRoute: () => root,
 });
+const legacyPrd = createRoute({
+	...LegacyPrdRoute.options,
+	path: "/prd/$id",
+	getParentRoute: () => root,
+});
 const prd = createRoute({
 	getParentRoute: () => workspace,
 	path: "prd",
@@ -135,7 +141,10 @@ let fetchMock: ReturnType<typeof vi.fn>;
 function mount(path: string) {
 	const router = createRouter({
 		context: { queryClient: new QueryClient() },
-		routeTree: root.addChildren([workspace.addChildren([prd, ac, task])]),
+		routeTree: root.addChildren([
+			workspace.addChildren([prd, ac, task]),
+			legacyPrd,
+		]),
 		history: createMemoryHistory({ initialEntries: [path] }),
 		defaultPendingMs: 0,
 	});
@@ -317,4 +326,16 @@ it("on /ac, existing tasks open instead of regenerating and viewing never writes
 	expect(await cta(/Lanjut ke Task/i)).toBeDefined();
 	expect(screen.queryByRole("button", { name: /Generate Task/i })).toBeNull();
 	expect(fetchMock).not.toHaveBeenCalled();
+});
+
+it("a legacy /prd/$id URL lands on the canonical route and derives the CTA from that project only", async () => {
+	seed("p1", { freshFromCall: 1 });
+	seed("p2", { hasPrd: false, childHasPrd: false });
+	const router = mount("/prd/p2");
+	await waitFor(() =>
+		expect(router.state.location.pathname).toBe("/vibeplan/p2/prd"),
+	);
+	const button = await cta(/Generate AC/i);
+	expect(button.hasAttribute("disabled")).toBe(true);
+	expect(fx("p1").calls).toBe(0);
 });
