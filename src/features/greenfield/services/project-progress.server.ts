@@ -3,7 +3,7 @@
 // stored document versions are never touched here.
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { projects, tasks } from "@/db/schema";
+import { acVersions, prdVersions, projects, tasks } from "@/db/schema";
 import { resolvePlanTier } from "@/features/greenfield/services/plan-tier";
 import {
 	hasNonPendingSubtask,
@@ -133,15 +133,23 @@ export async function handleProjectResetProgressRequest(
 // rewind step and strand History on the AC page. No-op = still 200.
 // The row lock serializes concurrent writers so two requests
 // reading the same old step cannot overwrite a newer one.
+export type AdvanceStepResult =
+	| { kind: "ok"; step: string | null }
+	| { kind: "not_found" }
+	| { kind: "prerequisite_missing" };
+
+// Forward targets need a persisted upstream artifact; the client snapshot is
+// never trusted. Checked on the locked project row so a concurrent delete or
+// mode change cannot slip between check and write.
 export async function advanceProjectStep(input: {
 	projectId: string;
 	userId: string;
 	step: FlowStep;
-}): Promise<{ step: string | null } | null> {
+}): Promise<AdvanceStepResult> {
 	const { projectId, userId, step } = input;
 	return db.transaction(async (tx) => {
 		const [existing] = await tx
-			.select({ step: projects.step })
+			.select({ step: projects.step, projectMode: projects.projectMode })
 			.from(projects)
 			.where(
 				and(
@@ -152,14 +160,30 @@ export async function advanceProjectStep(input: {
 			)
 			.limit(1)
 			.for("update");
-		if (!existing) return null;
+		if (!existing || existing.projectMode !== "greenfield")
+			return { kind: "not_found" as const };
+		if (step === "ac" || step === "task") {
+			const [artifact] =
+				step === "ac"
+					? await tx
+							.select({ id: prdVersions.id })
+							.from(prdVersions)
+							.where(eq(prdVersions.projectId, projectId))
+							.limit(1)
+					: await tx
+							.select({ id: acVersions.id })
+							.from(acVersions)
+							.where(eq(acVersions.projectId, projectId))
+							.limit(1);
+			if (!artifact) return { kind: "prerequisite_missing" as const };
+		}
 		const next = advanceStep(existing.step, step);
-		if (!next) return { step: existing.step };
+		if (!next) return { kind: "ok" as const, step: existing.step };
 		await tx
 			.update(projects)
 			.set({ step: next })
 			.where(and(eq(projects.id, projectId), eq(projects.userId, userId)));
-		return { step: next };
+		return { kind: "ok" as const, step: next };
 	});
 }
 
@@ -198,7 +222,15 @@ export async function handleProjectStepRequest(
 	}
 
 	const result = await advanceProjectStep({ projectId, userId: user.id, step });
-	if (!result)
+	if (result.kind === "not_found")
 		return Response.json({ error: "Project not found" }, { status: 404 });
+	if (result.kind === "prerequisite_missing")
+		return Response.json(
+			{
+				error: "Tahap sebelumnya belum tersimpan.",
+				code: "PREREQUISITE_MISSING",
+			},
+			{ status: 409 },
+		);
 	return Response.json({ success: true, step: result.step });
 }
