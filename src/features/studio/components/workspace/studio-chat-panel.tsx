@@ -1,124 +1,79 @@
-import { ScrollShadow } from "@heroui/react";
-import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
+import {
+	ArrowLeftDoubleIcon,
+	BubbleChatIcon,
+} from "@hugeicons/core-free-icons";
 import * as Dialog from "@radix-ui/react-dialog";
-import { type Dispatch, type SetStateAction, useEffect, useRef } from "react";
+import {
+	type Dispatch,
+	type SetStateAction,
+	useCallback,
+	useRef,
+	useState,
+} from "react";
 import { Icon } from "@/components/ui/icon";
-import { Spinner } from "@/components/ui/spinner";
+import { cn } from "@/lib/utils";
 import type { useStudioElementEditing } from "../../hooks/use-studio-element-editing";
 import type { StudioWorkspaceState } from "../../hooks/use-studio-workspace";
-import type { StudioMessageStatus } from "../../types/studio-conversation";
+import { studioChatPanelWidthCss } from "../../utils/studio-chat-layout";
 import { StudioComposer } from "../composer/studio-composer";
+import {
+	StudioChatConversation,
+	type StudioChatScrollMemory,
+} from "./studio-chat-conversation";
 
-const statusLabels: Record<StudioMessageStatus, string> = {
-	accepted: "Diterima",
-	queued: "Dalam antrean",
-	planning: "Menyusun rencana",
-	generating: "Membuat desain",
-	completed: "Selesai",
-	partial: "Sebagian tersedia",
-	failed: "Belum berhasil",
-};
+const floatingControl =
+	"flex size-11 shrink-0 items-center justify-center rounded-lg border border-iron/70 bg-charcoal/85 text-snow backdrop-blur-sm hover:bg-steel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-snow supports-[backdrop-filter]:bg-charcoal/70";
+const topBelowHeader = "top-[calc(4rem+env(safe-area-inset-top))]";
 
-function Conversation({ workspace }: { workspace: StudioWorkspaceState }) {
-	const viewport = useRef<HTMLDivElement>(null);
-	const following = useRef(true);
-	useEffect(() => {
-		if (!workspace.messages.length) return;
-		if (following.current && viewport.current)
-			viewport.current.scrollTop = viewport.current.scrollHeight;
-	}, [workspace.messages]);
-	return (
-		<ScrollShadow
-			ref={viewport}
-			role="log"
-			aria-label="Percakapan desain"
-			aria-live="polite"
-			aria-relevant="additions text"
-			tabIndex={0}
-			className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-4 py-5 focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-snow"
-			onScroll={(event) => {
-				const { scrollHeight, scrollTop, clientHeight } = event.currentTarget;
-				following.current = scrollHeight - scrollTop - clientHeight < 48;
-			}}
-		>
-			{workspace.messages.length === 0 ? (
-				<p className="text-sm leading-relaxed text-fog">
-					Percakapan desain akan tersimpan di project ini. Pilih layar untuk
-					revisi atau minta halaman baru.
-				</p>
-			) : (
-				workspace.messages.map((message) => (
-					<article key={message.id} className="mb-6 min-w-0 last:mb-0">
-						<div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-fog">
-							<span className="font-medium text-snow">
-								{message.role === "user" ? "Anda" : "Design agent"}
-							</span>
-							{message.role === "assistant" &&
-							(message.status === "planning" ||
-								message.status === "generating") ? (
-								<Spinner size={12} />
-							) : null}
-							<span>{statusLabels[message.status]}</span>
-						</div>
-						<p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-snow [overflow-wrap:anywhere]">
-							{message.content}
-						</p>
-						{message.attachments.length > 0 ? (
-							<ul
-								aria-label="Layar terkait"
-								className="mt-2 flex flex-wrap gap-1.5"
-							>
-								{message.attachments.map((attachment) => (
-									<li
-										key={attachment.frameId}
-										className="max-w-full truncate rounded-md border border-iron px-2 py-1 text-xs text-fog"
-										title={attachment.name}
-									>
-										{attachment.name}
-									</li>
-								))}
-							</ul>
-						) : null}
-					</article>
-				))
-			)}
-		</ScrollShadow>
-	);
-}
-
-export function StudioChatPanel({
-	workspace,
-	desktop,
-	open,
-	onOpenChange,
-	draft,
-	elementEditing,
-}: {
+interface PanelProps {
 	workspace: StudioWorkspaceState;
 	desktop: boolean;
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	draft: { prompt: string; setPrompt: Dispatch<SetStateAction<string>> };
 	elementEditing?: ReturnType<typeof useStudioElementEditing>;
+}
+
+function PanelBody({
+	workspace,
+	onOpenChange,
+	draft,
+	elementEditing,
+	expandedIds,
+	onToggleExpanded,
+	scrollMemory,
+}: Omit<PanelProps, "desktop" | "open"> & {
+	expandedIds: ReadonlySet<string>;
+	onToggleExpanded: (id: string) => void;
+	scrollMemory: StudioChatScrollMemory;
 }) {
-	const content = (
+	return (
 		<>
-			<div className="flex min-h-14 shrink-0 items-center justify-between gap-3 border-b border-iron px-4">
-				<span className="text-xs font-medium tracking-wide text-fog">
-					DESIGN AGENT
-				</span>
-				{!desktop ? (
-					<Dialog.Close
-						aria-label="Kembali ke canvas"
-						className="flex size-11 items-center justify-center rounded-lg text-fog hover:bg-steel hover:text-snow focus-visible:outline-2 focus-visible:outline-snow"
-					>
-						<Icon icon={ArrowLeft01Icon} size={18} />
-					</Dialog.Close>
-				) : null}
+			<div className="flex h-12 shrink-0 items-center justify-between gap-2 pr-1.5 pl-4">
+				<Icon
+					icon={BubbleChatIcon}
+					size={18}
+					className="text-fog"
+					aria-hidden="true"
+				/>
+				<button
+					type="button"
+					aria-label="Tutup panel chat"
+					title="Tutup panel chat"
+					onClick={() => onOpenChange(false)}
+					className="flex size-11 items-center justify-center rounded-lg text-fog hover:bg-steel hover:text-snow focus-visible:outline-2 focus-visible:outline-snow"
+				>
+					<Icon icon={ArrowLeftDoubleIcon} size={18} />
+				</button>
 			</div>
-			<Conversation workspace={workspace} />
+			<StudioChatConversation
+				messages={workspace.messages}
+				expandedIds={expandedIds}
+				onToggleExpanded={onToggleExpanded}
+				scrollMemory={scrollMemory}
+			/>
 			{elementEditing?.undo && !elementEditing.preview ? (
-				<div className="flex items-center justify-between gap-2 border-t border-iron px-4 py-2 text-xs text-fog">
+				<div className="mx-3 flex items-center justify-between gap-2 border-t border-iron px-1 py-2 text-xs text-fog">
 					<span className="min-w-0 truncate">
 						{elementEditing.undo.frameName}: revisi diterapkan
 					</span>
@@ -143,7 +98,7 @@ export function StudioChatPanel({
 			{workspace.error ? (
 				<div
 					role="alert"
-					className="flex shrink-0 items-center gap-2 border-t border-iron px-4 text-xs text-crimson"
+					className="mx-3 flex shrink-0 items-center gap-2 border-t border-iron px-1 text-xs text-crimson"
 				>
 					<p className="min-w-0 flex-1 break-words">{workspace.error}</p>
 					<button
@@ -156,7 +111,7 @@ export function StudioChatPanel({
 					</button>
 				</div>
 			) : null}
-			<div className="shrink-0 border-t border-iron px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+			<div className="shrink-0 px-3 pt-2 pb-3">
 				<StudioComposer
 					value={draft.prompt}
 					elementTarget={elementEditing?.target}
@@ -182,33 +137,99 @@ export function StudioChatPanel({
 			</div>
 		</>
 	);
-	if (desktop)
-		return open ? (
-			<aside
-				aria-label="Design agent"
-				className="flex min-h-0 w-[clamp(18rem,28vw,24rem)] shrink-0 flex-col border-r border-iron bg-obsidian"
-			>
-				{content}
-			</aside>
-		) : null;
+}
+
+/**
+ * Floating AI conversation. On desktop the panel stays mounted while collapsed
+ * (hidden and inert), so the composer draft, attachments, scroll position and
+ * expanded prompts survive a toggle. Below the desktop breakpoint it becomes a
+ * modal drawer; its state still lives here, above the unmounting dialog.
+ */
+export function StudioChatPanel({
+	workspace,
+	desktop,
+	open,
+	onOpenChange,
+	draft,
+	elementEditing,
+}: PanelProps) {
+	const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(
+		() => new Set(),
+	);
+	const scrollMemory = useRef({ top: 0, following: true });
+	const toggleExpanded = useCallback((id: string) => {
+		setExpandedIds((current) => {
+			const next = new Set(current);
+			if (!next.delete(id)) next.add(id);
+			return next;
+		});
+	}, []);
+	const body = (
+		<PanelBody
+			workspace={workspace}
+			onOpenChange={onOpenChange}
+			draft={draft}
+			elementEditing={elementEditing}
+			expandedIds={expandedIds}
+			onToggleExpanded={toggleExpanded}
+			scrollMemory={scrollMemory}
+		/>
+	);
 	return (
-		<Dialog.Root open={open} onOpenChange={onOpenChange}>
-			<Dialog.Portal>
-				<Dialog.Overlay className="fixed inset-0 z-40 bg-black/60" />
-				<Dialog.Content
-					onCloseAutoFocus={(event) => {
-						event.preventDefault();
-						document.getElementById("studio-chat-toggle")?.focus();
-					}}
-					className="fixed inset-y-0 left-0 z-50 flex h-dvh w-full max-w-md flex-col overflow-hidden border-r border-iron bg-obsidian pt-[env(safe-area-inset-top)] text-snow outline-none"
+		<>
+			{open ? null : (
+				<button
+					id="studio-chat-toggle"
+					type="button"
+					aria-label="Buka panel chat"
+					title="Buka panel chat"
+					aria-expanded={false}
+					onClick={() => onOpenChange(true)}
+					className={cn(
+						"absolute left-3 z-20",
+						topBelowHeader,
+						floatingControl,
+					)}
 				>
-					<Dialog.Title className="sr-only">Design agent</Dialog.Title>
-					<Dialog.Description className="sr-only">
-						Percakapan dan instruksi desain untuk project ini.
-					</Dialog.Description>
-					{content}
-				</Dialog.Content>
-			</Dialog.Portal>
-		</Dialog.Root>
+					<Icon icon={BubbleChatIcon} size={18} />
+				</button>
+			)}
+			{desktop ? (
+				<aside
+					aria-label="Design agent"
+					aria-hidden={!open}
+					inert={!open}
+					style={{ width: studioChatPanelWidthCss() }}
+					className={cn(
+						"absolute bottom-3 left-3 z-20 flex min-h-0 flex-col overflow-hidden rounded-xl border border-iron/70 bg-obsidian/95 backdrop-blur-sm transition-[opacity,transform,visibility] duration-200 ease-out motion-reduce:transition-none",
+						topBelowHeader,
+						open
+							? "visible translate-x-0 opacity-100"
+							: "pointer-events-none invisible -translate-x-3 opacity-0",
+					)}
+				>
+					{body}
+				</aside>
+			) : (
+				<Dialog.Root open={open} onOpenChange={onOpenChange}>
+					<Dialog.Portal>
+						<Dialog.Overlay className="studio-chat-scrim fixed inset-0 z-40 bg-black/60" />
+						<Dialog.Content
+							onCloseAutoFocus={(event) => {
+								event.preventDefault();
+								document.getElementById("studio-chat-toggle")?.focus();
+							}}
+							className="studio-chat-drawer fixed top-[calc(0.5rem+env(safe-area-inset-top))] bottom-2 left-2 z-50 flex w-[calc(100%-1rem)] max-w-md flex-col overflow-hidden rounded-xl border border-iron/70 bg-obsidian text-snow outline-none"
+						>
+							<Dialog.Title className="sr-only">Design agent</Dialog.Title>
+							<Dialog.Description className="sr-only">
+								Percakapan dan instruksi desain untuk project ini.
+							</Dialog.Description>
+							{body}
+						</Dialog.Content>
+					</Dialog.Portal>
+				</Dialog.Root>
+			)}
+		</>
 	);
 }

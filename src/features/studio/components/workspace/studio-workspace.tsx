@@ -34,8 +34,6 @@ export function StudioWorkspace({
 	return (
 		<main className="relative flex h-dvh min-h-0 w-full flex-col overflow-hidden bg-charcoal text-snow">
 			<StudioHeader
-				chatOpen={chat.open}
-				onToggleChat={() => chat.setOpen(!chat.open)}
 				title={workspace.project.title}
 				duplicating={workspace.duplicating}
 				exporting={workspace.exportingZip}
@@ -47,45 +45,46 @@ export function StudioWorkspace({
 				onDelete={workspace.handleDelete}
 			/>
 
-			<div className="relative flex min-h-0 flex-1 pt-[calc(3.5rem+env(safe-area-inset-top))]">
-				<StudioChatPanel
-					workspace={workspace}
-					desktop={chat.desktop}
-					open={chat.open}
-					onOpenChange={chat.setOpen}
-					elementEditing={elementEditing}
-					draft={draft}
+			{/* The canvas fills the viewport behind the floating header and chat
+			    panel; the panel never takes layout space from it. */}
+			<div className="absolute inset-0 overflow-hidden">
+				<StudioCanvas
+					project={workspace.project}
+					frames={workspace.frames}
+					activeJob={workspace.activeJob}
+					selectedFrameId={workspace.selectedFrameId}
+					elementTarget={elementEditing.target}
+					onSelectElement={(target) => {
+						if (target) {
+							elementEditing.selectTarget(target);
+							chat.setOpen(true);
+						} else elementEditing.clearTarget();
+					}}
+					selectedFrameIds={workspace.selectedFrameIds}
+					onSelectFrame={workspace.selectFrame}
+					onSelectFrames={workspace.selectFrames}
+					onRetryFrame={workspace.handleRetryFrame}
+					onRetryPlanning={
+						workspace.canRetryPlanning
+							? workspace.handleRetryPlanning
+							: undefined
+					}
+					retryingPlanning={workspace.retryingPlanning}
+					onRefreshStatus={() => window.location.reload()}
+					retryingFrameIds={workspace.retryingFrameIds}
+					frameRetryErrors={workspace.frameRetryErrors}
+					leftInsetPx={chat.insetPx}
+					className="size-full"
 				/>
-				<div className="relative min-w-0 flex-1 overflow-hidden">
-					<StudioCanvas
-						project={workspace.project}
-						frames={workspace.frames}
-						activeJob={workspace.activeJob}
-						selectedFrameId={workspace.selectedFrameId}
-						elementTarget={elementEditing.target}
-						onSelectElement={(target) => {
-							if (target) {
-								elementEditing.selectTarget(target);
-								chat.setOpen(true);
-							} else elementEditing.clearTarget();
-						}}
-						selectedFrameIds={workspace.selectedFrameIds}
-						onSelectFrame={workspace.selectFrame}
-						onSelectFrames={workspace.selectFrames}
-						onRetryFrame={workspace.handleRetryFrame}
-						onRetryPlanning={
-							workspace.canRetryPlanning
-								? workspace.handleRetryPlanning
-								: undefined
-						}
-						retryingPlanning={workspace.retryingPlanning}
-						onRefreshStatus={() => window.location.reload()}
-						retryingFrameIds={workspace.retryingFrameIds}
-						frameRetryErrors={workspace.frameRetryErrors}
-						className="size-full"
-					/>
-				</div>
 			</div>
+			<StudioChatPanel
+				workspace={workspace}
+				desktop={chat.desktop}
+				open={chat.open}
+				onOpenChange={chat.setOpen}
+				elementEditing={elementEditing}
+				draft={draft}
+			/>
 			<StudioElementPreview
 				editing={elementEditing}
 				projectId={workspace.project.id}

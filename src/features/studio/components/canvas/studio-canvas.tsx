@@ -53,6 +53,8 @@ export interface StudioCanvasProps {
 	frameRetryErrors?: Record<string, string>;
 	elementTarget?: StudioElementTarget | null;
 	onSelectElement?: (target: StudioElementTarget | null) => void;
+	/** Left band covered by the floating chat panel; `null` until its layout is known. */
+	leftInsetPx?: number | null;
 	className?: string;
 }
 
@@ -72,6 +74,7 @@ export const StudioCanvas = memo(function StudioCanvas({
 	frameRetryErrors,
 	elementTarget,
 	onSelectElement,
+	leftInsetPx = 0,
 	className = "",
 }: StudioCanvasProps) {
 	const canvasRef = useRef<HTMLElement>(null);
@@ -124,6 +127,7 @@ export const StudioCanvas = memo(function StudioCanvas({
 		projectId: project.id,
 		preferredZoom,
 		frames,
+		leftInsetPx,
 		canvasRef,
 		selectedFrameId,
 		zoom,

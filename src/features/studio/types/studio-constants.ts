@@ -106,6 +106,18 @@ export const STUDIO_CANVAS_MARQUEE_DRAG_THRESHOLD_PX = 4;
 
 export const STUDIO_CANVAS_ZOOM_BOTTOM_PX = 16;
 
+// Floating chat panel geometry. The same rule sizes the panel and insets the
+// opening canvas view, so frames never open underneath it.
+export const STUDIO_CHAT_PANEL_MARGIN_PX = 12;
+export const STUDIO_CHAT_PANEL_MIN_WIDTH_PX = 320;
+export const STUDIO_CHAT_PANEL_MAX_WIDTH_PX = 400;
+export const STUDIO_CHAT_PANEL_VIEWPORT_RATIO = 0.28;
+export const STUDIO_CHAT_PANEL_DESKTOP_QUERY = "(min-width: 1024px)";
+export const STUDIO_CHAT_TRANSITION_MS = 200;
+// A user prompt collapses past either bound; the stored text is never cut.
+export const STUDIO_USER_MESSAGE_COLLAPSE_CHARS = 280;
+export const STUDIO_USER_MESSAGE_COLLAPSE_LINES = 5;
+
 export const STUDIO_LOGO_ALLOWED_MIMES = [
 	"image/png",
 	"image/jpeg",

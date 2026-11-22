@@ -22,6 +22,11 @@ interface UseStudioCanvasViewInput {
 	/** Comfortable scale for this project's viewport class. */
 	preferredZoom: number;
 	frames: StudioFrameRow[];
+	/**
+	 * Width a floating overlay covers on the left. `null` while the layout is not
+	 * known yet, so the opening view is never computed against a guessed width.
+	 */
+	leftInsetPx: number | null;
 	canvasRef: React.RefObject<HTMLElement | null>;
 	selectedFrameId: string | null;
 	zoom: number;
@@ -45,6 +50,7 @@ export function useStudioCanvasView({
 	projectId,
 	preferredZoom,
 	frames,
+	leftInsetPx,
 	canvasRef,
 	selectedFrameId,
 	zoom,
@@ -99,7 +105,11 @@ export function useStudioCanvasView({
 		);
 		const { zoom: nextZoom, pan: nextPan } = computeCanvasFit({
 			bounds,
-			available: canvas.getBoundingClientRect(),
+			available: {
+				width: canvas.getBoundingClientRect().width,
+				height: canvas.getBoundingClientRect().height,
+				insetLeft: leftInsetPx ?? 0,
+			},
 			minZoom,
 			maxZoom,
 		});
@@ -109,6 +119,7 @@ export function useStudioCanvasView({
 		canvasRef,
 		dimensions,
 		frames,
+		leftInsetPx,
 		maxZoom,
 		minZoom,
 		resetZoom,
@@ -121,11 +132,15 @@ export function useStudioCanvasView({
 	const initializedProjectRef = useRef<string | null>(null);
 	useIsomorphicLayoutEffect(() => {
 		if (initializedProjectRef.current === projectId) return;
-		if (!frames.length) return;
+		if (!frames.length || leftInsetPx === null) return;
 		const canvas = canvasRef.current;
 		if (!canvas) return;
 		const rect = canvas.getBoundingClientRect();
-		const available = { width: rect.width, height: rect.height };
+		const available = {
+			width: rect.width,
+			height: rect.height,
+			insetLeft: leftInsetPx,
+		};
 		// A zero-sized canvas (hidden tab, server render, test DOM) has no
 		// geometry to frame yet.
 		if (available.width <= 0 || available.height <= 0) return;
@@ -159,6 +174,7 @@ export function useStudioCanvasView({
 	}, [
 		canvasRef,
 		frames,
+		leftInsetPx,
 		maxZoom,
 		minZoom,
 		preferredZoom,

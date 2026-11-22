@@ -19,6 +19,8 @@ export interface StudioCanvasFrameBounds {
 export interface StudioCanvasAvailable {
 	width: number;
 	height: number;
+	/** Left band a floating overlay (the chat panel) covers; frames are framed beside it. */
+	insetLeft?: number;
 }
 
 export interface StudioCanvasFitInput {
@@ -67,7 +69,9 @@ export function computeCanvasUsableBand(available: StudioCanvasAvailable): {
 	return {
 		width: Math.max(
 			STUDIO_CANVAS_MIN_VISIBLE_PX,
-			available.width - STUDIO_CANVAS_TOOLBAR_INSET_PX * 2,
+			available.width -
+				(available.insetLeft ?? 0) -
+				STUDIO_CANVAS_TOOLBAR_INSET_PX * 2,
 		),
 		height: Math.max(
 			STUDIO_CANVAS_MIN_VISIBLE_PX,
@@ -115,10 +119,11 @@ export function computeCanvasFit({
 	// centres the artboards when they fit. If they exceed the usable canvas
 	// band at minimum readable zoom, prioritize framing the leading artboard
 	// under the insets so content remains comfortably readable and pan-navigable.
+	const insetLeft = available.insetLeft ?? 0;
 	const panX =
 		track.width * zoom > usable.width
-			? STUDIO_CANVAS_TOOLBAR_INSET_PX
-			: (available.width - track.width * zoom) / 2;
+			? insetLeft + STUDIO_CANVAS_TOOLBAR_INSET_PX
+			: insetLeft + (available.width - insetLeft - track.width * zoom) / 2;
 
 	const panY =
 		track.height * zoom > usable.height
@@ -195,6 +200,7 @@ export function computeCanvasInitialView({
 		zoom,
 		pan: {
 			x:
+				(available.insetLeft ?? 0) +
 				STUDIO_CANVAS_HEADER_INSET_PX -
 				(STUDIO_CANVAS_FRAME_PADDING_PX + contentOffset) * zoom,
 			y: STUDIO_CANVAS_HEADER_INSET_PX - STUDIO_CANVAS_FRAME_PADDING_PX * zoom,
