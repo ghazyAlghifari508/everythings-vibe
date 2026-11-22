@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, lt, or } from "drizzle-orm";
+import { and, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { subscriptions } from "@/db/schema";
 import {
@@ -58,6 +58,7 @@ export async function rollOverFreeIfNeeded(
 				credits: PLAN_CREDITS.free,
 				creditsUsed: 0,
 				creditsReserved: 0,
+				allocationEpoch: sql`${subscriptions.allocationEpoch} + 1`,
 				updatedAt: now,
 			})
 			.where(

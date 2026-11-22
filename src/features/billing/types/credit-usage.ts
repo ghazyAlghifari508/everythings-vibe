@@ -8,7 +8,7 @@ import type {
 
 export interface CreditOperationItem {
 	id: string;
-	projectId: string;
+	projectId: string | null;
 	projectName?: string | null;
 	kind: CreditOperationKind;
 	stage: CreditOperationStage;

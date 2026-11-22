@@ -1,12 +1,12 @@
+import {
+	type CreditOperationKind,
+	type CreditPricingVersion,
+	maximumCreditsOf,
+	requireConfiguredPricing,
+} from "@/features/billing/services/credit-operation-registry";
 import { ADAPTIVE_CREDIT_PRICING } from "@/features/billing/types/billing-constants";
 
 export { ADAPTIVE_CREDIT_PRICING } from "@/features/billing/types/billing-constants";
-
-export type CreditOperationKind =
-	| "codebase_analysis"
-	| "prd_generation"
-	| "ac_generation"
-	| "task_generation";
 
 export type CreditOperationState =
 	| "quoted"
@@ -27,9 +27,7 @@ export type CreditLedgerEntryType =
 	| "refund"
 	| "correction";
 
-export type CreditPricingVersion =
-	| typeof ADAPTIVE_CREDIT_PRICING.version
-	| "2026-09-20";
+export type { CreditOperationKind, CreditPricingVersion };
 
 export interface CreditComplexityMetrics {
 	promptChars?: number;
@@ -122,7 +120,16 @@ export function surcharge(metrics: CreditComplexityMetrics): number {
 }
 
 export function estimateCreditQuote(input: CreditEstimateInput): CreditQuote {
-	const pricing = ADAPTIVE_CREDIT_PRICING.operations[input.operation];
+	const pricing = requireConfiguredPricing(input.operation);
+	if (pricing.mode === "fixed") {
+		return {
+			operation: input.operation,
+			pricingVersion: pricing.version,
+			estimatedCredits: pricing.credits,
+			maximumCredits: pricing.credits,
+			metrics: input.metrics,
+		};
+	}
 	const estimatedCredits = Math.min(
 		pricing.maximumCredits,
 		Math.max(
@@ -133,16 +140,28 @@ export function estimateCreditQuote(input: CreditEstimateInput): CreditQuote {
 
 	return {
 		operation: input.operation,
-		pricingVersion: ADAPTIVE_CREDIT_PRICING.version,
+		pricingVersion: pricing.version,
 		estimatedCredits,
 		maximumCredits: pricing.maximumCredits,
 		metrics: input.metrics,
 	};
 }
 
+/** Credits the work is worth for the measured metrics, before any cap. */
+export function measureCreditUnits(
+	operation: CreditOperationKind,
+	metrics: CreditComplexityMetrics,
+): number {
+	const pricing = requireConfiguredPricing(operation);
+	return pricing.mode === "fixed"
+		? pricing.credits
+		: pricing.baseCredits + surcharge(metrics);
+}
+
 export function calculateFinalCreditCost(input: CreditUsageInput): number {
-	const configuredMaximum =
-		ADAPTIVE_CREDIT_PRICING.operations[input.operation].maximumCredits;
+	const configuredMaximum = maximumCreditsOf(
+		requireConfiguredPricing(input.operation),
+	);
 	const maximumCredits = Math.min(
 		configuredMaximum,
 		Math.max(0, Math.floor(input.maximumCredits)),

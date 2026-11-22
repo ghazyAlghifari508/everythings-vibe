@@ -1,5 +1,6 @@
 import { and, eq, inArray, lte, sql } from "drizzle-orm";
 import { getDatabase } from "@/features/billing/services/credit-db";
+import { isCurrentAllocationEpoch } from "@/features/billing/services/credit-guards";
 import { releaseCreditOperation } from "@/features/billing/services/credit-release";
 import type { CreditOperationResult } from "@/features/billing/types/credit-contracts";
 import { CreditSubscriptionOriginError } from "@/features/billing/types/credit-contracts";
@@ -27,7 +28,10 @@ export async function quarantineCreditOperation(input: {
 			throw new Error("Credit operation is not active");
 		if (operation.subscriptionId) {
 			const [subscription] = await tx
-				.select({ id: schema.subscriptions.id })
+				.select({
+					id: schema.subscriptions.id,
+					allocationEpoch: schema.subscriptions.allocationEpoch,
+				})
 				.from(schema.subscriptions)
 				.where(
 					and(
@@ -37,7 +41,14 @@ export async function quarantineCreditOperation(input: {
 				)
 				.for("update")
 				.limit(1);
-			if (subscription) {
+			// Only a hold from the current epoch is still in the counter.
+			if (
+				subscription &&
+				isCurrentAllocationEpoch(
+					operation.subscriptionEpoch,
+					subscription.allocationEpoch,
+				)
+			) {
 				await tx
 					.update(schema.subscriptions)
 					.set({

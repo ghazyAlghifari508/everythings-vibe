@@ -26,6 +26,8 @@ export type CreditLedgerEntryRow = typeof creditLedgerEntries.$inferSelect;
 export interface CreditOperationCreateInput {
 	userId: string;
 	projectId: string;
+	/** Caller-verified plan family; this helper cannot read the project. */
+	product: "vibeplan_greenfield" | "vibeplan_codebase";
 	subscriptionId: string;
 	operation: CreditOperationKind;
 	stage: CreditOperationStage;
@@ -52,7 +54,7 @@ export interface CreditUsageQuery {
 
 export interface CreditUsageRow {
 	operationId: string;
-	projectId: string;
+	projectId: string | null;
 	stage: string;
 	operation: CreditOperationKind;
 	state: CreditOperationState;
@@ -251,7 +253,10 @@ export async function createCreditOperation(
 	return createOperation({
 		id: crypto.randomUUID(),
 		userId: input.userId,
+		resourceType: "plan_project",
 		projectId: input.projectId,
+		product: input.product,
+		fundingSource: "subscription_balance",
 		subscriptionId: input.subscriptionId,
 		kind: input.operation,
 		stage: input.stage,

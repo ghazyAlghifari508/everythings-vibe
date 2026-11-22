@@ -1,11 +1,10 @@
 import {
-	ADAPTIVE_CREDIT_PRICING,
 	type CreditOperationKind,
 	type CreditOperationState,
 	type CreditQuote,
 	calculateFinalCreditCost,
 	estimateCreditQuote,
-	surcharge,
+	measureCreditUnits,
 } from "@/features/billing/services/adaptive-credit";
 import type {
 	CreditLedgerEntry,
@@ -122,9 +121,10 @@ export function resolveSettlementParameters(
 
 	if (measuredUnits === undefined || finalCharge === undefined) {
 		if (input.actualMetrics) {
-			const pricing = ADAPTIVE_CREDIT_PRICING.operations[operation.kind];
-			const computedUnits =
-				pricing.baseCredits + surcharge(input.actualMetrics);
+			const computedUnits = measureCreditUnits(
+				operation.kind,
+				input.actualMetrics,
+			);
 			measuredUnits = measuredUnits ?? computedUnits;
 			finalCharge =
 				finalCharge ??
@@ -211,3 +211,18 @@ export function isReleasableReservation(state: CreditOperationState): boolean {
 export function freshRetryKey(idempotencyKey: string): string {
 	return `${idempotencyKey}:retry:${crypto.randomUUID()}`;
 }
+
+/**
+ * Whether an operation reserved in the subscription's current allocation
+ * epoch. A period reset zeroes credits_reserved/credits_used and bumps the
+ * epoch, so an operation from an older epoch has no hold left to move.
+ * A NULL operation epoch means it never bound to a subscription counter.
+ */
+export function isCurrentAllocationEpoch(
+	operationEpoch: number | null,
+	subscriptionEpoch: number,
+): boolean {
+	return operationEpoch === null || operationEpoch === subscriptionEpoch;
+}
+
+export const ALLOCATION_RESET_CODE = "allocation_period_reset";

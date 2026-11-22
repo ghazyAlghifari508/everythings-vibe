@@ -3,7 +3,11 @@ import {
 	getDatabase,
 	orValidPeriod,
 } from "@/features/billing/services/credit-db";
-import { requireBoundSubscriptionId } from "@/features/billing/services/credit-guards";
+import {
+	ALLOCATION_RESET_CODE,
+	isCurrentAllocationEpoch,
+	requireBoundSubscriptionId,
+} from "@/features/billing/services/credit-guards";
 import type { CreditOperationResult } from "@/features/billing/types/credit-contracts";
 import { CreditSubscriptionOriginError } from "@/features/billing/types/credit-contracts";
 
@@ -67,7 +71,10 @@ export async function releaseCreditOperation(input: {
 
 		const subscriptionId = requireBoundSubscriptionId(operation.subscriptionId);
 		const [subscription] = await tx
-			.select({ id: schema.subscriptions.id })
+			.select({
+				id: schema.subscriptions.id,
+				allocationEpoch: schema.subscriptions.allocationEpoch,
+			})
 			.from(schema.subscriptions)
 			.where(
 				and(
@@ -82,16 +89,26 @@ export async function releaseCreditOperation(input: {
 			.limit(1)
 			.for("update");
 		if (!subscription) throw new CreditSubscriptionOriginError("missing");
-		const subscriptionUpdates = await tx
-			.update(schema.subscriptions)
-			.set({
-				creditsReserved: sql`${schema.subscriptions.creditsReserved} - ${operation.reservedCredits}`,
-				updatedAt: new Date(),
-			})
-			.where(eq(schema.subscriptions.id, subscription.id))
-			.returning({ id: schema.subscriptions.id });
-		if (subscriptionUpdates.length !== 1)
-			throw new Error("Credit subscription release conflict");
+		// Same-epoch holds are returned to the counter. A hold from before a
+		// period reset no longer exists in the counter, so subtracting it
+		// would drain the new period's reservations; only the audit entry
+		// is written.
+		const holdIsLive = isCurrentAllocationEpoch(
+			operation.subscriptionEpoch,
+			subscription.allocationEpoch,
+		);
+		if (holdIsLive) {
+			const subscriptionUpdates = await tx
+				.update(schema.subscriptions)
+				.set({
+					creditsReserved: sql`${schema.subscriptions.creditsReserved} - ${operation.reservedCredits}`,
+					updatedAt: new Date(),
+				})
+				.where(eq(schema.subscriptions.id, subscription.id))
+				.returning({ id: schema.subscriptions.id });
+			if (subscriptionUpdates.length !== 1)
+				throw new Error("Credit subscription release conflict");
+		}
 		if (operation.reservedCredits > 0)
 			await tx.insert(schema.creditLedgerEntries).values({
 				id: crypto.randomUUID(),
@@ -101,7 +118,12 @@ export async function releaseCreditOperation(input: {
 				entryType: "release",
 				sourceCategory: "adaptive_credit",
 				pricingVersion: operation.pricingVersion,
-				metadata: { reason: input.reason },
+				metadata: holdIsLive
+					? { reason: input.reason }
+					: {
+							reason: input.reason,
+							reconciliationCode: ALLOCATION_RESET_CODE,
+						},
 			});
 		const updated = await tx
 			.update(schema.creditOperations)
@@ -152,7 +174,10 @@ export async function refundCreditOperation(input: {
 			throw new Error("Only settled credit operations can be refunded");
 		const subscriptionId = requireBoundSubscriptionId(operation.subscriptionId);
 		const [subscription] = await tx
-			.select({ id: schema.subscriptions.id })
+			.select({
+				id: schema.subscriptions.id,
+				allocationEpoch: schema.subscriptions.allocationEpoch,
+			})
 			.from(schema.subscriptions)
 			.where(
 				and(
@@ -165,6 +190,15 @@ export async function refundCreditOperation(input: {
 			.limit(1)
 			.for("update");
 		if (!subscription) throw new CreditSubscriptionOriginError("missing");
+		// The charge belongs to an earlier period; crediting the current
+		// period would rewrite history. Needs manual correction instead.
+		if (
+			!isCurrentAllocationEpoch(
+				operation.subscriptionEpoch,
+				subscription.allocationEpoch,
+			)
+		)
+			throw new CreditSubscriptionOriginError("invalid_period");
 		const subscriptionUpdates = await tx
 			.update(schema.subscriptions)
 			.set({

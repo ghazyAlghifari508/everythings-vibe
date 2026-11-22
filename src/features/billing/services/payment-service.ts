@@ -138,6 +138,7 @@ export async function applyPaymentSuccess(orderId: string) {
 					credits: grant.credits,
 					creditsUsed: 0,
 					creditsReserved: 0,
+					allocationEpoch: sql`${subscriptions.allocationEpoch} + 1`,
 					currentPeriodStart: grant.periodStart,
 					currentPeriodEnd: grant.periodEnd,
 					cancelledAt: null,
