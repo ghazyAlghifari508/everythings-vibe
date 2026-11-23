@@ -272,6 +272,43 @@ describe("PrdViewer version control", () => {
 	});
 });
 
+describe("PrdViewer pre-token canvas", () => {
+	const skeleton = () =>
+		container.querySelector('[data-testid="prd-skeleton"]');
+
+	it("shows a text skeleton instead of an empty document while generating", () => {
+		renderViewer({ content: "", versions: [], isGenerating: true });
+
+		expect(skeleton()).not.toBeNull();
+		// Placeholder only: no copy is rendered into the canvas.
+		expect(skeleton()?.textContent).toBe("");
+		expect(skeleton()?.getAttribute("aria-label")).toBe("Menyusun PRD");
+	});
+
+	it("replaces the skeleton with the live document on the first token", () => {
+		renderViewer({ content: "", versions: [], isGenerating: true });
+		renderViewer({
+			content: "## 1. Ringkasan\n\nToken pertama",
+			versions: [],
+			isGenerating: true,
+		});
+
+		expect(skeleton()).toBeNull();
+		expect(container.textContent).toContain("Token pertama");
+	});
+
+	it("never covers a saved document with the skeleton", () => {
+		renderViewer({
+			content: "## 1. Ringkasan\n\nTersimpan",
+			versions: [],
+			isGenerating: true,
+		});
+
+		expect(skeleton()).toBeNull();
+		expect(container.textContent).toContain("Tersimpan");
+	});
+});
+
 describe("Export PDF removal", () => {
 	// Vite rewrites import.meta.url to a `/@fs/` URL, so derive the repo root
 	// from process.cwd() (vitest runs at the repo root) instead.

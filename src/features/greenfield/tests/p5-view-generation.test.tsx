@@ -204,7 +204,7 @@ describe("P5 Task Breakdown generation", () => {
 		);
 		const canvas = screen.getByRole("region", { name: "Kanvas diagram task" });
 		expect(canvas.getAttribute("aria-busy")).toBe("true");
-		expect(screen.getByRole("link", { name: "Task" })).toBeTruthy();
+		expect(screen.getByRole("link", { name: "Kanban" })).toBeTruthy();
 
 		world.task = {
 			...world.task,
@@ -236,30 +236,36 @@ describe("P5 PRD single indicator", () => {
 		useChatStore.setState({ isGeneratingPRD: true, streamingPRDContent: "" });
 	});
 
-	it("shows no center fallback while the chat checklist is reachable", () => {
+	it("never overlays the canvas with loading copy or a spinner", () => {
 		useUIStore.setState({ isChatPanelOpen: true });
 		renderPrd();
 		expect(screen.queryByText("Menyusun PRD...")).toBeNull();
+		expect(screen.queryByRole("status")).toBeNull();
 		expect(screen.getByTestId("chat-panel")).toBeTruthy();
 	});
 
-	it("shows exactly one fallback when the chat panel is closed, then releases it on token", () => {
+	it("keeps the canvas copy-free when the chat panel is closed", () => {
+		useUIStore.setState({ isChatPanelOpen: false });
 		renderPrd();
-		expect(screen.getAllByRole("status")).toHaveLength(1);
-		expect(screen.getByText("Menyusun PRD...")).toBeTruthy();
+		expect(screen.queryByText("Menyusun PRD...")).toBeNull();
+		expect(screen.queryByRole("status")).toBeNull();
+	});
 
+	it("renders the first token into the document canvas", () => {
+		renderPrd();
 		act(() => {
 			world.prdStreamingForView = "## Overview";
 			useChatStore.setState({ streamingPRDContent: "## Overview" });
 		});
-		expect(screen.queryByText("Menyusun PRD...")).toBeNull();
+		expect(screen.queryByRole("status")).toBeNull();
 		expect(screen.getByTestId("prd-viewer").textContent).toContain("Overview");
 	});
 
-	it("hides the fallback in the mobile document tab while chat is visible", () => {
+	it("stays copy-free across the mobile Dokumen/Chat tabs", () => {
 		renderPrd();
 		fireEvent.click(screen.getByRole("button", { name: "Chat" }));
 		expect(screen.queryByText("Menyusun PRD...")).toBeNull();
+		expect(screen.queryByRole("status")).toBeNull();
 	});
 
 	it("does not remount the stream owner when the panel toggles", () => {

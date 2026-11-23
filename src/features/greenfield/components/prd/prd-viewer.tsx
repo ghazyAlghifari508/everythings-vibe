@@ -111,6 +111,48 @@ const PrdPreview = memo(function PrdPreview({ content }: { content: string }) {
 	);
 });
 
+// Canvas placeholder for the pre-token phase: grey text blocks read as a
+// document being written, so the canvas shows the PRD taking shape instead of
+// an empty pane. No copy is rendered — the chat section checklist is the only
+// textual status; the label is exposed to assistive tech only. Bars use the
+// shared `fog` token so the skeleton stays neutral in light and dark.
+const SKELETON_BAR = "rounded bg-fog/10";
+
+// Heading/paragraph/table rhythm of the real document, widths only. A flat list
+// keeps the placeholder simple and honest — it mirrors the PRD's shape without
+// inventing content or structure that could drift from the rendered output.
+const SKELETON_LINES = [
+	"h-7 w-2/5 bg-fog/15",
+	"mt-5 h-3.5 w-3/5",
+	"mt-10 h-4 w-1/3",
+	"mt-3 h-3.5 w-full",
+	"mt-3 h-3.5 w-11/12",
+	"mt-3 h-3.5 w-4/5",
+	"mt-3 h-3.5 w-5/6",
+	"mt-10 h-4 w-2/5",
+	"mt-3 h-3.5 w-full",
+	"mt-3 h-3.5 w-10/12",
+	"mt-3 h-3.5 w-2/3",
+	"mt-10 h-4 w-1/4",
+	"mt-3 h-3.5 w-full",
+	"mt-3 h-3.5 w-11/12",
+	"mt-3 h-3.5 w-9/12",
+] as const;
+
+const PrdSkeleton = memo(function PrdSkeleton() {
+	return (
+		<output
+			aria-label="Menyusun PRD"
+			data-testid="prd-skeleton"
+			className="mx-auto block max-w-3xl animate-pulse px-8 pb-16 pt-8 motion-reduce:animate-none"
+		>
+			{SKELETON_LINES.map((line) => (
+				<div key={line} className={cn(SKELETON_BAR, line)} />
+			))}
+		</output>
+	);
+});
+
 interface PrdVersion {
 	id: string;
 	version: number;
@@ -304,6 +346,8 @@ export const PrdViewer = memo(function PrdViewer({
 								newContent={comparePair.newContent}
 							/>
 						</div>
+					) : isGenerating && !cleanContent ? (
+						<PrdSkeleton />
 					) : (
 						<PrdPreview content={cleanContent} />
 					)}

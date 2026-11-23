@@ -134,7 +134,7 @@ export function TaskDetail({
 							params={{ id: projectId }}
 							className="btn-primary px-3 py-1.5 rounded-md text-xs font-[510]"
 						>
-							Task
+							Kanban
 						</Link>
 						<ImplementationOptions
 							projectId={projectId}
