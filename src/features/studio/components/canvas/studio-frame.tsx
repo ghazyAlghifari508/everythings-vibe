@@ -17,7 +17,10 @@ import { studioJobTiming } from "@/features/studio/services/studio-timing";
 import { extractCleanHtml } from "@/features/studio/utils/clean-html";
 import { resolveFrameArtboardMode } from "@/features/studio/utils/studio-frame-artboard";
 import { resolveStudioFrameStatus } from "@/features/studio/utils/studio-lifecycle";
-import type { StudioElementTarget } from "../../types/studio-element";
+import type {
+	StudioElementAction,
+	StudioElementTarget,
+} from "../../types/studio-element";
 import type { StudioDevice } from "../../types/studio-renderer";
 import { StudioLiveSurface } from "./studio-live-surface";
 
@@ -52,6 +55,13 @@ export interface StudioFrameProps {
 	onVisibilityChange?: (frameId: string, visible: boolean) => void;
 	elementTarget?: StudioElementTarget | null;
 	onSelectElement?: (target: StudioElementTarget | null) => void;
+	onElementAction?: (
+		action: StudioElementAction,
+		target: StudioElementTarget,
+		text?: string,
+	) => void;
+	elementActionBusy?: boolean;
+	menuLeftInsetPx?: number;
 }
 
 function frameStatusMessage(status: string, retryError?: string): string {
@@ -93,6 +103,9 @@ export const StudioFrame = memo(function StudioFrame({
 	device,
 	onVisibilityChange,
 	elementTarget,
+	onElementAction,
+	elementActionBusy = false,
+	menuLeftInsetPx = 0,
 	onSelectElement,
 }: StudioFrameProps) {
 	const visibleUrl = useRef<string | null>(null);
@@ -282,6 +295,9 @@ export const StudioFrame = memo(function StudioFrame({
 					suspended={isCanvasPanning}
 					target={elementTarget}
 					onSelect={onSelectElement}
+					onAction={onElementAction}
+					actionBusy={elementActionBusy}
+					leftInsetPx={menuLeftInsetPx}
 				/>
 
 				{liveNotice && artboardMode !== "last-good" ? (
