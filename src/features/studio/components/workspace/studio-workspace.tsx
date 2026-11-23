@@ -1,11 +1,15 @@
 "use client";
 
 import { AlertCircleIcon } from "@hugeicons/core-free-icons";
+import { useMemo } from "react";
 import { Icon } from "@/components/ui/icon";
+import { CreditExhaustedModal } from "@/features/billing/components/credit-exhausted-modal";
 import { StudioCanvas } from "@/features/studio/components/canvas/studio-canvas";
 import { StudioComposer } from "@/features/studio/components/composer/studio-composer";
 import { StudioHeader } from "@/features/studio/components/workspace/studio-header";
+import { useStudioCreditQuote } from "@/features/studio/hooks/use-studio-credit-quote";
 import { useStudioWorkspace } from "@/features/studio/hooks/use-studio-workspace";
+import type { StudioQuoteScope } from "@/features/studio/services/studio-credit-policy";
 import type { StudioDetailLoaderData } from "@/features/studio/types/studio";
 
 /**
@@ -21,6 +25,16 @@ export function StudioWorkspace({
 	initialData: StudioDetailLoaderData;
 }) {
 	const workspace = useStudioWorkspace(initialData);
+	const quoteScope = useMemo<StudioQuoteScope>(
+		() => ({
+			operation: "studio.revise",
+			frames: Math.max(1, workspace.selectedFrames.length),
+			promptChars: 0,
+			designMdChars: workspace.project.designMd?.length ?? 0,
+		}),
+		[workspace.selectedFrames.length, workspace.project.designMd],
+	);
+	const quoteView = useStudioCreditQuote(quoteScope);
 
 	return (
 		<main className="relative flex h-dvh min-h-0 w-full flex-col overflow-hidden bg-charcoal text-snow">
@@ -66,8 +80,18 @@ export function StudioWorkspace({
 					onDesignSkillChange={workspace.handleSkillChange}
 					referenceLabel={workspace.storedReferenceLabel}
 					referenceColors={workspace.storedReferenceColors}
+					creditLabel={quoteView?.label ?? null}
 				/>
 			</div>
+			<CreditExhaustedModal
+				isOpen={workspace.creditsExhausted !== null}
+				onClose={() => workspace.setCreditsExhausted(null)}
+				errorMessage={workspace.creditsExhausted ?? ""}
+				projectId={workspace.project.id}
+				stage="prd"
+				requiredCredits={quoteView?.requiredCredits ?? undefined}
+				availableCredits={quoteView?.availableCredits}
+			/>
 
 			{/* Error banner sits below the floating header band so it never
 			    collides with the header controls. */}

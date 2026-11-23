@@ -2,11 +2,12 @@
 
 import { Folder02Icon } from "@hugeicons/core-free-icons";
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
 import { PageHeading } from "@/components/ui";
 import { Icon } from "@/components/ui/icon";
 import { Logo } from "@/components/ui/logo";
+import { CreditExhaustedModal } from "@/features/billing/components/credit-exhausted-modal";
 import { getCanvasDotStyle } from "@/features/greenfield/components/whiteboard/canvas-connectors";
 import type { ScrapeDesignSource } from "@/features/scrape/services/scrape-design-md-service";
 import {
@@ -18,7 +19,9 @@ import { StudioShortcutCarousel } from "@/features/studio/components/studio-shor
 import { StudioLandingProfile } from "@/features/studio/components/workspace/studio-landing-profile";
 import { StudioMobileHistoryDrawer } from "@/features/studio/components/workspace/studio-mobile-history-drawer";
 import { StudioSidebar } from "@/features/studio/components/workspace/studio-sidebar";
+import { useStudioCreditQuote } from "@/features/studio/hooks/use-studio-credit-quote";
 import { useStudioHistoryActions } from "@/features/studio/hooks/use-studio-history-actions";
+import type { StudioQuoteScope } from "@/features/studio/services/studio-credit-policy";
 import {
 	STUDIO_DEFAULT_PAGE_COUNT,
 	type StudioDesignSkillId,
@@ -84,6 +87,27 @@ export function StudioLandingPage({
 	);
 	const [error, setError] = useState("");
 	const [loading, setLoading] = useState(false);
+	const [creditsExhausted, setCreditsExhausted] = useState<{
+		message: string;
+	} | null>(null);
+	const scope = useMemo<StudioQuoteScope>(
+		() => ({
+			operation: "studio.generate",
+			frames: config.initialPageCount,
+			promptChars: prompt.trim().length,
+			designMdChars:
+				stagedReference && "designMd" in stagedReference
+					? stagedReference.designMd.length
+					: 0,
+		}),
+		[prompt, config.initialPageCount, stagedReference],
+	);
+	const [quoteScope, setQuoteScope] = useState<StudioQuoteScope>(scope);
+	useEffect(() => {
+		const timer = setTimeout(() => setQuoteScope(scope), 250);
+		return () => clearTimeout(timer);
+	}, [scope]);
+	const quoteView = useStudioCreditQuote(quoteScope);
 
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const requestKey = useRef<{ body: string; key: string } | null>(null);
@@ -227,6 +251,12 @@ export function StudioLandingPage({
 					void navigate({ to: "/pricing" });
 					return;
 				}
+				if (data?.code === "INSUFFICIENT_CREDITS") {
+					setCreditsExhausted({
+						message: data.error ?? "Kredit tidak cukup untuk operasi ini.",
+					});
+					return;
+				}
 				setError(data?.error ?? "Studio gagal generate. Coba lagi.");
 				return;
 			}
@@ -336,6 +366,7 @@ export function StudioLandingPage({
 							onError={setError}
 							onSubmit={() => void submit()}
 							textareaRef={textareaRef}
+							creditLabel={quoteView?.label ?? null}
 						/>
 
 						<StudioShortcutCarousel
@@ -361,6 +392,15 @@ export function StudioLandingPage({
 				onSelectCustom={handleSelectCustom}
 				onSelectScrape={handleSelectScrape}
 				onClear={() => setStagedReference(null)}
+			/>
+			<CreditExhaustedModal
+				isOpen={creditsExhausted !== null}
+				onClose={() => setCreditsExhausted(null)}
+				errorMessage={creditsExhausted?.message ?? ""}
+				projectId=""
+				stage="prd"
+				requiredCredits={quoteView?.requiredCredits ?? undefined}
+				availableCredits={quoteView?.availableCredits}
 			/>
 		</div>
 	);

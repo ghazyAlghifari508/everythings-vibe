@@ -31,6 +31,7 @@ function statusFixture() {
 		prdContent: null,
 		prdFilename: null,
 		prdContentHash: null,
+		deletedAt: null,
 		createdAt: date,
 		updatedAt: date,
 	};
@@ -64,6 +65,8 @@ function statusFixture() {
 		claimedBy: "worker-1",
 		attempts: 1,
 		claimedAt: date,
+		creditOperationId: null,
+		deletedAt: null,
 		leaseExpiresAt: date,
 		startedAt: date,
 		finishedAt: null,

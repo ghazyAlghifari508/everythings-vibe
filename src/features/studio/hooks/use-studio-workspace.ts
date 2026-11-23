@@ -1,9 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type {
-	StudioFrameRow,
-	StudioJobRow,
-	StudioProjectRow,
-} from "@/db/schema";
+import type { StudioFrameRow } from "@/db/schema";
 import type { StudioComposerSubmitResult } from "@/features/studio/components/composer/studio-composer";
 import { useStudioScreenSuggestions } from "@/features/studio/hooks/use-studio-screen-suggestions";
 import { useStudioStatus } from "@/features/studio/hooks/use-studio-status";
@@ -13,13 +9,17 @@ import type { StudioDesignSkillId } from "@/features/studio/services/studio-gene
 import { STUDIO_DESIGN_PRESETS } from "@/features/studio/services/studio-presets";
 import type { StudioScreenSuggestion } from "@/features/studio/services/studio-screen-suggestions";
 import type { StudioDetailLoaderData } from "@/features/studio/types/studio";
+import type {
+	StudioVisibleJob,
+	StudioVisibleProject,
+} from "@/features/studio/types/studio-status";
 
 const NO_SUGGESTIONS: readonly StudioScreenSuggestion[] = [];
 
 export interface StudioWorkspaceState {
-	project: StudioProjectRow;
+	project: StudioVisibleProject;
 	frames: StudioFrameRow[];
-	activeJob: StudioJobRow | null;
+	activeJob: StudioVisibleJob | null;
 	selectedFrameId: string | null;
 	selectedFrameIds: string[];
 	selectedFrames: StudioFrameRow[];
@@ -31,6 +31,8 @@ export interface StudioWorkspaceState {
 	retryingFrameIds: string[];
 	/** Per-frame retry rejections, rendered inside that frame only. */
 	frameRetryErrors: Record<string, string>;
+	creditsExhausted: string | null;
+	setCreditsExhausted: (message: string | null) => void;
 	error: string;
 	isProcessing: boolean;
 	readyFramesCount: number;
@@ -199,6 +201,8 @@ export function useStudioWorkspace(
 		renaming: actions.renaming,
 		retryingFrameIds: actions.retryingFrameIds,
 		frameRetryErrors: actions.frameRetryErrors,
+		creditsExhausted: actions.creditsExhausted,
+		setCreditsExhausted: actions.setCreditsExhausted,
 		error: error || syncError,
 		isProcessing,
 		readyFramesCount,

@@ -44,6 +44,7 @@ export interface StudioComposerProps {
 	referenceColors?: readonly string[] | null;
 	/** Next-screen bubbles derived from the project's own structure. */
 	suggestions?: readonly StudioScreenSuggestion[];
+	creditLabel?: string | null;
 }
 
 export function StudioComposer({
@@ -57,6 +58,7 @@ export function StudioComposer({
 	referenceLabel,
 	referenceColors,
 	suggestions = [],
+	creditLabel,
 }: StudioComposerProps) {
 	const [prompt, setPrompt] = useState("");
 	const [sending, setSending] = useState(false);
@@ -273,6 +275,11 @@ export function StudioComposer({
 						)}
 					</button>
 				</div>
+				{creditLabel ? (
+					<p className="text-xs text-fog" data-testid="studio-credit-estimate">
+						{creditLabel}
+					</p>
+				) : null}
 				{error ? (
 					<p role="alert" className="text-xs text-crimson">
 						{error}

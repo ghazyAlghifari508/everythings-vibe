@@ -1,6 +1,6 @@
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { useCallback, useRef, useState } from "react";
-import type { StudioFrameRow, StudioProjectRow } from "@/db/schema";
+import type { StudioFrameRow } from "@/db/schema";
 import type { StudioComposerSubmitResult } from "@/features/studio/components/composer/studio-composer";
 import { exportProjectAsZip } from "@/features/studio/services/studio-export";
 import {
@@ -8,6 +8,7 @@ import {
 	requestStudioFrameRetry,
 } from "@/features/studio/services/studio-frame-retry-client";
 import type { StudioDesignSkillId } from "@/features/studio/services/studio-generation-options";
+import type { StudioVisibleProject } from "@/features/studio/types/studio-status";
 import { useUIStore } from "@/store";
 
 /** Reads what one composer request resolved to, so the UI explains clarify. */
@@ -25,7 +26,7 @@ function readComposerOutcome(body: unknown): {
 }
 
 export interface UseStudioWorkspaceActionsOptions {
-	project: StudioProjectRow;
+	project: StudioVisibleProject;
 	frames: StudioFrameRow[];
 	selectedFrameIds: string[];
 	isProcessing: boolean;
@@ -51,6 +52,7 @@ export function useStudioWorkspaceActions({
 	const [frameRetryErrors, setFrameRetryErrors] = useState<
 		Record<string, string>
 	>({});
+	const [creditsExhausted, setCreditsExhausted] = useState<string | null>(null);
 
 	const navigate = useNavigate();
 	const router = useRouter();
@@ -188,7 +190,24 @@ export function useStudioWorkspaceActions({
 					}),
 				});
 				if (!res.ok) {
-					setError(await readStudioApiError(res, "Permintaan desain ditolak."));
+					const body = (await res.json().catch(() => null)) as {
+						error?: string;
+						code?: string;
+					} | null;
+					if (body?.code === "INSUFFICIENT_CREDITS") {
+						setCreditsExhausted(
+							body.error ?? "Kredit tidak cukup untuk operasi ini.",
+						);
+						return { accepted: false };
+					}
+					if (
+						body?.code === "TRIAL_EXHAUSTED" ||
+						body?.code === "PRODUCT_PLAN_REQUIRED"
+					) {
+						void navigate({ to: "/pricing" });
+						return { accepted: false };
+					}
+					setError(body?.error ?? "Permintaan desain ditolak.");
 					return { accepted: false };
 				}
 				const outcome = readComposerOutcome(await res.json().catch(() => null));
@@ -205,7 +224,7 @@ export function useStudioWorkspaceActions({
 				setComposerLoading(false);
 			}
 		},
-		[project.id, selectedFrameIds, setError, syncProjectStatus],
+		[navigate, project.id, selectedFrameIds, setError, syncProjectStatus],
 	);
 
 	const handleSkillChange = useCallback(
@@ -322,6 +341,8 @@ export function useStudioWorkspaceActions({
 		renaming,
 		retryingFrameIds,
 		frameRetryErrors,
+		creditsExhausted,
+		setCreditsExhausted,
 		handleDuplicate,
 		handleDelete,
 		handleRename,

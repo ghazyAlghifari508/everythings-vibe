@@ -1,8 +1,9 @@
-import type { StudioFrameRow, StudioProjectRow } from "@/db/schema";
+import type { StudioFrameRow } from "@/db/schema";
 import {
 	getStudioScreenSuggestions,
 	type StudioScreenSuggestion,
 } from "@/features/studio/services/studio-screen-suggestions";
+import type { StudioVisibleProject } from "@/features/studio/types/studio-status";
 
 /**
  * Reads the suggestion cache for the current project revision. There is no
@@ -10,7 +11,7 @@ import {
  * the canvas never waits for them and no model call depends on a render.
  */
 export function useStudioScreenSuggestions(
-	project: StudioProjectRow,
+	project: StudioVisibleProject,
 	frames: readonly StudioFrameRow[],
 ): StudioScreenSuggestion[] {
 	return getStudioScreenSuggestions({

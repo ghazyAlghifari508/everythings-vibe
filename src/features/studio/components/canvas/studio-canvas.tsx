@@ -1,9 +1,5 @@
 import { memo, useCallback, useRef, useState } from "react";
-import type {
-	StudioFrameRow,
-	StudioJobRow,
-	StudioProjectRow,
-} from "@/db/schema";
+import type { StudioFrameRow } from "@/db/schema";
 import { getCanvasDotStyle } from "@/features/greenfield/components/whiteboard/canvas-connectors";
 import {
 	StudioCanvasPlanningFailure,
@@ -21,6 +17,10 @@ import {
 	STUDIO_CANVAS_MAX_ZOOM,
 	STUDIO_CANVAS_MIN_ZOOM,
 } from "@/features/studio/types/studio-constants";
+import type {
+	StudioVisibleJob,
+	StudioVisibleProject,
+} from "@/features/studio/types/studio-status";
 import { isCanvasControlTarget } from "@/features/studio/utils/studio-canvas-gesture";
 import { useCanvasZoom } from "@/hooks/use-canvas-zoom";
 
@@ -31,9 +31,9 @@ export type {
 export { computeCanvasFit } from "@/features/studio/utils/studio-canvas-fit";
 
 export interface StudioCanvasProps {
-	project: StudioProjectRow;
+	project: StudioVisibleProject;
 	frames: StudioFrameRow[];
-	activeJob?: StudioJobRow | null;
+	activeJob?: StudioVisibleJob | null;
 	selectedFrameId?: string | null;
 	selectedFrameIds?: string[];
 	onSelectFrame?: (frameId: string | null, additive?: boolean) => void;
