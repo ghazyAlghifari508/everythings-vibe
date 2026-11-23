@@ -21,6 +21,7 @@ import {
 	studioElementPreview,
 	writeStudioElementMessage,
 } from "./studio-element-storage";
+import { applyStudioElementRevision } from "./studio-element-transition";
 import { StudioFrameError } from "./studio-frame-errors";
 
 export { transitionStudioElementRevision } from "./studio-element-transition";
@@ -139,7 +140,11 @@ export async function prepareStudioElementRevision(
 		);
 		const afterHtml = patchStudioElement(
 			accepted.row.beforeHtml,
-			target,
+			{
+				projectId: target.projectId,
+				frameId: target.frameId,
+				baseRevision: target.baseRevision,
+			},
 			target,
 			edit,
 		);
@@ -153,20 +158,20 @@ export async function prepareStudioElementRevision(
 				userId,
 			);
 			assertStudioElementBase(frame, target);
-			const [row] = await tx
+			const [validated] = await tx
 				.update(studioElementRevisions)
-				.set({
-					afterHtml,
-					edit,
-					summary,
-					status: "preview",
-					updatedAt: new Date(),
-				})
+				.set({ afterHtml, edit, summary, updatedAt: new Date() })
 				.where(and(scope, eq(studioElementRevisions.status, "generating")))
 				.returning();
-			if (!row) throw new StudioFrameError("STUDIO_CANCELLED");
-			await writeStudioElementMessage(tx, row);
-			return studioElementPreview(row);
+			if (!validated) throw new StudioFrameError("STUDIO_CANCELLED");
+			const applied = await applyStudioElementRevision(
+				tx,
+				validated,
+				target.projectId,
+				userId,
+				"apply",
+			);
+			return studioElementPreview(applied);
 		});
 	} catch (error) {
 		await db.transaction(async (tx) => {

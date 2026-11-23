@@ -1,6 +1,6 @@
 /**
- * Compact guidance for a single selected element edit (P8 consumes the
- * approval workflow; this only supplies the judgment the edit needs).
+ * Compact guidance for a single selected element edit (P8 auto-apply path;
+ * this only supplies the judgment the edit needs).
  *
  * A full page standard would invite a whole-page restyle, so this is
  * deliberately scoped: one element, existing system, no new chrome.
