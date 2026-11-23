@@ -35,6 +35,8 @@ interface UseStudioLiveDocumentInput {
 	enabled: boolean;
 	revisionId?: string;
 	side?: "before" | "after";
+	/** Explicit Refresh only; a device change never alters the renderer key. */
+	refreshToken?: number;
 }
 
 /**
@@ -50,6 +52,7 @@ export function useStudioLiveDocument({
 	enabled,
 	revisionId,
 	side,
+	refreshToken,
 }: UseStudioLiveDocumentInput) {
 	const [state, dispatch] = useReducer(
 		reduceStudioLiveSlots,
@@ -64,7 +67,7 @@ export function useStudioLiveDocument({
 		revision,
 		htmlStamp: stamp,
 		attempt,
-		revisionId,
+		refresh: refreshToken,
 		side,
 	});
 	// biome-ignore lint/correctness/useExhaustiveDependencies: keyId encodes every fetch input

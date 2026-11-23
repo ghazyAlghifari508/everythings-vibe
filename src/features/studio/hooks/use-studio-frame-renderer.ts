@@ -23,6 +23,8 @@ interface UseStudioFrameRendererInput {
 	liveEnabled: boolean;
 	inspectElement: boolean;
 	device?: StudioDevice;
+	refreshToken?: number;
+	onReadinessChange?: (frameId: string, ready: boolean) => void;
 	onMeasure?: (id: string, width: number, height: number) => void;
 	onVisibilityChange?: (frameId: string, visible: boolean) => void;
 }
@@ -44,6 +46,8 @@ export function useStudioFrameRenderer({
 	liveEnabled,
 	inspectElement,
 	device,
+	refreshToken,
+	onReadinessChange,
 	onMeasure,
 	onVisibilityChange,
 }: UseStudioFrameRendererInput) {
@@ -55,6 +59,7 @@ export function useStudioFrameRenderer({
 		revision: frame.revision,
 		html: cleanHtml || null,
 		enabled: liveEnabled && hasRenderableHtml && status === "ready",
+		refreshToken,
 	});
 	const presentation = resolveStudioFramePresentation({
 		mode: inspectElement ? "inspect" : "canvas",
@@ -87,6 +92,10 @@ export function useStudioFrameRenderer({
 		observer.observe(node);
 		return () => observer.disconnect();
 	}, [artboardRef, onVisibility, frameId]);
+	const isLiveReady = live.readiness.phase === "ready";
+	useEffect(() => {
+		onReadinessChange?.(frame.id, isLiveReady);
+	}, [frame.id, isLiveReady, onReadinessChange]);
 	const measuredWidth = presentation.width;
 	const measuredHeight = presentation.height;
 	useEffect(() => {
