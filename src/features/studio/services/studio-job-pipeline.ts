@@ -6,6 +6,7 @@ import {
 	studioProjects,
 	studioRevisions,
 } from "@/db/schema";
+import type { ShadowOutcome } from "@/features/usage-metering/types/shadow-usage";
 import { STUDIO_FRAME_CONCURRENCY } from "../types/studio-constants";
 import { extractDesignSystemTokens } from "./studio-design-tokens";
 import {
@@ -33,6 +34,7 @@ import {
 } from "./studio-planning";
 import { resolveStudioProjectTitle } from "./studio-project-title";
 import { validateStudioDesignMode } from "./studio-prompt-validation";
+import { finalizeStudioUsage } from "./studio-usage-metering";
 
 export async function runStudioJobPipeline(
 	jobId: string,
@@ -47,6 +49,9 @@ export async function runStudioJobPipeline(
 	if (!job || job.projectId !== projectId || !job.leaseExpiresAt) return;
 	const claim: StudioJobClaim = { jobId, projectId, userId, workerId };
 	const startedAt = Date.now();
+	let usageOutcome: ShadowOutcome = "unknown";
+	let usageRequestedFrames: number | null = null;
+	let usageCompletedFrames = 0;
 	studioJobTiming("queue-wait", job.createdAt.getTime(), {
 		jobId,
 		projectId,
@@ -58,6 +63,9 @@ export async function runStudioJobPipeline(
 			async (signal) => {
 				if (job.jobType !== "initial") {
 					await runStudioFrameOperation(job, claim, signal);
+					usageRequestedFrames = 1;
+					usageCompletedFrames = 1;
+					usageOutcome = "success";
 					return;
 				}
 				const [project] = await db
@@ -177,6 +185,14 @@ export async function runStudioJobPipeline(
 				signal.throwIfAborted();
 				studioJobTiming("frames", frameStartedAt, { jobId, projectId });
 				const ready = results.filter((result) => result.ok);
+				usageRequestedFrames = frames.length;
+				usageCompletedFrames = ready.length;
+				usageOutcome =
+					ready.length === frames.length
+						? "success"
+						: ready.length > 0
+							? "partial"
+							: "failed";
 				const first = ready[0];
 				const persistenceStartedAt = Date.now();
 				await withStudioJobWrite(claim, async (tx) => {
@@ -240,6 +256,12 @@ export async function runStudioJobPipeline(
 			},
 		);
 	} catch (failure) {
+		usageOutcome =
+			failure instanceof StudioLeaseLostError &&
+			(failure.reason === "JOB_CANCELLED" ||
+				failure.reason === "WORKER_SHUTDOWN")
+				? "cancelled"
+				: "failed";
 		// Lease loss and worker shutdown are not failures of the work: recovery owns
 		// the job again, so finalising here would discard recoverable frames. A job
 		// timeout still holds the lease and is finalised normally.
@@ -296,6 +318,13 @@ export async function runStudioJobPipeline(
 			jobId,
 			projectId,
 			attempt: job.attempts,
+		});
+		await finalizeStudioUsage({
+			job,
+			outcome: usageOutcome,
+			requestedFrames: usageRequestedFrames,
+			completedFrames: usageCompletedFrames,
+			finishedAt: new Date(),
 		});
 	}
 }
