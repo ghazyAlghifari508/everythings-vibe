@@ -41,6 +41,11 @@ export interface CreditComplexityMetrics {
 		requirementCount?: number;
 		constraintCount?: number;
 	};
+	studio?: {
+		frames?: number;
+		promptChars?: number;
+		designMdChars?: number;
+	};
 	codebase?: {
 		fileCount?: number;
 		sourceBytes?: number;

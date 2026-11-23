@@ -117,6 +117,8 @@ export type ReserveCreditOperationBase = {
 	metrics: CreditQuote["metrics"];
 	idempotencyKey: string;
 	quote: CreditQuote;
+	/** Server-derived quote from the versioned tariff registry, when applicable. */
+	authoritativeQuote?: CreditQuote;
 	expiresAt?: Date;
 	initialAnalysisAllowance?: boolean;
 	analysisReference?: string;

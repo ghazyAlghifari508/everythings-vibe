@@ -17,7 +17,10 @@ const journalSchema = z.object({
 });
 
 function journal() {
-	const raw = readFileSync(resolve(MIGRATIONS_DIR, "meta/_journal.json"), "utf8");
+	const raw = readFileSync(
+		resolve(MIGRATIONS_DIR, "meta/_journal.json"),
+		"utf8",
+	);
 	return journalSchema.parse(JSON.parse(raw)).entries;
 }
 

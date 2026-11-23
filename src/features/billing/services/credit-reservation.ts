@@ -26,9 +26,14 @@ import {
 
 export async function reserveCreditOperation(
 	input: ReserveCreditOperationInput,
+	transaction?: Parameters<
+		Parameters<Awaited<ReturnType<typeof getDatabase>>["db"]["transaction"]>[0]
+	>[0],
 ): Promise<CreditOperationResult> {
 	const { db, schema } = await getDatabase();
-	return db.transaction(async (tx) => {
+	const reserve = async (
+		tx: NonNullable<typeof transaction>,
+	): Promise<CreditOperationResult> => {
 		const resource = await resolveCreditResource(tx, input);
 
 		if (input.initialAnalysisAllowance)
@@ -83,7 +88,12 @@ export async function reserveCreditOperation(
 				analysisReference: existing.analysisReference,
 			};
 		}
-		validateQuote(input.quote, input.operation, input.metrics);
+		validateQuote(
+			input.quote,
+			input.operation,
+			input.metrics,
+			input.authoritativeQuote,
+		);
 		if (!isExempt && input.initialAnalysisAllowance) {
 			if (input.operation !== "codebase_analysis")
 				throw new Error("Invalid allowance operation");
@@ -257,7 +267,8 @@ export async function reserveCreditOperation(
 			finalCharge: null,
 			analysisReference: operation.analysisReference,
 		};
-	});
+	};
+	return transaction ? reserve(transaction) : db.transaction(reserve);
 }
 
 export async function markCreditOperationRunning(input: {

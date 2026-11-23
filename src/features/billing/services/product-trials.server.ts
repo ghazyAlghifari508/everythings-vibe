@@ -16,7 +16,7 @@ export async function admitProductWork(
 	userId: string,
 	product: Product,
 	work: "trial" | "paid",
-	request?: { key?: string; payload: unknown },
+	request?: { key?: string; payload: unknown; maximumCredits?: number },
 ) {
 	const [account] = await tx
 		.select({ exempt: users.billingExempt })
@@ -62,8 +62,11 @@ export async function admitProductWork(
 		exempt: account.exempt,
 		work,
 		trial: liveTrial?.state === "released" ? null : (liveTrial?.state ?? null),
+		maximumCredits: request?.maximumCredits,
 	});
 	switch (decision) {
+		case "insufficient_paid_credit":
+			throw new ScrapeError("INSUFFICIENT_CREDITS");
 		case "trial_available":
 			if (!hash) throw new ScrapeError("STORAGE_FAILED");
 			return {

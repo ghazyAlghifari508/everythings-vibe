@@ -21,9 +21,14 @@ export type CreditOperationKind =
 	| StudioOperationKind
 	| ScrapeOperationKind;
 
+/**
+ * Known historical values stay enumerable; an approved Studio/Scrape tariff
+ * version is an open set supplied by the versioned tariff registry.
+ */
 export type CreditPricingVersion =
 	| typeof ADAPTIVE_CREDIT_PRICING.version
-	| "2026-09-20";
+	| "2026-09-20"
+	| (string & {});
 
 export type CreditResourceType = "plan_project" | "studio_project" | "scrape";
 export type CreditProductFamily =

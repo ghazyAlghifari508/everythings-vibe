@@ -11,14 +11,21 @@ import {
 import type { CreditOperationResult } from "@/features/billing/types/credit-contracts";
 import { CreditSubscriptionOriginError } from "@/features/billing/types/credit-contracts";
 
-export async function releaseCreditOperation(input: {
-	userId: string;
-	operationId: string;
-	reason: string;
-	actor?: string;
-}): Promise<CreditOperationResult> {
+export async function releaseCreditOperation(
+	input: {
+		userId: string;
+		operationId: string;
+		reason: string;
+		actor?: string;
+	},
+	transaction?: Parameters<
+		Parameters<Awaited<ReturnType<typeof getDatabase>>["db"]["transaction"]>[0]
+	>[0],
+): Promise<CreditOperationResult> {
 	const { db, schema } = await getDatabase();
-	return db.transaction(async (tx) => {
+	const release = async (
+		tx: NonNullable<typeof transaction>,
+	): Promise<CreditOperationResult> => {
 		const [operation] = await tx
 			.select()
 			.from(schema.creditOperations)
@@ -148,7 +155,8 @@ export async function releaseCreditOperation(input: {
 		if (updated.length !== 1)
 			throw new Error("Credit operation release conflict");
 		return updated[0];
-	});
+	};
+	return transaction ? release(transaction) : db.transaction(release);
 }
 
 export async function refundCreditOperation(input: {

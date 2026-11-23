@@ -147,6 +147,7 @@ export function validateQuote(
 	quote: CreditQuote,
 	operation: CreditOperationKind,
 	metrics: CreditQuote["metrics"],
+	authoritativeQuote?: CreditQuote,
 ): void {
 	if (
 		!Number.isInteger(quote.estimatedCredits) ||
@@ -159,10 +160,12 @@ export function validateQuote(
 	) {
 		throw new Error("Credit quote is invalid");
 	}
-	const serverQuote = estimateCreditQuote({
-		operation,
-		metrics,
-	});
+	const serverQuote =
+		authoritativeQuote ??
+		estimateCreditQuote({
+			operation,
+			metrics,
+		});
 	if (
 		quote.operation !== operation ||
 		quote.pricingVersion !== serverQuote.pricingVersion ||
