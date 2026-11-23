@@ -19,6 +19,7 @@ import { adminDb } from "./admin-db";
 const benchmarkFilterSchema = z
 	.object({
 		productFamily: z.enum(["studio", "scrape"]).optional(),
+		operationKind: z.string().min(1).max(80).optional(),
 		from: z.string().datetime().optional(),
 		to: z.string().datetime().optional(),
 		limit: z.number().int().min(1).max(2000).default(500),
@@ -41,6 +42,7 @@ export interface ShadowUsageBenchmarkResponse {
 	generatedAt: string;
 	sampledRecords: number;
 	groups: ReturnType<typeof buildBenchmarkReport>;
+	unmeasuredComponents: string[];
 }
 
 /** Admin-only aggregate. No prompts, URLs, headers, or artifact bytes exposed. */
@@ -62,6 +64,8 @@ export const getShadowUsageBenchmark = createServerFn({ method: "GET" })
 				// Column is stored as text; family is allowlisted by Zod above.
 				eq(shadowUsageRecords.productFamily, data.productFamily),
 			);
+		if (data.operationKind)
+			conditions.push(eq(shadowUsageRecords.operationKind, data.operationKind));
 
 		const rows = await db
 			.select({
@@ -104,5 +108,8 @@ export const getShadowUsageBenchmark = createServerFn({ method: "GET" })
 			generatedAt: new Date().toISOString(),
 			sampledRecords: records.length,
 			groups: buildBenchmarkReport(records),
+			unmeasuredComponents: Array.from(
+				new Set(records.flatMap((record) => record.cost.unmeasuredComponents)),
+			).sort(),
 		};
 	});
