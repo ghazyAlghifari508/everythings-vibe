@@ -200,6 +200,7 @@ export const scrapes = pgTable(
 		jobToken: text("job_token"),
 		leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
 		jobAttempts: integer("job_attempts").notNull().default(0),
+		deletedAt: timestamp("deleted_at", { withTimezone: true }),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.defaultNow()
 			.notNull(),
