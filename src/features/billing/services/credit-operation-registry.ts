@@ -37,7 +37,7 @@ export type CreditOperationProduct = CreditProductFamily | "legacy_unknown";
  * `subscription_balance` is the existing shared pool: plan allocation and
  * top-ups land in one `subscriptions.credits` counter, so no operation can
  * be attributed to one of them without changing the allocation policy.
- * `trial` is reserved for TASK 10 and never written by this codebase yet.
+ * One-time entitlement holds live in `product_trials`, outside the paid ledger.
  */
 export type CreditFundingSource =
 	| "subscription_balance"

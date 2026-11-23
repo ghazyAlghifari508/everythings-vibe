@@ -47,10 +47,29 @@ export async function deleteOwnedScrapes(
 			"STORAGE_FAILED",
 			"Terlalu banyak hasil untuk dihapus sekaligus.",
 		);
-	const removed = await db
-		.delete(scrapes)
-		.where(ownedScrapeFilter(unique, userId))
-		.returning({ id: scrapes.id });
+	const removed = await db.transaction(async (tx) => {
+		const scope = ownedScrapeFilter(unique, userId);
+		const rows = await tx
+			.select()
+			.from(scrapes)
+			.where(scope)
+			.orderBy(scrapes.id)
+			.for("update");
+		const { settleScrapeTrial } = await import("./scrape-trial-settlement");
+		for (const row of rows) await settleScrapeTrial(tx, row);
+		return tx
+			.delete(scrapes)
+			.where(
+				and(
+					scope,
+					inArray(
+						scrapes.id,
+						rows.map((row) => row.id),
+					),
+				),
+			)
+			.returning({ id: scrapes.id });
+	});
 	const deletedIds = removed.map((row) => row.id);
 	return {
 		deleted: deletedIds.length,

@@ -3,6 +3,7 @@ import { fetchAsset } from "@/features/scrape/services/http-transport";
 import { SCRAPE_LIMITS } from "@/features/scrape/types/scrape-contract";
 import { BROWSER_NAME_SHIM, createBrowserSession } from "@/lib/browser-session";
 import { isBlockedRequestUrl } from "@/lib/url-validator";
+import { trialTransferOptions } from "./scrape-trial-budget";
 
 export { BROWSER_NAME_SHIM, isBlockedRequestUrl };
 
@@ -95,6 +96,7 @@ export async function guardContext(
 			SharedWorker: { value: BlockedWorker, configurable: false },
 		});
 	});
+	const transfer = trialTransferOptions();
 	await context.route("**/*", async (route) => {
 		requests += 1;
 		if (
@@ -108,7 +110,11 @@ export async function guardContext(
 		if (shouldSkipCaptureResourceType(req.resourceType())) return route.abort();
 		if (await isBlockedRequestUrl(req.url())) return route.abort();
 		try {
-			const { body, status, contentType } = await fetchAsset(req.url());
+			const { body, status, contentType } = await fetchAsset(
+				req.url(),
+				0,
+				transfer,
+			);
 			transferredBytes += body.byteLength;
 			if (transferredBytes > SCRAPE_LIMITS.captureMaxBytes)
 				return route.abort();

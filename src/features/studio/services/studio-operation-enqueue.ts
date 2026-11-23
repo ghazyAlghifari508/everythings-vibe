@@ -206,6 +206,10 @@ export async function enqueueStudioOperation(
 		.limit(1);
 	if (!project)
 		throw new ScrapeError("WEBSITE_BLOCKED", "Studio tidak ditemukan.");
+	const { requirePaidProductWork } = await import(
+		"@/features/billing/services/product-trials.server"
+	);
+	await requirePaidProductWork(userId, "studio");
 	const frames = await db
 		.select()
 		.from(studioFrames)

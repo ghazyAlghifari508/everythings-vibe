@@ -228,6 +228,16 @@ export async function runStudioJobPipeline(
 							updatedAt: new Date(),
 						})
 						.where(eq(studioJobs.id, jobId));
+					const { settleProductTrial } = await import(
+						"@/features/billing/services/product-trial-settlement.server"
+					);
+					await settleProductTrial(
+						tx,
+						"studio",
+						job.userId,
+						job.id,
+						ready.length,
+					);
 					await tx
 						.update(studioProjects)
 						.set({ updatedAt: new Date() })
@@ -299,6 +309,10 @@ export async function runStudioJobPipeline(
 							updatedAt: new Date(),
 						})
 						.where(eq(studioJobs.id, jobId));
+					const { settleProductTrial } = await import(
+						"@/features/billing/services/product-trial-settlement.server"
+					);
+					await settleProductTrial(tx, "studio", job.userId, job.id, 0);
 				});
 			} catch (writeFailure) {
 				if (!(writeFailure instanceof StudioLeaseLostError)) throw writeFailure;

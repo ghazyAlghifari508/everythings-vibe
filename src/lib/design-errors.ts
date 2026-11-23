@@ -1,4 +1,9 @@
 export const DESIGN_ERROR_CODES = {
+	TRIAL_RESERVED: "Trial sedang diproses. Tunggu hasilnya.",
+	TRIAL_EXHAUSTED:
+		"Trial sudah digunakan. Upgrade untuk memulai pekerjaan baru.",
+	PRODUCT_PLAN_REQUIRED: "Operasi ini memerlukan Pro atau Hengker.",
+	TRIAL_LIMIT: "Pengaturan melampaui batas trial.",
 	QUEUE_CAPACITY: "Tunggu proses aktif selesai sebelum memulai ekstraksi baru.",
 	RATE_LIMITED: "Batas request tercapai. Coba lagi setelah satu menit.",
 	INVALID_URL: "URL tidak valid. Masukkan URL website yang benar.",
@@ -77,6 +82,10 @@ export type ScrapeFailureReason =
 	| "unknown";
 
 const ERROR_SOURCES: Record<DesignErrorCode, ScrapeErrorSource> = {
+	TRIAL_RESERVED: "request",
+	TRIAL_EXHAUSTED: "request",
+	PRODUCT_PLAN_REQUIRED: "request",
+	TRIAL_LIMIT: "request",
 	QUEUE_CAPACITY: "request",
 	RATE_LIMITED: "request",
 	INVALID_URL: "request",
@@ -101,6 +110,10 @@ const ERROR_SOURCES: Record<DesignErrorCode, ScrapeErrorSource> = {
 };
 
 const FAILURE_REASONS: Record<DesignErrorCode, ScrapeFailureReason> = {
+	TRIAL_RESERVED: "queue-capacity",
+	TRIAL_EXHAUSTED: "access-denied",
+	PRODUCT_PLAN_REQUIRED: "access-denied",
+	TRIAL_LIMIT: "invalid-url",
 	QUEUE_CAPACITY: "queue-capacity",
 	RATE_LIMITED: "app-rate-limited",
 	INVALID_URL: "invalid-url",
@@ -125,6 +138,10 @@ const FAILURE_REASONS: Record<DesignErrorCode, ScrapeFailureReason> = {
 };
 
 const HTTP_STATUSES: Record<DesignErrorCode, number> = {
+	TRIAL_RESERVED: 409,
+	TRIAL_EXHAUSTED: 402,
+	PRODUCT_PLAN_REQUIRED: 403,
+	TRIAL_LIMIT: 400,
 	QUEUE_CAPACITY: 409,
 	RATE_LIMITED: 429,
 	INVALID_URL: 400,
@@ -152,6 +169,10 @@ const HTTP_STATUSES: Record<DesignErrorCode, number> = {
 // that come from the site's own final answer, and request-level rejections,
 // stay non-retryable so a retry never hammers a site that already said no.
 const NON_RETRYABLE_CODES = new Set<string>([
+	"TRIAL_RESERVED",
+	"TRIAL_EXHAUSTED",
+	"PRODUCT_PLAN_REQUIRED",
+	"TRIAL_LIMIT",
 	"INVALID_URL",
 	"PRIVATE_URL_BLOCKED",
 	"WEBSITE_ACCESS_DENIED",

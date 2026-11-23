@@ -13,6 +13,10 @@ import {
 	studioJobs,
 	studioProjects,
 } from "@/db/schema";
+import {
+	admitProductWork,
+	STUDIO_TRIAL_FRAMES,
+} from "@/features/billing/services/product-trials.server";
 import { ScrapeError } from "@/lib/design-errors";
 import type { CreateStudioProjectInput } from "../types/studio-service";
 import { resolveStudioDesignReference } from "./studio-design-reference.server";
@@ -31,6 +35,7 @@ export async function createStudioProjectWithJob(
 	userId: string,
 	titleOrInput: string | CreateStudioProjectInput,
 	legacyPrompt?: string,
+	requestKey?: string,
 ): Promise<{
 	project: StudioProjectRow;
 	job: StudioJobRow;
@@ -115,7 +120,7 @@ export async function createStudioProjectWithJob(
 		)
 		.limit(1);
 
-	if (recentJob) {
+	if (recentJob && !requestKey) {
 		const recentFrames = await db
 			.select()
 			.from(studioFrames)
@@ -129,6 +134,45 @@ export async function createStudioProjectWithJob(
 	}
 
 	const { project, job, frames } = await db.transaction(async (tx) => {
+		const admission = await admitProductWork(tx, userId, "studio", "trial", {
+			key: requestKey,
+			payload: {
+				options,
+				prompt: checked.prompt,
+				cleanTitle,
+				prdContentHash,
+				validatedLogo,
+			},
+		});
+		if (admission.kind === "replay") {
+			const [match] = await tx
+				.select({ job: studioJobs, project: studioProjects })
+				.from(studioJobs)
+				.innerJoin(
+					studioProjects,
+					and(
+						eq(studioJobs.projectId, studioProjects.id),
+						eq(studioProjects.userId, userId),
+					),
+				)
+				.where(
+					and(
+						eq(studioJobs.userId, userId),
+						eq(studioJobs.id, admission.jobId),
+					),
+				);
+			if (!match) throw new ScrapeError("TRIAL_EXHAUSTED");
+			const frames = await tx
+				.select()
+				.from(studioFrames)
+				.where(eq(studioFrames.projectId, match.project.id))
+				.orderBy(asc(studioFrames.order));
+			return { ...match, frames };
+		}
+		const slotCount =
+			admission.kind === "trial"
+				? STUDIO_TRIAL_FRAMES
+				: options.initialPageCount;
 		let logoAssetId: string | null = null;
 		if (validatedLogo) {
 			const [asset] = await tx
@@ -154,7 +198,7 @@ export async function createStudioProjectWithJob(
 				designMd: cleanDesignMd,
 				logoAssetId,
 				designSkillId: options.designSkillId,
-				initialPageCount: options.initialPageCount,
+				initialPageCount: slotCount,
 				designReference: resolved.designReference,
 				prdContent: cleanPrdContent,
 				prdFilename: cleanPrdFilename,
@@ -194,7 +238,7 @@ export async function createStudioProjectWithJob(
 			);
 		}
 
-		const slotCount = options.initialPageCount;
+		if (admission.kind === "trial") await admission.reserve(newJob.id);
 		const slots = await tx
 			.insert(studioFrames)
 			.values(

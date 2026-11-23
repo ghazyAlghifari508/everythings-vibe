@@ -1,5 +1,6 @@
 import { getRequestHeaders } from "@tanstack/react-start/server";
 import { z } from "zod";
+import { httpStatusForErrorCode, ScrapeError } from "@/lib/design-errors";
 import { requireUser } from "@/lib/session";
 import {
 	STUDIO_FRAME_ERRORS,
@@ -10,6 +11,11 @@ import { enqueueStudioOperation } from "./studio-operation-enqueue";
 import { retryStudioFrame, retryStudioPlanning } from "./studio-retry-service";
 
 function studioErrorResponse(error: unknown): Response {
+	if (error instanceof ScrapeError && error.code === "PRODUCT_PLAN_REQUIRED")
+		return Response.json(
+			{ error: error.message, code: error.code },
+			{ status: httpStatusForErrorCode(error.code) },
+		);
 	// Public copy and HTTP status come from the taxonomy; the raw message stays
 	// in this server-side diagnostic line.
 	const report = studioFrameErrorReport(error);

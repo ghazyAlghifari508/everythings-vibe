@@ -312,6 +312,12 @@ export async function recoverStalledStudioJobs(
 								: undefined,
 						),
 					);
+			if (exhausted) {
+				const { settleProductTrial } = await import(
+					"@/features/billing/services/product-trial-settlement.server"
+				);
+				await settleProductTrial(tx, "studio", job.userId, job.id, 0);
+			}
 			recovered++;
 		});
 	}

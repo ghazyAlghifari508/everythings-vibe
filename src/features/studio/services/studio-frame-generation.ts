@@ -316,6 +316,16 @@ export async function generateInitialFrame(
 							eq(studioFrames.projectId, ctx.lease.projectId),
 						),
 					);
+				const { settleProductTrial } = await import(
+					"@/features/billing/services/product-trial-settlement.server"
+				);
+				await settleProductTrial(
+					tx,
+					"studio",
+					ctx.lease.userId,
+					ctx.lease.jobId,
+					1,
+				);
 			});
 			studioJobTiming("frame-persistence", persistenceStartedAt, {
 				jobId: ctx.lease.jobId,

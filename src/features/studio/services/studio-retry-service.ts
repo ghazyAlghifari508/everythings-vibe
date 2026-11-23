@@ -73,6 +73,10 @@ export async function retryStudioFrame(
 			)
 			.limit(1);
 		if (active) return { frame, retry: "already-running" };
+		const { admitProductWork } = await import(
+			"@/features/billing/services/product-trials.server"
+		);
+		await admitProductWork(tx, userId, "studio", "paid");
 		const [operation] = await tx
 			.select()
 			.from(studioJobs)
@@ -160,6 +164,12 @@ export async function retryStudioPlanning(
 			.orderBy(desc(studioJobs.createdAt))
 			.limit(1);
 		if (!job) throw new StudioFrameError("STUDIO_NOT_FOUND");
+		if (job.status === "failed") {
+			const { admitProductWork } = await import(
+				"@/features/billing/services/product-trials.server"
+			);
+			await admitProductWork(tx, userId, "studio", "paid");
+		}
 		if (job.status !== "failed")
 			throw new StudioFrameError(
 				job.status === "queued" ||

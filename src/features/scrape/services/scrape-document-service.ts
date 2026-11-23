@@ -69,6 +69,10 @@ export async function generateAndSaveDesignMd(
 			"HTML scrape belum tersedia.",
 		);
 	if (scrape.document) return scrape.document;
+	const { requirePaidProductWork } = await import(
+		"@/features/billing/services/product-trials.server"
+	);
+	await requirePaidProductWork(userId, "scrape");
 	const request = scrapeRequestSchema.parse(
 		scrape.request ?? { url: scrape.sourceUrl, mode: "design" },
 	);

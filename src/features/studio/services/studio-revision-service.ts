@@ -23,6 +23,10 @@ export async function reviseStudioProject(
 	const checked = validateStudioPrompt(prompt);
 	if (!checked.ok) throw new ScrapeError("INVALID_URL", checked.error);
 	const detail = await getStudioProject(projectId, userId);
+	const { requirePaidProductWork } = await import(
+		"@/features/billing/services/product-trials.server"
+	);
+	await requirePaidProductWork(userId, "studio");
 
 	const previousHtml = detail.latest?.htmlCode;
 	const designMode = validateStudioDesignMode(detail.designMode);

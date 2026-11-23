@@ -6,8 +6,12 @@ import {
 	type ScrapeMode,
 	type ScrapeRow,
 	scrapes,
-	users,
 } from "@/db/schema";
+import {
+	admitProductWork,
+	SCRAPE_TRIAL_PAGES,
+	SCRAPE_TRIAL_VIEWS,
+} from "@/features/billing/services/product-trials.server";
 import {
 	SCRAPE_LIMITS,
 	type ScrapeRequest,
@@ -38,14 +42,35 @@ export async function createScrape(
 	const validated = scrapeRequestSchema.parse(
 		request ?? { url: normalized, mode },
 	);
+	if (validated.mode !== mode || validated.url !== normalized)
+		throw new ScrapeError("INVALID_URL");
 	return db.transaction(async (tx) => {
-		const [owner] = await tx
-			.select({ id: users.id })
-			.from(users)
-			.where(eq(users.id, userId))
-			.for("update")
-			.limit(1);
-		if (!owner) throw new ScrapeError("STORAGE_FAILED");
+		const admission = await admitProductWork(tx, userId, "scrape", "trial", {
+			key: idempotencyKey,
+			payload: validated,
+		});
+		if (admission.kind === "replay") {
+			const [replay] = await tx
+				.select()
+				.from(scrapes)
+				.where(
+					and(eq(scrapes.userId, userId), eq(scrapes.id, admission.jobId)),
+				);
+			if (!replay) throw new ScrapeError("TRIAL_EXHAUSTED");
+			return replay;
+		}
+		if (admission.kind === "trial" && validated.mode === "crawl") {
+			validated.settings.maxPages = Math.min(
+				validated.settings.maxPages,
+				SCRAPE_TRIAL_PAGES,
+			);
+		}
+		if (admission.kind === "trial" && validated.mode === "design") {
+			const views =
+				(validated.settings.viewport === "both" ? 2 : 1) *
+				(validated.settings.theme === "both" ? 2 : 1);
+			if (views > SCRAPE_TRIAL_VIEWS) throw new ScrapeError("TRIAL_LIMIT");
+		}
 		if (idempotencyKey) {
 			const [replay] = await tx
 				.select()
@@ -133,6 +158,7 @@ export async function createScrape(
 			.returning();
 
 		if (!pending) throw new ScrapeError("STORAGE_FAILED");
+		if (admission.kind === "trial") await admission.reserve(pending.id);
 		return pending;
 	});
 }

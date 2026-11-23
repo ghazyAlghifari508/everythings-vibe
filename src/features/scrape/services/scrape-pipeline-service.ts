@@ -1,6 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
+	productTrials,
 	type ScrapeMetadata,
 	type ScrapeMode,
 	type ScrapeRow,
@@ -11,7 +12,10 @@ import {
 	type ScrapeCapture,
 	scrapeHtml,
 } from "@/features/scrape/services/page-capture";
-import { scrapeRequestSchema } from "@/features/scrape/types/scrape-contract";
+import {
+	SCRAPE_LIMITS,
+	scrapeRequestSchema,
+} from "@/features/scrape/types/scrape-contract";
 import type { ScrapeInstrumentation } from "@/features/scrape/types/scrape-instrumentation";
 import {
 	observeProviderUsage,
@@ -25,9 +29,12 @@ import {
 import { generateDesignMd } from "./prompts-design-md";
 import { saveScrapeDocument } from "./scrape-document-service";
 import {
+	SCRAPE_JOB_MAX_ATTEMPTS,
 	type ScrapeJobClaim,
 	scrapeClaimPredicate,
 } from "./scrape-job-service";
+import { withScrapeTrialBudget } from "./scrape-trial-budget";
+import { settleScrapeTrial } from "./scrape-trial-settlement";
 import { finalizeScrapeUsage } from "./scrape-usage-metering";
 
 async function runScrapePipelineCore(
@@ -71,11 +78,16 @@ async function runScrapePipelineCore(
 			progress: undefined,
 			stageStartedAt: new Date().toISOString(),
 		};
-		const saved = await db
-			.update(scrapes)
-			.set({ status, metadata: meta, updatedAt: new Date(), ...columns })
-			.where(writePredicate())
-			.returning({ id: scrapes.id });
+		const saved = await db.transaction(async (tx) => {
+			const rows = await tx
+				.update(scrapes)
+				.set({ status, metadata: meta, updatedAt: new Date(), ...columns })
+				.where(writePredicate())
+				.returning();
+			if (status === "completed" && rows[0])
+				await settleScrapeTrial(tx, rows[0]);
+			return rows;
+		});
 		if (!saved.length)
 			throw new ScrapeError("STORAGE_FAILED", "Job lease sudah tidak berlaku.");
 	};
@@ -305,14 +317,15 @@ async function runScrapePipelineCore(
 		if (error instanceof ScrapeError && error.finalUrl !== undefined)
 			evidence.finalUrl = error.finalUrl;
 
-		await db
-			.update(scrapes)
-			.set({
-				status: "failed",
-				// The stage that actually failed is read from the persisted row at
-				// update time. Worker modes write their stage directly to the row, so
-				// a locally cached stage would report the stage from before the job ran.
-				metadata: sql`coalesce(${scrapes.metadata}, '{}'::jsonb) || jsonb_build_object(
+		await db.transaction(async (tx) => {
+			const [failed] = await tx
+				.update(scrapes)
+				.set({
+					status: "failed",
+					// The stage that actually failed is read from the persisted row at
+					// update time. Worker modes write their stage directly to the row, so
+					// a locally cached stage would report the stage from before the job ran.
+					metadata: sql`coalesce(${scrapes.metadata}, '{}'::jsonb) || jsonb_build_object(
 						'mode', ${mode}::text,
 						'stage', 'failed',
 						'stageStartedAt', ${new Date().toISOString()}::text,
@@ -322,9 +335,12 @@ async function runScrapePipelineCore(
 						'failureReason', ${failureReason}::text,
 						'failedAtStage', coalesce(${scrapes.metadata}->>'stage', 'queued')
 					) || ${JSON.stringify({ progress: 0, ...evidence })}::jsonb`,
-				updatedAt: new Date(),
-			})
-			.where(writePredicate());
+					updatedAt: new Date(),
+				})
+				.where(writePredicate())
+				.returning();
+			if (failed) await settleScrapeTrial(tx, failed);
+		});
 	}
 }
 
@@ -335,7 +351,29 @@ export async function runScrapePipeline(
 	claim?: ScrapeJobClaim,
 ): Promise<void> {
 	try {
-		await runScrapePipelineCore(scrapeId, userId, claim);
+		const [trial] = await db
+			.select({ id: productTrials.id })
+			.from(productTrials)
+			.where(
+				and(
+					eq(productTrials.userId, userId),
+					eq(productTrials.product, "scrape"),
+					eq(productTrials.jobId, scrapeId),
+					eq(productTrials.state, "reserved"),
+				),
+			);
+		if (trial) {
+			if (!claim) throw new ScrapeError("STORAGE_FAILED");
+			const timeout = AbortSignal.timeout(
+				Math.floor(SCRAPE_LIMITS.jobTimeoutMs / SCRAPE_JOB_MAX_ATTEMPTS),
+			);
+			const signal = claim.signal
+				? AbortSignal.any([claim.signal, timeout])
+				: timeout;
+			await withScrapeTrialBudget(signal, () =>
+				runScrapePipelineCore(scrapeId, userId, { ...claim, signal }),
+			);
+		} else await runScrapePipelineCore(scrapeId, userId, claim);
 	} finally {
 		await finalizeScrapeUsage({
 			scrapeId,

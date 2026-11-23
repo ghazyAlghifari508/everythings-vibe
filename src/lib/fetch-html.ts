@@ -37,6 +37,7 @@ export interface FetchAssetOptions {
 	allowUrl?: (url: string) => boolean | Promise<boolean>;
 	signal?: AbortSignal;
 	maxBytes?: number;
+	reserveBytes?: (bytes: number) => boolean;
 	range?: { start: number; end?: number; suffixLength?: number };
 }
 
@@ -103,7 +104,8 @@ export async function fetchAsset(
 			res.on("error", reject);
 			const next = redirectTarget(res, url);
 			if (next) {
-				res.resume();
+				if (options.reserveBytes) res.destroy();
+				else res.resume();
 				fetchAsset(next, redirects + 1, options).then(resolve, reject);
 				return;
 			}
@@ -113,7 +115,10 @@ export async function fetchAsset(
 			res.on("data", (chunk: Buffer) => {
 				if (failed) return;
 				size += chunk.length;
-				if (size > maxBytes) {
+				if (
+					(options.reserveBytes && !options.reserveBytes(chunk.length)) ||
+					size > maxBytes
+				) {
 					failed = true;
 					// Destroy without an error: the rejection carries the reason, and a
 					// socket error would arrive after "end" was already swallowed.

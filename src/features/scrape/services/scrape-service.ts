@@ -40,6 +40,10 @@ export async function retryScrape(
 		if (!scrape)
 			throw new ScrapeError("WEBSITE_BLOCKED", "Scrape tidak ditemukan.");
 		if (scrape.status !== "failed") return { ok: true };
+		const { admitProductWork } = await import(
+			"@/features/billing/services/product-trials.server"
+		);
+		await admitProductWork(tx, userId, "scrape", "paid");
 		// A retry consumes a real worker slot, so it respects the same request
 		// rate limit as creating a new scrape instead of bypassing it.
 		const { checkRateLimit } = await import("@/lib/rate-limit");

@@ -67,6 +67,21 @@ export async function deleteStudioProject(
 		await tx
 			.delete(studioRevisions)
 			.where(eq(studioRevisions.projectId, projectId));
+		const { settleProductTrial } = await import(
+			"@/features/billing/services/product-trial-settlement.server"
+		);
+		const jobs = await tx
+			.select({ id: studioJobs.id })
+			.from(studioJobs)
+			.where(
+				and(
+					eq(studioJobs.projectId, projectId),
+					eq(studioJobs.userId, userId),
+					eq(studioJobs.jobType, "initial"),
+				),
+			);
+		for (const job of jobs)
+			await settleProductTrial(tx, "studio", userId, job.id, 0);
 		await tx.delete(studioFrames).where(eq(studioFrames.projectId, projectId));
 		await tx.delete(studioJobs).where(eq(studioJobs.projectId, projectId));
 		const deleted = await tx
