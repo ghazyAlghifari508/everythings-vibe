@@ -89,6 +89,16 @@ export const FETCH_MAX_REDIRECTS = 3;
 export const ERROR_REPORT_MAX_MESSAGE_CHARS = 2000;
 export const ERROR_REPORT_MAX_CONTEXT_CHARS = 8000;
 
+// Shadow usage telemetry is observational cost evidence, not billing data.
+// Kept past one billing cycle so a full monthly benchmark can be recomputed;
+// an explicit retention deadline travels with every record.
+export const SHADOW_USAGE_RETENTION_DAYS = 90;
+/** p95 is only reported once a group has enough samples to be meaningful. */
+export const SHADOW_USAGE_P95_MIN_SAMPLES = 20;
+
+// A crashed worker may leave an undrained key. Bound the in-process map.
+export const SHADOW_OBSERVATION_MAX_KEYS = 5_000;
+
 // Single display timezone for every user-facing date and time. The database
 // stores instants (timestamptz); rendering must not depend on the host or
 // browser timezone, or the same payment can show a different calendar day.
