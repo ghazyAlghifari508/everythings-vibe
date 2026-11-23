@@ -13,6 +13,33 @@ vi.mock("@tanstack/react-router", () => ({
 	useNavigate: () => vi.fn(async () => {}),
 }));
 
+vi.mock("../services/scrape-credit.functions", () => ({
+	getScrapeQuote: vi.fn(async () => ({
+		state: "trial_available",
+		availableCredits: 2,
+		quote: null,
+	})),
+}));
+
+it("starts an eligible trial with one submit and no confirmation", async () => {
+	const submit = vi.fn(async () => Response.json({ scrapeId: "trial-job" }));
+	vi.stubGlobal("fetch", submit);
+	try {
+		render(<ScrapeWorkspaceForm mode="images" />);
+		await screen.findByText("1 trial tersedia");
+		fireEvent.change(screen.getByLabelText(/URL website/i), {
+			target: { value: "example.test" },
+		});
+		fireEvent.click(
+			screen.getByRole("button", { name: /jalankan scrape images/i }),
+		);
+		await waitFor(() => expect(submit).toHaveBeenCalledTimes(1));
+		expect(screen.queryByRole("dialog")).toBeNull();
+	} finally {
+		vi.unstubAllGlobals();
+	}
+});
+
 afterEach(() => {
 	cleanup();
 	vi.restoreAllMocks();

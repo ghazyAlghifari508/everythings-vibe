@@ -2,7 +2,15 @@
 
 import { ArrowUp01Icon, Loading02Icon } from "@hugeicons/core-free-icons";
 import { useNavigate } from "@tanstack/react-router";
-import { type FormEvent, useId, useRef, useState } from "react";
+import {
+	type FormEvent,
+	lazy,
+	Suspense,
+	useEffect,
+	useId,
+	useRef,
+	useState,
+} from "react";
 import { z } from "zod";
 import { Icon } from "@/components/ui/icon";
 import type { ScrapeMode } from "@/db/schema";
@@ -14,6 +22,7 @@ import {
 	SCRAPE_LIMITS,
 	scrapeRequestSchema,
 } from "@/features/scrape/types/scrape-contract";
+import { getScrapeQuote } from "../services/scrape-credit.functions";
 import {
 	ADVANCED_PARAMETER_GROUPS,
 	type AnyScrapeSettings,
@@ -21,11 +30,21 @@ import {
 	type ToggleParameterSpec,
 	validateParameterGroup,
 } from "../types/parameter-spec";
+import { ScrapeCreditStatus } from "./scrape-credit-status";
 import { ScrapeFormNotice } from "./scrape-form-notice";
 import { ScrapeWorkspaceAdvancedPanel } from "./scrape-workspace-advanced-panel";
 
+const CreditExhaustedModal = lazy(async () => ({
+	default: (
+		await import("@/features/billing/components/credit-exhausted-modal")
+	).CreditExhaustedModal,
+}));
+
 const responseSchema = z.object({ scrapeId: z.string() });
-const errorSchema = z.object({ error: z.string() });
+const errorSchema = z.object({
+	error: z.string(),
+	code: z.string().optional(),
+});
 
 export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 	const navigate = useNavigate();
@@ -77,6 +96,33 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 				: mode === "html"
 					? html
 					: images;
+	const quoteInput = JSON.stringify({ mode, settings: activeSettings });
+	const [quoteState, setQuoteState] = useState<{
+		key: string;
+		view?: Awaited<ReturnType<typeof getScrapeQuote>>;
+		failed: boolean;
+	}>();
+	const [creditError, setCreditError] = useState<string | null>(null);
+	useEffect(() => {
+		const parsed = scrapeRequestSchema.safeParse({
+			...JSON.parse(quoteInput),
+			url: "https://example.com/",
+		});
+		let current = true;
+		void getScrapeQuote({ data: parsed.success ? parsed.data : null }).then(
+			(view) => {
+				if (current) setQuoteState({ key: quoteInput, view, failed: false });
+			},
+			() => {
+				if (current) setQuoteState({ key: quoteInput, failed: true });
+			},
+		);
+		return () => {
+			current = false;
+		};
+	}, [quoteInput]);
+	const quoteView =
+		quoteState?.key === quoteInput ? quoteState.view : undefined;
 
 	const issues = groups
 		.flatMap((group) => validateParameterGroup(group, activeSettings))
@@ -171,96 +217,142 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 
 	return (
 		<>
-		<form
-			onSubmit={(event) => void submit(event)}
-			className="mx-auto w-full max-w-3xl text-left"
-		>
-			<fieldset disabled={pending} className="min-w-0">
-				<div className="rounded-xl border border-graphite bg-charcoal focus-within:ring-2 focus-within:ring-indigo">
-					<ScrapeFormNotice tone="plain" />
-					<div aria-hidden className="mx-4 mt-4 border-t border-graphite" />
-					<div className="flex items-stretch gap-2 px-3 py-2 sm:px-3.5 sm:py-2.5">
-						<div className="flex h-8 sm:h-9 min-w-0 flex-1 items-center overflow-hidden rounded-md bg-transparent">
-							<span className="flex h-full shrink-0 items-center border-r border-graphite px-3 font-mono text-xs text-fog sm:text-sm">
-								{protocol}
-							</span>
-							<label htmlFor="scrape-url" className="sr-only">
-								URL website
-							</label>
-							<input
-								id="scrape-url"
-								name="url"
-								inputMode="url"
-								autoComplete="url"
-								value={input}
-								onChange={(event) => changeUrl(event.target.value)}
-								placeholder="example.com"
-								required
-								maxLength={SCRAPE_LIMITS.urlChars}
-								aria-invalid={!!error}
-								aria-describedby={error ? "scrape-form-error" : undefined}
-								className="h-full min-w-0 flex-1 bg-transparent px-3 text-base text-snow outline-none placeholder:text-fog sm:text-sm [--autofill-bg:var(--color-charcoal)]"
-							/>
-						</div>
-						<button
-							type="submit"
-							disabled={pending || !input.trim()}
-							aria-label={`Jalankan ${mode === "design" ? "Generate DESIGN.md" : mode === "crawl" ? "Crawl Website" : mode === "images" ? "Scrape Images" : "Scrape HTML"}`}
-							title="Mulai ekstraksi"
-							className="btn-primary inline-flex size-8 sm:size-9 shrink-0 items-center justify-center rounded-md focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-40"
-						>
-							{pending ? (
-								<Icon
-									icon={Loading02Icon}
-									size={16}
-									aria-hidden
-									className="motion-safe:animate-spin"
+			<form
+				onSubmit={(event) => void submit(event)}
+				className="mx-auto w-full max-w-3xl text-left"
+			>
+				<fieldset disabled={pending} className="min-w-0">
+					<div className="rounded-xl border border-graphite bg-charcoal focus-within:ring-2 focus-within:ring-indigo">
+						<ScrapeFormNotice tone="plain" />
+						<div aria-hidden className="mx-4 mt-4 border-t border-graphite" />
+						<div className="flex items-stretch gap-2 px-3 py-2 sm:px-3.5 sm:py-2.5">
+							<div className="flex h-8 sm:h-9 min-w-0 flex-1 items-center overflow-hidden rounded-md bg-transparent">
+								<span className="flex h-full shrink-0 items-center border-r border-graphite px-3 font-mono text-xs text-fog sm:text-sm">
+									{protocol}
+								</span>
+								<label htmlFor="scrape-url" className="sr-only">
+									URL website
+								</label>
+								<input
+									id="scrape-url"
+									name="url"
+									inputMode="url"
+									autoComplete="url"
+									value={input}
+									onChange={(event) => changeUrl(event.target.value)}
+									placeholder="example.com"
+									required
+									maxLength={SCRAPE_LIMITS.urlChars}
+									aria-invalid={!!error}
+									aria-describedby={error ? "scrape-form-error" : undefined}
+									className="h-full min-w-0 flex-1 bg-transparent px-3 text-base text-snow outline-none placeholder:text-fog sm:text-sm [--autofill-bg:var(--color-charcoal)]"
 								/>
-							) : (
-								<Icon icon={ArrowUp01Icon} size={16} aria-hidden />
-							)}
-						</button>
+							</div>
+							<button
+								type="submit"
+								disabled={pending || !input.trim()}
+								aria-label={`Jalankan ${mode === "design" ? "Generate DESIGN.md" : mode === "crawl" ? "Crawl Website" : mode === "images" ? "Scrape Images" : "Scrape HTML"}`}
+								title="Mulai ekstraksi"
+								className="btn-primary inline-flex size-8 sm:size-9 shrink-0 items-center justify-center rounded-md focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-40"
+							>
+								{pending ? (
+									<Icon
+										icon={Loading02Icon}
+										size={16}
+										aria-hidden
+										className="motion-safe:animate-spin"
+									/>
+								) : (
+									<Icon icon={ArrowUp01Icon} size={16} aria-hidden />
+								)}
+							</button>
+						</div>
+						{quoteView?.state !== "paid_legacy" &&
+						quoteView?.state !== "billing_exempt" ? (
+							<div className="px-4 pb-2">
+								{mode === "crawl" &&
+								quoteState?.view?.quote?.operation === "scrape.crawl" &&
+								!advancedOpen ? (
+									<label className="mb-1 flex flex-wrap items-center gap-2 text-xs text-fog">
+										Maksimum halaman
+										<input
+											type="number"
+											inputMode="numeric"
+											min={1}
+											max={SCRAPE_LIMITS.maxPages}
+											value={
+												Number.isFinite(crawl.maxPages) ? crawl.maxPages : ""
+											}
+											onChange={(event) =>
+												updateNumber(
+													"maxPages",
+													event.currentTarget.valueAsNumber,
+												)
+											}
+											className="min-h-11 w-20 rounded-lg border border-graphite bg-charcoal px-2 text-snow focus-visible:ring-2 focus-visible:ring-indigo"
+										/>
+									</label>
+								) : null}
+								<ScrapeCreditStatus
+									view={quoteView}
+									mode={mode}
+									failed={quoteState?.key === quoteInput && quoteState.failed}
+								/>
+							</div>
+						) : null}
 					</div>
-				</div>
 
-				{hasAdvanced ? (
-					<ScrapeWorkspaceAdvancedPanel
-						mode={mode}
-						open={advancedOpen}
-						onToggle={() => setAdvancedOpen((open) => !open)}
-						panelId={advancedPanelId}
-						groups={groups}
-						settings={activeSettings}
-						issues={issues}
-						urlRegex={crawl.urlRegex}
-						onUrlRegexChange={(value) => {
-							if (error) setError("");
-							setCrawl({ ...crawl, urlRegex: value });
-						}}
-						onNumberChange={updateNumber}
-						onToggleChange={updateToggle}
-						onSelectChange={(key, value) => {
-							if (error) setError("");
-							const parsed = designSettingsSchema.safeParse({
-								...design,
-								[key]: value,
-							});
-							if (parsed.success) setDesign(parsed.data);
-						}}
-						onReset={reset}
-					/>
+					{hasAdvanced ? (
+						<ScrapeWorkspaceAdvancedPanel
+							mode={mode}
+							open={advancedOpen}
+							onToggle={() => setAdvancedOpen((open) => !open)}
+							panelId={advancedPanelId}
+							groups={groups}
+							settings={activeSettings}
+							issues={issues}
+							urlRegex={crawl.urlRegex}
+							onUrlRegexChange={(value) => {
+								if (error) setError("");
+								setCrawl({ ...crawl, urlRegex: value });
+							}}
+							onNumberChange={updateNumber}
+							onToggleChange={updateToggle}
+							onSelectChange={(key, value) => {
+								if (error) setError("");
+								const parsed = designSettingsSchema.safeParse({
+									...design,
+									[key]: value,
+								});
+								if (parsed.success) setDesign(parsed.data);
+							}}
+							onReset={reset}
+						/>
+					) : null}
+				</fieldset>
+				{error ? (
+					<p
+						id="scrape-form-error"
+						role="alert"
+						className="mt-3 text-sm text-crimson"
+					>
+						{error}
+					</p>
 				) : null}
-			</fieldset>
-			{error ? (
-				<p
-					id="scrape-form-error"
-					role="alert"
-					className="mt-3 text-sm text-crimson"
-				>
-					{error}
-				</p>
+			</form>
+			{creditError ? (
+				<Suspense>
+					<CreditExhaustedModal
+						isOpen
+						onClose={() => setCreditError(null)}
+						errorMessage={creditError}
+						projectId=""
+						stage="prd"
+						availableCredits={quoteView?.availableCredits}
+						requiredCredits={quoteView?.quote?.maximumCredits}
+					/>
+				</Suspense>
 			) : null}
-		</form>
 		</>
 	);
 }
