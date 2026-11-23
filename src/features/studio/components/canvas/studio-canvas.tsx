@@ -1,4 +1,4 @@
-import { memo, useCallback, useRef, useState } from "react";
+import { memo, useCallback, useMemo, useRef, useState } from "react";
 import type {
 	StudioFrameRow,
 	StudioJobRow,
@@ -26,7 +26,10 @@ import {
 import { isCanvasControlTarget } from "@/features/studio/utils/studio-canvas-gesture";
 import { deriveStudioLifecycle } from "@/features/studio/utils/studio-lifecycle";
 import { useCanvasZoom } from "@/hooks/use-canvas-zoom";
-import type { StudioElementTarget } from "../../types/studio-element";
+import type {
+	StudioElementAction,
+	StudioElementTarget,
+} from "../../types/studio-element";
 import type { StudioDevice } from "../../types/studio-renderer";
 
 export type {
@@ -56,6 +59,12 @@ export interface StudioCanvasProps {
 	frameRetryErrors?: Record<string, string>;
 	elementTarget?: StudioElementTarget | null;
 	onSelectElement?: (target: StudioElementTarget | null) => void;
+	onElementAction?: (
+		action: StudioElementAction,
+		target: StudioElementTarget,
+		text?: string,
+	) => void;
+	elementActionBusy?: boolean;
 	/** Presentation-only device per frame id; absent means the native device. */
 	frameDevices?: Readonly<Record<string, StudioDevice>>;
 	/** Left band covered by the floating chat panel; `null` until its layout is known. */
@@ -79,6 +88,8 @@ export const StudioCanvas = memo(function StudioCanvas({
 	frameRetryErrors,
 	elementTarget,
 	onSelectElement,
+	onElementAction,
+	elementActionBusy = false,
 	frameDevices,
 	leftInsetPx = 0,
 	className = "",
@@ -120,20 +131,20 @@ export const StudioCanvas = memo(function StudioCanvas({
 	const [spacePan, setSpacePan] = useState(false);
 	const [isPanning, setIsPanning] = useState(false);
 	const panMode = tool === "hand" || spacePan;
-	const inspectFrame = frames.find(
-		(frame) =>
-			frame.id ===
-				(selectedFrameId ??
-					(selectedFrameIds.length === 1 ? selectedFrameIds[0] : null)) &&
-			frame.htmlCode &&
-			frame.status === "ready",
+	const editableFrameIds = useMemo(
+		() =>
+			frames
+				.filter((frame) => frame.htmlCode && frame.status === "ready")
+				.map((frame) => frame.id),
+		[frames],
 	);
+	const elementTool = tool === "element";
 
 	const { pool: livePool, reportVisibility } = useStudioLivePool({
 		frames,
-		selectedFrameId,
-		selectedFrameIds,
-		inspectFrameId: tool === "element" ? (inspectFrame?.id ?? null) : null,
+		selectedFrameId: elementTool ? null : selectedFrameId,
+		selectedFrameIds: elementTool ? editableFrameIds : selectedFrameIds,
+		inspectFrameId: null,
 	});
 
 	const { measureFrame, fitAll } = useStudioCanvasView({
@@ -212,9 +223,10 @@ export const StudioCanvas = memo(function StudioCanvas({
 			data-testid="studio-canvas"
 			aria-label={`Canvas Desain ${project.title}`}
 			onPointerDown={(event) => {
+				// Element editing happens inside the isolated document. A press on
+				// the surrounding canvas must neither marquee-select nor pan.
+				if (elementTool) return;
 				if (panMode) {
-					// A real control overlay owns its own press; only the canvas
-					// background and the frame gesture surfaces start a pan.
 					if (isCanvasControlTarget(event.target)) return;
 					if (startPan(event)) setIsPanning(true);
 					return;
@@ -289,6 +301,9 @@ export const StudioCanvas = memo(function StudioCanvas({
 								elementTarget?.frameId === frame.id ? elementTarget : null
 							}
 							onSelectElement={onSelectElement}
+							onElementAction={onElementAction}
+							elementActionBusy={elementActionBusy}
+							menuLeftInsetPx={leftInsetPx ?? 0}
 							liveEnabled={livePool.includes(frame.id)}
 							device={frameDevices?.[frame.id]}
 							onVisibilityChange={reportVisibility}

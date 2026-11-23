@@ -2,7 +2,7 @@ import {
 	AlertCircleIcon,
 	Cursor01Icon,
 	HandIcon,
-	Search01Icon,
+	PencilEdit01Icon,
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/ui/icon";
 import { ZoomControls } from "@/components/ui/zoom-controls";
@@ -57,14 +57,14 @@ export function StudioCanvasToolPalette({
 			</button>
 			<button
 				type="button"
-				title="Pilih elemen pada satu frame"
-				aria-label="Pilih elemen"
+				title="Edit elemen (E)"
+				aria-label="Edit elemen"
 				aria-pressed={tool === "element"}
 				disabled={!canSelectElement}
 				onClick={() => onSelectTool("element")}
 				className={`flex size-11 items-center justify-center rounded-md text-snow focus-visible:outline-2 focus-visible:outline-snow disabled:opacity-40 ${tool === "element" ? "bg-steel" : "hover:bg-steel"}`}
 			>
-				<Icon icon={Search01Icon} size={18} />
+				<Icon icon={PencilEdit01Icon} size={18} />
 			</button>
 		</div>
 	);

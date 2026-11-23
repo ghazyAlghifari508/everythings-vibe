@@ -11,7 +11,7 @@ interface UseStudioCanvasInputInput {
 	setPan: React.Dispatch<React.SetStateAction<{ x: number; y: number }>>;
 	nudgePan: (key: string) => void;
 	endPan: () => void;
-	setTool: (tool: "select" | "hand") => void;
+	setTool: (tool: "select" | "hand" | "element") => void;
 	setSpacePan: (active: boolean) => void;
 	setIsPanning: (panning: boolean) => void;
 	onSelectFrame?: (frameId: string | null, additive?: boolean) => void;
@@ -110,6 +110,10 @@ export function useStudioCanvasInput({
 			if (event.key.toLowerCase() === "h") {
 				cancelMarquee();
 				setTool("hand");
+			}
+			if (event.key.toLowerCase() === "e") {
+				cancelMarquee();
+				setTool("element");
 			}
 			if (event.key.startsWith("Arrow")) nudgePan(event.key);
 			if (event.code === "Space") {
