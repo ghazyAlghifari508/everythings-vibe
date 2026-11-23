@@ -17,6 +17,12 @@ const envelope = {
 	baseRevision: z.int().nonnegative(),
 	baseHash: z.string().regex(/^[a-f0-9]{64}$/),
 };
+const regionSchema = z.strictObject({
+	elementId: z.string().min(1).max(200),
+	bounds: studioElementBoundsSchema,
+});
+/** Bounded once-per-ready snapshot used only by the pencil activation reveal. */
+export const STUDIO_ELEMENT_INVENTORY_MAX = 48;
 const messageSchema = z.discriminatedUnion("type", [
 	z.strictObject({
 		...envelope,
@@ -31,6 +37,21 @@ const messageSchema = z.discriminatedUnion("type", [
 		bounds: studioElementBoundsSchema,
 	}),
 	z.strictObject({ ...envelope, type: z.literal("studio:element:clear") }),
+	z.strictObject({
+		...envelope,
+		type: z.literal("studio:element:hover"),
+		elementId: z.string().min(1).max(200),
+		bounds: studioElementBoundsSchema,
+	}),
+	z.strictObject({
+		...envelope,
+		type: z.literal("studio:element:hover-clear"),
+	}),
+	z.strictObject({
+		...envelope,
+		type: z.literal("studio:element:inventory"),
+		regions: z.array(regionSchema).max(STUDIO_ELEMENT_INVENTORY_MAX),
+	}),
 ]);
 const rendererMessageSchema = z.discriminatedUnion("type", [
 	z.strictObject({
@@ -112,11 +133,61 @@ export function acceptStudioSelectionMessage(
 	if (!sameDocument(data, expected)) return null;
 	if (data.type === "studio:element:clear")
 		return { type: data.type, target: null };
+	if (
+		data.type !== "studio:element:select" &&
+		data.type !== "studio:element:bounds"
+	)
+		return null;
 	const targets = expected.elements.filter(
 		(element) => element.elementId === data.elementId,
 	);
 	if (targets.length !== 1) return null;
 	return { type: data.type, target: { ...targets[0], bounds: data.bounds } };
+}
+
+export type StudioHoverMessage =
+	| {
+			type: "hover";
+			elementId: string;
+			bounds: z.infer<typeof studioElementBoundsSchema>;
+	  }
+	| { type: "hover-clear" };
+
+/** Hover never changes selection; the parent resolves policy from identity. */
+export function acceptStudioHoverMessage(
+	event: { source: unknown; origin: string; data: unknown },
+	expected: StudioBridgeExpectation & {
+		elements: readonly StudioElementIdentity[];
+	},
+): StudioHoverMessage | null {
+	if (!trustedSender(event, expected)) return null;
+	const parsed = messageSchema.safeParse(event.data);
+	if (!parsed.success || !sameDocument(parsed.data, expected)) return null;
+	const data = parsed.data;
+	if (data.type === "studio:element:hover-clear")
+		return { type: "hover-clear" };
+	if (data.type !== "studio:element:hover") return null;
+	if (!expected.elements.some((item) => item.elementId === data.elementId))
+		return null;
+	return { type: "hover", elementId: data.elementId, bounds: data.bounds };
+}
+
+/** Once-per-ready, bounded overlay inventory for the pencil activation reveal. */
+export function acceptStudioInventoryMessage(
+	event: { source: unknown; origin: string; data: unknown },
+	expected: StudioBridgeExpectation & {
+		elements: readonly StudioElementIdentity[];
+	},
+) {
+	if (!trustedSender(event, expected)) return null;
+	const parsed = messageSchema.safeParse(event.data);
+	if (!parsed.success || !sameDocument(parsed.data, expected)) return null;
+	const data = parsed.data;
+	if (data.type !== "studio:element:inventory") return null;
+	const known = new Set(expected.elements.map((item) => item.elementId));
+	return {
+		regions: data.regions.filter((region) => known.has(region.elementId)),
+	};
 }
 
 export function studioSelectionBridgeScript(
@@ -128,14 +199,23 @@ export function studioSelectionBridgeScript(
 const envelope = ${JSON.stringify(envelope).replaceAll("<", "\\u003c")};
 const origin = ${JSON.stringify(parentOrigin)};
 let selected = null;
+let hovering = null;
 let scheduled = false;
+let hoverScheduled = false;
+const rect = node => { const r = node.getBoundingClientRect(); return {x:r.x,y:r.y,width:r.width,height:r.height}; };
 const send = (type = 'studio:element:bounds') => {
  scheduled = false;
  if (!selected || !selected.isConnected) return;
- const r = selected.getBoundingClientRect();
- parent.postMessage({...envelope, type, elementId:selected.getAttribute('data-ev-inspect-id'), bounds:{x:r.x,y:r.y,width:r.width,height:r.height}}, origin);
+ parent.postMessage({...envelope, type, elementId:selected.getAttribute('data-ev-inspect-id'), bounds:rect(selected)}, origin);
 };
-const update = () => { if (!scheduled) { scheduled = true; requestAnimationFrame(() => { send(); metrics(); }); } };
+const sendHover = () => {
+ hoverScheduled = false;
+ if (!hovering || !hovering.isConnected) return;
+ parent.postMessage({...envelope, type:'studio:element:hover', elementId:hovering.getAttribute('data-ev-inspect-id'), bounds:rect(hovering)}, origin);
+};
+const scheduleHover = () => { if (!hoverScheduled) { hoverScheduled = true; requestAnimationFrame(sendHover); } };
+const clearHover = () => { hovering = null; parent.postMessage({...envelope, type:'studio:element:hover-clear'}, origin); };
+const update = () => { if (!scheduled) { scheduled = true; requestAnimationFrame(() => { send(); metrics(); if (hovering) sendHover(); }); } };
 const measure = () => ({
  scrollWidth: Math.ceil(document.documentElement.scrollWidth),
  scrollHeight: Math.ceil(Math.max(document.body.scrollHeight, document.body.getBoundingClientRect().bottom + window.scrollY)),
@@ -156,8 +236,20 @@ const settled = Promise.all([
  const m = measure();
  lastMetrics = m.scrollWidth + 'x' + m.scrollHeight;
  parent.postMessage({...envelope, type:'${STUDIO_RENDERER_MESSAGE_TYPES.ready}', ...m, unresolvedImages}, origin);
+ const regions = Array.from(document.querySelectorAll('[data-ev-inspect-id]')).filter(node => {
+  const r = node.getBoundingClientRect();
+  return r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < window.innerHeight;
+ }).slice(0, ${STUDIO_ELEMENT_INVENTORY_MAX}).map(node => ({elementId:node.getAttribute('data-ev-inspect-id'), bounds:rect(node)}));
+ if (regions.length) parent.postMessage({...envelope, type:'studio:element:inventory', regions}, origin);
  update();
 });
+document.addEventListener('pointermove', event => {
+ const target = event.target instanceof Element ? event.target.closest('[data-ev-inspect-id]') : null;
+ if (target === hovering) { scheduleHover(); return; }
+ if (target) hovering = target;
+ else clearHover();
+}, true);
+document.documentElement.addEventListener('pointerleave', clearHover);
 document.addEventListener('click', event => {
  event.preventDefault(); event.stopImmediatePropagation();
  const target = event.target instanceof Element ? event.target.closest('[data-ev-inspect-id]') : null;
