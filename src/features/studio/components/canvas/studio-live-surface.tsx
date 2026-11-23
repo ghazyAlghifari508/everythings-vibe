@@ -1,5 +1,12 @@
-import { useEffect, useRef } from "react";
-import type { StudioElementTarget } from "../../types/studio-element";
+import { useEffect, useRef, useState } from "react";
+import {
+	resolveStudioElementParent,
+	resolveStudioElementTarget,
+} from "../../services/studio-element-targeting";
+import type {
+	StudioElementAction,
+	StudioElementTarget,
+} from "../../types/studio-element";
 import {
 	acceptStudioHoverMessage,
 	acceptStudioInventoryMessage,
@@ -122,6 +129,14 @@ export function StudioLiveSurface({
 	activeTarget.current = target;
 	const stateRef = useRef(state);
 	stateRef.current = state;
+	const hoverOutline = useRef<HTMLDivElement>(null);
+	const wasInteractive = useRef(false);
+	const [revealKey, setRevealKey] = useState(0);
+	const [revealRegions, setRevealRegions] = useState<
+		{ elementId: string; bounds: ElementBounds }[]
+	>([]);
+	const inventoryByElement = useRef(new Map<string, ElementBounds>());
+	const [menuOpen, setMenuOpen] = useState(false);
 	const active = state.active?.document ?? null;
 	const incoming = state.incoming;
 
@@ -170,7 +185,43 @@ export function StudioLiveSurface({
 					type === "studio:element:bounds" ||
 					type === "studio:element:clear"
 				) {
-					select.current?.(result.target);
+					const result = acceptStudioSelectionMessage(event, {
+						...expected,
+						elements: document.elements,
+					});
+					if (
+						result &&
+						(result.type !== "studio:element:bounds" ||
+							activeTarget.current?.elementId === result.target?.elementId)
+					) {
+						select.current?.(result.target);
+						return;
+					}
+					continue;
+				}
+				if (
+					type === "studio:element:hover" ||
+					type === "studio:element:hover-clear"
+				) {
+					const hover = acceptStudioHoverMessage(event, {
+						...expected,
+						elements: document.elements,
+					});
+					const node = hoverOutline.current;
+					if (!node) return;
+					const identity =
+						hover?.type === "hover"
+							? resolveStudioElementTarget(hover.elementId, document.elements)
+							: null;
+					if (!hover || hover.type !== "hover" || !identity) {
+						node.style.display = "none";
+						return;
+					}
+					node.style.display = "block";
+					node.style.left = `${hover.bounds.x}px`;
+					node.style.top = `${hover.bounds.y}px`;
+					node.style.width = `${hover.bounds.width}px`;
+					node.style.height = `${hover.bounds.height}px`;
 					return;
 				}
 				if (type === "studio:element:inventory") {
@@ -197,6 +248,50 @@ export function StudioLiveSurface({
 		return () => window.removeEventListener("message", message);
 	}, [dispatch]);
 
+	useEffect(() => {
+		if (interactive && !wasInteractive.current) setRevealKey((key) => key + 1);
+		wasInteractive.current = interactive;
+	}, [interactive]);
+
+	const lastChannel = useRef(active?.channel);
+	useEffect(() => {
+		if (lastChannel.current === active?.channel) return;
+		lastChannel.current = active?.channel;
+		setRevealRegions([]);
+		if (hoverOutline.current) hoverOutline.current.style.display = "none";
+	}, [active?.channel]);
+
+	const targetKey = target
+		? `${target.frameId}:${target.elementId}:${target.baseRevision}`
+		: null;
+	useEffect(() => {
+		setMenuOpen(targetKey !== null);
+	}, [targetKey]);
+
+	const canSelectParent = Boolean(
+		active &&
+			target &&
+			resolveStudioElementParent(target.elementId, active.elements),
+	);
+	function handleAction(
+		action: StudioElementAction,
+		current: StudioElementTarget,
+		text?: string,
+	) {
+		if (action === "select-parent") {
+			const parent = active
+				? resolveStudioElementParent(current.elementId, active.elements)
+				: null;
+			if (parent)
+				select.current?.({
+					...parent,
+					bounds:
+						inventoryByElement.current.get(parent.elementId) ?? current.bounds,
+				});
+			return;
+		}
+		onAction?.(action, current, text);
+	}
 	function track(document: StudioLiveDocument) {
 		return (node: HTMLIFrameElement | null) => {
 			if (node) {
@@ -243,6 +338,35 @@ export function StudioLiveSurface({
 					frameRef={track(incoming)}
 				/>
 			) : null}
+			{interactive && revealRegions.length > 0 ? (
+				<div
+					key={revealKey}
+					aria-hidden
+					data-ev-editor-overlay
+					className="pointer-events-none absolute inset-0 z-10"
+				>
+					{revealRegions.map((region, index) => (
+						<div
+							key={region.elementId}
+							data-ev-editor-overlay
+							className="studio-element-reveal absolute border border-blue-500/70"
+							style={{
+								left: region.bounds.x,
+								top: region.bounds.y,
+								width: region.bounds.width,
+								height: region.bounds.height,
+								animationDelay: `${Math.min(index, STUDIO_REVEAL_REGIONS_MAX) * 24}ms`,
+							}}
+						/>
+					))}
+				</div>
+			) : null}
+			<div
+				ref={hoverOutline}
+				aria-hidden
+				data-ev-editor-overlay
+				className="pointer-events-none absolute z-20 hidden border-2 border-blue-500/90"
+			/>
 			{interactive &&
 			active &&
 			target &&

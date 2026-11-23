@@ -1,5 +1,6 @@
 "use client";
 import { AlertCircleIcon } from "@hugeicons/core-free-icons";
+import { useCallback, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { StudioCanvas } from "@/features/studio/components/canvas/studio-canvas";
 import { StudioChatPanel } from "@/features/studio/components/workspace/studio-chat-panel";

@@ -261,7 +261,13 @@ export const StudioCanvas = memo(function StudioCanvas({
 			className={`relative size-full overflow-hidden select-none touch-none bg-charcoal text-snow focus-visible:outline-2 focus-visible:outline-snow ${className}`}
 			style={{
 				...getCanvasDotStyle(zoom, pan),
-				cursor: panMode ? (isPanning ? "grabbing" : "grab") : "default",
+				cursor: elementTool
+					? "crosshair"
+					: panMode
+						? isPanning
+							? "grabbing"
+							: "grab"
+						: "default",
 			}}
 		>
 			{/* Transformed Canvas Surface holding frames */}
@@ -295,7 +301,7 @@ export const StudioCanvas = memo(function StudioCanvas({
 							retryError={frameRetryErrors?.[frame.id]}
 							isCanvasPanning={panMode}
 							inspectElement={
-								tool === "element" && frame.id === inspectFrame?.id
+								elementTool && editableFrameIds.includes(frame.id)
 							}
 							elementTarget={
 								elementTarget?.frameId === frame.id ? elementTarget : null
@@ -361,7 +367,9 @@ export const StudioCanvas = memo(function StudioCanvas({
 			<StudioCanvasToolPalette
 				tool={tool}
 				onSelectTool={selectTool}
-				canSelectElement={Boolean(inspectFrame && onSelectElement)}
+				canSelectElement={
+					editableFrameIds.length > 0 && Boolean(onSelectElement)
+				}
 			/>
 
 			<StudioCanvasZoomCorner

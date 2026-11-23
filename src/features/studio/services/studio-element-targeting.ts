@@ -202,7 +202,7 @@ export function resolveStudioElementParent(
 	const start = byId.get(elementId);
 	if (!start?.parentId) return null;
 	const seen = new Set<string>([start.elementId]);
-	let current = byId.get(start.parentId);
+	let current: StudioElementIdentity | undefined = byId.get(start.parentId);
 	for (
 		let depth = 0;
 		current && depth < STUDIO_TARGET_ANCESTOR_LIMIT;
@@ -211,7 +211,7 @@ export function resolveStudioElementParent(
 		if (seen.has(current.elementId)) return null;
 		seen.add(current.elementId);
 		if (classifyStudioElement(current)) return current;
-		current = current.parentId ? byId.get(current.parentId) : null;
+		current = current.parentId ? byId.get(current.parentId) : undefined;
 	}
 	return null;
 }
