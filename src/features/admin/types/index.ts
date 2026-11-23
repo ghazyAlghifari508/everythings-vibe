@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { subscriptions, users } from "@/db/schema";
+import type { AdminCreditBreakdownItem } from "./admin-credit";
 
 export interface DailyTrendPoint {
 	date: string;
@@ -337,19 +338,26 @@ export type AdminTransactionsSearchParams = z.infer<
 
 export interface AdminDashboardMetrics {
 	usersCount: number;
-	projectsCount: number;
+	activeProjectsCount: number;
 	prdCount: number;
 	acCount: number;
 	tasksCount: number;
-	feedbackCount: number;
-	errorCount: number;
-	totalRevenue: number;
+	activeFeedbackCount: number;
+	activeErrorCount: number;
+	activeTicketsCount: number;
 	currentMonthRevenue: number;
+	settledCreditsUsed: number;
+	successfulOperations: number;
+	partialOperations: number;
+	creditWindowStart: string;
+	creditWindowEnd: string;
+	creditBreakdown: AdminCreditBreakdownItem[];
 	planDistribution: { plan: string; count: number }[];
 	recentProjects: {
 		id: string;
 		name: string;
 		step: string | null;
+		projectMode: string | null;
 		userName: string | null;
 		userEmail: string | null;
 		createdAt: Date | null;

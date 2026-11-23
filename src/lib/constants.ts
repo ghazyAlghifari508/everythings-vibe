@@ -104,6 +104,12 @@ export const SHADOW_OBSERVATION_MAX_KEYS = 5_000;
 // browser timezone, or the same payment can show a different calendar day.
 export const APP_TIME_ZONE = "Asia/Jakarta";
 
+// Admin overview reporting windows. Kept here so the KPI cards, the credit
+// breakdown, and their labels cannot drift apart.
+export const ADMIN_DASHBOARD_CREDIT_WINDOW_DAYS = 30;
+export const ADMIN_DASHBOARD_TREND_DAYS = 7;
+export const ADMIN_DASHBOARD_RECENT_LIMIT = 5;
+
 /**
  * Canonical canvas zoom bounds. Every zoom entry point (toolbar, wheel,
  * pinch, reset, fit-to-content) clamps against these, so no path can leave the

@@ -22,16 +22,49 @@ export function formatDateKey(d: Date): string {
 	return `${yyyy}-${mm}-${dd}`;
 }
 
+function zonedDateParts(
+	d: Date,
+	timeZone: string,
+): { year: string; month: string; day: string } {
+	const parts = new Intl.DateTimeFormat("en-US", {
+		timeZone,
+		year: "numeric",
+		month: "2-digit",
+		day: "2-digit",
+	}).formatToParts(d);
+	const values = new Map(
+		parts
+			.filter((part) => part.type !== "literal")
+			.map((part) => [part.type, part.value]),
+	);
+	return {
+		year: values.get("year") ?? "",
+		month: values.get("month") ?? "",
+		day: values.get("day") ?? "",
+	};
+}
+
+/** Calendar day in an explicit zone, matching DB `AT TIME ZONE` grouping. */
+export function formatDateKeyInZone(d: Date, timeZone: string): string {
+	const { year, month, day } = zonedDateParts(d, timeZone);
+	return `${year}-${month}-${day}`;
+}
+
 export function formatDateLabel(d: Date): string {
 	const day = d.getDate();
 	const month = MONTH_NAMES[d.getMonth()];
 	return `${day} ${month}`;
 }
 
-export function buildDateRangeSeries(days: number): {
-	date: string;
-	label: string;
-}[] {
+function formatDateLabelInZone(d: Date, timeZone: string): string {
+	const { month, day } = zonedDateParts(d, timeZone);
+	return `${Number(day)} ${MONTH_NAMES[Number(month) - 1] ?? month}`;
+}
+
+export function buildDateRangeSeries(
+	days: number,
+	timeZone?: string,
+): { date: string; label: string }[] {
 	if (!Number.isSafeInteger(days) || days <= 0 || days > 366) {
 		throw new RangeError("days must be a positive integer <= 366");
 	}
@@ -42,8 +75,12 @@ export function buildDateRangeSeries(days: number): {
 		const target = new Date(now);
 		target.setDate(target.getDate() - i);
 		series.push({
-			date: formatDateKey(target),
-			label: formatDateLabel(target),
+			date: timeZone
+				? formatDateKeyInZone(target, timeZone)
+				: formatDateKey(target),
+			label: timeZone
+				? formatDateLabelInZone(target, timeZone)
+				: formatDateLabel(target),
 		});
 	}
 

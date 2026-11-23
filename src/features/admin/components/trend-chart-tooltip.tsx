@@ -41,7 +41,7 @@ export function TrendChartTooltip({
 				<span className="h-2 w-2 rounded-full bg-indigo-500" />
 				<span className="text-mist">Pengguna Baru:</span>
 				<span className="font-mono font-medium text-indigo-400">
-					{hoveredItem.newUsers} user
+					{hoveredItem.newUsers.toLocaleString("id-ID")} user
 				</span>
 			</div>
 		</div>

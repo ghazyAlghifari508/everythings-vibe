@@ -3,22 +3,25 @@ import type { AdminCreditBreakdownItem } from "../types/admin-credit";
 
 interface AdminCreditBreakdownChartProps {
 	items: readonly AdminCreditBreakdownItem[];
+	periodLabel?: string;
 }
 
 export const AdminCreditBreakdownChart = memo(
 	function AdminCreditBreakdownChart({
 		items,
+		periodLabel,
 	}: AdminCreditBreakdownChartProps) {
 		const max = Math.max(1, ...items.map((item) => item.settledCredits));
-
 		return (
 			<section className="rounded-xl border border-graphite bg-charcoal p-5 shadow-[var(--shadow-inset)]">
 				<div className="flex flex-wrap items-baseline justify-between gap-2">
 					<h2 className="text-base font-[510] text-snow">
-						Penggunaan berdasarkan fitur
+						Penggunaan kredit per fitur
 					</h2>
 					<p className="text-xs text-fog">
-						Kredit debit terverifikasi, bukan reservasi atau tagihan shadow
+						Debit buku besar terverifikasi
+						{periodLabel ? ` ${periodLabel}` : ""}, bukan reservasi atau tagihan
+						shadow
 					</p>
 				</div>
 				<div className="mt-5 space-y-3">

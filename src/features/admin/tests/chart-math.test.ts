@@ -62,6 +62,17 @@ describe("Chart Geometry Math", () => {
 		expect(path).not.toContain("Infinity");
 	});
 
+	it("keeps smoothing control points inside the data range", () => {
+		const path = generateSplinePath([
+			{ x: 0, y: 100 },
+			{ x: 50, y: 100 },
+			{ x: 100, y: 0 },
+		]);
+		const numbers = (path.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
+		expect(numbers.length).toBeGreaterThan(0);
+		expect(numbers.every((value) => value >= 0 && value <= 100)).toBe(true);
+	});
+
 	it("safely handles large datasets and non-finite values in calculateYScale", () => {
 		const large = Array.from({ length: 20_000 }, (_, i) =>
 			i % 2 === 0 ? i : Number.NaN,
