@@ -86,7 +86,10 @@ function clampZoom(value: number, minZoom: number, maxZoom: number): number {
 	return Math.min(maxZoom, Math.max(minZoom, value));
 }
 
-function frameOffset(bounds: StudioCanvasFrameBounds[], index: number): number {
+export function frameOffset(
+	bounds: StudioCanvasFrameBounds[],
+	index: number,
+): number {
 	return (
 		bounds.slice(0, index).reduce((total, frame) => total + frame.width, 0) +
 		index * STUDIO_CANVAS_FRAME_GAP_PX
@@ -204,6 +207,65 @@ export function computeCanvasInitialView({
 				STUDIO_CANVAS_HEADER_INSET_PX -
 				(STUDIO_CANVAS_FRAME_PADDING_PX + contentOffset) * zoom,
 			y: STUDIO_CANVAS_HEADER_INSET_PX - STUDIO_CANVAS_FRAME_PADDING_PX * zoom,
+		},
+	};
+}
+
+/**
+ * Pure camera math for the contextual Focus action. Unlike Fit All this frames
+ * one artboard: it keeps a readable width floor for tall mobile screens,
+ * leaves room for the chat panel and both floating tool columns, and top-aligns
+ * when the frame cannot fit vertically. The frame id and its HTML are never
+ * touched; only zoom and pan are produced.
+ */
+export function computeFrameFocus({
+	bounds,
+	available,
+	minZoom,
+	maxZoom,
+	frameIndex,
+	readableMinZoom = STUDIO_CANVAS_INITIAL_MIN_ZOOM,
+}: StudioCanvasFitInput & {
+	frameIndex: number;
+	readableMinZoom?: number;
+}): StudioCanvasView {
+	if (!bounds.length) return { zoom: minZoom, pan: { x: 0, y: 0 } };
+	const index = Math.min(
+		bounds.length - 1,
+		Math.max(0, Number.isFinite(frameIndex) ? Math.trunc(frameIndex) : 0),
+	);
+	const target = bounds[index];
+	if (!target) return { zoom: minZoom, pan: { x: 0, y: 0 } };
+	const usable = computeCanvasUsableBand(available);
+	const zoom = clampZoom(
+		Math.max(
+			readableMinZoom,
+			Math.min(
+				usable.width / (target.width + STUDIO_CANVAS_TOOLBAR_INSET_PX),
+				usable.height / target.height,
+			),
+		),
+		minZoom,
+		maxZoom,
+	);
+	const scaledWidth = target.width * zoom;
+	const scaledHeight = target.height * zoom;
+	const bandLeft = (available.insetLeft ?? 0) + STUDIO_CANVAS_TOOLBAR_INSET_PX;
+	const x =
+		scaledWidth + STUDIO_CANVAS_TOOLBAR_INSET_PX <= usable.width
+			? bandLeft +
+				(usable.width - STUDIO_CANVAS_TOOLBAR_INSET_PX - scaledWidth) / 2
+			: bandLeft;
+	const y =
+		scaledHeight <= usable.height
+			? STUDIO_CANVAS_HEADER_INSET_PX + (usable.height - scaledHeight) / 2
+			: STUDIO_CANVAS_HEADER_INSET_PX;
+	const contentOffset = frameOffset(bounds, index);
+	return {
+		zoom,
+		pan: {
+			x: x - (STUDIO_CANVAS_FRAME_PADDING_PX + contentOffset) * zoom,
+			y: y - STUDIO_CANVAS_FRAME_PADDING_PX * zoom,
 		},
 	};
 }

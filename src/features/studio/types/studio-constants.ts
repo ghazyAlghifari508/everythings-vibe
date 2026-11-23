@@ -108,6 +108,21 @@ export const STUDIO_CANVAS_ZOOM_BOTTOM_PX = 16;
 // Gap between a canvas overlay and the edge (or the chat panel) it sits beside.
 export const STUDIO_CANVAS_OVERLAY_EDGE_PX = 12;
 
+// Contextual frame toolbar. Screen-space chrome is deliberately excluded from
+// the canvas transform: the buttons stay readable at every zoom level.
+export const STUDIO_FRAME_TOOLBAR_BUTTON_PX = 44;
+export const STUDIO_FRAME_TOOLBAR_WIDTH_PX = STUDIO_FRAME_TOOLBAR_BUTTON_PX;
+export const STUDIO_FRAME_TOOLBAR_GROUP_GAP_PX = 8;
+export const STUDIO_FRAME_TOOLBAR_FRAME_GAP_PX = 16;
+export const STUDIO_FRAME_TOOLBAR_HEIGHT_PX =
+	STUDIO_FRAME_TOOLBAR_BUTTON_PX * 3 * 2 +
+	STUDIO_FRAME_TOOLBAR_GROUP_GAP_PX * 4 +
+	STUDIO_FRAME_TOOLBAR_GROUP_GAP_PX;
+export const STUDIO_FRAME_TOOLBAR_BORDER_GAP_PX = 24;
+
+// Focus camera. Reduced motion skips the interpolation entirely.
+export const STUDIO_CANVAS_FOCUS_TRANSITION_MS = 260;
+
 // Floating chat panel geometry. The same rule sizes the panel and insets the
 // opening canvas view, so frames never open underneath it.
 export const STUDIO_CHAT_PANEL_MARGIN_PX = 12;

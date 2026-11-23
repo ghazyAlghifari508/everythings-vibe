@@ -33,6 +33,7 @@ export function studioRendererKeyId(key: StudioRendererKey): string {
 		key.attempt,
 		key.revisionId ?? "",
 		key.side ?? "",
+		key.refresh ?? 0,
 	].join("|");
 }
 

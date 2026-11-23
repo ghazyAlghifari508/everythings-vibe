@@ -30,6 +30,8 @@ export const STUDIO_DEVICE_PRESETS = {
 	tablet: { width: 768, height: 1024 },
 	mobile: { width: 390, height: 844 },
 } as const;
+
+export const STUDIO_DEVICES = ["desktop", "tablet", "mobile"] as const;
 export type StudioDevice = keyof typeof STUDIO_DEVICE_PRESETS;
 
 /** Width breakpoints that select the pinned viewport height for `vh` units. */
@@ -80,6 +82,8 @@ export interface StudioRendererKey {
 	/** Revision-history comparison source, when rendering a stored snapshot. */
 	revisionId?: string;
 	side?: "before" | "after";
+	/** Bumped by explicit Refresh; never by a device change. */
+	refresh?: number;
 }
 
 export const studioRendererMetricsSchema = z.strictObject({
