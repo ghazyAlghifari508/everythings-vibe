@@ -61,6 +61,10 @@ export interface StudioFrameProps {
 		text?: string,
 	) => void;
 	elementActionBusy?: boolean;
+	/** Explicit Refresh invalidation; never part of the design revision. */
+	refreshToken?: number;
+	/** Reports whether the live renderer behind this frame is ready. */
+	onRendererReadinessChange?: (frameId: string, ready: boolean) => void;
 	menuLeftInsetPx?: number;
 }
 
@@ -107,6 +111,8 @@ export const StudioFrame = memo(function StudioFrame({
 	elementActionBusy = false,
 	menuLeftInsetPx = 0,
 	onSelectElement,
+	refreshToken,
+	onRendererReadinessChange,
 }: StudioFrameProps) {
 	const visibleUrl = useRef<string | null>(null);
 	const status = resolveStudioFrameStatus(frame, job);
@@ -151,8 +157,9 @@ export const StudioFrame = memo(function StudioFrame({
 		device,
 		onMeasure,
 		onVisibilityChange,
+		refreshToken,
+		onReadinessChange: onRendererReadinessChange,
 	});
-
 	return (
 		<article
 			ref={artboardRef}

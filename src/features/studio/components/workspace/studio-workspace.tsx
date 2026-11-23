@@ -1,6 +1,6 @@
 "use client";
 import { AlertCircleIcon } from "@hugeicons/core-free-icons";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { StudioCanvas } from "@/features/studio/components/canvas/studio-canvas";
 import { StudioChatPanel } from "@/features/studio/components/workspace/studio-chat-panel";
@@ -36,6 +36,30 @@ export function StudioWorkspace({
 	);
 	const [selectedElement, setSelectedElement] =
 		useState<StudioElementTarget | null>(null);
+	const frameIdKey = workspace.frames.map((frame) => frame.id).join("|");
+	// biome-ignore lint/correctness/useExhaustiveDependencies: frameIdKey is the stable identity of workspace.frames
+	const frameIdList = useMemo(
+		() => workspace.frames.map((frame) => frame.id),
+		[frameIdKey],
+	);
+	const { frameDevices, setFrameDevice } = useStudioFrameDevices({
+		userId: workspace.project.userId,
+		projectId: workspace.project.id,
+		frameIds: frameIdList,
+	});
+	const [frameRefreshTokens, setFrameRefreshTokens] = useState<
+		Readonly<Record<string, number>>
+	>({});
+	const handleRefreshFrame = useCallback(
+		(frameId: string) => {
+			setFrameRefreshTokens((previous) => ({
+				...previous,
+				[frameId]: (previous[frameId] ?? 0) + 1,
+			}));
+			void workspace.syncProjectStatus();
+		},
+		[workspace.syncProjectStatus],
+	);
 	const { selectTarget, submit, busy: elementBusy } = elementEditing;
 	const handleSelectElement = useCallback(
 		(target: StudioElementTarget | null) => setSelectedElement(target),
@@ -106,9 +130,13 @@ export function StudioWorkspace({
 							: undefined
 					}
 					retryingPlanning={workspace.retryingPlanning}
-					onRefreshStatus={() => window.location.reload()}
+					onRefreshStatus={() => void workspace.syncProjectStatus()}
 					retryingFrameIds={workspace.retryingFrameIds}
 					frameRetryErrors={workspace.frameRetryErrors}
+					frameDevices={frameDevices}
+					onFrameDeviceChange={setFrameDevice}
+					frameRefreshTokens={frameRefreshTokens}
+					onRefreshFrame={handleRefreshFrame}
 					leftInsetPx={chat.insetPx}
 					className="size-full"
 				/>

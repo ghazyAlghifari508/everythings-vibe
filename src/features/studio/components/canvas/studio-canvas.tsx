@@ -1,4 +1,5 @@
-import { memo, useCallback, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+
 import type {
 	StudioFrameRow,
 	StudioJobRow,
@@ -13,9 +14,9 @@ import {
 	StudioCanvasZoomCorner,
 } from "@/features/studio/components/canvas/studio-canvas-controls";
 import { StudioFrame } from "@/features/studio/components/canvas/studio-frame";
+import { StudioFrameToolbar } from "@/features/studio/components/canvas/studio-frame-toolbar";
 import { useStudioCanvasInput } from "@/features/studio/hooks/use-studio-canvas-input";
 import { useStudioCanvasMarquee } from "@/features/studio/hooks/use-studio-canvas-marquee";
-import { useStudioCanvasView } from "@/features/studio/hooks/use-studio-canvas-view";
 import { useStudioLivePool } from "@/features/studio/hooks/use-studio-live-pool";
 import {
 	STUDIO_CANVAS_INITIAL_ZOOM,
@@ -23,6 +24,18 @@ import {
 	STUDIO_CANVAS_MIN_ZOOM,
 	STUDIO_CANVAS_OVERLAY_EDGE_PX,
 } from "@/features/studio/types/studio-constants";
+import {
+	buildStudioPreviewTarget,
+	type StudioPreviewTarget,
+} from "@/features/studio/types/studio-preview-contract";
+import {
+	type StudioDevice,
+	studioNativeDevice,
+} from "@/features/studio/types/studio-renderer";
+import {
+	computeFrameToolbarPlacement,
+	type StudioFrameToolbarPlacement,
+} from "@/features/studio/utils/studio-frame-toolbar";
 import { isCanvasControlTarget } from "@/features/studio/utils/studio-canvas-gesture";
 import { deriveStudioLifecycle } from "@/features/studio/utils/studio-lifecycle";
 import { useCanvasZoom } from "@/hooks/use-canvas-zoom";
@@ -30,7 +43,6 @@ import type {
 	StudioElementAction,
 	StudioElementTarget,
 } from "../../types/studio-element";
-import type { StudioDevice } from "../../types/studio-renderer";
 
 export type {
 	StudioCanvasFitInput,
@@ -67,6 +79,13 @@ export interface StudioCanvasProps {
 	elementActionBusy?: boolean;
 	/** Presentation-only device per frame id; absent means the native device. */
 	frameDevices?: Readonly<Record<string, StudioDevice>>;
+	/** Explicit Refresh invalidation per frame; never touches HTML or revision. */
+	frameRefreshTokens?: Readonly<Record<string, number>>;
+	onFrameDeviceChange?: (frameId: string, device: StudioDevice) => void;
+	onRefreshFrame?: (frameId: string) => void;
+	onOpenPreview?: (target: StudioPreviewTarget) => void;
+	/** True only when the authorized P10 preview route exists. */
+	previewRouteAvailable?: boolean;
 	/** Left band covered by the floating chat panel; `null` until its layout is known. */
 	leftInsetPx?: number | null;
 	className?: string;
@@ -91,10 +110,16 @@ export const StudioCanvas = memo(function StudioCanvas({
 	onElementAction,
 	elementActionBusy = false,
 	frameDevices,
+	frameRefreshTokens,
+	onFrameDeviceChange,
+	onRefreshFrame,
+	onOpenPreview,
+	previewRouteAvailable = false,
 	leftInsetPx = 0,
 	className = "",
 }: StudioCanvasProps) {
 	const canvasRef = useRef<HTMLElement>(null);
+
 	const priorityFrameId = frames.find((frame) => frame.htmlCode)?.id;
 	const lifecycle = deriveStudioLifecycle({ project, frames, activeJob });
 	const marqueeRef = useRef<HTMLDivElement>(null);
@@ -313,6 +338,8 @@ export const StudioCanvas = memo(function StudioCanvas({
 							liveEnabled={livePool.includes(frame.id)}
 							device={frameDevices?.[frame.id]}
 							onVisibilityChange={reportVisibility}
+							refreshToken={frameRefreshTokens?.[frame.id]}
+							onRendererReadinessChange={reportRendererReadiness}
 						/>
 					))
 				) : lifecycle.planningFailed ? (
@@ -324,6 +351,20 @@ export const StudioCanvas = memo(function StudioCanvas({
 					/>
 				) : null}
 			</div>
+			{toolbarContext && toolbarPlacement && (
+				<StudioFrameToolbar
+					placement={toolbarPlacement}
+					frameName={toolbarContext.frame.name}
+					device={toolbarContext.device}
+					nativeDevice={toolbarContext.nativeDevice}
+					liveReady={toolbarContext.liveReady}
+					previewTarget={toolbarContext.previewTarget}
+					onDeviceChange={handleDeviceChange}
+					onFocus={() => focusFrame(toolbarContext.frame.id)}
+					onRefresh={() => onRefreshFrame?.(toolbarContext.frame.id)}
+					onPreview={handleToolbarPreview}
+				/>
+			)}
 			{lifecycle.inconsistent && (
 				<output
 					className="absolute top-20 z-20 max-w-md rounded-xl border border-graphite bg-obsidian p-4 text-sm text-fog"
