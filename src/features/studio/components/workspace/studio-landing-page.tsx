@@ -86,6 +86,7 @@ export function StudioLandingPage({
 	const [loading, setLoading] = useState(false);
 
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
+	const requestKey = useRef<{ body: string; key: string } | null>(null);
 
 	useEffect(() => {
 		if (search.prompt !== undefined) setPrompt(search.prompt);
@@ -170,51 +171,66 @@ export function StudioLandingPage({
 		setLoading(true);
 		setError("");
 		try {
-			const res = await fetch("/api/studio/generate", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					prompt: prompt.trim(),
-					designMode: config.designMode,
-					designSkillId: config.designSkillId,
-					initialPageCount: config.initialPageCount,
-					designReference: stagedReference
-						? stagedReference.kind === "theme"
-							? { kind: "theme", id: stagedReference.id }
-							: stagedReference.kind === "scrape"
-								? { kind: "scrape", id: stagedReference.id }
-								: { kind: "custom", filename: stagedReference.filename }
+			const body = JSON.stringify({
+				prompt: prompt.trim(),
+				designMode: config.designMode,
+				designSkillId: config.designSkillId,
+				initialPageCount: config.initialPageCount,
+				designReference: stagedReference
+					? stagedReference.kind === "theme"
+						? { kind: "theme", id: stagedReference.id }
+						: stagedReference.kind === "scrape"
+							? { kind: "scrape", id: stagedReference.id }
+							: { kind: "custom", filename: stagedReference.filename }
+					: null,
+				// A scrape reference carries no document: the server reads the
+				// stored DESIGN.md for the caller.
+				designMd:
+					stagedReference && "designMd" in stagedReference
+						? stagedReference.designMd
 						: null,
-					// A scrape reference carries no document: the server reads the
-					// stored DESIGN.md for the caller.
-					designMd:
-						stagedReference && "designMd" in stagedReference
-							? stagedReference.designMd
-							: null,
-					prdAttachment: stagedPrd
+				prdAttachment: stagedPrd
+					? {
+							filename: stagedPrd.filename,
+							content: stagedPrd.content,
+						}
+					: null,
+				logo:
+					stagedReference?.kind === "custom" && stagedReference.logo
 						? {
-								filename: stagedPrd.filename,
-								content: stagedPrd.content,
+								filename: stagedReference.logo.filename,
+								mimeType: stagedReference.logo.mimeType,
+								data: stagedReference.logo.data,
 							}
 						: null,
-					logo:
-						stagedReference?.kind === "custom" && stagedReference.logo
-							? {
-									filename: stagedReference.logo.filename,
-									mimeType: stagedReference.logo.mimeType,
-									data: stagedReference.logo.data,
-								}
-							: null,
-				}),
+			});
+			if (requestKey.current?.body !== body)
+				requestKey.current = { body, key: crypto.randomUUID() };
+			const res = await fetch("/api/studio/generate", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					"Idempotency-Key": requestKey.current.key,
+				},
+				body,
 			});
 			const data = (await res.json().catch(() => null)) as {
 				projectId?: string;
 				error?: string;
+				code?: string;
 			} | null;
 			if (!res.ok || !data?.projectId) {
+				if (
+					data?.code === "TRIAL_EXHAUSTED" ||
+					data?.code === "PRODUCT_PLAN_REQUIRED"
+				) {
+					void navigate({ to: "/pricing" });
+					return;
+				}
 				setError(data?.error ?? "Studio gagal generate. Coba lagi.");
 				return;
 			}
+			requestKey.current = null;
 			void navigate({
 				to: "/design/$id",
 				params: { id: data.projectId },

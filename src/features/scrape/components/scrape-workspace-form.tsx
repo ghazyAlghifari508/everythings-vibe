@@ -141,6 +141,10 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 			const responseBody: unknown = await response.json();
 			const result = responseSchema.safeParse(responseBody);
 			if (!response.ok || !result.success) {
+				if (response.status === 402 || response.status === 403) {
+					await navigate({ to: "/pricing" });
+					return;
+				}
 				setError(
 					errorSchema.safeParse(responseBody).data?.error ??
 						"Proses belum bisa dimulai. Coba lagi.",

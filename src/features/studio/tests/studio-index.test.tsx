@@ -177,7 +177,10 @@ describe("StudioPage UI & Workflow", () => {
 				"/api/studio/generate",
 				expect.objectContaining({
 					method: "POST",
-					headers: { "Content-Type": "application/json" },
+					headers: {
+						"Content-Type": "application/json",
+						"Idempotency-Key": expect.stringMatching(/^[a-f0-9-]{36}$/),
+					},
 					body: JSON.stringify({
 						prompt: "Aplikasi mobile fitness tracking dengan kalender",
 						designMode: "mobile",
