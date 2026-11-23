@@ -2,7 +2,17 @@
 
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/ui/icon";
+import type { CreditOperationFundingSource } from "@/features/billing/services/credit-operation-registry";
 import type { CreditOperationItem } from "@/features/billing/types/credit-usage";
+import { getProductLabel } from "@/features/billing/utils/credit-usage-status";
+
+const FUNDING_LABELS: Record<CreditOperationFundingSource, string> = {
+	subscription_balance: "Saldo kredit",
+	initial_analysis_allowance: "Alokasi analisis awal",
+	exempt: "Dibebaskan",
+	trial: "Trial",
+	legacy_unknown: "Tidak diklasifikasi",
+};
 
 export function CreditUsageDetail({
 	selectedOp,
@@ -13,6 +23,10 @@ export function CreditUsageDetail({
 	activityLabel: string;
 	onClose: () => void;
 }) {
+	const releasedCredits =
+		selectedOp.state === "released" || selectedOp.state === "refunded"
+			? Math.max(0, selectedOp.reservedCredits - (selectedOp.finalCharge ?? 0))
+			: 0;
 	return (
 		<div
 			className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
@@ -61,6 +75,44 @@ export function CreditUsageDetail({
 								{selectedOp.projectName || "Proyek Tanpa Nama"}
 							</p>
 						</div>
+						<div>
+							<span className="text-(--text-secondary)">Fitur:</span>
+							<p className="font-semibold text-snow mt-0.5">
+								{getProductLabel(selectedOp.product)}
+							</p>
+						</div>
+						<div>
+							<span className="text-(--text-secondary)">Sumber Dana:</span>
+							<p className="font-semibold text-snow mt-0.5">
+								{FUNDING_LABELS[selectedOp.fundingSource]}
+							</p>
+						</div>
+						<div>
+							<span className="text-(--text-secondary)">Direservasi:</span>
+							<p className="font-mono text-snow mt-0.5">
+								{selectedOp.reservedCredits} kredit
+							</p>
+						</div>
+						<div>
+							<span className="text-(--text-secondary)">Final:</span>
+							<p className="font-mono text-snow mt-0.5">
+								{selectedOp.finalCharge ?? 0} kredit
+							</p>
+						</div>
+						<div>
+							<span className="text-(--text-secondary)">Dilepaskan:</span>
+							<p className="font-mono text-snow mt-0.5">
+								{releasedCredits} kredit
+							</p>
+						</div>
+						{selectedOp.usage && (
+							<div>
+								<span className="text-(--text-secondary)">Unit Terukur:</span>
+								<p className="font-mono text-snow mt-0.5">
+									{selectedOp.usage.measuredUnits}
+								</p>
+							</div>
+						)}
 						<div>
 							<span className="text-(--text-secondary)">Versi Pricing:</span>
 							<p className="font-mono text-snow mt-0.5">

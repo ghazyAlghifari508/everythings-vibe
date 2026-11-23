@@ -111,6 +111,8 @@ function toCreditOperationItem(
 		id: operation.id,
 		projectId: operation.projectId,
 		projectName: projectName ?? null,
+		product: "vibeplan_greenfield",
+		fundingSource: "subscription_balance",
 		kind: operation.kind,
 		stage: operation.stage,
 		state: operation.state,

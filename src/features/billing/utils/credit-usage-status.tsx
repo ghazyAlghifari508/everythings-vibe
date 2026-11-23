@@ -4,6 +4,8 @@ import type {
 	CreditOperationKind,
 	CreditOperationState,
 } from "@/features/billing/services/adaptive-credit";
+import type { CreditOperationProduct } from "@/features/billing/services/credit-operation-registry";
+import type { CreditOperationItem } from "@/features/billing/types/credit-usage";
 
 export interface CreditStatusPresentation {
 	label: string;
@@ -21,9 +23,46 @@ export function getActivityLabel(kind: CreditOperationKind): string {
 			return "Generate AC";
 		case "task_generation":
 			return "Generate Task";
+		case "studio.generate":
+			return "Buat Studio";
+		case "studio.add_frame":
+			return "Tambah frame Studio";
+		case "studio.revise":
+			return "Revisi Studio";
+		case "studio.regenerate":
+			return "Regenerasi Studio";
+		case "scrape.crawl":
+			return "Crawl Scrape";
+		case "scrape.html":
+			return "HTML Scrape";
+		case "scrape.images":
+			return "Gambar Scrape";
+		case "scrape.design_md":
+			return "DESIGN.md Scrape";
 		default:
 			return kind;
 	}
+}
+
+export function getProductLabel(product?: CreditOperationProduct): string {
+	switch (product) {
+		case "vibeplan_greenfield":
+			return "Greenfield";
+		case "vibeplan_codebase":
+			return "Existing Codebase";
+		case "studio":
+			return "Studio";
+		case "scrape":
+			return "Scrape";
+		default:
+			return "Legacy";
+	}
+}
+
+export function getResourceLabel(
+	op: Pick<CreditOperationItem, "product" | "resourceName" | "projectName">,
+): string {
+	return op.resourceName ?? op.projectName ?? "Tidak ada data";
 }
 
 /**
