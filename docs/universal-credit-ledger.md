@@ -43,7 +43,7 @@ Pricing is `adaptive`, `fixed` or `unconfigured`. Studio and Scrape are `unconfi
 - `(user_id, idempotency_key)` is unique; a reused key must match kind and resource or it is rejected.
 - Settlement and release lock the operation and subscription rows; over-settlement, double settle and double release fail.
 - Period resets (free rollover, plan purchase) zero `credits_reserved` and bump `allocation_epoch`. An operation from an older epoch can no longer release, settle, refund or quarantine against the new period's counters. Release writes only an audit entry coded `allocation_period_reset`; settle and refund throw `invalid_period` so the existing quarantine path takes over.
-- Paid allocation and top-ups share one `subscriptions.credits` counter, so they are not split per operation. `trial` is representable and constrained to zero reserved credits but is never written yet (TASK 10).
+- Paid allocation and top-ups share one `subscriptions.credits` counter. TASK 10 tracks trials separately in `product_trials`, not as zero-price paid operations.
 
 ## Migration `0045_universal_credit_ledger`
 
@@ -64,5 +64,14 @@ CREDIT_ISOLATED_TEST_ADMIN_URL=postgresql://postgres@localhost:55432/postgres pn
 - Apply 0045 to staging and production; stop web and worker writers during the migration window.
 - Studio projects, studio jobs and scrapes are hard-deleted today. Once charges exist the FKs block that deletion; TASK 11/12 must tombstone billed resources like `projects.deleted_at`.
 - Tariffs: TASK 07 benchmark, TASK 09 approval, then set `pricing` per key.
-- Trial entitlements: TASK 10.
+- Apply migration 0047 before running the updated web and worker processes. Do not mix old workers with the new admission code: old workers cannot close trial holds.
 - History UI and admin Kredit still read VibePlan labels; TASK 13/08.
+
+## One-time trials (TASK 10)
+
+No trial rows are backfilled. Admission reads the effective subscription and billing exemption server-side. Free accounts receive one Studio trial and one Scrape trial independently. Pro, Hengker, and exempt accounts retain legacy access without new charges.
+
+Trial admission and queue writes share a transaction. A partial unique index prevents concurrent holds for the same account and product. Request keys remain bound to their logical jobs even after release. Worker recovery retains the hold across attempts. Terminal writes release zero-unit holds or record the completed units; deletion preserves consumption evidence. Neither subscription changes nor credit rollover touch the records.
+
+Studio generates one frame. Scrape allows up to three crawl pages and two DESIGN.md views. The 50 MB transfer and 15-minute runtime ceilings are divided across the maximum automatic attempts, so worker recovery cannot multiply the budget. Trial settlement never changes the VibePlan balance.
+

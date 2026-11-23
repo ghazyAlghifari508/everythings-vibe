@@ -320,7 +320,8 @@ Persiapan lokal pada Inisiatif 12 dikerjakan melalui `docs/prompt-random/p4.md`;
 - [x] TASK 06: ledger `credit_operations` mendukung resource Studio/Scrape, `product`, `funding_source`, `allocation_epoch`, migrasi 0045, registry operasi dengan harga `unconfigured`.
 - [ ] Terapkan migrasi 0045 ke staging dan production (hentikan writer web dan worker selama migrasi).
 - [ ] TASK 07/09: benchmark dan tarif Studio/Scrape. Tidak ada tarif aktif; jangan isi 0 sebagai placeholder.
-- [ ] TASK 10: trial satu kali per akun Free (`funding_source = 'trial'` sudah representable, belum diaktifkan).
+- [x] TASK 10: Trial Studio dan Scrape independen, satu kali per akun Free; reservasi atomik, settlement berdasarkan hasil, dan billing paid tetap legacy.
+- [ ] Terapkan migrasi 0047 sebelum mengaktifkan versi web dan worker yang baru di staging dan production.
 - [ ] TASK 11/12: integrasi Studio dan Scrape, termasuk tombstone untuk project/job/scrape yang sudah ditagih (FK menolak hard delete).
 - [ ] TASK 13/08: UI billing dan Admin Kredit multi-produk.
 
