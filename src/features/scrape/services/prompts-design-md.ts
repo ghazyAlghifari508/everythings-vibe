@@ -2,6 +2,7 @@ import { z } from "zod";
 import { DESIGN_SYNTHESIS_DETAIL_MAX_CHARS } from "@/features/scrape/types/scrape-constants";
 import type { ScrapeInstrumentation } from "@/features/scrape/types/scrape-instrumentation";
 import { ScrapeError } from "@/lib/design-errors";
+import { COMBO_MODEL_ID } from "@/lib/model-config";
 import { extractJson } from "@/lib/services/json-extract";
 import { visualEvidenceSchema } from "../types/design-evidence-contract";
 import {
@@ -202,6 +203,12 @@ async function synthesizeWithEvidence(
 		for await (const chunk of stream.generator) {
 			response += chunk;
 		}
+		// Numeric usage only. The callback never sees the prompt or response.
+		await instrumentation.onProviderUsage?.({
+			...stream.outcome,
+			provider: "9router",
+			model: COMBO_MODEL_ID,
+		});
 		// A job cancelled at any point during synthesis must stop the pipeline
 		// rather than be reported as a degraded enrichment.
 		if (signal?.aborted) {

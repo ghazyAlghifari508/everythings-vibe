@@ -14,6 +14,10 @@ import {
 import { scrapeRequestSchema } from "@/features/scrape/types/scrape-contract";
 import type { ScrapeInstrumentation } from "@/features/scrape/types/scrape-instrumentation";
 import {
+	observeProviderUsage,
+	observeTiming,
+} from "@/features/usage-metering/services/shadow-usage-observation";
+import {
 	errorSourceForCode,
 	ScrapeError,
 	scrapeFailureReasonForCode,
@@ -24,8 +28,9 @@ import {
 	type ScrapeJobClaim,
 	scrapeClaimPredicate,
 } from "./scrape-job-service";
+import { finalizeScrapeUsage } from "./scrape-usage-metering";
 
-export async function runScrapePipeline(
+async function runScrapePipelineCore(
 	scrapeId: string,
 	userId: string,
 	claim?: ScrapeJobClaim,
@@ -95,6 +100,10 @@ export async function runScrapePipeline(
 		onTiming: (label, durationMs) => {
 			timings[label] = (timings[label] ?? 0) + durationMs;
 			meta = { ...meta, timings: { ...timings } };
+			observeTiming(scrapeId, label, durationMs);
+		},
+		onProviderUsage: (usage) => {
+			observeProviderUsage(scrapeId, usage);
 		},
 	};
 
@@ -316,5 +325,24 @@ export async function runScrapePipeline(
 				updatedAt: new Date(),
 			})
 			.where(writePredicate());
+	}
+}
+
+/** Core execution plus shadow metering. Metering never changes the job result. */
+export async function runScrapePipeline(
+	scrapeId: string,
+	userId: string,
+	claim?: ScrapeJobClaim,
+): Promise<void> {
+	try {
+		await runScrapePipelineCore(scrapeId, userId, claim);
+	} finally {
+		await finalizeScrapeUsage({
+			scrapeId,
+			userId,
+			claimToken: claim?.token,
+			outcome: claim?.signal?.aborted ? "cancelled" : undefined,
+			finishedAt: new Date(),
+		});
 	}
 }
