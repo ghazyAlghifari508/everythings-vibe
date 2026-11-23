@@ -4,6 +4,15 @@ export const STUDIO_ELEMENT_HTML_MAX = 500_000;
 export const STUDIO_ELEMENT_FRAGMENT_MAX = 40_000;
 export const STUDIO_ELEMENT_COUNT_MAX = 2500;
 export const STUDIO_ELEMENT_TIMEOUT_MS = 120_000;
+
+/** Menu actions P7 dispatches; execution stays behind these stable contracts. */
+export const STUDIO_ELEMENT_ACTIONS = [
+	"edit-text",
+	"edit-ai",
+	"delete",
+	"select-parent",
+] as const;
+export type StudioElementAction = (typeof STUDIO_ELEMENT_ACTIONS)[number];
 export const STUDIO_ELEMENT_ATTR = "data-studio-element-id";
 export const STUDIO_INSPECTION_ATTR = "data-ev-inspect-id";
 const id = z.string().min(1).max(200);

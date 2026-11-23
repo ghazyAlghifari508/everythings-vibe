@@ -1,5 +1,4 @@
 "use client";
-
 import { AlertCircleIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/ui/icon";
 import { StudioCanvas } from "@/features/studio/components/canvas/studio-canvas";
@@ -9,6 +8,10 @@ import { useStudioChatDraft } from "@/features/studio/hooks/use-studio-chat-draf
 import { useStudioChatPanel } from "@/features/studio/hooks/use-studio-chat-panel";
 import { useStudioWorkspace } from "@/features/studio/hooks/use-studio-workspace";
 import type { StudioDetailLoaderData } from "@/features/studio/types/studio";
+import type {
+	StudioElementAction,
+	StudioElementTarget,
+} from "@/features/studio/types/studio-element";
 import { useStudioElementEditing } from "../../hooks/use-studio-element-editing";
 import { StudioElementPreview } from "./studio-element-preview";
 
@@ -30,7 +33,42 @@ export function StudioWorkspace({
 	const draft = useStudioChatDraft(
 		`studio-chat-draft:${workspace.project.userId}:${workspace.project.id}`,
 	);
-
+	const [selectedElement, setSelectedElement] =
+		useState<StudioElementTarget | null>(null);
+	const { selectTarget, submit, busy: elementBusy } = elementEditing;
+	const handleSelectElement = useCallback(
+		(target: StudioElementTarget | null) => setSelectedElement(target),
+		[],
+	);
+	const handleElementAction = useCallback(
+		(
+			action: StudioElementAction,
+			target: StudioElementTarget,
+			text?: string,
+		) => {
+			// Resolved inside the live surface where the indexed parent exists.
+			if (action === "select-parent") return;
+			// Clicking an element only opens the menu. Chat receives the target
+			// when the user explicitly chooses "Edit with AI".
+			if (action === "edit-ai") {
+				selectTarget(target);
+				chat.setOpen(true);
+				return;
+			}
+			if (action === "edit-text") {
+				void submit("Ganti teks elemen sesuai nilai yang dimasukkan.", {
+					target,
+					edit: { kind: "text", text: text ?? "" },
+				});
+				return;
+			}
+			void submit("Hapus elemen ini dari desain.", {
+				target,
+				edit: { kind: "remove" },
+			});
+		},
+		[chat, selectTarget, submit],
+	);
 	return (
 		<main className="relative flex h-dvh min-h-0 w-full flex-col overflow-hidden bg-charcoal text-snow">
 			<StudioHeader
@@ -53,13 +91,10 @@ export function StudioWorkspace({
 					frames={workspace.frames}
 					activeJob={workspace.activeJob}
 					selectedFrameId={workspace.selectedFrameId}
-					elementTarget={elementEditing.target}
-					onSelectElement={(target) => {
-						if (target) {
-							elementEditing.selectTarget(target);
-							chat.setOpen(true);
-						} else elementEditing.clearTarget();
-					}}
+					elementTarget={selectedElement}
+					onSelectElement={handleSelectElement}
+					onElementAction={handleElementAction}
+					elementActionBusy={elementBusy}
 					selectedFrameIds={workspace.selectedFrameIds}
 					onSelectFrame={workspace.selectFrame}
 					onSelectFrames={workspace.selectFrames}

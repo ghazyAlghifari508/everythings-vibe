@@ -7,6 +7,7 @@ import {
 import { readStudioApiError } from "../services/studio-frame-retry-client";
 import {
 	STUDIO_ELEMENT_TIMEOUT_MS,
+	type StudioElementEdit,
 	type StudioElementPreview,
 	type StudioElementTarget,
 	studioElementPreviewSchema,
@@ -118,16 +119,24 @@ export function useStudioElementEditing({
 	);
 	const clearTarget = useCallback(() => setTarget(null), []);
 	const submit = useCallback(
-		async (prompt: string) => {
-			if (!target || working.current) return { accepted: false };
+		async (
+			prompt: string,
+			options?: { target?: StudioElementTarget; edit?: StudioElementEdit },
+		) => {
+			const chosen = options?.target ?? target;
+			if (!chosen || working.current) return { accepted: false };
 			working.current = true;
 			sequence.current++;
 			setBusy(true);
 			setLocalError("");
 			setError("");
-			const snapshot = structuredClone(target);
+			const snapshot = structuredClone(chosen);
 			const key = `studio-element-request:${userId}:${projectId}`;
-			const signature = JSON.stringify({ prompt, target: snapshot });
+			const signature = JSON.stringify({
+				prompt,
+				target: snapshot,
+				edit: options?.edit ?? null,
+			});
 			let stored: unknown = null;
 			try {
 				stored = JSON.parse(readStudioChatStorage(key) || "null");
@@ -146,7 +155,12 @@ export function useStudioElementEditing({
 					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify({
 						action: "element-prepare",
-						request: { requestId, target: snapshot, prompt },
+						request: {
+							requestId,
+							target: snapshot,
+							prompt,
+							edit: options?.edit,
+						},
 					}),
 					signal: AbortSignal.timeout(STUDIO_ELEMENT_TIMEOUT_MS),
 				});
