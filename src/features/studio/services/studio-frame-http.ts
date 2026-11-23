@@ -13,6 +13,7 @@ import {
 } from "./studio-frame-errors";
 import { getStudioFrameVisual } from "./studio-frame-visual";
 import { enqueueStudioOperation } from "./studio-operation-enqueue";
+import { readStudioPrototypeHttp } from "./studio-prototype-http";
 import { retryStudioFrame, retryStudioPlanning } from "./studio-retry-service";
 
 function studioErrorResponse(error: unknown): Response {
@@ -42,6 +43,11 @@ export async function GET({
 		if (elementResponse) {
 			status = elementResponse.status;
 			return elementResponse;
+		}
+		const prototypeResponse = await readStudioPrototypeHttp(url, user.id);
+		if (prototypeResponse) {
+			status = prototypeResponse.status;
+			return prototypeResponse;
 		}
 		const projectId = url.searchParams.get("projectId");
 		const frameId = url.searchParams.get("frameId");
