@@ -1,7 +1,12 @@
 import { SQL } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { expect, it, vi } from "vitest";
-import { payments, subscriptions } from "@/db/schema";
+import {
+	creditOperations,
+	payments,
+	productTrials,
+	subscriptions,
+} from "@/db/schema";
 
 const state = vi.hoisted(() => ({
 	filters: [] as { table: unknown; filter: unknown }[],
@@ -33,6 +38,11 @@ const state = vi.hoisted(() => ({
 		createdAt: Date;
 		updatedAt: Date;
 	}>,
+	trialRows: [] as Array<{ product: string; state: string }>,
+	productUsageRows: [] as Array<{
+		product: string | null;
+		credits: number | string;
+	}>,
 }));
 vi.mock("@tanstack/react-start", () => ({
 	createServerFn: () => ({
@@ -50,25 +60,29 @@ vi.mock("@/lib/session", () => ({
 }));
 vi.mock("@/db", () => ({
 	db: {
-		select: () => ({
+		select: (fields?: Record<string, unknown>) => ({
 			from: (table: unknown) => {
-				const chain = Object.assign(
-					Promise.resolve(table === payments ? state.rows : []),
-					{
-						where: (filter: unknown) => {
-							state.filters.push({ table, filter });
-							return chain;
-						},
-						orderBy: () => chain,
-						leftJoin: () => chain,
-						limit: async (limit: number) => {
-							state.limits.push({ table, limit });
-							return table === subscriptions
-								? state.subRows.slice(0, limit)
+				const resolvedRows =
+					fields && "credits" in fields
+						? state.productUsageRows
+						: fields && "state" in fields && "product" in fields
+							? state.trialRows
+							: table === payments
+								? state.rows
 								: [];
-						},
+				const chain = Object.assign(Promise.resolve(resolvedRows), {
+					where: (filter: unknown) => {
+						state.filters.push({ table, filter });
+						return chain;
 					},
-				);
+					leftJoin: () => chain,
+					orderBy: () => chain,
+					groupBy: () => chain,
+					limit: async (limit: number) => {
+						state.limits.push({ table, limit });
+						return table === subscriptions ? state.subRows.slice(0, limit) : [];
+					},
+				});
 				return chain;
 			},
 		}),
@@ -151,5 +165,73 @@ it("derives available capacity from the canonical subscription state", async () 
 		expect(result.creditUsage.availableCredits).toBe(0);
 	} finally {
 		state.subRows = [];
+	}
+});
+
+it("scopes trial and settled paid product usage to the authenticated tenant", async () => {
+	state.rows = [];
+	state.subRows = [];
+	state.filters.length = 0;
+	try {
+		const result = await loadBilling();
+		expect(result.trials).toEqual({ studio: "available", scrape: "available" });
+		expect(result.creditUsage.productBreakdown).toEqual([]);
+
+		const trialFilter = state.filters.find(
+			(entry) => entry.table === productTrials,
+		)?.filter;
+		if (!(trialFilter instanceof SQL))
+			throw new Error("Missing trial ownership filter");
+		expect(new PgDialect().sqlToQuery(trialFilter).params).toEqual([
+			"tenant-a",
+			"studio",
+			"scrape",
+		]);
+
+		const usageFilters = state.filters.flatMap((entry) =>
+			entry.table === creditOperations && entry.filter instanceof SQL
+				? [new PgDialect().sqlToQuery(entry.filter).params]
+				: [],
+		);
+		expect(
+			usageFilters.some(
+				(params) =>
+					params.includes("tenant-a") &&
+					params.includes("settled") &&
+					params.includes("subscription_balance") &&
+					params.includes(0),
+			),
+		).toBe(true);
+	} finally {
+		state.filters.length = 0;
+	}
+});
+
+it("maps trial states and counts only settled paid product charges", async () => {
+	state.rows = [];
+	state.subRows = [];
+	state.trialRows = [
+		{ product: "studio", state: "consumed" },
+		{ product: "scrape", state: "released" },
+	];
+	state.productUsageRows = [
+		{ product: "vibeplan_greenfield", credits: "16" },
+		{ product: "studio", credits: 18 },
+		{ product: null, credits: 4 },
+	];
+	try {
+		const result = await loadBilling();
+		expect(result.trials).toEqual({
+			studio: "consumed",
+			scrape: "available",
+		});
+		expect(result.creditUsage.productBreakdown).toEqual([
+			{ product: "vibeplan_greenfield", credits: 16 },
+			{ product: "studio", credits: 18 },
+			{ product: "legacy_unknown", credits: 4 },
+		]);
+	} finally {
+		state.trialRows = [];
+		state.productUsageRows = [];
 	}
 });

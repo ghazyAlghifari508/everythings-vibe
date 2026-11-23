@@ -83,17 +83,25 @@ describe("Billing layout and payment history preview", () => {
 		updatedAt: "2026-10-25T10:00:00Z",
 	});
 
+	const billingEntitlements = {
+		trials: { studio: "available" as const, scrape: "available" as const },
+		productChargingEnabled: { studio: false, scrape: false },
+	};
+	const emptyUsage = {
+		availableCredits: 0,
+		reservedCredits: 0,
+		totalCreditsUsed: 0,
+		operations: [],
+		productBreakdown: [],
+		periodStart: "2026-10-01T00:00:00.000Z",
+	};
 	it("uses CSS grid row stretching on desktop without items-start to match card heights", () => {
 		const { container } = render(
 			<BillingPage
 				subscription={undefined}
 				payments={[]}
-				creditUsage={{
-					availableCredits: 0,
-					reservedCredits: 0,
-					totalCreditsUsed: 0,
-					operations: [],
-				}}
+				creditUsage={{ ...emptyUsage }}
+				{...billingEntitlements}
 			/>,
 		);
 
@@ -123,12 +131,8 @@ describe("Billing layout and payment history preview", () => {
 			<BillingPage
 				subscription={undefined}
 				payments={payments}
-				creditUsage={{
-					availableCredits: 0,
-					reservedCredits: 0,
-					totalCreditsUsed: 0,
-					operations: [],
-				}}
+				creditUsage={{ ...emptyUsage }}
+				{...billingEntitlements}
 			/>,
 		);
 
@@ -149,12 +153,8 @@ describe("Billing layout and payment history preview", () => {
 			<BillingPage
 				subscription={undefined}
 				payments={payments}
-				creditUsage={{
-					availableCredits: 0,
-					reservedCredits: 0,
-					totalCreditsUsed: 0,
-					operations: [],
-				}}
+				creditUsage={{ ...emptyUsage }}
+				{...billingEntitlements}
 			/>,
 		);
 
@@ -174,12 +174,8 @@ describe("Billing layout and payment history preview", () => {
 			<BillingPage
 				subscription={undefined}
 				payments={[]}
-				creditUsage={{
-					availableCredits: 0,
-					reservedCredits: 0,
-					totalCreditsUsed: 0,
-					operations: [],
-				}}
+				creditUsage={{ ...emptyUsage }}
+				{...billingEntitlements}
 			/>,
 		);
 
@@ -212,11 +208,11 @@ describe("Billing layout and payment history preview", () => {
 				}}
 				payments={[]}
 				creditUsage={{
+					...emptyUsage,
 					availableCredits: 95,
-					reservedCredits: 0,
 					totalCreditsUsed: 10,
-					operations: [],
 				}}
+				{...billingEntitlements}
 			/>,
 		);
 
@@ -236,11 +232,12 @@ describe("Billing layout and payment history preview", () => {
 				subscription={undefined}
 				payments={[]}
 				creditUsage={{
+					...emptyUsage,
 					availableCredits: 25,
 					reservedCredits: 20,
 					totalCreditsUsed: 80,
-					operations: [],
 				}}
+				{...billingEntitlements}
 			/>,
 		);
 		expect(screen.getByRole("meter").getAttribute("aria-valuetext")).toContain(

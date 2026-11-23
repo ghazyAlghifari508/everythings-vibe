@@ -1,7 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
-import { and, desc, eq, ne } from "drizzle-orm";
+import { and, desc, eq, gt, gte, inArray, lte, ne, sql } from "drizzle-orm";
+import { BILLING_PERIOD_DAYS } from "@/features/billing/types/billing-constants";
 import type { CreditOperationItem } from "../components/credit-usage";
 import { resolveSubscriptionState } from "./billing";
+import { resolveProductChargingState } from "./charging-state.functions";
+import type { CreditOperationProduct } from "./credit-operation-registry";
 import { queryCreditUsageHistory } from "./credit-usage.functions";
 
 export interface BillingSubscription {
@@ -32,11 +35,19 @@ export interface BillingPaymentItem {
 	updatedAt: string | null;
 }
 
+export type ProductTrialState = "available" | "reserved" | "consumed";
+
+export interface BillingProductUsage {
+	product: CreditOperationProduct;
+	credits: number;
+}
 export interface BillingCreditUsage {
 	availableCredits: number;
 	reservedCredits: number;
 	totalCreditsUsed: number;
 	operations: CreditOperationItem[];
+	productBreakdown: BillingProductUsage[];
+	periodStart: string;
 	pagination?: {
 		page: number;
 		pageSize: number;
@@ -50,7 +61,8 @@ export const loadBilling = createServerFn({ method: "GET" }).handler(
 		const { requireUserServer } = await import("@/lib/session");
 		const user = await requireUserServer();
 		const { db } = await import("@/db");
-		const { payments, subscriptions } = await import("@/db/schema");
+		const { creditOperations, payments, productTrials, subscriptions } =
+			await import("@/db/schema");
 
 		const [subRows, paymentRows, initialUsage] = await Promise.all([
 			db
@@ -70,6 +82,55 @@ export const loadBilling = createServerFn({ method: "GET" }).handler(
 				.orderBy(desc(payments.createdAt)),
 			queryCreditUsageHistory(user.id, { page: 1, pageSize: 10 }),
 		]);
+		const now = new Date();
+		const periodStart =
+			subRows[0]?.currentPeriodStart ??
+			new Date(now.getTime() - BILLING_PERIOD_DAYS * 24 * 60 * 60 * 1000);
+		const [trialRows, productUsageRows] = await Promise.all([
+			db
+				.select({ product: productTrials.product, state: productTrials.state })
+				.from(productTrials)
+				.where(
+					and(
+						eq(productTrials.userId, user.id),
+						inArray(productTrials.product, ["studio", "scrape"]),
+					),
+				),
+			// Only settled paid charges count. Trials, exempt work, initial
+			// analysis allowance, shadow metering and open holds are excluded.
+			db
+				.select({
+					product: creditOperations.product,
+					credits: sql<number>`coalesce(sum(${creditOperations.finalCharge}), 0)`,
+				})
+				.from(creditOperations)
+				.where(
+					and(
+						eq(creditOperations.userId, user.id),
+						eq(creditOperations.state, "settled"),
+						eq(creditOperations.fundingSource, "subscription_balance"),
+						gt(creditOperations.finalCharge, 0),
+						gte(creditOperations.settledAt, periodStart),
+						lte(creditOperations.settledAt, now),
+					),
+				)
+				.groupBy(creditOperations.product),
+		]);
+
+		const trials: Record<"studio" | "scrape", ProductTrialState> = {
+			studio: "available",
+			scrape: "available",
+		};
+		for (const row of trialRows) {
+			trials[row.product] = row.state === "released" ? "available" : row.state;
+		}
+
+		const productBreakdown: BillingProductUsage[] = productUsageRows.map(
+			(row) => ({
+				product: row.product ?? "legacy_unknown",
+				credits: Number(row.credits ?? 0),
+			}),
+		);
 
 		// ponytail: server fn boundary rejects Date + unknown - coerce to plain JSON.
 		const subscription: BillingSubscription | undefined = subRows[0]
@@ -117,7 +178,7 @@ export const loadBilling = createServerFn({ method: "GET" }).handler(
 		// would over-report spendable capacity on the first render.
 		const availableCredits = resolveSubscriptionState(
 			subRows[0],
-			new Date(),
+			now,
 		).remaining;
 
 		const creditUsage: BillingCreditUsage = {
@@ -125,6 +186,8 @@ export const loadBilling = createServerFn({ method: "GET" }).handler(
 			reservedCredits: creditsReserved,
 			totalCreditsUsed: creditsUsed,
 			operations: operationsList,
+			productBreakdown,
+			periodStart: periodStart.toISOString(),
 			pagination: {
 				page: initialUsage.page,
 				pageSize: initialUsage.pageSize,
@@ -133,6 +196,12 @@ export const loadBilling = createServerFn({ method: "GET" }).handler(
 			},
 		};
 
-		return { subscription, payments: paymentsList, creditUsage };
+		return {
+			subscription,
+			payments: paymentsList,
+			creditUsage,
+			trials,
+			productChargingEnabled: resolveProductChargingState(process.env),
+		};
 	},
 );
