@@ -59,7 +59,7 @@ Tidak ada deploy, publish, merge, pembayaran, atau pembelian paket. Tidak ada kr
 | F4 | Medium | Pre-token PRD menampilkan spinner/copy "Menyusun PRD..." di kanvas | Fallback `GenerationProgress` dirender di tengah | Fallback dihapus; kanvas menampilkan **text skeleton** tanpa teks (label hanya untuk assistive tech) sampai token pertama | Fixed + tes regresi |
 | F5 | High (fungsional) | History drawer gagal memuat: "Gagal memuat riwayat dari server" | Drawer memanggil `loadHistory()` tanpa payload; validator Zod menolak `undefined` (`expected object`) sehingga server function error (HTTP 200 + error terserialisasi) | `historyFilterSchema` diberi `.default({})` sehingga payload kosong = "semua" | Fixed + tes regresi; drawer memuat 17 item |
 | F6 | Medium (responsive) | Navbar overflow: CTA terpotong di 390 px; stepper berlabel meluap di 768 px | Wordmark logo + stepper berlabel muncul terlalu dini | Wordmark disembunyikan `<sm`; stepper penuh + label tahap pindah ke `lg` (≥1024); stepper ringkas untuk <1024 | Fixed; semua viewport 360–1440 fit |
-| F7 | Low (copy) | Kontrol menuju Kanban berlabel "Task" di halaman Task | Label lama menyamai nama tahap | Label menjadi `Kanban` | Fixed |
+| F7 | Low (copy) | Kontrol menuju Kanban berlabel "Task" di halaman Task | Label lama menyamai nama tahap | Sempat diubah ke `Kanban`, lalu **dikembalikan ke `Task`** atas keputusan user (lihat gambar referensi user) | Reverted |
 | F8 | Low (test) | Tes lama `-home-mode.test.ts` mematok rute legacy `/ask/$id` | Sisa migrasi nested route (P1) | Asersi diperbarui ke `/vibeplan/$id/ask` (kontrak kanonik) | Fixed |
 
 Catatan yang **tidak** diubah (dilaporkan apa adanya):

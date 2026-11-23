@@ -204,7 +204,7 @@ describe("P5 Task Breakdown generation", () => {
 		);
 		const canvas = screen.getByRole("region", { name: "Kanvas diagram task" });
 		expect(canvas.getAttribute("aria-busy")).toBe("true");
-		expect(screen.getByRole("link", { name: "Kanban" })).toBeTruthy();
+		expect(screen.getByRole("link", { name: "Task" })).toBeTruthy();
 
 		world.task = {
 			...world.task,
