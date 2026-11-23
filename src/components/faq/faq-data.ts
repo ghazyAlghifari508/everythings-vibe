@@ -9,32 +9,50 @@ export const FAQ_ITEMS: FaqItem[] = [
 		id: "project-persistence",
 		title: "Apakah project yang saya buat tersimpan otomatis?",
 		content:
-			"Ya. Setiap tahapan yang selesai di-generate (PRD, kriteria penerimaan, dan daftar task) otomatis tersimpan ke akun Anda. Anda bisa keluar kapan saja dan melanjutkan project melalui Dashboard atau menu Riwayat.",
+			"Ya. Setiap tahapan yang selesai di-generate tersimpan ke akun kamu. Kamu bisa keluar kapan saja dan melanjutkan melalui Dashboard atau menu Riwayat.",
 	},
 	{
 		id: "interrupted-generation",
 		title: "Apa yang terjadi jika koneksi terputus saat AI sedang generate?",
 		content:
-			"Credit yang digunakan berada dalam status reservasi sementara. Jika server berhasil menyelesaikan dokumen sebelum koneksi terputus, hasilnya tetap tersimpan. Jika proses gagal atau waktu tunggu habis, reservasi akan dilepas kembali ke saldo Anda dan project tetap berada di tahap terakhir agar bisa di-generate ulang.",
+			"Saat operasi berjalan, kredit yang dibutuhkan ditandai sebagai reservasi, bukan pemotongan final. Jika pekerjaan selesai, hasil tersimpan dan reservasi menjadi biaya akhir. Jika gagal, reservasi dilepas kembali ke saldo. Kamu bisa melihat statusnya di Pengaturan > Billing pada Riwayat Penggunaan Kredit.",
 	},
 	{
 		id: "prd-revision",
-		title: "Apakah revisi PRD melalui chat memotong credit?",
+		title: "Apakah revisi PRD melalui chat memotong kredit?",
 		content:
-			"Tidak. Revisi seksi PRD melalui chat panel sepenuhnya gratis dan membuat versi dokumen baru. Credit hanya dipotong saat pertama kali membuat PRD baru atau menjalankan generate untuk tahap berikutnya seperti kriteria penerimaan dan task.",
+			"Tidak. Revisi PRD melalui chat memakai patch seksi dan tidak memotong kredit. Aturan ini khusus VibePlan. Revisi AI di Studio mengikuti pekerjaan yang dijalankan dan saat ini belum memotong kredit karena tarifnya belum aktif.",
 	},
 	{
 		id: "credit-expiry-and-topup",
 		title:
-			"Apakah credit memiliki masa aktif, dan bagaimana cara kerja top-up?",
+			"Apakah kredit memiliki masa aktif, dan bagaimana cara kerja top up?",
 		content:
-			"Credit paket langganan berlaku selama siklus 30 hari berjalan dan hangus jika tidak diperpanjang. Paket Free mendapat alokasi 2 credit setiap 30 hari tanpa akumulasi sisa bulan sebelumnya. Paket top-up menambahkan credit ke saldo periode aktif saat ini, tetapi tidak memperpanjang masa aktif langganan.",
+			"Satu akun memakai satu saldo kredit untuk VibePlan, Studio, dan Scrape saat tarifnya aktif. Alokasi paket direset setiap 30 hari dan sisa tidak dibawa ke periode berikutnya. Top up masuk ke saldo periode berjalan, tidak memperpanjang masa aktif, dan hangus bersama alokasi di akhir periode.",
+	},
+	{
+		id: "product-trials",
+		title: "Bagaimana trial Studio dan Scrape bekerja untuk akun Free?",
+		content:
+			"Setiap akun Free mendapat satu trial Studio dan satu trial Scrape tanpa pembayaran. Trial Studio menghasilkan satu frame. Trial Scrape mencakup satu job dengan maksimal tiga halaman dan dua tampilan DESIGN.md. Trial tidak diperbarui tiap bulan, tetapi hasil yang sudah dibuat tetap bisa diakses. Akun Pro dan Hengker memakai akses penuh tanpa trial terpisah.",
+	},
+	{
+		id: "free-actions",
+		title: "Aksi apa yang tidak memotong kredit?",
+		content:
+			"Melihat hasil, revisi manual, revisi PRD via chat, dan VibeTemplate tidak memotong kredit. Biaya kredit hanya muncul untuk operasi yang memang memakai kredit, dengan estimasi yang ditampilkan sebelum dijalankan.",
+	},
+	{
+		id: "credit-usage-history",
+		title: "Di mana saya melihat pemakaian kredit?",
+		content:
+			"Buka Pengaturan > Billing. Meter menunjukkan alokasi, kredit terpakai, dan kredit yang sedang direservasi. Riwayat Penggunaan Kredit merangkum semua fitur dan aktivitas, termasuk estimasi, reservasi, biaya akhir, dan statusnya.",
 	},
 	{
 		id: "cancel-subscription",
 		title: "Apa yang terjadi jika saya membatalkan langganan berbayar?",
 		content:
-			"Pembatalan melalui menu Pengaturan > Billing langsung berlaku seketika. Akun Anda kembali ke paket Free dan sisa credit langganan berbayar akan hangus. Semua dokumen dan riwayat project yang sudah dibuat tetap tersimpan di akun Anda.",
+			"Pembatalan melalui menu Pengaturan > Billing langsung berlaku. Akun kamu kembali ke paket Free dengan alokasi 2 kredit per 30 hari dan sisa kredit langganan berbayar hangus. Semua dokumen dan riwayat project tetap tersimpan.",
 	},
 	{
 		id: "repository-security",

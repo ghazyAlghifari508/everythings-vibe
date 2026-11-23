@@ -159,7 +159,8 @@ export function CreditExhaustedModal({
 									Mau kuota lebih banyak & fitur lengkap?
 								</span>
 								<p className="text-[11px] text-fog mt-0.5">
-									Mulai Rp 49.000/bulan untuk 30 kredit, full AC, Task & Kanban.
+									Mulai Rp 49.000/30 hari untuk 30 kredit. VibePlan penuh,
+									Studio, Scrape, dan VibeTemplate.
 								</p>
 							</div>
 							<span className="flex items-center gap-1 font-mono text-xs text-snow font-medium shrink-0 ml-2">
