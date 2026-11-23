@@ -21,6 +21,23 @@ import type {
 	StudioElementTarget,
 } from "../../types/studio-element";
 
+// Void elements cannot hold a text node; the patch engine also rejects them.
+const VOID_ELEMENT_TAGS = new Set([
+	"area",
+	"base",
+	"br",
+	"col",
+	"embed",
+	"hr",
+	"img",
+	"input",
+	"link",
+	"meta",
+	"param",
+	"source",
+	"track",
+	"wbr",
+]);
 interface StudioElementEditMenuProps {
 	target: StudioElementTarget;
 	open: boolean;
@@ -68,7 +85,9 @@ export function StudioElementEditMenu({
 	const menuRef = useRef<HTMLDivElement>(null);
 	const cancelled = useRef(false);
 	const currentText = textValue ?? target.label;
-	const canEditText = textEditable ?? supportsDirectTextEdit(target);
+	const canEditText =
+		(textEditable ?? supportsDirectTextEdit(target)) &&
+		!VOID_ELEMENT_TAGS.has(target.tag.toLowerCase());
 
 	useEffect(() => {
 		if (!editing) return;

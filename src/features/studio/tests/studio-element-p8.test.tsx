@@ -198,6 +198,26 @@ describe("P8 deterministic text editing", () => {
 		expect(screen.getByText("Edit with AI")).toBeTruthy();
 		expect(screen.getByText("Delete")).toBeTruthy();
 	});
+
+	it("does not advertise direct editing for a void element", () => {
+		const imageTarget: StudioElementTarget = {
+			...textTarget,
+			tag: "img",
+			selector: "#cover",
+			elementId: "id:cover",
+		};
+		render(
+			<StudioElementEditMenu
+				target={imageTarget}
+				open
+				onOpenChange={vi.fn()}
+				onAction={vi.fn()}
+				textEditable
+			/>,
+		);
+		expect(screen.queryByText("Edit Text")).toBeNull();
+		expect(screen.getByText("Edit with AI")).toBeTruthy();
+	});
 });
 
 describe("P8 scoped design intelligence delivery", () => {
