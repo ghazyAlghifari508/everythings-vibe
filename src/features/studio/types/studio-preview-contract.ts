@@ -2,9 +2,9 @@ import { z } from "zod";
 import { STUDIO_DEVICES, type StudioDevice } from "./studio-renderer";
 
 /**
- * P10 owns the interactive viewer route. P9 only builds the authorized target:
- * project id in the path, selected frame and viewport in validated search
- * state, plus the canvas path to return to. No fake preview modal is created.
+ * P9 builds the authorized target (project id in the path, selected frame and
+ * viewport in validated search state, plus the canvas path to return to); P10
+ * owns the viewer route it points at.
  */
 export const STUDIO_PREVIEW_ROUTE = "/design/$id/preview" as const;
 
@@ -20,7 +20,7 @@ export interface StudioPreviewTargetInput {
 	frameId: string;
 	device: StudioDevice;
 	returnTo?: string;
-	/** True only once the authorized P10 viewer route exists. */
+	/** False only when the caller has no way to open the viewer. */
 	routeAvailable?: boolean;
 }
 
@@ -36,7 +36,7 @@ export function buildStudioPreviewTarget({
 	frameId,
 	device,
 	returnTo,
-	routeAvailable = false,
+	routeAvailable = true,
 }: StudioPreviewTargetInput): StudioPreviewTarget {
 	const search = studioPreviewSearchSchema.parse({
 		frameId,
@@ -56,4 +56,17 @@ export function buildStudioPreviewTarget({
 			? {}
 			: { unavailableReason: "Peninjau prototipe belum tersedia." }),
 	};
+}
+
+/**
+ * Back always lands on this project's own canvas. A caller-supplied path is
+ * honoured only when it is exactly that canvas, so the viewer can never be used
+ * as an open redirect or to leave the authorized project.
+ */
+export function resolveStudioPreviewReturn(
+	requested: string | undefined,
+	projectId: string,
+): string {
+	const canvas = `/design/${encodeURIComponent(projectId)}`;
+	return requested === canvas ? requested : canvas;
 }

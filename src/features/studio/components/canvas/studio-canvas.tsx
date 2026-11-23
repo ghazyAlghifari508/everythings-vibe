@@ -85,7 +85,7 @@ export interface StudioCanvasProps {
 	onFrameDeviceChange?: (frameId: string, device: StudioDevice) => void;
 	onRefreshFrame?: (frameId: string) => void;
 	onOpenPreview?: (target: StudioPreviewTarget) => void;
-	/** True only when the authorized P10 preview route exists. */
+	/** False disables the Preview action, e.g. when no viewer handler is wired. */
 	previewRouteAvailable?: boolean;
 	/** Left band covered by the floating chat panel; `null` until its layout is known. */
 	leftInsetPx?: number | null;
@@ -115,7 +115,7 @@ export const StudioCanvas = memo(function StudioCanvas({
 	onFrameDeviceChange,
 	onRefreshFrame,
 	onOpenPreview,
-	previewRouteAvailable = false,
+	previewRouteAvailable = true,
 	leftInsetPx = 0,
 	className = "",
 }: StudioCanvasProps) {
@@ -265,7 +265,7 @@ export const StudioCanvas = memo(function StudioCanvas({
 				frameId: frame.id,
 				device,
 				returnTo: `/design/${encodeURIComponent(project.id)}`,
-				routeAvailable: previewRouteAvailable,
+				routeAvailable: previewRouteAvailable && Boolean(onOpenPreview),
 			}),
 		};
 	}, [
@@ -273,6 +273,7 @@ export const StudioCanvas = memo(function StudioCanvas({
 		frames,
 		liveReadyFrameIds,
 		previewRouteAvailable,
+		onOpenPreview,
 		project.id,
 		toolbarFrameId,
 	]);

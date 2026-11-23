@@ -1,5 +1,6 @@
 "use client";
 import { AlertCircleIcon } from "@hugeicons/core-free-icons";
+import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { StudioCanvas } from "@/features/studio/components/canvas/studio-canvas";
@@ -14,6 +15,7 @@ import type {
 	StudioElementAction,
 	StudioElementTarget,
 } from "@/features/studio/types/studio-element";
+import type { StudioPreviewTarget } from "@/features/studio/types/studio-preview-contract";
 import { useStudioElementEditing } from "../../hooks/use-studio-element-editing";
 import { StudioElementFeedback } from "./studio-element-feedback";
 
@@ -60,6 +62,19 @@ export function StudioWorkspace({
 			void workspace.syncProjectStatus();
 		},
 		[workspace.syncProjectStatus],
+	);
+	const navigate = useNavigate();
+	// The viewer is a sibling route: leaving unmounts the canvas, and the camera,
+	// frame selection and chat draft come back from their own persisted stores.
+	const handleOpenPreview = useCallback(
+		(target: StudioPreviewTarget) => {
+			void navigate({
+				to: "/design/$id/preview",
+				params: { id: workspace.project.id },
+				search: target.search,
+			});
+		},
+		[navigate, workspace.project.id],
 	);
 	const { selectTarget, submit, busy: elementBusy } = elementEditing;
 	const handleSelectElement = useCallback(
@@ -138,6 +153,7 @@ export function StudioWorkspace({
 					onFrameDeviceChange={setFrameDevice}
 					frameRefreshTokens={frameRefreshTokens}
 					onRefreshFrame={handleRefreshFrame}
+					onOpenPreview={handleOpenPreview}
 					leftInsetPx={chat.insetPx}
 					className="size-full"
 				/>
