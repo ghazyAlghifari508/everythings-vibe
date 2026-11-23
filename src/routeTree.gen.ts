@@ -25,6 +25,7 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TemplatesRouteImport } from './routes/templates'
 import { Route as AcIdRouteImport } from './routes/ac/$id'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as AdminCreditRouteImport } from './routes/admin/credit'
 import { Route as AdminFeedbackRouteImport } from './routes/admin/feedback'
 import { Route as AdminProjectsRouteImport } from './routes/admin/projects'
 import { Route as AdminTransactionsRouteImport } from './routes/admin/transactions'
@@ -198,6 +199,11 @@ const AcIdRoute = AcIdRouteImport.update({
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminCreditRoute = AdminCreditRouteImport.update({
+  id: '/credit',
+  path: '/credit',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminFeedbackRoute = AdminFeedbackRouteImport.update({
@@ -704,6 +710,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRouteWithChildren
   '/templates': typeof TemplatesRoute
   '/ac/$id': typeof AcIdRoute
+  '/admin/credit': typeof AdminCreditRoute
   '/admin/feedback': typeof AdminFeedbackRoute
   '/admin/projects': typeof AdminProjectsRoute
   '/admin/transactions': typeof AdminTransactionsRoute
@@ -812,6 +819,7 @@ export interface FileRoutesByTo {
   '/pricing': typeof PricingRoute
   '/templates': typeof TemplatesRoute
   '/ac/$id': typeof AcIdRoute
+  '/admin/credit': typeof AdminCreditRoute
   '/admin/feedback': typeof AdminFeedbackRoute
   '/admin/projects': typeof AdminProjectsRoute
   '/admin/transactions': typeof AdminTransactionsRoute
@@ -924,6 +932,7 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRouteWithChildren
   '/templates': typeof TemplatesRoute
   '/ac/$id': typeof AcIdRoute
+  '/admin/credit': typeof AdminCreditRoute
   '/admin/feedback': typeof AdminFeedbackRoute
   '/admin/projects': typeof AdminProjectsRoute
   '/admin/transactions': typeof AdminTransactionsRoute
@@ -1038,6 +1047,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/templates'
     | '/ac/$id'
+    | '/admin/credit'
     | '/admin/feedback'
     | '/admin/projects'
     | '/admin/transactions'
@@ -1146,6 +1156,7 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/templates'
     | '/ac/$id'
+    | '/admin/credit'
     | '/admin/feedback'
     | '/admin/projects'
     | '/admin/transactions'
@@ -1257,6 +1268,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/templates'
     | '/ac/$id'
+    | '/admin/credit'
     | '/admin/feedback'
     | '/admin/projects'
     | '/admin/transactions'
@@ -1538,6 +1550,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/credit': {
+      id: '/admin/credit'
+      path: '/credit'
+      fullPath: '/admin/credit'
+      preLoaderRoute: typeof AdminCreditRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/feedback': {
@@ -2202,6 +2221,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AdminRouteChildren {
+  AdminCreditRoute: typeof AdminCreditRoute
   AdminFeedbackRoute: typeof AdminFeedbackRoute
   AdminProjectsRoute: typeof AdminProjectsRoute
   AdminTransactionsRoute: typeof AdminTransactionsRoute
@@ -2210,6 +2230,7 @@ interface AdminRouteChildren {
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminCreditRoute: AdminCreditRoute,
   AdminFeedbackRoute: AdminFeedbackRoute,
   AdminProjectsRoute: AdminProjectsRoute,
   AdminTransactionsRoute: AdminTransactionsRoute,
@@ -2450,10 +2471,13 @@ export const routeTree = rootRouteImport
   ._addFileTypes<FileRouteTypes>()
 
 import type { getRouter } from './router.tsx'
+
 import type { createStart } from '@tanstack/react-start'
+
 declare module '@tanstack/react-start' {
   interface Register {
     ssr: true
+
     router: Awaited<ReturnType<typeof getRouter>>
   }
 }

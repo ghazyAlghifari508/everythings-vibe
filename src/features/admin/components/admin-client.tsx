@@ -2,6 +2,7 @@
 
 import {
 	BubbleChatIcon,
+	Coins01Icon,
 	CreditCardIcon,
 	DashboardSquare01Icon,
 	GitBranchIcon,
@@ -55,6 +56,13 @@ const NAV_ITEMS: NavItem[] = [
 		icon: CreditCardIcon,
 		isActive: (p: string) =>
 			p === "/admin/transactions" || p.startsWith("/admin/transactions/"),
+	},
+	{
+		href: "/admin/credit",
+		label: "Kredit",
+		icon: Coins01Icon,
+		isActive: (p: string) =>
+			p === "/admin/credit" || p.startsWith("/admin/credit/"),
 	},
 ];
 

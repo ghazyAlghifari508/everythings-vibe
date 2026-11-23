@@ -56,7 +56,7 @@ describe("AdminClient Top-Nav Shell", () => {
 		container?.remove();
 	});
 
-	it("renders a single navigation landmark with exactly 5 tabs, theme toggle, and no redundant Admin label", () => {
+	it("renders a single navigation landmark with exactly 6 tabs, theme toggle, and no redundant Admin label", () => {
 		act(() => {
 			root?.render(
 				<AdminClient>
@@ -77,14 +77,15 @@ describe("AdminClient Top-Nav Shell", () => {
 		expect(container.textContent).not.toContain("Admin Panel");
 		expect(navElements[0].children.length).toBe(1);
 
-		// Exactly 5 navigation tabs (Pengaturan removed)
+		// Exactly 6 navigation tabs (Pengaturan removed)
 		const navLinks = Array.from(container.querySelectorAll("nav a"));
-		expect(navLinks.length).toBe(5);
+		expect(navLinks.length).toBe(6);
 		expect(container.textContent).toContain("Ringkasan");
 		expect(container.textContent).toContain("Pengguna");
 		expect(container.textContent).toContain("Tiket");
 		expect(container.textContent).toContain("Proyek");
 		expect(container.textContent).toContain("Transaksi");
+		expect(container.textContent).toContain("Kredit");
 		expect(container.textContent).not.toContain("Pengaturan");
 
 		// Target destinations intact
@@ -95,6 +96,7 @@ describe("AdminClient Top-Nav Shell", () => {
 			"/admin/feedback",
 			"/admin/projects",
 			"/admin/transactions",
+			"/admin/credit",
 		]);
 
 		// No exit link in header shell
