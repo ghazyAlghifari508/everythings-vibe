@@ -7,6 +7,7 @@ import {
 	studioProjects,
 } from "@/db/schema";
 import { STUDIO_JOB_CLAIM_TTL_MS } from "../types/studio-constants";
+import { settleStudioOperationCharge } from "./studio-credit-adapter.server";
 
 export const STUDIO_JOB_MAX_ATTEMPTS = 3;
 export const STUDIO_JOB_HEARTBEAT_MS = 15_000;
@@ -97,8 +98,8 @@ function studioClaimPredicate(claim: StudioJobClaim) {
 		eq(studioJobs.projectId, claim.projectId),
 		eq(studioJobs.userId, claim.userId),
 		eq(studioJobs.claimedBy, claim.workerId),
+		isNull(studioJobs.deletedAt),
 		inArray(studioJobs.status, activeStatuses),
-		sql`${studioJobs.leaseExpiresAt} > clock_timestamp()`,
 	);
 }
 
@@ -150,6 +151,7 @@ export async function claimStudioJob(
 			and(
 				eq(studioJobs.id, jobId),
 				eq(studioJobs.userId, userId),
+				isNull(studioJobs.deletedAt),
 				inArray(studioJobs.status, activeStatuses),
 				lt(studioJobs.attempts, STUDIO_JOB_MAX_ATTEMPTS),
 				or(
@@ -242,6 +244,7 @@ export async function recoverStalledStudioJobs(
 	userId?: string,
 ): Promise<number> {
 	const eligible = and(
+		isNull(studioJobs.deletedAt),
 		inArray(studioJobs.status, activeStatuses),
 		or(
 			isNull(studioJobs.leaseExpiresAt),
@@ -317,6 +320,14 @@ export async function recoverStalledStudioJobs(
 					"@/features/billing/services/product-trial-settlement.server"
 				);
 				await settleProductTrial(tx, "studio", job.userId, job.id, 0);
+				await settleStudioOperationCharge(tx, {
+					userId: job.userId,
+					jobId: job.id,
+					operationId: job.creditOperationId,
+					outcome: "failed",
+					completedFrames: 0,
+					artifactReference: job.id,
+				});
 			}
 			recovered++;
 		});

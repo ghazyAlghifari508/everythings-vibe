@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { studioProjects, studioRevisions } from "@/db/schema";
 import { ScrapeError } from "@/lib/design-errors";
@@ -13,7 +13,11 @@ export async function getStudioProject(
 		.select()
 		.from(studioProjects)
 		.where(
-			and(eq(studioProjects.id, projectId), eq(studioProjects.userId, userId)),
+			and(
+				eq(studioProjects.id, projectId),
+				eq(studioProjects.userId, userId),
+				isNull(studioProjects.deletedAt),
+			),
 		)
 		.limit(1);
 

@@ -8,6 +8,7 @@ import {
 } from "@/db/schema";
 import type { ShadowOutcome } from "@/features/usage-metering/types/shadow-usage";
 import { STUDIO_FRAME_CONCURRENCY } from "../types/studio-constants";
+import { settleStudioOperationCharge } from "./studio-credit-adapter.server";
 import { extractDesignSystemTokens } from "./studio-design-tokens";
 import {
 	studioFrameErrorCodeFor,
@@ -238,6 +239,14 @@ export async function runStudioJobPipeline(
 						job.id,
 						ready.length,
 					);
+					await settleStudioOperationCharge(tx, {
+						userId: job.userId,
+						jobId: job.id,
+						operationId: job.creditOperationId,
+						outcome: usageOutcome === "unknown" ? "failed" : usageOutcome,
+						completedFrames: ready.length,
+						artifactReference: job.id,
+					});
 					await tx
 						.update(studioProjects)
 						.set({ updatedAt: new Date() })
@@ -313,6 +322,14 @@ export async function runStudioJobPipeline(
 						"@/features/billing/services/product-trial-settlement.server"
 					);
 					await settleProductTrial(tx, "studio", job.userId, job.id, 0);
+					await settleStudioOperationCharge(tx, {
+						userId: job.userId,
+						jobId: job.id,
+						operationId: job.creditOperationId,
+						outcome: "failed",
+						completedFrames: 0,
+						artifactReference: job.id,
+					});
 				});
 			} catch (writeFailure) {
 				if (!(writeFailure instanceof StudioLeaseLostError)) throw writeFailure;

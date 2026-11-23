@@ -1,6 +1,7 @@
-import { and, desc, eq, or } from "drizzle-orm";
+import { and, desc, eq, isNull, or } from "drizzle-orm";
 import { db } from "@/db";
 import {
+	creditOperations,
 	type InsertStudioAssetRow,
 	type InsertStudioFrameRow,
 	type InsertStudioProjectRow,
@@ -23,7 +24,9 @@ export async function listStudioProjects(
 	return db
 		.select()
 		.from(studioProjects)
-		.where(eq(studioProjects.userId, userId))
+		.where(
+			and(eq(studioProjects.userId, userId), isNull(studioProjects.deletedAt)),
+		)
 		.orderBy(desc(studioProjects.updatedAt))
 		.limit(limit);
 }
@@ -49,6 +52,57 @@ export async function deleteStudioProject(
 			.for("update");
 		if (!project)
 			throw new ScrapeError("WEBSITE_BLOCKED", "Studio tidak ditemukan.");
+		const [billed] = await tx
+			.select({ id: creditOperations.id })
+			.from(creditOperations)
+			.where(
+				and(
+					eq(creditOperations.userId, userId),
+					eq(creditOperations.studioProjectId, projectId),
+				),
+			)
+			.limit(1);
+		if (billed) {
+			const deletedAt = new Date();
+			await tx
+				.delete(studioAssets)
+				.where(
+					and(
+						eq(studioAssets.userId, userId),
+						project.logoAssetId
+							? or(
+									eq(studioAssets.projectId, projectId),
+									eq(studioAssets.id, project.logoAssetId),
+								)
+							: eq(studioAssets.projectId, projectId),
+					),
+				);
+			await tx
+				.delete(studioRevisions)
+				.where(eq(studioRevisions.projectId, projectId));
+			await tx
+				.delete(studioFrames)
+				.where(eq(studioFrames.projectId, projectId));
+			await tx
+				.update(studioJobs)
+				.set({ deletedAt, updatedAt: deletedAt })
+				.where(
+					and(
+						eq(studioJobs.projectId, projectId),
+						eq(studioJobs.userId, userId),
+					),
+				);
+			await tx
+				.update(studioProjects)
+				.set({ deletedAt, updatedAt: deletedAt })
+				.where(
+					and(
+						eq(studioProjects.id, projectId),
+						eq(studioProjects.userId, userId),
+					),
+				);
+			return { id: projectId };
+		}
 
 		// Assets have no project FK, so cascade deletion alone leaves orphans.
 		await tx

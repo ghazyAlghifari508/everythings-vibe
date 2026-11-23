@@ -19,6 +19,10 @@ import {
 } from "@/features/billing/services/product-trials.server";
 import { ScrapeError } from "@/lib/design-errors";
 import type { CreateStudioProjectInput } from "../types/studio-service";
+import {
+	reserveStudioOperationCharge,
+	serverStudioQuote,
+} from "./studio-credit-adapter.server";
 import { resolveStudioDesignReference } from "./studio-design-reference.server";
 import { studioGenerationOptionsSchema } from "./studio-generation-options";
 import { validateAndProcessLogo } from "./studio-logo-service";
@@ -132,7 +136,13 @@ export async function createStudioProjectWithJob(
 			frames: recentFrames,
 		};
 	}
-
+	const quoteScope = {
+		operation: "studio.generate" as const,
+		frames: options.initialPageCount,
+		promptChars: checked.prompt.length,
+		designMdChars: cleanDesignMd?.length ?? 0,
+	};
+	const quote = serverStudioQuote(quoteScope);
 	const { project, job, frames } = await db.transaction(async (tx) => {
 		const admission = await admitProductWork(tx, userId, "studio", "trial", {
 			key: requestKey,
@@ -143,6 +153,7 @@ export async function createStudioProjectWithJob(
 				prdContentHash,
 				validatedLogo,
 			},
+			maximumCredits: quote?.maximumCredits,
 		});
 		if (admission.kind === "replay") {
 			const [match] = await tx
@@ -239,6 +250,15 @@ export async function createStudioProjectWithJob(
 		}
 
 		if (admission.kind === "trial") await admission.reserve(newJob.id);
+		if (quote && admission.kind !== "trial") {
+			await reserveStudioOperationCharge(tx, {
+				userId,
+				projectId: newProject.id,
+				jobId: newJob.id,
+				scope: { ...quoteScope, frames: slotCount },
+				idempotencyKey: `studio-generate:${newJob.id}`,
+			});
+		}
 		const slots = await tx
 			.insert(studioFrames)
 			.values(

@@ -162,11 +162,18 @@ export async function POST({
 			};
 		}
 
+		const requestKey = request.headers.get("Idempotency-Key") ?? undefined;
+		if (requestKey !== undefined && !/^[a-zA-Z0-9-]{16,100}$/.test(requestKey))
+			return Response.json(
+				{ error: "Request key tidak valid." },
+				{ status: 400 },
+			);
 		if (typeof body.projectId === "string" && body.projectId.length > 0) {
 			const revision = await reviseStudioProject(
 				body.projectId,
 				user.id,
 				checked.prompt,
+				requestKey,
 			);
 			return Response.json(
 				{
@@ -178,12 +185,6 @@ export async function POST({
 			);
 		}
 
-		const requestKey = request.headers.get("Idempotency-Key") ?? undefined;
-		if (requestKey !== undefined && !/^[a-zA-Z0-9-]{16,100}$/.test(requestKey))
-			return Response.json(
-				{ error: "Request key tidak valid." },
-				{ status: 400 },
-			);
 		const { project, job, frames } = await createStudioProjectWithJob(
 			user.id,
 			{

@@ -40,7 +40,13 @@ export async function dispatchStudioWorkerBatch(
 		const pending = await db
 			.select()
 			.from(studioJobs)
-			.where(and(eq(studioJobs.status, "queued"), isNull(studioJobs.claimedBy)))
+			.where(
+				and(
+					eq(studioJobs.status, "queued"),
+					isNull(studioJobs.claimedBy),
+					isNull(studioJobs.deletedAt),
+				),
+			)
 			.orderBy(asc(studioJobs.createdAt))
 			.limit(STUDIO_FRAME_CONCURRENCY);
 		const batch = selectStudioWorkerBatch(pending);
