@@ -63,10 +63,16 @@ describe("P9 contextual toolbar interaction", () => {
 		).toBe(true);
 	});
 
-	it("keeps P10 preview disabled while its route is unavailable", () => {
+	it("keeps preview disabled only while the viewer is explicitly unavailable", () => {
 		render(
 			<StudioFrameToolbar
 				{...baseProps}
+				previewTarget={buildStudioPreviewTarget({
+					projectId: "p1",
+					frameId: "f1",
+					device: "desktop",
+					routeAvailable: false,
+				})}
 				onDeviceChange={vi.fn()}
 				onFocus={vi.fn()}
 				onRefresh={vi.fn()}
@@ -81,6 +87,21 @@ describe("P9 contextual toolbar interaction", () => {
 			(screen.getByRole("button", { name: /Muat ulang/ }) as HTMLButtonElement)
 				.disabled,
 		).toBe(false);
+	});
+
+	it("opens the viewer with the validated target when preview is available", () => {
+		const onPreview = vi.fn();
+		render(
+			<StudioFrameToolbar
+				{...baseProps}
+				onDeviceChange={vi.fn()}
+				onFocus={vi.fn()}
+				onRefresh={vi.fn()}
+				onPreview={onPreview}
+			/>,
+		);
+		fireEvent.click(screen.getByRole("button", { name: /pratinjau/ }));
+		expect(onPreview).toHaveBeenCalledWith(baseProps.previewTarget);
 	});
 
 	it("reports device changes without leaking pointer gestures to the canvas", () => {

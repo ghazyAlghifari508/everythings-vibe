@@ -20,19 +20,19 @@ describe("P9 P10 preview contract", () => {
 			device: "mobile",
 			returnTo: "/design/project%2F42",
 		});
-		expect(target.routeAvailable).toBe(false);
-		expect(target.unavailableReason).toBeTruthy();
+		expect(target.routeAvailable).toBe(true);
+		expect(target.unavailableReason).toBeUndefined();
 	});
 
-	it("reports availability only when the route is really provided", () => {
+	it("reports an honest reason when the viewer cannot be opened", () => {
 		const target = buildStudioPreviewTarget({
 			projectId: "p1",
 			frameId: "f1",
 			device: "tablet",
-			routeAvailable: true,
+			routeAvailable: false,
 		});
-		expect(target.routeAvailable).toBe(true);
-		expect(target.unavailableReason).toBeUndefined();
+		expect(target.routeAvailable).toBe(false);
+		expect(target.unavailableReason).toBeTruthy();
 	});
 
 	it("rejects unknown devices and extra search keys", () => {
