@@ -23,10 +23,10 @@ describe("HOME_PROJECT_MODE_OPTIONS", () => {
 });
 
 describe("decideHomePostCreationTarget", () => {
-	it("routes greenfield creation to /ask/$id", () => {
+	it("routes greenfield creation to the canonical workspace ask child", () => {
 		expect(
 			decideHomePostCreationTarget({ id: "proj-1", projectMode: "greenfield" }),
-		).toEqual({ to: "/ask/$id", params: { id: "proj-1" } });
+		).toEqual({ to: "/vibeplan/$id/ask", params: { id: "proj-1" } });
 	});
 
 	it("routes existing-codebase creation to /codebases/$id", () => {
@@ -43,15 +43,15 @@ describe("decideHomePostCreationTarget", () => {
 
 	it("keeps legacy responses without mode on the greenfield route", () => {
 		expect(decideHomePostCreationTarget({ id: "proj-1" })).toEqual({
-			to: "/ask/$id",
+			to: "/vibeplan/$id/ask",
 			params: { id: "proj-1" },
 		});
 		expect(
 			decideHomePostCreationTarget({ id: "proj-1", projectMode: null }),
-		).toEqual({ to: "/ask/$id", params: { id: "proj-1" } });
+		).toEqual({ to: "/vibeplan/$id/ask", params: { id: "proj-1" } });
 		expect(
 			decideHomePostCreationTarget({ id: "proj-1", projectMode: "unknown" }),
-		).toEqual({ to: "/ask/$id", params: { id: "proj-1" } });
+		).toEqual({ to: "/vibeplan/$id/ask", params: { id: "proj-1" } });
 	});
 });
 

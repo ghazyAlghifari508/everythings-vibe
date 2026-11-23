@@ -70,7 +70,7 @@ export function FlowStepNav(props?: {
 							<span
 								aria-hidden
 								className={cn(
-									"hidden h-px w-4 transition-colors duration-300 md:block",
+									"hidden h-px w-4 transition-colors duration-300 lg:block",
 									connectorActive ? "bg-indigo/60" : "bg-graphite",
 								)}
 							/>
@@ -93,7 +93,7 @@ export function FlowStepNav(props?: {
 							</span>
 							<span
 								className={cn(
-									"hidden font-inter text-sm transition-colors duration-300 md:block",
+									"hidden font-inter text-sm transition-colors duration-300 lg:block",
 									isActive
 										? "font-[510] text-snow"
 										: isCompleted
