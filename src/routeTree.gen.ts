@@ -36,6 +36,8 @@ import { Route as ApiReportErrorRouteImport } from './routes/api/report-error'
 import { Route as ApiScrapeRouteImport } from './routes/api/scrape'
 import { Route as AskIdRouteImport } from './routes/ask/$id'
 import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
+import { Route as BantuanIndexRouteImport } from './routes/bantuan.index'
+import { Route as BantuanCategoryIdRouteImport } from './routes/bantuan.$categoryId'
 import { Route as CodebasesIndexRouteImport } from './routes/codebases/index'
 import { Route as CodebasesIdRouteImport } from './routes/codebases/$id'
 import { Route as DesignIndexRouteImport } from './routes/design/index'
@@ -85,6 +87,7 @@ import { Route as ApiStudioProjectRouteImport } from './routes/api/studio.projec
 import { Route as ApiTaskProjectIdRouteImport } from './routes/api/task/$projectId'
 import { Route as ApiTaskGenerateRouteImport } from './routes/api/task/generate'
 import { Route as ApiUserPlanRouteImport } from './routes/api/user/plan'
+import { Route as BantuanCategoryIdArticleIdRouteImport } from './routes/bantuan.$categoryId.$articleId'
 import { Route as DesignScrapIndexRouteImport } from './routes/design/scrap.index'
 import { Route as DesignScrapIdRouteImport } from './routes/design/scrap.$id'
 import { Route as DesignScrapHistoryRouteImport } from './routes/design/scrap.history'
@@ -255,6 +258,16 @@ const AuthCallbackRoute = AuthCallbackRouteImport.update({
   id: '/auth/callback',
   path: '/auth/callback',
   getParentRoute: () => rootRouteImport,
+} as any)
+const BantuanIndexRoute = BantuanIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => BantuanRoute,
+} as any)
+const BantuanCategoryIdRoute = BantuanCategoryIdRouteImport.update({
+  id: '/$categoryId',
+  path: '/$categoryId',
+  getParentRoute: () => BantuanRoute,
 } as any)
 const CodebasesIndexRoute = CodebasesIndexRouteImport.update({
   id: '/',
@@ -501,6 +514,12 @@ const ApiUserPlanRoute = ApiUserPlanRouteImport.update({
   path: '/api/user/plan',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BantuanCategoryIdArticleIdRoute =
+  BantuanCategoryIdArticleIdRouteImport.update({
+    id: '/$articleId',
+    path: '/$articleId',
+    getParentRoute: () => BantuanCategoryIdRoute,
+  } as any)
 const DesignScrapIndexRoute = DesignScrapIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -698,7 +717,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/admin': typeof AdminRouteWithChildren
-  '/bantuan': typeof BantuanRoute
+  '/bantuan': typeof BantuanRouteWithChildren
   '/codebases': typeof CodebasesRouteWithChildren
   '/faq': typeof FaqRoute
   '/history': typeof HistoryRoute
@@ -721,6 +740,7 @@ export interface FileRoutesByFullPath {
   '/api/scrape': typeof ApiScrapeRouteWithChildren
   '/ask/$id': typeof AskIdRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/bantuan/$categoryId': typeof BantuanCategoryIdRouteWithChildren
   '/codebases/$id': typeof CodebasesIdRoute
   '/design/$id': typeof DesignIdRoute
   '/design/scrap': typeof DesignScrapRouteWithChildren
@@ -739,6 +759,7 @@ export interface FileRoutesByFullPath {
   '/settings/profile': typeof SettingsProfileRoute
   '/task/$id': typeof TaskIdRoute
   '/admin/': typeof AdminIndexRoute
+  '/bantuan/': typeof BantuanIndexRoute
   '/codebases/': typeof CodebasesIndexRoute
   '/design/': typeof DesignIndexRoute
   '/plan/': typeof PlanIndexRoute
@@ -769,6 +790,7 @@ export interface FileRoutesByFullPath {
   '/api/task/$projectId': typeof ApiTaskProjectIdRoute
   '/api/task/generate': typeof ApiTaskGenerateRoute
   '/api/user/plan': typeof ApiUserPlanRoute
+  '/bantuan/$categoryId/$articleId': typeof BantuanCategoryIdArticleIdRoute
   '/design/scrap/$id': typeof DesignScrapIdRoute
   '/design/scrap/history': typeof DesignScrapHistoryRoute
   '/prd/share/$token': typeof PrdShareTokenRoute
@@ -810,7 +832,6 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
-  '/bantuan': typeof BantuanRoute
   '/faq': typeof FaqRoute
   '/history': typeof HistoryRoute
   '/login': typeof LoginRoute
@@ -830,6 +851,7 @@ export interface FileRoutesByTo {
   '/api/scrape': typeof ApiScrapeRouteWithChildren
   '/ask/$id': typeof AskIdRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/bantuan/$categoryId': typeof BantuanCategoryIdRouteWithChildren
   '/codebases/$id': typeof CodebasesIdRoute
   '/design/$id': typeof DesignIdRoute
   '/fitur/$id': typeof FiturIdRoute
@@ -847,6 +869,7 @@ export interface FileRoutesByTo {
   '/settings/profile': typeof SettingsProfileRoute
   '/task/$id': typeof TaskIdRoute
   '/admin': typeof AdminIndexRoute
+  '/bantuan': typeof BantuanIndexRoute
   '/codebases': typeof CodebasesIndexRoute
   '/design': typeof DesignIndexRoute
   '/plan': typeof PlanIndexRoute
@@ -877,6 +900,7 @@ export interface FileRoutesByTo {
   '/api/task/$projectId': typeof ApiTaskProjectIdRoute
   '/api/task/generate': typeof ApiTaskGenerateRoute
   '/api/user/plan': typeof ApiUserPlanRoute
+  '/bantuan/$categoryId/$articleId': typeof BantuanCategoryIdArticleIdRoute
   '/design/scrap/$id': typeof DesignScrapIdRoute
   '/design/scrap/history': typeof DesignScrapHistoryRoute
   '/prd/share/$token': typeof PrdShareTokenRoute
@@ -920,7 +944,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/admin': typeof AdminRouteWithChildren
-  '/bantuan': typeof BantuanRoute
+  '/bantuan': typeof BantuanRouteWithChildren
   '/codebases': typeof CodebasesRouteWithChildren
   '/faq': typeof FaqRoute
   '/history': typeof HistoryRoute
@@ -943,6 +967,7 @@ export interface FileRoutesById {
   '/api/scrape': typeof ApiScrapeRouteWithChildren
   '/ask/$id': typeof AskIdRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/bantuan/$categoryId': typeof BantuanCategoryIdRouteWithChildren
   '/codebases/$id': typeof CodebasesIdRoute
   '/design/$id': typeof DesignIdRoute
   '/design/scrap': typeof DesignScrapRouteWithChildren
@@ -961,6 +986,7 @@ export interface FileRoutesById {
   '/settings/profile': typeof SettingsProfileRoute
   '/task/$id': typeof TaskIdRoute
   '/admin/': typeof AdminIndexRoute
+  '/bantuan/': typeof BantuanIndexRoute
   '/codebases/': typeof CodebasesIndexRoute
   '/design/': typeof DesignIndexRoute
   '/plan/': typeof PlanIndexRoute
@@ -991,6 +1017,7 @@ export interface FileRoutesById {
   '/api/task/$projectId': typeof ApiTaskProjectIdRoute
   '/api/task/generate': typeof ApiTaskGenerateRoute
   '/api/user/plan': typeof ApiUserPlanRoute
+  '/bantuan/$categoryId/$articleId': typeof BantuanCategoryIdArticleIdRoute
   '/design/scrap/$id': typeof DesignScrapIdRoute
   '/design/scrap/history': typeof DesignScrapHistoryRoute
   '/prd/share/$token': typeof PrdShareTokenRoute
@@ -1058,6 +1085,7 @@ export interface FileRouteTypes {
     | '/api/scrape'
     | '/ask/$id'
     | '/auth/callback'
+    | '/bantuan/$categoryId'
     | '/codebases/$id'
     | '/design/$id'
     | '/design/scrap'
@@ -1076,6 +1104,7 @@ export interface FileRouteTypes {
     | '/settings/profile'
     | '/task/$id'
     | '/admin/'
+    | '/bantuan/'
     | '/codebases/'
     | '/design/'
     | '/plan/'
@@ -1106,6 +1135,7 @@ export interface FileRouteTypes {
     | '/api/task/$projectId'
     | '/api/task/generate'
     | '/api/user/plan'
+    | '/bantuan/$categoryId/$articleId'
     | '/design/scrap/$id'
     | '/design/scrap/history'
     | '/prd/share/$token'
@@ -1147,7 +1177,6 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/about'
-    | '/bantuan'
     | '/faq'
     | '/history'
     | '/login'
@@ -1167,6 +1196,7 @@ export interface FileRouteTypes {
     | '/api/scrape'
     | '/ask/$id'
     | '/auth/callback'
+    | '/bantuan/$categoryId'
     | '/codebases/$id'
     | '/design/$id'
     | '/fitur/$id'
@@ -1184,6 +1214,7 @@ export interface FileRouteTypes {
     | '/settings/profile'
     | '/task/$id'
     | '/admin'
+    | '/bantuan'
     | '/codebases'
     | '/design'
     | '/plan'
@@ -1214,6 +1245,7 @@ export interface FileRouteTypes {
     | '/api/task/$projectId'
     | '/api/task/generate'
     | '/api/user/plan'
+    | '/bantuan/$categoryId/$articleId'
     | '/design/scrap/$id'
     | '/design/scrap/history'
     | '/prd/share/$token'
@@ -1279,6 +1311,7 @@ export interface FileRouteTypes {
     | '/api/scrape'
     | '/ask/$id'
     | '/auth/callback'
+    | '/bantuan/$categoryId'
     | '/codebases/$id'
     | '/design/$id'
     | '/design/scrap'
@@ -1297,6 +1330,7 @@ export interface FileRouteTypes {
     | '/settings/profile'
     | '/task/$id'
     | '/admin/'
+    | '/bantuan/'
     | '/codebases/'
     | '/design/'
     | '/plan/'
@@ -1327,6 +1361,7 @@ export interface FileRouteTypes {
     | '/api/task/$projectId'
     | '/api/task/generate'
     | '/api/user/plan'
+    | '/bantuan/$categoryId/$articleId'
     | '/design/scrap/$id'
     | '/design/scrap/history'
     | '/prd/share/$token'
@@ -1370,7 +1405,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
   AdminRoute: typeof AdminRouteWithChildren
-  BantuanRoute: typeof BantuanRoute
+  BantuanRoute: typeof BantuanRouteWithChildren
   CodebasesRoute: typeof CodebasesRouteWithChildren
   FaqRoute: typeof FaqRoute
   HistoryRoute: typeof HistoryRoute
@@ -1628,6 +1663,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/auth/callback'
       preLoaderRoute: typeof AuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/bantuan/': {
+      id: '/bantuan/'
+      path: '/'
+      fullPath: '/bantuan/'
+      preLoaderRoute: typeof BantuanIndexRouteImport
+      parentRoute: typeof BantuanRoute
+    }
+    '/bantuan/$categoryId': {
+      id: '/bantuan/$categoryId'
+      path: '/$categoryId'
+      fullPath: '/bantuan/$categoryId'
+      preLoaderRoute: typeof BantuanCategoryIdRouteImport
+      parentRoute: typeof BantuanRoute
     }
     '/codebases/': {
       id: '/codebases/'
@@ -1972,6 +2021,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiUserPlanRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/bantuan/$categoryId/$articleId': {
+      id: '/bantuan/$categoryId/$articleId'
+      path: '/$articleId'
+      fullPath: '/bantuan/$categoryId/$articleId'
+      preLoaderRoute: typeof BantuanCategoryIdArticleIdRouteImport
+      parentRoute: typeof BantuanCategoryIdRoute
+    }
     '/design/scrap/': {
       id: '/design/scrap/'
       path: '/'
@@ -2240,6 +2296,30 @@ const AdminRouteChildren: AdminRouteChildren = {
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
+interface BantuanCategoryIdRouteChildren {
+  BantuanCategoryIdArticleIdRoute: typeof BantuanCategoryIdArticleIdRoute
+}
+
+const BantuanCategoryIdRouteChildren: BantuanCategoryIdRouteChildren = {
+  BantuanCategoryIdArticleIdRoute: BantuanCategoryIdArticleIdRoute,
+}
+
+const BantuanCategoryIdRouteWithChildren =
+  BantuanCategoryIdRoute._addFileChildren(BantuanCategoryIdRouteChildren)
+
+interface BantuanRouteChildren {
+  BantuanCategoryIdRoute: typeof BantuanCategoryIdRouteWithChildren
+  BantuanIndexRoute: typeof BantuanIndexRoute
+}
+
+const BantuanRouteChildren: BantuanRouteChildren = {
+  BantuanCategoryIdRoute: BantuanCategoryIdRouteWithChildren,
+  BantuanIndexRoute: BantuanIndexRoute,
+}
+
+const BantuanRouteWithChildren =
+  BantuanRoute._addFileChildren(BantuanRouteChildren)
+
 interface CodebasesRouteChildren {
   CodebasesIdRoute: typeof CodebasesIdRoute
   CodebasesIndexRoute: typeof CodebasesIndexRoute
@@ -2399,7 +2479,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
   AdminRoute: AdminRouteWithChildren,
-  BantuanRoute: BantuanRoute,
+  BantuanRoute: BantuanRouteWithChildren,
   CodebasesRoute: CodebasesRouteWithChildren,
   FaqRoute: FaqRoute,
   HistoryRoute: HistoryRoute,

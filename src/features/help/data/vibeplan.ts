@@ -71,6 +71,13 @@ export const VIBEPLAN_ARTICLES: readonly HelpArticle[] = [
 					"Sinkronisasi ulang membuat snapshot dan analisis baru. Proyek, dokumen rencana, dan tugas yang sudah kamu buat tidak tertimpa.",
 				],
 			},
+			{
+				heading: "Menyerahkan ke AI Agent",
+				paragraphs: [
+					"Setelah snapshot tersinkron dan tugas tersedia, agent dapat mengambil pekerjaan dari terminal. Gunakan everythings-vibe task next untuk melihat tugas berikutnya, task update untuk mengubah status, dan kanban untuk melihat papan kerja.",
+				],
+				note: "Sinkronisasi ulang perlu dilakukan jika kode repository berubah sebelum agent mengerjakan tugas berikutnya.",
+			},
 		],
 		relatedIds: ["sync-repository", "mode-greenfield", "pasang-cli"],
 	},
@@ -94,7 +101,7 @@ export const VIBEPLAN_ARTICLES: readonly HelpArticle[] = [
 			{
 				heading: "Membuat dokumen",
 				paragraphs: [
-					"Pada tahap PRD, AI menyusun delapan bagian dokumen berdasarkan jawaban klarifikasi dan pohon fitur. Pembuatan awal memotong kredit sesuai estimasi yang ditampilkan.",
+					"Product Requirement Document (PRD), atau dokumen requirement produk, berisi delapan bagian yang disusun dari jawaban klarifikasi dan pohon fitur. Pembuatan awal memotong kredit sesuai estimasi yang ditampilkan.",
 				],
 			},
 			{

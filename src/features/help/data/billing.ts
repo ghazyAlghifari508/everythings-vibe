@@ -43,14 +43,17 @@ export const BILLING_ARTICLES: readonly HelpArticle[] = [
 				note: "Tarif kredit Studio dan Scrape belum diaktifkan, jadi belum ada potongan kredit untuk kedua produk itu.",
 			},
 		],
-		relatedIds: ["cara-kerja-kredit", "top-up-dan-pembayaran", "kredit-untuk-pemula"],
+		relatedIds: [
+			"cara-kerja-kredit",
+			"top-up-dan-pembayaran",
+			"kredit-untuk-pemula",
+		],
 	},
 	{
 		id: "cara-kerja-kredit",
 		categoryId: "billing",
 		title: "Cara kerja pemotongan kredit",
-		description:
-			"Estimasi, reservasi, biaya akhir, dan kegagalan operasi.",
+		description: "Estimasi, reservasi, biaya akhir, dan kegagalan operasi.",
 		keywords: [
 			"kredit habis",
 			"saldo habis",

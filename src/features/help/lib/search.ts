@@ -10,7 +10,9 @@ function fold(value: string): string {
 }
 
 export function searchTokens(query: string): readonly string[] {
-	return fold(query).split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+	return fold(query)
+		.split(/[^\p{L}\p{N}]+/u)
+		.filter(Boolean);
 }
 
 function articleContent(article: HelpArticle): string {
@@ -49,7 +51,9 @@ export function searchHelpArticles(
 	const results: HelpSearchResult[] = [];
 
 	for (const article of articles) {
-		const category = HELP_CATEGORIES.find((item) => item.id === article.categoryId);
+		const category = HELP_CATEGORIES.find(
+			(item) => item.id === article.categoryId,
+		);
 		const fields: ReadonlyArray<readonly [string, number]> = [
 			[fold(article.title), 12],
 			[fold(article.keywords.join(" ")), 10],
@@ -87,6 +91,7 @@ export function searchHelpArticles(
 	}
 
 	return results.sort(
-		(a, b) => b.score - a.score || a.article.title.localeCompare(b.article.title, "id"),
+		(a, b) =>
+			b.score - a.score || a.article.title.localeCompare(b.article.title, "id"),
 	);
 }

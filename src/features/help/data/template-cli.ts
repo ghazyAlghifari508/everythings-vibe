@@ -5,7 +5,8 @@ export const TEMPLATE_AND_CLI_ARTICLES: readonly HelpArticle[] = [
 		id: "memakai-template",
 		categoryId: "template",
 		title: "Memakai VibeTemplate",
-		description: "Temukan blueprint, salin prompt, dan pakai sebagai titik awal.",
+		description:
+			"Temukan blueprint, salin prompt, dan pakai sebagai titik awal.",
 		keywords: [
 			"template",
 			"blueprint",

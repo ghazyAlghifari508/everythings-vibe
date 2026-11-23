@@ -30,7 +30,9 @@ describe("local help search", () => {
 	});
 
 	it("returns an empty result set when no token matches", () => {
-		expect(searchHelpArticles("resep masakan rendang", HELP_ARTICLES)).toEqual([]);
+		expect(searchHelpArticles("resep masakan rendang", HELP_ARTICLES)).toEqual(
+			[],
+		);
 	});
 
 	it("requires every token to match and ranks by relevance", () => {

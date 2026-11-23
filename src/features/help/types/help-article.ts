@@ -27,8 +27,6 @@ export type ProductHref =
 	| "/settings/feedback"
 	| "/settings/api-keys";
 
-export type HelpHref = ProductHref | `/bantuan/${string}`;
-
 export interface HelpCategory {
 	readonly id: HelpCategoryId;
 	readonly label: string;
@@ -43,7 +41,7 @@ export interface HelpArticleSection {
 	readonly steps?: readonly string[];
 	readonly bullets?: readonly string[];
 	readonly note?: string;
-	readonly link?: { readonly label: string; readonly to: HelpHref };
+	readonly link?: { readonly label: string; readonly to: ProductHref };
 }
 
 export interface HelpArticle {

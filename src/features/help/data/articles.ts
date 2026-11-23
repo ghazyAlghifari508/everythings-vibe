@@ -1,4 +1,8 @@
-import type { HelpArticle, HelpCategory, HelpCategoryId } from "../types/help-article";
+import type {
+	HelpArticle,
+	HelpCategory,
+	HelpCategoryId,
+} from "../types/help-article";
 import { BILLING_ARTICLES } from "./billing";
 import { HELP_CATEGORIES } from "./categories";
 import { GETTING_STARTED_ARTICLES } from "./getting-started";
@@ -18,7 +22,9 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
 	...BILLING_ARTICLES,
 ];
 
-const ARTICLES_BY_ID = new Map(HELP_ARTICLES.map((article) => [article.id, article]));
+const ARTICLES_BY_ID = new Map(
+	HELP_ARTICLES.map((article) => [article.id, article]),
+);
 
 export function getHelpArticle(id: string): HelpArticle | null {
 	return ARTICLES_BY_ID.get(id) ?? null;
