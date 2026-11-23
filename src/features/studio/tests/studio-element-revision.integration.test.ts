@@ -3,7 +3,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { db } from "@/db";
 import {
 	creditLedgerEntries,
+	studioElementRevisions,
 	studioFrames,
+	studioJobs,
 	studioMessages,
 	studioProjects,
 	studioRevisions,
@@ -93,49 +95,38 @@ afterEach(async () => {
 });
 
 describe("persisted scoped revisions", () => {
-	it("previews without mutation; cancel leaves every frame and revision untouched", async () => {
+	it("auto-applies atomically, leaves other frames untouched and rejects late cancel", async () => {
 		const { userId, project, frames, input } = await fixture();
-		const preview = await prepareStudioElementRevision(userId, input);
-		expect(preview.status).toBe("preview");
-		expect((await stored(frames[0].id)).htmlCode).toBe(html);
-		await transitionStudioElementRevision(
-			userId,
-			project.id,
-			preview.id,
-			"cancel",
-		);
-		expect((await stored(frames[0].id)).revision).toBe(5);
+		const applied = await prepareStudioElementRevision(userId, input);
+		expect(applied.status).toBe("applied");
+		expect(applied.appliedRevision).toBe(6);
+		expect((await stored(frames[0].id)).htmlCode).toBe(applied.after);
+		expect((await stored(frames[0].id)).revision).toBe(6);
 		expect((await stored(frames[1].id)).htmlCode).toBe(html);
 		expect(
-			await db
-				.select()
-				.from(studioRevisions)
-				.where(eq(studioRevisions.projectId, project.id)),
-		).toEqual([]);
+			(
+				await db
+					.select()
+					.from(studioRevisions)
+					.where(eq(studioRevisions.projectId, project.id))
+			).map((row) => row.frameRevision),
+		).toEqual([6]);
 		await expect(
-			transitionStudioElementRevision(userId, project.id, preview.id, "apply"),
-		).rejects.toMatchObject({ code: "STUDIO_CANCELLED" });
+			transitionStudioElementRevision(userId, project.id, applied.id, "cancel"),
+		).rejects.toMatchObject({ code: "STUDIO_STALE_REVISION" });
+		await expect(
+			transitionStudioElementRevision(userId, project.id, applied.id, "apply"),
+		).resolves.toMatchObject({ status: "applied", appliedRevision: 6 });
 	});
 	it("applies once, preserves other frames, restores through monotonic Undo and reloads history", async () => {
 		const { userId, project, frames, input } = await fixture();
-		const preview = await prepareStudioElementRevision(userId, input);
-		const applied = await transitionStudioElementRevision(
-			userId,
-			project.id,
-			preview.id,
-			"apply",
-		);
-		await transitionStudioElementRevision(
-			userId,
-			project.id,
-			preview.id,
-			"apply",
-		);
+		const applied = await prepareStudioElementRevision(userId, input);
+		expect(applied.status).toBe("applied");
 		expect(applied.appliedRevision).toBe(6);
-		expect((await stored(frames[0].id)).htmlCode).toBe(preview.after);
+		expect((await stored(frames[0].id)).htmlCode).toBe(applied.after);
 		expect(
 			(await readStudioFrameDocument(project.id, frames[0].id, userId)).html,
-		).toBe(preview.after);
+		).toBe(applied.after);
 		expect((await stored(frames[1].id)).revision).toBe(5);
 		expect(
 			(await readStudioElementRevisions(project.id, userId))[0].status,
@@ -143,7 +134,7 @@ describe("persisted scoped revisions", () => {
 		await transitionStudioElementRevision(
 			userId,
 			project.id,
-			preview.id,
+			applied.id,
 			"undo",
 		);
 		expect(await stored(frames[0].id)).toMatchObject({
@@ -158,6 +149,9 @@ describe("persisted scoped revisions", () => {
 					.where(eq(studioRevisions.projectId, project.id))
 			).map((row) => row.frameRevision),
 		).toEqual([6, 7]);
+		expect(
+			(await readStudioElementRevisions(project.id, userId))[0].status,
+		).toBe("undone");
 	});
 	it("rejects cross-project and cross-user targets including candidate actions", async () => {
 		const a = await fixture();
@@ -181,21 +175,43 @@ describe("persisted scoped revisions", () => {
 			),
 		).rejects.toMatchObject({ code: "STUDIO_NOT_FOUND" });
 	});
-	it("only one concurrent candidate can apply; stale and duplicate operations never charge", async () => {
-		const { userId, project, frames, input } = await fixture();
-		const [first, duplicate] = await Promise.all([
-			prepareStudioElementRevision(userId, input),
-			prepareStudioElementRevision(userId, input),
-		]);
-		expect(first.id).toBe(duplicate.id);
-		const second = await prepareStudioElementRevision(userId, {
-			...input,
+	it("dedupes a retried request and rejects a stale base without charging credits", async () => {
+		const { userId, frames, input } = await fixture();
+		const request = { ...input, prompt: "Redesign this selected card only" };
+		const first = await prepareStudioElementRevision(userId, request);
+		const duplicate = await prepareStudioElementRevision(userId, request);
+		expect(duplicate.id).toBe(first.id);
+		expect(model.calls).toBe(1);
+		expect((await stored(frames[0].id)).revision).toBe(6);
+		await expect(
+			prepareStudioElementRevision(userId, {
+				...request,
+				requestId: crypto.randomUUID(),
+			}),
+		).rejects.toMatchObject({ code: "STUDIO_STALE_REVISION" });
+		expect(
+			await db
+				.select()
+				.from(creditLedgerEntries)
+				.where(eq(creditLedgerEntries.userId, userId)),
+		).toEqual([]);
+	});
+	it("cannot publish two in-flight edits against the same base", async () => {
+		const { userId, frames, input } = await fixture();
+		const request = { ...input, prompt: "Redesign this selected card only" };
+		let release = () => {};
+		model.wait = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		const first = prepareStudioElementRevision(userId, request);
+		await vi.waitFor(() => expect(model.calls).toBe(1));
+		const second = prepareStudioElementRevision(userId, {
+			...request,
 			requestId: crypto.randomUUID(),
 		});
-		const attempts = await Promise.allSettled([
-			transitionStudioElementRevision(userId, project.id, first.id, "apply"),
-			transitionStudioElementRevision(userId, project.id, second.id, "apply"),
-		]);
+		await vi.waitFor(() => expect(model.calls).toBe(2));
+		release();
+		const attempts = await Promise.allSettled([first, second]);
 		expect(
 			attempts.filter((attempt) => attempt.status === "fulfilled"),
 		).toHaveLength(1);
@@ -203,12 +219,6 @@ describe("persisted scoped revisions", () => {
 			attempts.find((attempt) => attempt.status === "rejected"),
 		).toMatchObject({ reason: { code: "STUDIO_STALE_REVISION" } });
 		expect((await stored(frames[0].id)).revision).toBe(6);
-		await expect(
-			prepareStudioElementRevision(userId, {
-				...input,
-				requestId: crypto.randomUUID(),
-			}),
-		).rejects.toMatchObject({ code: "STUDIO_STALE_REVISION" });
 		expect(
 			await db
 				.select()
@@ -270,19 +280,13 @@ describe("persisted scoped revisions", () => {
 			html: expect.stringContaining("data-ev-inspect-id"),
 		});
 		expect((await stored(frames[0].id)).htmlCode).toBe(html);
-		const preview = await prepareStudioElementRevision(userId, input);
-		await transitionStudioElementRevision(
-			userId,
-			project.id,
-			preview.id,
-			"apply",
-		);
+		const applied = await prepareStudioElementRevision(userId, input);
 		const exported = await readStudioFrameDocument(
 			project.id,
 			frames[0].id,
 			userId,
 		);
-		expect(exported.html).toBe(preview.after);
+		expect(exported.html).toBe(applied.after);
 		expect(exported.html).not.toMatch(
 			/data-ev-inspect|data-ev-editor|studio:element:select/,
 		);
@@ -341,20 +345,97 @@ describe("persisted scoped revisions", () => {
 	});
 	it("rejects Undo after a newer approval rather than overwriting it", async () => {
 		const { userId, project, frames, input } = await fixture();
-		const preview = await prepareStudioElementRevision(userId, input);
-		await transitionStudioElementRevision(
-			userId,
-			project.id,
-			preview.id,
-			"apply",
-		);
+		const applied = await prepareStudioElementRevision(userId, input);
 		await db
 			.update(studioFrames)
 			.set({ revision: 7, htmlCode: html.replace("Hero", "Latest approval") })
 			.where(eq(studioFrames.id, frames[0].id));
 		await expect(
-			transitionStudioElementRevision(userId, project.id, preview.id, "undo"),
+			transitionStudioElementRevision(userId, project.id, applied.id, "undo"),
 		).rejects.toMatchObject({ code: "STUDIO_STALE_REVISION" });
 		expect((await stored(frames[0].id)).htmlCode).toContain("Latest approval");
+	});
+	it("applies a direct text edit deterministically and restores it through Undo", async () => {
+		const { userId, project, frames, input } = await fixture();
+		const hero = indexStudioElements(html, {
+			projectId: project.id,
+			frameId: frames[0].id,
+			baseRevision: 5,
+		}).elements.find((item) => item.selector === "#hero");
+		if (!hero) throw new Error("Missing hero target");
+		const text = '<script>alert(1)</script> "Promo"';
+		const applied = await prepareStudioElementRevision(userId, {
+			...input,
+			target: { ...hero, bounds: input.target.bounds },
+			edit: { kind: "text", text },
+		});
+		expect(applied.status).toBe("applied");
+		const [savedRevision] = await db
+			.select()
+			.from(studioElementRevisions)
+			.where(eq(studioElementRevisions.id, applied.id));
+		expect(savedRevision.edit).toEqual({ kind: "text", text });
+		expect(model.calls).toBe(0);
+		const saved = (await stored(frames[0].id)).htmlCode;
+		expect(saved).toContain("&lt;script&gt;");
+		expect(saved).not.toContain("<script>");
+		expect((await stored(frames[1].id)).htmlCode).toBe(html);
+		expect(
+			await db
+				.select()
+				.from(studioJobs)
+				.where(eq(studioJobs.projectId, project.id)),
+		).toEqual([]);
+		expect(
+			await db
+				.select()
+				.from(creditLedgerEntries)
+				.where(eq(creditLedgerEntries.userId, userId)),
+		).toEqual([]);
+		await transitionStudioElementRevision(
+			userId,
+			project.id,
+			applied.id,
+			"undo",
+		);
+		expect((await stored(frames[0].id)).htmlCode).toBe(html);
+	});
+	it("deletes only the selected element without a model, job or credit charge", async () => {
+		const { userId, project, frames, input } = await fixture();
+		const applied = await prepareStudioElementRevision(userId, {
+			...input,
+			edit: { kind: "remove" },
+		});
+		expect(applied.status).toBe("applied");
+		const [savedRevision] = await db
+			.select()
+			.from(studioElementRevisions)
+			.where(eq(studioElementRevisions.id, applied.id));
+		expect(savedRevision.edit).toEqual({ kind: "remove" });
+		expect(model.calls).toBe(0);
+		const saved = (await stored(frames[0].id)).htmlCode;
+		expect(saved).not.toContain('<section id="stats">');
+		expect(saved).toContain('<section id="hero">Hero</section>');
+		expect(saved).toContain('<section id="projects">Projects</section>');
+		expect((await stored(frames[1].id)).htmlCode).toBe(html);
+		expect(
+			await db
+				.select()
+				.from(studioJobs)
+				.where(eq(studioJobs.projectId, project.id)),
+		).toEqual([]);
+		expect(
+			await db
+				.select()
+				.from(creditLedgerEntries)
+				.where(eq(creditLedgerEntries.userId, userId)),
+		).toEqual([]);
+		await transitionStudioElementRevision(
+			userId,
+			project.id,
+			applied.id,
+			"undo",
+		);
+		expect((await stored(frames[0].id)).htmlCode).toBe(html);
 	});
 });

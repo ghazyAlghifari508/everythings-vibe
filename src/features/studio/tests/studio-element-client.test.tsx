@@ -21,18 +21,18 @@ const target: StudioElementTarget = {
 	parentId: "id:main",
 	bounds: { x: 10, y: 50, width: 100, height: 80 },
 };
-const preview: StudioElementPreview = {
+const applied: StudioElementPreview = {
 	id: "12345678-1234-4234-8234-123456789abc",
 	frameId: "f",
 	frameName: "Home",
 	baseRevision: 5,
 	baseHash: target.baseHash,
 	target,
-	status: "preview",
+	status: "applied",
 	before: "Before",
 	after: "After",
 	summary: "Removed Statistics",
-	appliedRevision: null,
+	appliedRevision: 6,
 };
 afterEach(() => {
 	cleanup();
@@ -45,7 +45,7 @@ function setup() {
 		if (!init?.body) return Response.json({ revisions: [] });
 		const body: unknown = JSON.parse(String(init.body));
 		requests.push(body);
-		return Response.json({ revision: preview });
+		return Response.json({ revision: applied });
 	});
 	vi.stubGlobal("fetch", fetcher);
 	const refresh = vi.fn(async () => {});
@@ -62,7 +62,7 @@ function setup() {
 	);
 	return { ...hook, fetcher, requests, refresh, error };
 }
-it("prioritizes one scoped element over multi-frame selection and snapshots the request", async () => {
+it("prioritizes one scoped element, applies the validated result and snapshots the request", async () => {
 	const hook = setup();
 	await act(async () => {
 		hook.result.current.selectTarget(target);
@@ -76,10 +76,11 @@ it("prioritizes one scoped element over multi-frame selection and snapshots the 
 		request: { target, prompt: "Remove this selected section" },
 	});
 	expect(hook.requests[0]).not.toHaveProperty("frameIds");
-	expect(hook.result.current.preview?.status).toBe("preview");
+	expect(hook.result.current.undo?.status).toBe("applied");
+	expect(hook.result.current.pending).toBeNull();
 	expect(hook.refresh).toHaveBeenCalledTimes(1);
 });
-it("detaching a target does not mutate persisted HTML or discard a pending preview", async () => {
+it("detaching a target does not discard applied feedback", async () => {
 	const hook = setup();
 	await act(async () => {
 		hook.result.current.selectTarget(target);
@@ -91,13 +92,13 @@ it("detaching a target does not mutate persisted HTML or discard a pending previ
 		hook.result.current.clearTarget();
 	});
 	expect(hook.result.current.target).toBeNull();
-	expect(hook.result.current.preview?.id).toBe(preview.id);
+	expect(hook.result.current.undo?.id).toBe(applied.id);
 	expect(hook.requests).toHaveLength(1);
 });
-it("restores a persisted preview after reload without resubmitting generation", async () => {
+it("restores a persisted applied revision after reload without resubmitting generation", async () => {
 	vi.stubGlobal(
 		"fetch",
-		vi.fn(async () => Response.json({ revisions: [preview] })),
+		vi.fn(async () => Response.json({ revisions: [applied] })),
 	);
 	const hook = renderHook(() =>
 		useStudioElementEditing({
@@ -109,14 +110,14 @@ it("restores a persisted preview after reload without resubmitting generation", 
 			syncProjectStatus: vi.fn(async () => {}),
 		}),
 	);
-	await waitFor(() => expect(hook.result.current.preview?.id).toBe(preview.id));
+	await waitFor(() => expect(hook.result.current.undo?.id).toBe(applied.id));
 });
-it("does not erase a new candidate when an older history read arrives late", async () => {
+it("does not erase a new applied state when an older history read arrives late", async () => {
 	let resolveHistory = (_response: Response) => {};
 	vi.stubGlobal(
 		"fetch",
 		vi.fn(async (_url: string, init?: RequestInit) => {
-			if (init?.body) return Response.json({ revision: preview });
+			if (init?.body) return Response.json({ revision: applied });
 			return new Promise<Response>((resolve) => {
 				resolveHistory = resolve;
 			});
@@ -141,7 +142,36 @@ it("does not erase a new candidate when an older history read arrives late", asy
 	await act(async () => {
 		resolveHistory(Response.json({ revisions: [] }));
 	});
-	expect(hook.result.current.preview?.id).toBe(preview.id);
+	expect(hook.result.current.undo?.id).toBe(applied.id);
+});
+it("clears a history error after a successful retry", async () => {
+	let broken = true;
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async () =>
+			broken
+				? Response.json({ error: "Riwayat gagal" }, { status: 500 })
+				: Response.json({ revisions: [] }),
+		),
+	);
+	const hook = renderHook(() =>
+		useStudioElementEditing({
+			projectId: "p",
+			userId: "u",
+			frames: [{ id: "f", revision: 5 }],
+			selectedFrameIds: ["f"],
+			setError: vi.fn(),
+			syncProjectStatus: vi.fn(async () => {}),
+		}),
+	);
+	await waitFor(() =>
+		expect(hook.result.current.error).toContain("Riwayat gagal"),
+	);
+	broken = false;
+	await act(async () => {
+		await hook.result.current.refresh();
+	});
+	expect(hook.result.current.error).toBe("");
 });
 it("keeps a scoped target detached after its frame version changes", async () => {
 	vi.stubGlobal(
