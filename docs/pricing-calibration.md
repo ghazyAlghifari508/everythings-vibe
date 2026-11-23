@@ -1,6 +1,6 @@
 # Kalibrasi Tarif Kredit Studio dan Scrape (TASK 09)
 
-Status: DRAFT, menunggu persetujuan owner.
+Status: Kebijakan trial disetujui. Kalibrasi tarif produksi masih menunggu benchmark terverifikasi; owner memilih billing legacy tetap berlaku.
 Charging Studio dan Scrape: NONAKTIF.
 Tanggal penyusunan: 2026-11-23.
 
@@ -169,7 +169,7 @@ Eksposur biaya dalam Rupiah tidak dihitung pada ketiga skenario. Biaya per opera
 
 Kesepakatan sebelumnya dipertahankan: satu Studio trial dan satu Scrape trial per akun Free, tanpa reset bulanan. Kebutuhan trial bukan saldo kredit tambahan.
 
-| Aspek | Usulan batas | Dasar |
+| Aspek | Batas dan kebijakan yang disetujui | Dasar |
 | :-- | :-- | :-- |
 | Studio trial | 1 akun generate, tepat 1 frame, mode `studio.generate` saja | Target trial satu frame yang dihasilkan |
 | Studio non-trial | Add frame, revise, regenerate tidak tersedia dalam trial | Mencegah satu trial dipakai untuk beberapa operasi |
@@ -182,7 +182,7 @@ Kesepakatan sebelumnya dipertahankan: satu Studio trial dan satu Scrape trial pe
 | Retry | Retry memakai `logicalJobId` yang sama, attempt dicatat terpisah | Idempotensi shadow metering |
 | Partial success | Trial terpakai sekali saat minimal satu unit selesai | Mencegah trial dipakai berulang |
 | System failure | entitlements dikembalikan bila tidak ada unit selesai | Trial tidak hangus karena kegagalan sistem |
-| Cancellation | Tidak ada konsumsi bila dibatalkan sebelum aktivasi sukses | Tidak menghukum user |
+| Cancellation | Tidak mengonsumsi trial jika belum ada unit selesai; mengonsumsi trial jika minimal satu unit sudah selesai | Konsumsi mengikuti hasil yang benar-benar tersedia |
 | Deletion dan subscription change | Status trial tetap terminal, tidak direset atau diberikan ulang | Satu trial per akun, bukan per periode |
 
 Konsumsi trial harus dikekunci pada pasangan `user_id` dan product family, bukan pada subscription epoch, sehingga retry, penghapasan resource, atau perubahan paket tidak dapat mengonsumsi trial dua kali. Penegakan aturan ini menjadi tanggung jawab TASK 10. Resource yang sudah ditagih wajib di-tombstone di TASK 11 dan 12.
@@ -195,12 +195,13 @@ Bila kredit atau trial mencukupi, user menekan tombol operasi yang sudah ada, ba
 
 ## 9. Gate persetujuan owner
 
-Status: PENDING. Tidak ada tarif produksi yang aktif.
+Status: Trial disetujui. Tarif produksi tetap nonaktif sesuai keputusan owner untuk mempertahankan billing legacy.
 
 - [ ] Nilai tarif pasti per operasi beserta versi registry yang disetujui.
-- [ ] Batas trial Studio dan Scrape yang disetujui.
+- [x] Batas trial Studio dan Scrape pada bagian 7.
 - [ ] Perubahan alokasi paket, bila ada.
-- [ ] Kebijakan partial settlement dan cancellation yang disetujui.
+- [x] Partial success dan cancellation untuk trial pada bagian 7.
+  - [ ] Settlement produksi untuk tarif paid baru.
 - [ ] Strategi deploy dan rollout, termasuk kapan tarif dipasang ke `CREDIT_OPERATION_REGISTRY`.
 
 Pengukuran yang masih kurang dan tindakan lanjutan:
@@ -231,4 +232,4 @@ Tidak ada browser QA sesuai instruksi. Test membuktikan mekanika kebijakan, buka
 
 ## 11. Keputusan yang belum selesai
 
-Tarif riil, nilai kredit finansial, batas final trial, perubahan alokasi, dan strategi rollout menunggu data benchmark dan persetujuan owner. Definition of Done untuk approval belum tercapai. Dokumen ini hanya memenuhi bagian proposal, contract, dan testability dari TASK 09.
+Tarif riil, nilai kredit finansial, dan rollout charging baru tetap menunggu benchmark serta persetujuan owner. Harga dan alokasi paket tidak berubah. Persetujuan trial hanya mencakup aturan pada bagian 7, bukan tarif produksi.
