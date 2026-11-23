@@ -8,8 +8,10 @@ import { type CreditTransaction, getDatabase } from "./credit-db";
 type Product = typeof productTrials.$inferSelect.product;
 
 export const STUDIO_TRIAL_FRAMES = 1;
-export const SCRAPE_TRIAL_PAGES = 3;
-export const SCRAPE_TRIAL_VIEWS = 2;
+export {
+	SCRAPE_TRIAL_PAGES,
+	SCRAPE_TRIAL_VIEWS,
+} from "@/features/scrape/types/scrape-trial-limits";
 
 export async function admitProductWork(
 	tx: CreditTransaction,
@@ -87,6 +89,8 @@ export async function admitProductWork(
 			throw new ScrapeError("TRIAL_EXHAUSTED");
 		case "plan_gated":
 			throw new ScrapeError("PRODUCT_PLAN_REQUIRED");
+		case "paid_credit_available":
+			return { kind: "paid" } as const;
 		default:
 			return { kind: "legacy" } as const;
 	}

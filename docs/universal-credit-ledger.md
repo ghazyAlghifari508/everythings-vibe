@@ -62,7 +62,7 @@ CREDIT_ISOLATED_TEST_ADMIN_URL=postgresql://postgres@localhost:55432/postgres pn
 ## Pending dependencies
 
 - Apply 0045 to staging and production; stop web and worker writers during the migration window.
-- Studio projects, studio jobs and scrapes are hard-deleted today. Once charges exist the FKs block that deletion; TASK 11/12 must tombstone billed resources like `projects.deleted_at`.
+- Deploy the Studio and Scrape tombstone migrations before enabling paid pricing; their ledger FKs retain billed resource identities.
 - Tariffs: TASK 07 benchmark, TASK 09 approval, then set `pricing` per key.
 - Apply migration 0047 before running the updated web and worker processes. Do not mix old workers with the new admission code: old workers cannot close trial holds.
 - History UI and admin Kredit still read VibePlan labels; TASK 13/08.
@@ -74,4 +74,10 @@ No trial rows are backfilled. Admission reads the effective subscription and bil
 Trial admission and queue writes share a transaction. A partial unique index prevents concurrent holds for the same account and product. Request keys remain bound to their logical jobs even after release. Worker recovery retains the hold across attempts. Terminal writes release zero-unit holds or record the completed units; deletion preserves consumption evidence. Neither subscription changes nor credit rollover touch the records.
 
 Studio generates one frame. Scrape allows up to three crawl pages and two DESIGN.md views. The 50 MB transfer and 15-minute runtime ceilings are divided across the maximum automatic attempts, so worker recovery cannot multiply the budget. Trial settlement never changes the VibePlan balance.
+
+## Scrape integration (TASK 12)
+
+Migration `0049_scrape_billing_tombstone` adds `scrapes.deleted_at`. Deploy it before the web and Scrape worker together. Billed result deletion hides the job and revokes its preview capabilities while preserving its ledger reference; legacy jobs retain cascade deletion.
+
+`SCRAPE_CREDIT_CHARGING_ENABLED` defaults to false. The production registry has no tariffs. Before activation, approve and version the fixed HTML/Images prices and resource limits, the adaptive Crawl/DESIGN.md prices, and terminal settlement rules. Keep old tariff versions available until their reservations close. Until then, paid access remains legacy and Free accounts retain their one-time trial. Synthetic prices only run in tests.
 

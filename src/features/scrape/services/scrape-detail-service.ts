@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import {
 	type ScrapeDocumentRow,
@@ -105,7 +105,13 @@ export async function getScrapeById(
 	const [row] = await db
 		.select()
 		.from(scrapes)
-		.where(and(eq(scrapes.id, id), eq(scrapes.userId, userId)))
+		.where(
+			and(
+				eq(scrapes.id, id),
+				eq(scrapes.userId, userId),
+				isNull(scrapes.deletedAt),
+			),
+		)
 		.limit(1);
 	if (!row) throw new ScrapeError("WEBSITE_BLOCKED", "Scrape tidak ditemukan.");
 	const [document] = await db

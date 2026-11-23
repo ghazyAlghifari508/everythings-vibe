@@ -46,6 +46,7 @@ export interface CreditComplexityMetrics {
 		promptChars?: number;
 		designMdChars?: number;
 	};
+	scrape?: { requestedUnits: number };
 	codebase?: {
 		fileCount?: number;
 		sourceBytes?: number;

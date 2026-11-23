@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
 	productTrials,
@@ -27,6 +27,7 @@ import {
 	scrapeFailureReasonForCode,
 } from "@/lib/design-errors";
 import { generateDesignMd } from "./prompts-design-md";
+import { findScrapeCharge } from "./scrape-credit.server";
 import { saveScrapeDocument } from "./scrape-document-service";
 import {
 	SCRAPE_JOB_MAX_ATTEMPTS,
@@ -45,13 +46,23 @@ async function runScrapePipelineCore(
 	const [scrape] = await db
 		.select()
 		.from(scrapes)
-		.where(and(eq(scrapes.id, scrapeId), eq(scrapes.userId, userId)))
+		.where(
+			and(
+				eq(scrapes.id, scrapeId),
+				eq(scrapes.userId, userId),
+				isNull(scrapes.deletedAt),
+			),
+		)
 		.limit(1);
 	if (!scrape) return;
 	const writePredicate = () =>
 		claim
 			? scrapeClaimPredicate(claim)
-			: and(eq(scrapes.id, scrapeId), eq(scrapes.userId, userId));
+			: and(
+					eq(scrapes.id, scrapeId),
+					eq(scrapes.userId, userId),
+					isNull(scrapes.deletedAt),
+				);
 	const mode: ScrapeMode = (scrape.mode ??
 		scrape.metadata?.mode ??
 		"design") as ScrapeMode;
@@ -215,7 +226,7 @@ async function runScrapePipelineCore(
 
 		await persist(
 			"extracting",
-			{},
+			{ visualEvidence: captured.metadata.visualEvidence },
 			{
 				sourceUrl: captured.sourceUrl,
 				domain: captured.domain,
@@ -362,7 +373,7 @@ export async function runScrapePipeline(
 					eq(productTrials.state, "reserved"),
 				),
 			);
-		if (trial) {
+		if (trial || (await findScrapeCharge(db, { id: scrapeId, userId }))) {
 			if (!claim) throw new ScrapeError("STORAGE_FAILED");
 			const timeout = AbortSignal.timeout(
 				Math.floor(SCRAPE_LIMITS.jobTimeoutMs / SCRAPE_JOB_MAX_ATTEMPTS),

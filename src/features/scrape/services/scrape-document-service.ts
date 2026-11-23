@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import {
 	type InsertScrapeDocumentRow,
@@ -36,7 +36,11 @@ export async function saveScrapeDocument(
 			.where(
 				claim
 					? scrapeClaimPredicate(claim)
-					: and(eq(scrapes.id, scrapeId), eq(scrapes.userId, userId)),
+					: and(
+							eq(scrapes.id, scrapeId),
+							eq(scrapes.userId, userId),
+							isNull(scrapes.deletedAt),
+						),
 			)
 			.for("update")
 			.limit(1);

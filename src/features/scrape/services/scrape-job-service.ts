@@ -67,6 +67,7 @@ export function scrapeClaimPredicate(claim: ScrapeJobClaim) {
 	return and(
 		eq(scrapes.id, claim.id),
 		eq(scrapes.userId, claim.userId),
+		isNull(scrapes.deletedAt),
 		eq(scrapes.jobToken, claim.token),
 		gt(scrapes.leaseExpiresAt, new Date()),
 	);
@@ -127,6 +128,7 @@ export async function claimScrapeJob(): Promise<ScrapeJobClaim | null> {
 			.from(scrapes)
 			.where(
 				and(
+					isNull(scrapes.deletedAt),
 					inArray(scrapes.status, [...activeStatuses]),
 					or(
 						isNull(scrapes.leaseExpiresAt),
@@ -162,7 +164,7 @@ export async function claimScrapeJob(): Promise<ScrapeJobClaim | null> {
 				})
 				.where(and(eq(scrapes.id, row.id), eq(scrapes.userId, row.userId)));
 			const { settleScrapeTrial } = await import("./scrape-trial-settlement");
-			await settleScrapeTrial(tx, row);
+			await settleScrapeTrial(tx, row, "failed");
 			return null;
 		}
 		const token = crypto.randomUUID();

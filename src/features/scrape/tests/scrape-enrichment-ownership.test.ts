@@ -37,6 +37,7 @@ describe("enrichment retry ownership", () => {
 				jobToken: null,
 				leaseExpiresAt: null,
 				jobAttempts: 0,
+				deletedAt: null,
 				createdAt: new Date(),
 				updatedAt: new Date(),
 				metadata: {

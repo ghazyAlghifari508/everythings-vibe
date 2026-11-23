@@ -3,6 +3,7 @@ import type { CreditOperationKind } from "@/features/billing/services/credit-ope
 export type TariffBillingUnit =
 	| "frame"
 	| "page"
+	| "design_view"
 	| "image"
 	| "request"
 	| "megabyte";

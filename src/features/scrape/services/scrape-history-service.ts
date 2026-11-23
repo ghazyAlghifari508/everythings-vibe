@@ -6,6 +6,7 @@ import {
 	eq,
 	ilike,
 	inArray,
+	isNull,
 	or,
 	type SQL,
 } from "drizzle-orm";
@@ -124,7 +125,7 @@ function scrapeHistoryConditions(
 	userId: string,
 	query: NormalizedScrapeHistoryQuery,
 ) {
-	const conditions = [eq(scrapes.userId, userId)];
+	const conditions = [eq(scrapes.userId, userId), isNull(scrapes.deletedAt)];
 	if (query.mode) conditions.push(eq(scrapes.mode, query.mode));
 	if (query.status === "completed")
 		conditions.push(eq(scrapes.status, "completed"));

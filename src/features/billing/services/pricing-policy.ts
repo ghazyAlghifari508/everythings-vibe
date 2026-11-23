@@ -49,6 +49,7 @@ export {
 const BILLING_UNITS: readonly TariffBillingUnit[] = [
 	"frame",
 	"page",
+	"design_view",
 	"image",
 	"request",
 	"megabyte",

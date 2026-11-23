@@ -13,8 +13,14 @@ import { settleProductTrial } from "@/features/billing/services/product-trial-se
 // Call while holding the scrape row lock, before deleting cascading outputs.
 export async function settleScrapeTrial(
 	tx: CreditTransaction,
-	row: Pick<ScrapeRow, "id" | "userId" | "mode" | "html" | "metadata">,
+	row: ScrapeRow,
+	outcome: "completed" | "failed" | "cancelled" = row.status === "completed"
+		? "completed"
+		: "failed",
 ) {
+	const { closeScrapeCharge, findScrapeCharge } = await import(
+		"./scrape-credit.server"
+	);
 	const [trial] = await tx
 		.select({ id: productTrials.id })
 		.from(productTrials)
@@ -25,8 +31,9 @@ export async function settleScrapeTrial(
 				eq(productTrials.jobId, row.id),
 				eq(productTrials.state, "reserved"),
 			),
-		);
-	if (!trial) return;
+		)
+		.limit(1);
+	if (!trial && !(await findScrapeCharge(tx, row))) return;
 	let units = 0;
 	if (row.mode === "crawl" || row.mode === "images") {
 		const table = row.mode === "crawl" ? scrapePages : scrapeImages;
@@ -56,7 +63,10 @@ export async function settleScrapeTrial(
 			)
 			.where(eq(scrapeDocuments.scrapeId, row.id))
 			.limit(1);
-		units = result ? 1 : 0;
+		units = result
+			? 1 + (row.metadata?.visualEvidence?.additionalViews?.length ?? 0)
+			: 0;
 	}
-	await settleProductTrial(tx, "scrape", row.userId, row.id, units);
+	if (trial) await settleProductTrial(tx, "scrape", row.userId, row.id, units);
+	else await closeScrapeCharge(tx, row, outcome, units);
 }

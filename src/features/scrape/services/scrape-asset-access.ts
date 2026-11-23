@@ -48,6 +48,7 @@ export async function getCapabilityOwner(
 			and(
 				eq(scrapes.id, scrapeId),
 				eq(scrapes.userId, ownerId),
+				isNull(scrapes.deletedAt),
 				isNull(users.bannedAt),
 			),
 		)

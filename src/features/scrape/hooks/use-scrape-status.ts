@@ -133,6 +133,19 @@ export function useScrapeStatus(
 				setError(errData?.error ?? "Gagal mengulang proses scrape.");
 				return;
 			}
+			const result: unknown = await res.json().catch(() => null);
+			if (
+				result &&
+				typeof result === "object" &&
+				"scrapeId" in result &&
+				typeof result.scrapeId === "string" &&
+				result.scrapeId !== scrapeId
+			) {
+				window.location.assign(
+					`/scrape/${encodeURIComponent(result.scrapeId)}${window.location.search}`,
+				);
+				return;
+			}
 			await fetchStatus();
 		} catch {
 			setError("Jaringan bermasalah. Coba lagi.");

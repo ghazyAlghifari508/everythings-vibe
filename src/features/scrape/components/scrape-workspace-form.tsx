@@ -141,6 +141,11 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 			const responseBody: unknown = await response.json();
 			const result = responseSchema.safeParse(responseBody);
 			if (!response.ok || !result.success) {
+				const rejection = errorSchema.safeParse(responseBody).data;
+				if (rejection?.code === "INSUFFICIENT_CREDITS") {
+					setCreditError(rejection.error);
+					return;
+				}
 				if (response.status === 402 || response.status === 403) {
 					await navigate({ to: "/pricing" });
 					return;
@@ -165,6 +170,7 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 	}
 
 	return (
+		<>
 		<form
 			onSubmit={(event) => void submit(event)}
 			className="mx-auto w-full max-w-3xl text-left"
@@ -255,5 +261,6 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 				</p>
 			) : null}
 		</form>
+		</>
 	);
 }
