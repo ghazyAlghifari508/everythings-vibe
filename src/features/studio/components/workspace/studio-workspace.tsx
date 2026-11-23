@@ -7,6 +7,7 @@ import { StudioChatPanel } from "@/features/studio/components/workspace/studio-c
 import { StudioHeader } from "@/features/studio/components/workspace/studio-header";
 import { useStudioChatDraft } from "@/features/studio/hooks/use-studio-chat-draft";
 import { useStudioChatPanel } from "@/features/studio/hooks/use-studio-chat-panel";
+import { useStudioFrameDevices } from "@/features/studio/hooks/use-studio-frame-devices";
 import { useStudioWorkspace } from "@/features/studio/hooks/use-studio-workspace";
 import type { StudioDetailLoaderData } from "@/features/studio/types/studio";
 import type {

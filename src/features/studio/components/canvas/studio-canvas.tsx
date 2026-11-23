@@ -17,6 +17,7 @@ import { StudioFrame } from "@/features/studio/components/canvas/studio-frame";
 import { StudioFrameToolbar } from "@/features/studio/components/canvas/studio-frame-toolbar";
 import { useStudioCanvasInput } from "@/features/studio/hooks/use-studio-canvas-input";
 import { useStudioCanvasMarquee } from "@/features/studio/hooks/use-studio-canvas-marquee";
+import { useStudioCanvasView } from "@/features/studio/hooks/use-studio-canvas-view";
 import { useStudioLivePool } from "@/features/studio/hooks/use-studio-live-pool";
 import {
 	STUDIO_CANVAS_INITIAL_ZOOM,
@@ -32,11 +33,11 @@ import {
 	type StudioDevice,
 	studioNativeDevice,
 } from "@/features/studio/types/studio-renderer";
+import { isCanvasControlTarget } from "@/features/studio/utils/studio-canvas-gesture";
 import {
 	computeFrameToolbarPlacement,
 	type StudioFrameToolbarPlacement,
 } from "@/features/studio/utils/studio-frame-toolbar";
-import { isCanvasControlTarget } from "@/features/studio/utils/studio-canvas-gesture";
 import { deriveStudioLifecycle } from "@/features/studio/utils/studio-lifecycle";
 import { useCanvasZoom } from "@/hooks/use-canvas-zoom";
 import type {
@@ -172,7 +173,7 @@ export const StudioCanvas = memo(function StudioCanvas({
 		inspectFrameId: null,
 	});
 
-	const { measureFrame, fitAll } = useStudioCanvasView({
+	const { measureFrame, fitAll, bounds, focusFrame } = useStudioCanvasView({
 		projectId: project.id,
 		preferredZoom,
 		frames,
@@ -183,6 +184,7 @@ export const StudioCanvas = memo(function StudioCanvas({
 		pan,
 		minZoom,
 		maxZoom,
+		frameDevices,
 		setZoom,
 		setPan,
 		resetZoom,
@@ -217,6 +219,122 @@ export const StudioCanvas = memo(function StudioCanvas({
 		onSelectFrames,
 		panMode,
 	});
+
+	// Only the live renderer knows whether a non-native viewport has a prepared
+	// surface. Device buttons must not enable before that signal arrives.
+	const [liveReadyFrameIds, setLiveReadyFrameIds] = useState<
+		ReadonlySet<string>
+	>(() => new Set());
+	const reportRendererReadiness = useCallback(
+		(frameId: string, ready: boolean) => {
+			setLiveReadyFrameIds((previous) => {
+				if (previous.has(frameId) === ready) return previous;
+				const next = new Set(previous);
+				if (ready) next.add(frameId);
+				else next.delete(frameId);
+				return next;
+			});
+		},
+		[],
+	);
+
+	const activeElementId = elementTarget?.frameId ?? null;
+	const toolbarFrameId =
+		frames.length === 1 &&
+		frames[0]?.status === "ready" &&
+		!elementTool &&
+		selectedFrameId === frames[0]?.id &&
+		activeElementId === null &&
+		!hasActiveGesture &&
+		!isPanning
+			? (frames[0]?.id ?? null)
+			: null;
+	const toolbarContext = useMemo(() => {
+		if (!toolbarFrameId) return null;
+		const frame = frames.find((item) => item.id === toolbarFrameId);
+		if (!frame) return null;
+		const nativeDevice = studioNativeDevice(frame.viewport);
+		const device = frameDevices?.[frame.id] ?? nativeDevice;
+		return {
+			frame,
+			device,
+			nativeDevice,
+			liveReady: liveReadyFrameIds.has(frame.id),
+			previewTarget: buildStudioPreviewTarget({
+				projectId: project.id,
+				frameId: frame.id,
+				device,
+				returnTo: `/design/${encodeURIComponent(project.id)}`,
+				routeAvailable: previewRouteAvailable,
+			}),
+		};
+	}, [
+		frameDevices,
+		frames,
+		liveReadyFrameIds,
+		previewRouteAvailable,
+		project.id,
+		toolbarFrameId,
+	]);
+
+	const [viewportTick, setViewportTick] = useState(0);
+	useEffect(() => {
+		const handleResize = () => setViewportTick((value) => value + 1);
+		window.addEventListener("resize", handleResize);
+		return () => window.removeEventListener("resize", handleResize);
+	}, []);
+	// viewportTick is a deliberate recompute trigger after a resize.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: viewportTick forces placement recalculation
+	const toolbarPlacement = useMemo<StudioFrameToolbarPlacement | null>(() => {
+		if (!toolbarContext || !canvasRef.current) return null;
+		const rect = canvasRef.current.getBoundingClientRect();
+		return computeFrameToolbarPlacement({
+			bounds,
+			frameIndex: frames.findIndex(
+				(item) => item.id === toolbarContext.frame.id,
+			),
+			zoom,
+			pan,
+			canvas: { width: rect.width, height: rect.height },
+			leftInsetPx: leftInsetPx ?? 0,
+		});
+	}, [
+		bounds,
+		canvasRef,
+		frames,
+		leftInsetPx,
+		pan,
+		toolbarContext,
+		viewportTick,
+		zoom,
+	]);
+
+	const focusedDeviceRef = useRef<StudioDevice | undefined>(undefined);
+	useEffect(() => {
+		if (!toolbarFrameId || !toolbarContext) return;
+		const device = toolbarContext.device;
+		if (focusedDeviceRef.current === undefined) {
+			focusedDeviceRef.current = device;
+			return;
+		}
+		if (focusedDeviceRef.current === device) return;
+		focusedDeviceRef.current = device;
+		focusFrame(toolbarFrameId);
+	}, [focusFrame, toolbarContext, toolbarFrameId]);
+
+	const handleDeviceChange = useCallback(
+		(device: StudioDevice) => {
+			if (!toolbarFrameId) return;
+			onFrameDeviceChange?.(toolbarFrameId, device);
+		},
+		[onFrameDeviceChange, toolbarFrameId],
+	);
+	const handleToolbarPreview = useCallback(
+		(target: StudioPreviewTarget) => {
+			if (target.routeAvailable) onOpenPreview?.(target);
+		},
+		[onOpenPreview],
+	);
 
 	useStudioCanvasInput({
 		canvasRef,
