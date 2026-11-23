@@ -12,7 +12,7 @@ import {
 } from "react";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
-import type { useStudioElementEditing } from "../../hooks/use-studio-element-editing";
+import type { StudioElementEditing } from "../../hooks/use-studio-element-editing";
 import type { StudioWorkspaceState } from "../../hooks/use-studio-workspace";
 import { studioChatPanelWidthCss } from "../../utils/studio-chat-layout";
 import { StudioComposer } from "../composer/studio-composer";
@@ -31,7 +31,7 @@ interface PanelProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	draft: { prompt: string; setPrompt: Dispatch<SetStateAction<string>> };
-	elementEditing?: ReturnType<typeof useStudioElementEditing>;
+	elementEditing?: StudioElementEditing;
 }
 
 function PanelBody({
@@ -72,29 +72,6 @@ function PanelBody({
 				onToggleExpanded={onToggleExpanded}
 				scrollMemory={scrollMemory}
 			/>
-			{elementEditing?.undo && !elementEditing.preview ? (
-				<div className="mx-3 flex items-center justify-between gap-2 border-t border-iron px-1 py-2 text-xs text-fog">
-					<span className="min-w-0 truncate">
-						{elementEditing.undo.frameName}: revisi diterapkan
-					</span>
-					<button
-						type="button"
-						disabled={elementEditing.busy}
-						onClick={() =>
-							elementEditing.undo &&
-							void elementEditing.transition(elementEditing.undo, "undo")
-						}
-						className="min-h-11 rounded-md px-3 text-snow hover:bg-steel focus-visible:outline-2 focus-visible:outline-snow disabled:opacity-40"
-					>
-						Undo
-					</button>
-				</div>
-			) : null}
-			{elementEditing?.error && !elementEditing.preview ? (
-				<p role="alert" className="px-4 py-2 text-xs text-crimson">
-					{elementEditing.error}
-				</p>
-			) : null}
 			{workspace.error ? (
 				<div
 					role="alert"
@@ -128,7 +105,7 @@ function PanelBody({
 					loading={
 						workspace.composerLoading ||
 						elementEditing?.busy ||
-						Boolean(elementEditing?.preview)
+						Boolean(elementEditing?.pending)
 					}
 					suggestions={workspace.suggestions}
 					referenceLabel={workspace.storedReferenceLabel}

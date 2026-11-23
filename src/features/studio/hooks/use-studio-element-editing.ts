@@ -18,6 +18,25 @@ const revisionsSchema = z.object({
 });
 const responseSchema = z.object({ revision: studioElementPreviewSchema });
 const pendingSchema = z.object({ signature: z.string(), id: z.uuid() });
+export interface StudioElementEditing {
+	target: StudioElementTarget | null;
+	pending: StudioElementPreview | null;
+	undo: StudioElementPreview | null;
+	busy: boolean;
+	error: string;
+	selectTarget: (next: StudioElementTarget) => void;
+	clearTarget: () => void;
+	submit: (
+		prompt: string,
+		options?: { target?: StudioElementTarget; edit?: StudioElementEdit },
+	) => Promise<{ accepted: boolean }>;
+	transition: (
+		row: StudioElementPreview,
+		action: "apply" | "cancel" | "undo",
+	) => Promise<void>;
+	refresh: (signal?: AbortSignal) => Promise<void>;
+}
+
 export function useStudioElementEditing({
 	projectId,
 	userId,
@@ -32,9 +51,9 @@ export function useStudioElementEditing({
 	selectedFrameIds: string[];
 	setError: (message: string) => void;
 	syncProjectStatus: () => Promise<void>;
-}) {
+}): StudioElementEditing {
 	const [target, setTarget] = useState<StudioElementTarget | null>(null);
-	const [preview, setPreview] = useState<StudioElementPreview | null>(null);
+	const [pending, setPending] = useState<StudioElementPreview | null>(null);
 	const [undo, setUndo] = useState<StudioElementPreview | null>(null);
 	const [busy, setBusy] = useState(false);
 	const [error, setLocalError] = useState("");
@@ -64,14 +83,20 @@ export function useStudioElementEditing({
 					request !== sequence.current
 				)
 					return;
-				const pending = parsed.revisions.filter(
-					(row) => row.status === "preview" || row.status === "generating",
+				// An empty history is a valid result. A successful retry clears an
+				// earlier failure instead of leaving a stale error on screen.
+				setPending(
+					parsed.revisions
+						.filter(
+							(row) => row.status === "preview" || row.status === "generating",
+						)
+						.at(-1) ?? null,
 				);
-				setPreview(pending.at(-1) ?? null);
 				setUndo(
 					parsed.revisions.filter((row) => row.status === "applied").at(-1) ??
 						null,
 				);
+				setLocalError("");
 			} catch (failure) {
 				if (
 					!signal?.aborted &&
@@ -89,7 +114,7 @@ export function useStudioElementEditing({
 	);
 	useEffect(() => {
 		setTarget(null);
-		setPreview(null);
+		setPending(null);
 		setUndo(null);
 		setLocalError("");
 		const controller = new AbortController();
@@ -175,10 +200,20 @@ export function useStudioElementEditing({
 				}
 				const { revision } = responseSchema.parse(await response.json());
 				if (currentProject.current !== projectId) return { accepted: false };
-				if (revision.status === "preview" || revision.status === "generating")
-					setPreview(revision);
-				else if (revision.status === "applied") setUndo(revision);
+				if (revision.status === "applied") {
+					setUndo(revision);
+					setPending(null);
+				} else if (
+					revision.status === "generating" ||
+					revision.status === "preview"
+				) {
+					setPending(revision);
+				} else {
+					setPending(null);
+				}
 				writeStudioChatStorage(key, "");
+				// The mutation response is authoritative. Do not follow it with a
+				// history read that could arrive late and erase the new undo state.
 				await syncProjectStatus();
 				return { accepted: true };
 			} catch (failure) {
@@ -223,7 +258,7 @@ export function useStudioElementEditing({
 					);
 				const { revision } = responseSchema.parse(await response.json());
 				if (currentProject.current !== projectId) return;
-				setPreview(null);
+				setPending(null);
 				if (action === "apply") {
 					setUndo(revision);
 					setTarget(null);
@@ -250,7 +285,7 @@ export function useStudioElementEditing({
 	);
 	return {
 		target,
-		preview,
+		pending,
 		undo,
 		busy,
 		error,

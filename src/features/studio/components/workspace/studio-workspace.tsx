@@ -14,7 +14,7 @@ import type {
 	StudioElementTarget,
 } from "@/features/studio/types/studio-element";
 import { useStudioElementEditing } from "../../hooks/use-studio-element-editing";
-import { StudioElementPreview } from "./studio-element-preview";
+import { StudioElementFeedback } from "./studio-element-feedback";
 
 export function StudioWorkspace({
 	initialData,
@@ -121,15 +121,7 @@ export function StudioWorkspace({
 				elementEditing={elementEditing}
 				draft={draft}
 			/>
-			<StudioElementPreview
-				editing={elementEditing}
-				projectId={workspace.project.id}
-				viewport={
-					workspace.frames.find(
-						(frame) => frame.id === elementEditing.preview?.frameId,
-					)?.viewport ?? workspace.project.designMode
-				}
-			/>
+			<StudioElementFeedback editing={elementEditing} />
 
 			{workspace.error && !chat.open && (
 				<div

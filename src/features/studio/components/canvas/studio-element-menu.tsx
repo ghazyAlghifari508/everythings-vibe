@@ -34,6 +34,10 @@ interface StudioElementEditMenuProps {
 	busy?: boolean;
 	/** Floating chat band on the left that the menu must not cover. */
 	leftInsetPx?: number;
+	/** Full text from the live document; the identity label is truncated. */
+	textValue?: string;
+	/** False when the live node cannot be safely patched as text. */
+	textEditable?: boolean;
 }
 
 const actionClass =
@@ -42,7 +46,9 @@ const actionClass =
 /**
  * Context menu for one selected element. Positioning, outside interaction,
  * Escape and keyboard navigation come from the shared Radix menu primitive;
- * the canvas only supplies the target identity and action dispatch.
+ * the canvas only supplies the target identity and action dispatch. Direct
+ * text editing happens in place over the selected element, never through a
+ * separate dialog or a model request.
  */
 export function StudioElementEditMenu({
 	target,
@@ -52,150 +58,192 @@ export function StudioElementEditMenu({
 	canSelectParent = false,
 	busy = false,
 	leftInsetPx = 0,
+	textValue,
+	textEditable,
 }: StudioElementEditMenuProps) {
-	const [textKey, setTextKey] = useState<string | null>(null);
-	const [draftValue, setDraftValue] = useState("");
+	const [editing, setEditing] = useState(false);
+	const [draft, setDraft] = useState("");
 	const inputRef = useRef<HTMLTextAreaElement>(null);
-	const key = `${target.frameId}:${target.elementId}:${target.baseRevision}`;
-	const editingText = textKey === key;
-	const draft = textKey === key ? draftValue : target.label;
+	const triggerRef = useRef<HTMLButtonElement>(null);
+	const menuRef = useRef<HTMLDivElement>(null);
+	const cancelled = useRef(false);
+	const currentText = textValue ?? target.label;
+	const canEditText = textEditable ?? supportsDirectTextEdit(target);
 
 	useEffect(() => {
-		if (editingText) inputRef.current?.focus();
-	}, [editingText]);
+		if (!editing) return;
+		// Radix moves focus into the closing menu after the editor mounts;
+		// refocus once that transition is done.
+		const frame = requestAnimationFrame(() => inputRef.current?.focus());
+		return () => cancelAnimationFrame(frame);
+	}, [editing]);
 
 	const close = () => onOpenChange(false);
 	const dispatch = (action: StudioElementAction, text?: string) => {
 		onAction(action, target, text);
 		close();
 	};
+	const openEditor = () => {
+		cancelled.current = false;
+		setDraft(currentText);
+		setEditing(true);
+		close();
+	};
+	const cancelEditor = () => {
+		cancelled.current = true;
+		setEditing(false);
+	};
+	const commitEditor = () => {
+		if (!editing || cancelled.current) return;
+		cancelled.current = true;
+		setEditing(false);
+		const next = draft;
+		if (!next.trim() || next === currentText) return;
+		dispatch("edit-text", next);
+	};
 
 	return (
-		<DropdownMenu open={open} onOpenChange={onOpenChange}>
-			<DropdownMenuTrigger asChild>
-				<button
-					type="button"
-					aria-label={`Buka menu edit elemen ${target.label}`}
-					title="Edit elemen"
-					className="absolute z-20 flex size-8 items-center justify-center rounded-sm border border-snow/70 bg-charcoal/90 text-snow hover:bg-steel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-snow"
-					style={{
-						left: Math.max(0, target.bounds.x + target.bounds.width - 32),
-						top: Math.max(0, target.bounds.y),
-					}}
-				>
-					<Icon icon={Edit01Icon} size={14} />
-				</button>
-			</DropdownMenuTrigger>
-			<DropdownMenuContent
-				align="end"
-				side="bottom"
-				sideOffset={8}
-				avoidCollisions
-				collisionPadding={{
-					top: 72,
-					right: 12,
-					bottom: 12,
-					left: leftInsetPx + 12,
-				}}
-				className="w-64 rounded-xl border-iron bg-obsidian shadow-none"
-			>
-				<div className="flex items-center justify-between gap-2 px-2 py-1.5">
-					<span className="font-[510] text-xs text-snow">Edit Element</span>
+		<>
+			<DropdownMenu open={open} onOpenChange={onOpenChange}>
+				<DropdownMenuTrigger asChild>
 					<button
+						ref={triggerRef}
 						type="button"
-						aria-label="Tutup menu edit elemen"
-						title="Tutup menu"
-						onClick={close}
-						className="flex size-8 items-center justify-center rounded-sm text-fog hover:bg-steel hover:text-snow focus-visible:outline-2 focus-visible:outline-snow"
-					>
-						<Icon icon={Cancel01Icon} size={14} />
-					</button>
-				</div>
-				<DropdownMenuSeparator />
-				{editingText ? (
-					<form
-						className="flex flex-col gap-2 p-2"
-						onSubmit={(event) => {
-							event.preventDefault();
-							if (draft.trim() && !busy) dispatch("edit-text", draft);
+						aria-label={`Buka menu edit elemen ${target.label}`}
+						title="Edit elemen"
+						className="absolute z-20 flex size-8 items-center justify-center rounded-sm border border-snow/70 bg-charcoal/90 text-snow hover:bg-steel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-snow"
+						style={{
+							left: Math.max(0, target.bounds.x + target.bounds.width - 32),
+							top: Math.max(0, target.bounds.y),
 						}}
 					>
-						<label
-							htmlFor="studio-element-text"
-							className="text-xs font-[510] text-fog"
+						<Icon icon={Edit01Icon} size={14} />
+					</button>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent
+					ref={menuRef}
+					align="end"
+					side="bottom"
+					sideOffset={8}
+					avoidCollisions
+					collisionPadding={{
+						top: 72,
+						right: 12,
+						bottom: 12,
+						left: leftInsetPx + 12,
+					}}
+					className="w-64 rounded-xl border-iron bg-obsidian shadow-none"
+				>
+					<div className="flex items-center justify-between gap-2 px-2 py-1.5">
+						<span className="font-[510] text-xs text-snow">Edit Element</span>
+						<button
+							type="button"
+							aria-label="Tutup menu edit elemen"
+							title="Tutup menu"
+							onClick={close}
+							className="flex size-8 items-center justify-center rounded-sm text-fog hover:bg-steel hover:text-snow focus-visible:outline-2 focus-visible:outline-snow"
 						>
-							Teks elemen
-						</label>
-						<textarea
-							id="studio-element-text"
-							ref={inputRef}
-							value={draft}
-							onChange={(event) => setDraftValue(event.target.value)}
-							onKeyDown={(event) => {
-								if (event.key.startsWith("Arrow")) event.stopPropagation();
-							}}
-							rows={3}
-							maxLength={8000}
-							className="w-full resize-y rounded-sm border border-iron bg-charcoal p-2 text-sm text-snow focus-visible:outline-2 focus-visible:outline-snow"
-						/>
-						<div className="flex justify-end gap-2">
-							<button
-								type="button"
-								onClick={() => setTextKey(null)}
-								className="min-h-11 rounded-sm px-3 text-xs text-fog hover:bg-steel hover:text-snow focus-visible:outline-2 focus-visible:outline-snow"
-							>
-								Batal
-							</button>
-							<button
-								type="submit"
-								disabled={busy || !draft.trim()}
-								className="min-h-11 rounded-sm bg-steel px-3 text-xs text-snow hover:brightness-110 focus-visible:outline-2 focus-visible:outline-snow disabled:opacity-40"
-							>
-								Simpan
-							</button>
-						</div>
-					</form>
-				) : (
-					<>
-						{supportsDirectTextEdit(target) ? (
-							<DropdownMenuItem
-								className={actionClass}
-								onSelect={(event) => {
-									event.preventDefault();
-									setTextKey(key);
-								}}
-							>
-								<Icon icon={Edit01Icon} size={16} />
-								Edit Text
-							</DropdownMenuItem>
-						) : null}
+							<Icon icon={Cancel01Icon} size={14} />
+						</button>
+					</div>
+					<DropdownMenuSeparator />
+					{canEditText ? (
 						<DropdownMenuItem
 							className={actionClass}
-							onSelect={() => dispatch("edit-ai")}
+							onClick={(event) => {
+								// Prevent Radix's select handler from restoring focus
+								// to the trigger after the menu closes.
+								event.preventDefault();
+								openEditor();
+							}}
 						>
-							<Icon icon={MagicWand02Icon} size={16} />
-							Edit with AI
+							<Icon icon={Edit01Icon} size={16} />
+							Edit Text
 						</DropdownMenuItem>
-						{canSelectParent ? (
-							<DropdownMenuItem
-								className={actionClass}
-								onSelect={() => dispatch("select-parent")}
-							>
-								Pilih induk
-							</DropdownMenuItem>
-						) : null}
-						<DropdownMenuSeparator />
+					) : null}
+					<DropdownMenuItem
+						className={actionClass}
+						onSelect={() => dispatch("edit-ai")}
+					>
+						<Icon icon={MagicWand02Icon} size={16} />
+						Edit with AI
+					</DropdownMenuItem>
+					{canSelectParent ? (
 						<DropdownMenuItem
-							disabled={busy}
-							className={`gap-2 py-2 font-[510] text-crimson focus:bg-crimson/10 focus:text-crimson ${busy ? "opacity-50" : ""}`}
-							onSelect={() => dispatch("delete")}
+							className={actionClass}
+							onSelect={() => dispatch("select-parent")}
 						>
-							<Icon icon={Delete02Icon} size={16} />
-							Delete
+							Pilih induk
 						</DropdownMenuItem>
-					</>
-				)}
-			</DropdownMenuContent>
-		</DropdownMenu>
+					) : null}
+					<DropdownMenuSeparator />
+					<DropdownMenuItem
+						disabled={busy}
+						className={`gap-2 py-2 font-[510] text-crimson focus:bg-crimson/10 focus:text-crimson ${busy ? "opacity-50" : ""}`}
+						onSelect={() => dispatch("delete")}
+					>
+						<Icon icon={Delete02Icon} size={16} />
+						Delete
+					</DropdownMenuItem>
+				</DropdownMenuContent>
+			</DropdownMenu>
+			{editing ? (
+				<div
+					data-ev-editor-overlay
+					className="absolute z-30 flex flex-col gap-1 rounded-sm border border-snow bg-obsidian/95 p-1 shadow-lg"
+					style={{
+						left: Math.max(0, target.bounds.x),
+						top: Math.max(0, target.bounds.y),
+						width: Math.min(Math.max(target.bounds.width, 180), 480),
+					}}
+				>
+					<textarea
+						ref={inputRef}
+						aria-label="Teks elemen"
+						value={draft}
+						disabled={busy}
+						rows={Math.min(
+							Math.max(Math.ceil(target.bounds.height / 20), 1),
+							6,
+						)}
+						maxLength={8000}
+						onChange={(event) => setDraft(event.target.value)}
+						onKeyDown={(event) => {
+							if (event.key === "Escape") {
+								event.preventDefault();
+								cancelEditor();
+							} else if (event.key === "Enter" && !event.shiftKey) {
+								event.preventDefault();
+								commitEditor();
+							} else {
+								event.stopPropagation();
+							}
+						}}
+						onBlur={(event) => {
+							const next = event.relatedTarget;
+							if (
+								next instanceof Node &&
+								(menuRef.current?.contains(next) ||
+									triggerRef.current?.contains(next))
+							)
+								return;
+							commitEditor();
+						}}
+						className="w-full resize-y rounded-sm border border-iron bg-charcoal p-2 text-sm text-snow focus-visible:outline-2 focus-visible:outline-snow"
+					/>
+					<div className="flex items-center justify-between gap-2 px-1 pb-0.5 text-xs text-fog">
+						<span>Enter simpan · Shift+Enter baris baru</span>
+						<button
+							type="button"
+							onPointerDown={(event) => event.preventDefault()}
+							onClick={cancelEditor}
+							className="min-h-8 rounded-sm px-2 hover:bg-steel hover:text-snow focus-visible:outline-2 focus-visible:outline-snow"
+						>
+							Batal
+						</button>
+					</div>
+				</div>
+			) : null}
+		</>
 	);
 }

@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
 	resolveStudioElementParent,
 	resolveStudioElementTarget,
 } from "../../services/studio-element-targeting";
-import type {
-	StudioElementAction,
-	StudioElementTarget,
+import {
+	STUDIO_INSPECTION_ATTR,
+	type StudioElementAction,
+	type StudioElementTarget,
 } from "../../types/studio-element";
 import {
 	acceptStudioHoverMessage,
@@ -139,6 +140,18 @@ export function StudioLiveSurface({
 	const [menuOpen, setMenuOpen] = useState(false);
 	const active = state.active?.document ?? null;
 	const incoming = state.incoming;
+	const editorText = useMemo(() => {
+		const html = active?.html;
+		if (!target || !html) return null;
+		const parsed = new DOMParser().parseFromString(html, "text/html");
+		const node = parsed.querySelector(
+			`[${STUDIO_INSPECTION_ATTR}=${JSON.stringify(target.elementId)}]`,
+		);
+		// A leaf with element children owns markup, icons or formatting: a text
+		// patch would destroy them, so direct editing is not advertised.
+		if (!node || node.children.length > 0) return null;
+		return { value: node.textContent ?? "" };
+	}, [active?.html, target]);
 
 	useEffect(() => {
 		function message(event: MessageEvent<unknown>) {
@@ -389,11 +402,14 @@ export function StudioLiveSurface({
 			onAction &&
 			state.active?.document.baseHash === target.baseHash ? (
 				<StudioElementEditMenu
+					key={`${target.frameId}:${target.elementId}:${target.baseRevision}`}
 					target={target}
 					open={menuOpen}
 					onOpenChange={setMenuOpen}
 					onAction={handleAction}
 					canSelectParent={canSelectParent}
+					textValue={editorText?.value}
+					textEditable={editorText !== null}
 					busy={actionBusy}
 					leftInsetPx={leftInsetPx}
 				/>
