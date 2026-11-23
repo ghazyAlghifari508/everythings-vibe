@@ -52,6 +52,8 @@ export const studioProjects = pgTable(
 		prdContent: text("prd_content"),
 		prdFilename: text("prd_filename"),
 		prdContentHash: text("prd_content_hash"),
+		/** Set instead of deleting when a credit operation references this row. */
+		deletedAt: timestamp("deleted_at", { withTimezone: true }),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.defaultNow()
 			.notNull(),
@@ -132,6 +134,9 @@ export const studioJobs = pgTable(
 		leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
 		startedAt: timestamp("started_at", { withTimezone: true }),
 		finishedAt: timestamp("finished_at", { withTimezone: true }),
+		/** Credit operation funding this job attempt, pinned at reservation. */
+		creditOperationId: text("credit_operation_id"),
+		deletedAt: timestamp("deleted_at", { withTimezone: true }),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.defaultNow()
 			.notNull(),
