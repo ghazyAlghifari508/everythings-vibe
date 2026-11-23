@@ -13,7 +13,7 @@ P8 is complete at source and targeted-test level. No browser QA was run; P11 own
 
 ## Direct editing implementation
 
-- `StudioElementEditMenu` exposes `Edit Text` only when `textEditable ?? supportsDirectTextEdit(target)` is true. `StudioLiveSurface` enables it only when the inspected DOM node exists and has no child elements, and passes the **full** text from the active live document (`textValue`), never the truncated label.
+- `StudioElementEditMenu` exposes `Edit Text` only when `textEditable ?? supportsDirectTextEdit(target)` is true **and** the target is not a void element (`img`, `input`, `br`, ...). `StudioLiveSurface` enables it only when the inspected DOM node exists and has no child elements, and passes the **full** text from the active live document (`textValue`), never the truncated label.
 - Enter / blur commit; Shift+Enter inserts a newline; Escape cancels; blank (`trim() === ""`) and unchanged text are no-ops and create no revision.
 - The menu is keyed by element id, base revision and frame id, so a new revision cannot inherit stale editor state.
 - `onAction("edit-text", target, text)` is handled by `useStudioElementEditing.submit()` with an explicit deterministic edit. `prepareStudioElementRevision` passes `{ projectId, frameId, baseRevision }` to `patchStudioElement`; the existing deterministic `text` / `remove` operations are reused. No second patch engine.
@@ -106,7 +106,7 @@ Coverage: exact text commit, literal markup handling, Escape / unchanged / blank
 ## Remaining limitations
 
 - No browser QA or visual regression run; P11 owns it. "No shimmer" is enforced by code and tests, not visual observation.
-- Direct text editing is intentionally limited to one DOM text node with no child elements; complex components use scoped AI patches instead.
+- Direct text editing is intentionally limited to one non-void DOM text node with no child elements; complex components use scoped AI patches instead.
 - Undo covers the latest applied revision per target; older history is read-only, not batch-reversible.
 - Legacy `preview` candidates still require explicit Apply/Cancel and cannot retroactively claim Auto Apply or Undo.
 - Whole-frame generation unchanged in this phase: it still uses jobs and credits; P8 only removes those costs from deterministic element operations.
