@@ -52,6 +52,7 @@ export const EVVIBE_DESIGN_STAGE_REFERENCES: Record<
 	],
 	"add-screen": ["navigation-patterns", "web-design", "mobile-design"],
 	revision: ["revision-scope", "good-vs-bad"],
+	prototype: ["prototype-interactions"],
 	correction: [],
 };
 

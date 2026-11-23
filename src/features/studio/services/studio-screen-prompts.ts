@@ -109,6 +109,9 @@ ${getStudioComponentGuidance(opts.blueprint?.screenPlan.find((screen) => screen.
 		)?.composition,
 	});
 	if (intelligence) sections.push(intelligence);
+	// Every frame must declare which controls the prototype runtime animates.
+	const prototype = buildEvvibeDesignContext("prototype");
+	if (prototype) sections.push(prototype);
 
 	// Design tokens
 	if (opts.designMd && opts.designMd.trim().length > 0) {

@@ -20,6 +20,8 @@ export const EVVIBE_DESIGN_INTERNAL_ID = "evvibe-design";
  * - `planning-platform` is the platform addendum of the planning user prompt.
  * - `generation` is the static frame standard in the system prompt.
  * - `initial`, `add-screen` and `revision` are per-request addenda.
+ * - `prototype` is the interaction contract between generated markup and the
+ *   trusted prototype runtime; every frame request carries it.
  * - `correction` intentionally delivers nothing: the frame system prompt and
  *   the reported defects already cover a bounded repair, and adding general
  *   guidance there only pushes a large document over the correction budget.
@@ -31,6 +33,7 @@ export type EvvibeDesignStage =
 	| "initial"
 	| "add-screen"
 	| "revision"
+	| "prototype"
 	| "correction";
 
 export type EvvibeDesignLayoutIntent =
@@ -84,6 +87,7 @@ export const EVVIBE_DESIGN_STAGE_BUDGET_CHARS: Record<
 	initial: 5_000,
 	"add-screen": 5_000,
 	revision: 4_000,
+	prototype: 3_600,
 	correction: 0,
 };
 

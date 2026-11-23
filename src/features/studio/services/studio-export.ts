@@ -105,6 +105,18 @@ async function bundleAssets(
 	return assetMap;
 }
 
+/**
+ * Exports are the committed static HTML only. The interactive prototype
+ * (cross-page navigation, dialogs, forms, mock state) is provided by the
+ * trusted viewer runtime, which is never injected into a file: a standalone
+ * HTML keeps its native behaviour (links, <details>, native form controls) and
+ * its inert data-proto-* markers, nothing more.
+ */
+export const STUDIO_EXPORT_INTERACTIVITY = {
+	prototypeRuntime: false,
+	note: "Ekspor berisi HTML statis. Interaksi prototipe (navigasi antar halaman, dialog, formulir, state contoh) hanya tersedia di penampil prototipe VibeDesign dan tidak disertakan dalam berkas ini.",
+} as const;
+
 export async function exportProjectAsZip(
 	projectTitle: string,
 	projectId: string,
@@ -138,6 +150,7 @@ export async function exportProjectAsZip(
 	].sort();
 	const manifest = {
 		title: projectTitle,
+		interactivity: STUDIO_EXPORT_INTERACTIVITY,
 		exportedAt: new Date().toISOString(),
 		// Bundled local assets travel with the ZIP; anything else is an online
 		// dependency the reader must have network access for.

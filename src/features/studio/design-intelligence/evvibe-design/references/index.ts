@@ -6,6 +6,7 @@ import { designReasoning } from "./design-reasoning";
 import { mediaAndImagery } from "./media-and-imagery";
 import { mobileDesign } from "./mobile-design";
 import { navigationPatterns } from "./navigation-patterns";
+import { prototypeInteractions } from "./prototype-interactions";
 import { revisionScope } from "./revision-scope";
 import { typographyAndLayout } from "./typography-and-layout";
 import { webDesign } from "./web-design";
@@ -16,6 +17,7 @@ export const EVVIBE_DESIGN_REFERENCES: readonly EvvibeDesignReference[] = [
 	webDesign,
 	mobileDesign,
 	navigationPatterns,
+	prototypeInteractions,
 	typographyAndLayout,
 	componentLibrary,
 	mediaAndImagery,
