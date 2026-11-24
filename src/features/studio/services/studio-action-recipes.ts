@@ -27,6 +27,7 @@ const PAYOUT = /\b(pencairan|payout|royalti|penerbit)\b/i;
 const PORTFOLIO = /\b(portofolio|portfolio|desainer|studi kasus)\b/i;
 const FINANCE = /\b(anggaran|budget|pengeluaran|dompet)\b/i;
 const COMMERCE = /\b(keranjang|belanja|katalog)\b/i;
+const PROFILE = /\b(profil|profile|data diri|kontak)\b/i;
 
 export const ACTION_RECIPES: readonly StudioActionRecipe[] = [
 	{
@@ -108,6 +109,16 @@ export const ACTION_RECIPES: readonly StudioActionRecipe[] = [
 		description: "Ringkasan item sebelum pembayaran.",
 		focus:
 			"Rancang state visual ringkasan pesanan setelah keranjang diisi: daftar item, jumlah, subtotal, ongkos kirim, dan jalur lanjut ke pembayaran. Fokus pada tampilan state yang bisa dirender.",
+	},
+	{
+		id: "profile-contact-validation",
+		detect: PROFILE,
+		kind: "add_validation",
+		target: /profil|profile/i,
+		title: "Uji validasi data kontak yang belum lengkap",
+		description: "Field wajib yang kosong ditandai sebelum disimpan.",
+		focus:
+			"Sertakan validasi saat data kontak wajib belum lengkap: sorot field yang kosong, jelaskan data yang dibutuhkan, dan arahkan pengguna untuk melengkapinya sebelum menyimpan.",
 	},
 ];
 

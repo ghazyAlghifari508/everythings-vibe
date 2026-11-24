@@ -8,7 +8,6 @@ import type {
 } from "@/db/schema";
 import type { StudioComposerSubmitResult } from "@/features/studio/components/composer/studio-composer";
 import { useStudioPlanningRetry } from "@/features/studio/hooks/use-studio-planning-retry";
-import { useStudioScreenSuggestions } from "@/features/studio/hooks/use-studio-screen-suggestions";
 import { useStudioStatus } from "@/features/studio/hooks/use-studio-status";
 import { useStudioWorkspaceActions } from "@/features/studio/hooks/use-studio-workspace-actions";
 import {
@@ -17,13 +16,11 @@ import {
 } from "@/features/studio/services/studio-chat-storage";
 import { extractDesignSystemTokens } from "@/features/studio/services/studio-design-tokens";
 import { STUDIO_DESIGN_PRESETS } from "@/features/studio/services/studio-presets";
-import type { StudioScreenSuggestion } from "@/features/studio/services/studio-screen-suggestions";
 import type { StudioDetailLoaderData } from "@/features/studio/types/studio";
 import type { StudioStatus } from "@/features/studio/types/studio-status";
 import { pruneStudioFrameSelection } from "@/features/studio/utils/studio-frame-selection";
 import { deriveStudioLifecycle } from "@/features/studio/utils/studio-lifecycle";
 
-const NO_SUGGESTIONS: readonly StudioScreenSuggestion[] = [];
 const selectedFrameIdsSchema = z.array(z.string().min(1));
 
 export interface StudioWorkspaceState {
@@ -49,8 +46,6 @@ export interface StudioWorkspaceState {
 	readyFramesCount: number;
 	storedReferenceLabel: string | null;
 	storedReferenceColors: readonly string[] | null;
-	/** Empty while work is in flight; a new screen is already on its way. */
-	suggestions: readonly StudioScreenSuggestion[];
 	/** Attaches exactly one live frame by name; null clears composer targets. */
 	selectTargetFrameByName: (frameName: string | null) => void;
 	selectFrame: (id: string | null, additive?: boolean) => void;
@@ -157,35 +152,6 @@ export function useStudioWorkspace(
 		() => frames.filter((f) => f.status === "ready").length,
 		[frames],
 	);
-
-	const conversationText = useMemo(
-		() => (messages ?? []).map((message) => message.content).join("\n"),
-		[messages],
-	);
-	const recentRequest = useMemo(() => {
-		const rows = messages ?? [];
-		for (let index = rows.length - 1; index >= 0; index--)
-			if (rows[index]?.role === "user") return rows[index]?.content ?? "";
-		return "";
-	}, [messages]);
-	const selectedFrameNames = useMemo(
-		() =>
-			frames
-				.filter((frame) => selectedFrameIds.includes(frame.id))
-				.map((frame) => frame.name),
-		[frames, selectedFrameIds],
-	);
-	const projectSuggestions = useStudioScreenSuggestions(
-		project,
-		frames,
-		conversationText,
-		selectedFrameNames,
-		recentRequest,
-	);
-	// While a job is running the project is mid-plan, and a next-screen request
-	// would race the planning step that rewrites the frame list. Suggestions
-	// come back as soon as the canvas is idle again.
-	const suggestions = isProcessing ? NO_SUGGESTIONS : projectSuggestions;
 
 	// Derived selection state must keep a stable identity: a fresh array on
 	// every poll tick would re-render the composer even when nothing changed.
@@ -309,7 +275,6 @@ export function useStudioWorkspace(
 		readyFramesCount,
 		storedReferenceLabel,
 		storedReferenceColors,
-		suggestions,
 		selectTargetFrameByName,
 		selectFrame,
 		selectFrames,

@@ -449,8 +449,8 @@ describe("contextual bubble suggestions", () => {
 
 		expect(suggestions.map((suggestion) => suggestion.cardCopy)).toEqual([
 			"Perjelas status pesanan pada riwayat perjalanan",
+			"Uji validasi data kontak yang belum lengkap",
 			"Buka jelajah destinasi dengan destinasi per wilayah dengan rekomendasi.",
-			"Temukan festival dan acara dengan acara lokal beserta tanggal dan lokasinya.",
 		]);
 		// The card shows a full sentence; the prompt behind it stays complete.
 		const explore = suggestions.find((suggestion) =>

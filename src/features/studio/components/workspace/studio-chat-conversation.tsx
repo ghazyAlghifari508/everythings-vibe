@@ -5,9 +5,11 @@ import { Icon } from "@/components/ui/icon";
 import type { StudioFrameRow, StudioMessageRow } from "@/db/schema";
 import { useIsomorphicLayoutEffect } from "@/hooks/use-isomorphic-layout-effect";
 import { cn } from "@/lib/utils";
+import type { StudioScreenSuggestion } from "../../services/studio-screen-suggestions";
 import { isLongStudioUserMessage } from "../../utils/studio-chat-message";
 import { StudioChatMarkdown } from "./studio-chat-markdown";
 import { StudioChatResult } from "./studio-chat-result";
+import { StudioConversationSuggestions } from "./studio-conversation-suggestions";
 
 /** Scroll position lives above the conversation so a remounted drawer reopens where it was. */
 export type StudioChatScrollMemory = MutableRefObject<{
@@ -22,6 +24,9 @@ interface ConversationProps {
 	expandedIds: ReadonlySet<string>;
 	onToggleExpanded: (id: string) => void;
 	scrollMemory: StudioChatScrollMemory;
+	suggestionsByMessage: ReadonlyMap<string, readonly StudioScreenSuggestion[]>;
+	onSelectSuggestion: (suggestion: StudioScreenSuggestion) => void;
+	suggestionsDisabled?: boolean;
 }
 
 function Attachments({ message }: { message: StudioMessageRow }) {
@@ -92,10 +97,16 @@ function AssistantMessage({
 	message,
 	frames,
 	onOpenFrame,
+	suggestions,
+	onSelectSuggestion,
+	disabled,
 }: {
 	message: StudioMessageRow;
 	frames: readonly StudioFrameRow[];
 	onOpenFrame: (frameId: string) => void;
+	suggestions: readonly StudioScreenSuggestion[];
+	onSelectSuggestion: (suggestion: StudioScreenSuggestion) => void;
+	disabled: boolean;
 }) {
 	return (
 		<article aria-label="Balasan design agent" className="min-w-0">
@@ -106,6 +117,11 @@ function AssistantMessage({
 				message={message}
 				frames={frames}
 				onOpenFrame={onOpenFrame}
+			/>
+			<StudioConversationSuggestions
+				suggestions={suggestions}
+				onSelect={onSelectSuggestion}
+				disabled={disabled}
 			/>
 		</article>
 	);
@@ -118,6 +134,9 @@ export function StudioChatConversation({
 	expandedIds,
 	onToggleExpanded,
 	scrollMemory,
+	suggestionsByMessage,
+	onSelectSuggestion,
+	suggestionsDisabled = false,
 }: ConversationProps) {
 	const viewport = useRef<HTMLDivElement>(null);
 	useIsomorphicLayoutEffect(() => {
@@ -168,6 +187,9 @@ export function StudioChatConversation({
 								message={message}
 								frames={frames}
 								onOpenFrame={onOpenFrame}
+								suggestions={suggestionsByMessage.get(message.id) ?? []}
+								onSelectSuggestion={onSelectSuggestion}
+								disabled={suggestionsDisabled}
 							/>
 						),
 					)}

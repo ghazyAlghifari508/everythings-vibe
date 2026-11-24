@@ -16,11 +16,9 @@ import { Icon } from "@/components/ui/icon";
 import { Spinner } from "@/components/ui/spinner";
 import { STUDIO_DESIGN_PRESETS } from "@/features/studio/services/studio-presets";
 import { STUDIO_MIN_PROMPT_CHARS } from "@/features/studio/services/studio-prompt-validation";
-import type { StudioScreenSuggestion } from "@/features/studio/services/studio-screen-suggestions";
 import { shouldSubmitComposerEvent } from "@/features/studio/utils/composer-keyboard";
 import type { StudioElementTarget } from "../../types/studio-element";
 import { filterValidHexColors, StudioPaletteDisk } from "./studio-palette-disk";
-import { StudioSuggestionRow } from "./studio-suggestion-row";
 
 /**
  * The server resolves the operation, so the composer only reports whether the
@@ -46,10 +44,6 @@ export interface StudioComposerProps {
 	onClearFrames?: () => void;
 	referenceLabel?: string | null;
 	referenceColors?: readonly string[] | null;
-	/** Next-action cards derived from the project's own structure. */
-	suggestions?: readonly StudioScreenSuggestion[];
-	/** Selects the exact live frame a card targets; null clears the attachment. */
-	onSelectTargetFrame?: (frameName: string | null) => void;
 	elementTarget?: StudioElementTarget | null;
 	onRemoveElement?: () => void;
 }
@@ -65,8 +59,6 @@ export function StudioComposer({
 	onClearFrames,
 	referenceLabel,
 	referenceColors,
-	suggestions = [],
-	onSelectTargetFrame,
 	elementTarget,
 	onRemoveElement,
 }: StudioComposerProps) {
@@ -76,7 +68,6 @@ export function StudioComposer({
 	const [sending, setSending] = useState(false);
 	const [error, setError] = useState("");
 	const [clarify, setClarify] = useState("");
-	const inputRef = useRef<HTMLTextAreaElement>(null);
 	const pending = useRef(false);
 	const singleFrame = selectedFrames.length === 1 ? selectedFrames[0] : null;
 	const targetFrame = selectedFrames.find(
@@ -148,15 +139,6 @@ export function StudioComposer({
 		void submit();
 	}
 
-	// A suggestion only fills the composer and attaches its exact target frame:
-	// the user still reviews and submits, so no card click spends a credit.
-	function insertSuggestion(suggestion: StudioScreenSuggestion) {
-		setPrompt(suggestion.prompt);
-		onSelectTargetFrame?.(suggestion.targetFrameName ?? null);
-		setClarify("");
-		inputRef.current?.focus();
-	}
-
 	return (
 		<div
 			data-testid="studio-composer"
@@ -164,16 +146,9 @@ export function StudioComposer({
 			onPointerDown={(event) => event.stopPropagation()}
 			onWheel={(event) => event.stopPropagation()}
 		>
-			{!elementTarget && suggestions.length > 0 ? (
-				<StudioSuggestionRow
-					suggestions={suggestions}
-					disabled={loading || sending}
-					onSelect={insertSuggestion}
-				/>
-			) : null}
 			<form
 				onSubmit={handleSubmit}
-				className="flex flex-col gap-3 rounded-xl border border-iron bg-obsidian p-3 text-snow focus-within:border-snow"
+				className="flex flex-col gap-3 rounded-xl border border-iron bg-obsidian p-3 text-snow transition-colors duration-150 focus-within:border-snow"
 			>
 				{composerTargets.length > 0 ? (
 					<div className="flex flex-wrap items-center gap-2">
@@ -253,7 +228,6 @@ export function StudioComposer({
 				) : null}
 				<div className="flex items-end gap-2">
 					<TextArea
-						ref={inputRef}
 						value={prompt}
 						rows={2}
 						aria-label="Instruksi desain"
@@ -274,7 +248,7 @@ export function StudioComposer({
 										? `Minta perubahan untuk ${selectedFrames.length} layar terpilih...`
 										: "Minta revisi, atau sebutkan halaman baru yang ingin dibuat..."
 						}
-						className="field-sizing-content max-h-40 min-h-12 min-w-0 flex-1 resize-none rounded-md border-0 bg-transparent px-1 text-sm leading-6 text-snow placeholder:text-fog focus-visible:outline-2 focus-visible:outline-snow"
+						className="field-sizing-content max-h-40 min-h-12 min-w-0 flex-1 resize-none rounded-md border-0 bg-transparent px-1 text-sm leading-6 text-snow placeholder:text-fog focus-visible:outline-none"
 					/>
 					<button
 						type="submit"

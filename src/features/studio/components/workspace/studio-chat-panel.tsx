@@ -7,6 +7,7 @@ import {
 	type Dispatch,
 	type SetStateAction,
 	useCallback,
+	useMemo,
 	useRef,
 	useState,
 } from "react";
@@ -14,6 +15,8 @@ import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import type { StudioElementEditing } from "../../hooks/use-studio-element-editing";
 import type { StudioWorkspaceState } from "../../hooks/use-studio-workspace";
+import { deriveStudioConversationSuggestions } from "../../services/studio-conversation-suggestions";
+import type { StudioScreenSuggestion } from "../../services/studio-screen-suggestions";
 import { studioChatPanelWidthCss } from "../../utils/studio-chat-layout";
 import { StudioComposer } from "../composer/studio-composer";
 import {
@@ -49,15 +52,35 @@ function PanelBody({
 	onToggleExpanded: (id: string) => void;
 	scrollMemory: StudioChatScrollMemory;
 }) {
+	const suggestionsDisabled =
+		Boolean(elementEditing?.target) ||
+		workspace.composerLoading ||
+		workspace.isProcessing;
+	const suggestionsByMessage = useMemo(
+		() =>
+			deriveStudioConversationSuggestions({
+				project: workspace.project,
+				frames: workspace.frames,
+				messages: workspace.messages,
+				processing: suggestionsDisabled,
+			}),
+		[
+			workspace.project,
+			workspace.frames,
+			workspace.messages,
+			suggestionsDisabled,
+		],
+	);
+	const insertSuggestion = useCallback(
+		(suggestion: StudioScreenSuggestion) => {
+			draft.setPrompt(suggestion.prompt);
+			workspace.selectTargetFrameByName(suggestion.targetFrameName ?? null);
+		},
+		[draft.setPrompt, workspace.selectTargetFrameByName],
+	);
 	return (
 		<>
-			<div className="flex h-12 shrink-0 items-center justify-between gap-2 pr-1.5 pl-4">
-				<Icon
-					icon={BubbleChatIcon}
-					size={18}
-					className="text-fog"
-					aria-hidden="true"
-				/>
+			<div className="flex h-12 shrink-0 items-center justify-end gap-2 pr-1.5 pl-4">
 				<button
 					type="button"
 					aria-label="Tutup panel chat"
@@ -75,6 +98,9 @@ function PanelBody({
 				expandedIds={expandedIds}
 				onToggleExpanded={onToggleExpanded}
 				scrollMemory={scrollMemory}
+				suggestionsByMessage={suggestionsByMessage}
+				onSelectSuggestion={insertSuggestion}
+				suggestionsDisabled={suggestionsDisabled}
 			/>
 			{workspace.error ? (
 				<div
@@ -99,7 +125,6 @@ function PanelBody({
 					onRemoveElement={elementEditing?.clearTarget}
 					onValueChange={draft.setPrompt}
 					selectedFrames={workspace.selectedFrames}
-					onSelectTargetFrame={workspace.selectTargetFrameByName}
 					onRemoveFrame={workspace.removeSelectedFrame}
 					onSubmit={
 						elementEditing?.target
@@ -111,7 +136,6 @@ function PanelBody({
 						elementEditing?.busy ||
 						Boolean(elementEditing?.pending)
 					}
-					suggestions={workspace.suggestions}
 					referenceLabel={workspace.storedReferenceLabel}
 					referenceColors={workspace.storedReferenceColors}
 				/>
