@@ -71,6 +71,7 @@ const INITIAL_BLUEPRINT: StudioDesignBlueprint = {
 	productIdentity: {
 		productName: "Kasir Pro",
 		targetAudience: "UMKM Indonesia",
+		layoutIntent: "web-application",
 		platform: "web",
 		visualDirection: "Clean Modern",
 	},
