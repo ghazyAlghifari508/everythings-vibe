@@ -29,21 +29,24 @@ Cause labels follow P11 §5.
 - **Validation:** `studio-semantic-navigation.ts` (all nav landmarks, search binding), `studio-generated-html-validation.ts` (scenery substitute).
 - **Photography:** `photo-query.ts` (new), `studio-photo-source.ts`.
 - **Tests:** `studio-design-quality-p11-fix06.test.ts` (new), `studio-blueprint-navigation.test.ts` (stale normalized `layoutIntent` expectation updated, assertion kept strict).
+- **Legacy compatibility:** the scenery-substitute rule is gated to `compositionOwner === "model"`; legacy canonical blueprints keep their previous behavior.
 
 No universal navbar, Home destination, hero, card quota, KPI row, back-bar, or header-action count was added. No runtime design-catalog browsing was added.
 
 ## 3. P11 consolidated delivery checklist
 
-1. **HTML-first renderer** — unchanged from Fix 01/01.1/01.2; real standalone HTML remains the generated artifact. No JPEG substitution was introduced.
-2. **Canvas/toolbar/trackpad** — unchanged from Fix 02; this task touched generation services only, not the canvas interaction layer.
-3. **Pencil and editing** — unchanged from Fix 02/03; revision preservation contracts remain covered by existing tests.
-4. **Chat explanations and frame result cards** — unchanged from Fix 04; no additional LLM call was added here.
-5. **Vertical suggestions and composer** — unchanged from Fix 05; no chat/conversation files were modified.
-6. **Design generation and photography** — implemented above: ownership-consistent prompts, journey-derived navigation reasoning, shared sample-data continuity, honest photo slots, and short public photo queries.
-7. **Known limitations** — listed in §4.
-8. **Test results** — listed in §5.
-9. **Remaining baseline failures** — listed in §6.
-10. **P12 Browser QA readiness** — transferred to `p12.md`; no browser acceptance is claimed here.
+| # | Item | Current-state evidence | Claim |
+|:--|:--|:--|:--|
+| 1 | HTML-first renderer | `src/features/studio/tests/studio-chat-result-p11-fix04.test.tsx:132-136` renders sandboxed iframes from committed `htmlCode`; `src/features/studio/tests/studio-conversation-p11-fix04.integration.test.ts:290` serves a script-free document only to the owner. | Real standalone HTML remains the authoritative artifact; no JPEG substitution. Browser confirmation is P12 work. |
+| 2 | Canvas / toolbar / trackpad | `docs/prompt-design-studio/p11-fix02-report.md`; `studio-canvas-gesture-input.test.tsx`, `studio-canvas-gesture.test.ts`, `studio-canvas-zoom-p5.test.tsx`, `studio-canvas-marquee.test.ts`. | Fix 02 behavior is preserved; Fix 06 touched generation services only. |
+| 3 | Pencil and editing | `docs/prompt-design-studio/p11-report.md` (Fix 03), `p11-fix03-report.md`; `studio-revision-preservation.test.ts`, `studio-document-persistence-p5.integration.test.ts`. | Revision preservation and scoped editing contracts remain covered. No legacy project is auto-regenerated. |
+| 4 | Chat explanations and result cards | `docs/prompt-design-studio/p11-fix04-report.md`; `studio-conversation-grounding-p11-fix04.test.ts`, `studio-chat-result-p11-fix04.test.tsx`, `studio-conversation-p11-fix04.integration.test.ts:261`. | Grounded explanations and honest result rows are preserved; no extra explanation model call was added. |
+| 5 | Vertical suggestions and composer | Commit `d46529a8` (`fix(studio): replace suggestion carousel with conversation steps`); `studio-chat-suggestions-p11-fix05.test.tsx`, `studio-conversation-suggestions-p11-fix05.test.ts`, `studio-composer-p11-fix05.test.tsx`. | Fix 05 behavior is preserved; no conversation files were modified in Fix 06. No separate fix01/fix05 report file exists in the repository; the commit and tests are the retained evidence. |
+| 6 | Design generation and photography | §1 matrix and §2 layer list; `studio-design-quality-p11-fix06.test.ts`, `studio-photo-placement.test.ts`, `studio-photo-provider.test.ts`. | Ownership-consistent prompts, journey-derived navigation, sample-data continuity, honest slots and short public queries are implemented. |
+| 7 | Known limitations | §4. | Stated explicitly; no visual acceptance inferred from unit tests. |
+| 8 | Test results | §5 and final test run recorded there. | Exact commands and pass/fail counts are recorded. |
+| 9 | Remaining baseline failures | §6. | One pre-existing P6 pattern-contract failure is retained, reproduced on unmodified `HEAD`. |
+| 10 | P12 Browser QA readiness | `docs/prompt-design-studio/p12.md`. | All browser-dependent acceptance was transferred; no browser acceptance is claimed here. |
 
 ## 4. Known limitations
 
@@ -53,18 +56,30 @@ No universal navbar, Home destination, hero, card quota, KPI row, back-bar, or h
 - Query normalization intentionally keeps only two significant subject terms. That improves the measured landmark case but can be less specific for rare subjects; the planner still supplies the subject and the slot remains honest when lookup fails.
 - Legal licence scope was not widened. `by-sa` and other redistributive/non-commercial licences remain excluded per the documented P2 product decision.
 - No visual/browser acceptance was performed. This is P12 work.
+- Prompt-size figures below are deterministic character counts for representative prompts, not live provider token billing; real timing measurement remains P12 work.
 
 ## 5. Test results
 
 Executed with the repository's own commands:
 
-- `pnpm biome check <14 touched files>` — clean, no diagnostics.
+- `pnpm biome check <touched files>` — clean, no diagnostics.
 - `pnpm exec tsc --noEmit` — clean.
-- Focused Vitest: new Fix 06 test + blueprint navigation + semantic composition + photo provider + design blueprint — **5 files, 41 tests passed**.
-- Wider targeted Vitest (10 studio files listed in P11 §14 coverage areas) — **122 passed, 1 failed**; the single failure is the pre-existing P6 malformed-pattern contract described in §6.
+- Focused Vitest after the legacy-gating fix: new Fix 06 test — **1 file, 9 tests passed**.
+- Final targeted Vitest across 19 files covering P11 §14 areas — **209 passed, 1 failed**. The single failure is the pre-existing P6 malformed-pattern contract described in §6; 18 files pass fully.
 - Live Openverse queries (read-only): long descriptive query `0` results; `Labuan Bajo` `178` results; `Raja Ampat` `240` results. Upstream 500/504/timeout responses were observed on other short queries and are treated as provider unavailability, not design failures.
 
-The new regression tests cover discovery-led mobile plans with 1/2/4 destinations and no Home, unplanned nav rejection, search binding honesty, cross-screen sample facts in frame prompts, query normalization and provider propagation, chrome-ownership wording, and scenery substitution. Deterministic photo planning, provider failure, slot application, attribution, SSRF/MIME/size checks, export/revision preservation, and no-extra-model-call contracts were already covered by existing tests and re-run here.
+Deterministic prompt-size measurement for a representative Jelajahin brief (`pnpm exec tsx` calling the real builders):
+
+| Prompt | Characters |
+|:--|--:|
+| Planning system (cacheable) | 17,387 |
+| Planning user request | 6,203 |
+| Frame system (byte-identical per frame) | 14,116 |
+| Frame user request (4-screen travel blueprint) | 17,960 |
+
+Media pipeline: `generateValidatedFrameHtml()` starts photo resolution before the generation loop (`studio-frame-generation.ts:74-95`) and awaits it only when applying slots after HTML generation (`studio-frame-generation.ts:257-265`). Each resolution emits a `photo-resolution` timing event. No extra model or provider call was added; request caps remain `STUDIO_FRAME_REQUEST_MAX = 3`, `STUDIO_FRAME_CORRECTION_MAX = 1`, `STUDIO_PLANNING_REQUEST_MAX = 3`, `STUDIO_PLANNING_CORRECTION_MAX = 1`.
+
+The new regression tests cover discovery-led mobile plans with 1/2/4 destinations and no Home, unplanned nav rejection, search binding honesty, cross-screen sample facts in frame prompts, query normalization and provider propagation, chrome-ownership wording, scenery substitution, and preservation of legacy canonical behavior. Deterministic photo planning, provider failure, slot application, attribution, SSRF/MIME/size checks, export/revision preservation, and no-extra-model-call contracts were already covered by existing tests and re-run here.
 
 ## 6. Remaining baseline failure
 
@@ -72,7 +87,24 @@ The new regression tests cover discovery-led mobile plans with 1/2/4 destination
 
 A previous stale assertion in `studio-blueprint-navigation.test.ts` expected `productIdentity` without the normalized `layoutIntent`. It was updated to the precise normalized value `"web-application"` rather than loosened.
 
-## 7. Handoff
+## 7. P11 §14 coverage ledger
+
+| Required coverage | Evidence |
+|:--|:--|
+| Model-owned composition path | `studio-design-quality-p11-fix06.test.ts`, `studio-semantic-composition.test.ts`. |
+| Legacy canonical compatibility | `studio-canonical-shell.test.ts`, `studio-canonical-blueprint.test.ts`, and the new legacy-scenery regression in `studio-design-quality-p11-fix06.test.ts`. |
+| No forced three-link navbar / no mandatory Home / alternative mobile models | `studio-design-quality-p11-fix06.test.ts` (1/2/4 discovery-led destinations, no Home), `studio-prompt-contracts.ts:112`. |
+| Correct destination references and contextual behavior | `studio-semantic-composition.test.ts:107-140`, `studio-semantic-navigation.ts:60-104`. |
+| Theme / DESIGN.md consistency | `studio-design-intelligence.test.ts:441`, `studio-design-reference.server.test.ts:45`, `studio-add-screen.integration.test.ts:153`. |
+| Diverse valid composition contracts; bounded card-wall check | `studio-design-blueprint.test.ts`, `studio-design-intelligence.test.ts:467-583`; validator is gated to `public-website`. |
+| Consistent cross-screen prototype data | `studio-design-quality-p11-fix06.test.ts` (`sampleData` in every frame prompt), `studio-screen-prompts.ts:35-52`. |
+| Photo planning, provider resolution/failure, slot application, no fabricated URL, secure refs, fallback honesty, attribution | `studio-photo-placement.test.ts`, `studio-photo-provider.test.ts`, `studio-design-intelligence.test.ts:456-464`, `photo-asset.ts:40-142`. |
+| Revision/export preservation | `studio-revision-preservation.test.ts`, `studio-document-persistence-p5.integration.test.ts`. |
+| No unnecessary model calls | `studio-design-intelligence.test.ts:390-428` (1 planning + 1 per frame; no browsing stage), bounded request constants in `studio-constants.ts:163-168`. |
+
+These are deterministic contract checks. They do not prove subjective visual excellence; browser confirmation belongs to P12.
+
+## 8. Handoff
 
 - Historical reports remain in `docs/prompt-design-studio/`.
 - `p11.md` now labels Fix 06 as complete and points to this report and the P12 brief.
