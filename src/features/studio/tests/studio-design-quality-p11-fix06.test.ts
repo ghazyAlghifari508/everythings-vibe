@@ -250,3 +250,36 @@ it("flags large decorative scenery that replaces a planned photo slot", () => {
 		),
 	).toEqual([]);
 });
+
+it("does not apply the model-owned photo rule to legacy canonical blueprints", () => {
+	const blueprint = discoveryBlueprint({
+		compositionOwner: undefined,
+		screenPlan: [
+			{
+				name: "Eksplorasi Destinasi",
+				role: "Find a trip",
+				order: 0,
+				navigationRole: "primary",
+				destinationId: "explore",
+				photos: [
+					{
+						id: "labuan-bajo",
+						subject: "Labuan Bajo",
+						purpose: "Show the destination",
+						query: "Labuan Bajo",
+						aspect: "landscape",
+						alt: "Labuan Bajo coastline",
+						source: "stock",
+					},
+				],
+			},
+		],
+	});
+	const scenery =
+		'<svg viewBox="0 0 800 400" aria-label="Illustration"><path d="M0 300 L400 100 L800 300 Z"></path></svg>';
+	expect(
+		issues(scenery, blueprint, "Eksplorasi Destinasi").some((issue) =>
+			issue.includes("photo slot"),
+		),
+	).toBe(false);
+});

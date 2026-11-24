@@ -405,7 +405,11 @@ export function validateGeneratedHtml(
 		}
 	}
 	if (opts.blueprint) {
-		if (opts.screen && hasScenerySubstitute(html, opts.blueprint, opts.screen))
+		if (
+			opts.blueprint.compositionOwner === "model" &&
+			opts.screen &&
+			hasScenerySubstitute(html, opts.blueprint, opts.screen)
+		)
 			issues.push(
 				"Planned photo slot is missing; do not replace it with decorative artwork.",
 			);
