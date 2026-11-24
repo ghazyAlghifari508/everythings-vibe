@@ -74,8 +74,15 @@ export async function readStudioElementHttp(
 				? candidate.beforeHtml
 				: (candidate.afterHtml ?? "");
 		baseRevision = candidate.baseRevision;
-	} else if (Number(url.searchParams.get("baseRevision")) !== frame.revision)
-		throw new StudioFrameError("STUDIO_STALE_REVISION");
+	} else {
+		const requested = url.searchParams.get("baseRevision");
+		const revision =
+			requested && /^\d+$/.test(requested) ? Number(requested) : NaN;
+		if (!Number.isSafeInteger(revision))
+			throw new StudioFrameError("STUDIO_INVALID_INPUT");
+		if (revision !== frame.revision)
+			throw new StudioFrameError("STUDIO_STALE_REVISION");
+	}
 	const assets = await db
 		.select({
 			id: studioAssets.id,
@@ -119,7 +126,7 @@ export async function mutateStudioElementHttp(
 	return Response.json(
 		{ revision },
 		{
-			status: revision.status === "generating" ? 202 : 200,
+			status: revision?.status === "generating" ? 202 : 200,
 			headers: { "Cache-Control": "private, no-store" },
 		},
 	);

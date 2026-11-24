@@ -12,11 +12,11 @@ import {
 } from "@/features/studio/components/canvas/studio-frame-error";
 import { StudioFrameShimmer } from "@/features/studio/components/canvas/studio-frame-shimmer";
 import { useStudioFrameRenderer } from "@/features/studio/hooks/use-studio-frame-renderer";
-import { useStudioFrameVisual } from "@/features/studio/hooks/use-studio-frame-visual";
-import { studioJobTiming } from "@/features/studio/services/studio-timing";
 import { extractCleanHtml } from "@/features/studio/utils/clean-html";
 import { resolveFrameArtboardMode } from "@/features/studio/utils/studio-frame-artboard";
 import { resolveStudioFrameStatus } from "@/features/studio/utils/studio-lifecycle";
+import { studioFailureCopy } from "@/features/studio/utils/studio-renderer";
+import type { StudioVisibilityReporter } from "../../hooks/use-studio-live-pool";
 import type {
 	StudioElementAction,
 	StudioElementTarget,
@@ -25,16 +25,12 @@ import type { StudioDevice } from "../../types/studio-renderer";
 import { StudioLiveSurface } from "./studio-live-surface";
 
 export type { StudioFrameArtboardMode } from "@/features/studio/utils/studio-frame-artboard";
-export {
-	isFrameVisualPending,
-	resolveFrameArtboardMode,
-} from "@/features/studio/utils/studio-frame-artboard";
+export { resolveFrameArtboardMode } from "@/features/studio/utils/studio-frame-artboard";
 
 export interface StudioFrameProps {
 	frame: StudioFrameRow;
 	job?: StudioJobRow | null;
 	initialJobTiming?: { id: string; createdAt: Date };
-	priorityPreview?: boolean;
 	isSelected?: boolean;
 	onSelect?: (frameId: string, additive?: boolean) => void;
 	onRetry?: (frameId: string) => void;
@@ -47,14 +43,19 @@ export interface StudioFrameProps {
 	onMeasure?: (id: string, width: number, height: number) => void;
 	/** Element inspection is active for this frame. */
 	inspectElement?: boolean;
-	/** The frame may hold a live document (bounded pool membership). */
+	/** The frame may hold a live document (visible/selected/inspected pool). */
 	liveEnabled?: boolean;
 	/** Presentation-only device preset; never part of the design revision. */
 	device?: StudioDevice;
+	/** The canvas viewport, so visibility follows the transformed artboards. */
+	viewportRef?: React.RefObject<HTMLElement | null>;
 	/** Reports whether the artboard is near the viewport. */
-	onVisibilityChange?: (frameId: string, visible: boolean) => void;
+	onVisibilityChange?: StudioVisibilityReporter;
 	elementTarget?: StudioElementTarget | null;
-	onSelectElement?: (target: StudioElementTarget | null) => void;
+	onSelectElement?: (
+		target: StudioElementTarget | null,
+		frameId: string,
+	) => void;
 	onElementAction?: (
 		action: StudioElementAction,
 		target: StudioElementTarget,
@@ -63,14 +64,16 @@ export interface StudioFrameProps {
 	elementActionBusy?: boolean;
 	/** Explicit Refresh invalidation; never part of the design revision. */
 	refreshToken?: number;
-	/** Reports whether the live renderer behind this frame is ready. */
+	/** Reports whether the committed revision is rendered and ready. */
 	onRendererReadinessChange?: (frameId: string, ready: boolean) => void;
 	menuLeftInsetPx?: number;
+	canvasZoom?: number;
+	onElementError?: (message: string) => void;
 }
 
 function frameStatusMessage(status: string, retryError?: string): string {
-	if (status === "failed")
-		return retryError || "Perubahan belum berhasil diterapkan.";
+	if (retryError) return retryError;
+	if (status === "failed") return "Perubahan belum berhasil diterapkan.";
 	if (status === "queued") return "Menunggu antrean pembaruan.";
 	return "Sedang menerapkan perubahan.";
 }
@@ -83,7 +86,7 @@ function frameStatusMessage(status: string, retryError?: string): string {
  * sr-only text alternatives.
  * Recovery lives inside the failed artboard instead of the header, so the frame
  * keeps exactly one retry control. A frame that already has HTML keeps that
- * preview while a new version is built or after it failed.
+ * document while a new version is built or after it failed.
  *
  * Memoized: status polling replaces the frame array every tick, so without a
  * stable render boundary every artboard would re-render (and re-run its HTML
@@ -93,7 +96,6 @@ export const StudioFrame = memo(function StudioFrame({
 	frame,
 	job = null,
 	initialJobTiming,
-	priorityPreview = false,
 	isSelected = false,
 	onSelect,
 	onRetry,
@@ -105,61 +107,74 @@ export const StudioFrame = memo(function StudioFrame({
 	inspectElement = false,
 	liveEnabled = false,
 	device,
+	viewportRef,
 	onVisibilityChange,
 	elementTarget,
 	onElementAction,
 	elementActionBusy = false,
 	menuLeftInsetPx = 0,
+	canvasZoom = 1,
+	onElementError,
 	onSelectElement,
 	refreshToken,
 	onRendererReadinessChange,
 }: StudioFrameProps) {
-	const visibleUrl = useRef<string | null>(null);
+	const artboardRef = useRef<HTMLElement>(null);
 	const status = resolveStudioFrameStatus(frame, job);
 	const isMobile = frame.viewport === "mobile";
-	const {
-		visual,
-		visualError,
-		markVisualLoaded,
-		setVisualError,
-		retryVisual,
-		artboardRef,
-		frameHeight,
-	} = useStudioFrameVisual({ frame, isMobile, onMeasure, priorityPreview });
-
 	const cleanHtml = frame.htmlCode ? extractCleanHtml(frame.htmlCode) : "";
-	// A ready frame whose HTML is missing or empty cannot produce a preview.
-	// Reporting that state is what keeps the artboard from shimmering forever
-	// with no explanation and no recovery action.
 	const hasRenderableHtml = cleanHtml.length > 0;
+	const { live, presentation, liveNotice, isCurrent } = useStudioFrameRenderer({
+		frame,
+		hasRenderableHtml,
+		cleanHtml,
+		artboardRef,
+		viewportRef,
+		liveEnabled,
+		device,
+		refreshToken,
+		initialJobTiming,
+		onMeasure,
+		onVisibilityChange,
+		onReadinessChange: onRendererReadinessChange,
+	});
+	const rendererFailure =
+		live.readiness.phase === "failed" ? live.readiness.failure : null;
 	const artboardMode = resolveFrameArtboardMode({
 		status,
 		hasRenderableHtml,
-		hasVisual: visual !== null,
-		hasVisualError: Boolean(visualError),
+		rendererFailure,
+		hasActiveDocument: presentation.showLive,
 	});
 	const retry = onRetry ? () => onRetry(frame.id) : undefined;
-	const showsPreview =
-		(artboardMode === "preview" || artboardMode === "last-good") &&
-		visual !== null;
+	const passive = !inspectElement;
 
-	const { live, presentation, liveNotice } = useStudioFrameRenderer({
-		frame,
-		status,
-		hasRenderableHtml,
-		cleanHtml,
-		artboardMode,
-		artboardRef,
-		visual,
-		frameHeight,
-		liveEnabled,
-		inspectElement,
-		device,
-		onMeasure,
-		onVisibilityChange,
-		refreshToken,
-		onReadinessChange: onRendererReadinessChange,
-	});
+	const rendererStrip = liveNotice
+		? {
+				message: liveNotice.message,
+				tone: liveNotice.tone,
+				actionLabel: liveNotice.retry ? "Muat ulang dokumen" : undefined,
+				onAction: liveNotice.retry ? live.retry : undefined,
+			}
+		: null;
+	const generationStrip =
+		status !== "ready" || retryError
+			? {
+					message: frameStatusMessage(status, retryError),
+					tone:
+						status === "failed" || retryError
+							? ("danger" as const)
+							: ("progress" as const),
+					actionLabel: status === "failed" ? "Coba lagi" : undefined,
+					onAction: status === "failed" ? retry : undefined,
+				}
+			: null;
+	// Exactly one status disclosure: a retryable renderer failure wins, then
+	// generation progress, then passive renderer notes. No duplicate strips.
+	const strip = rendererStrip?.onAction
+		? rendererStrip
+		: (generationStrip ?? rendererStrip);
+
 	return (
 		<article
 			ref={artboardRef}
@@ -167,12 +182,12 @@ export const StudioFrame = memo(function StudioFrame({
 			aria-label={`Frame ${frame.name}`}
 			className={`flex flex-col gap-2 select-none ${className}`}
 		>
-			{/* Frame Title Bar */}
 			<div className="flex items-center justify-between gap-2 px-1">
 				<div className="flex min-w-0 items-center gap-2">
 					<button
 						type="button"
 						data-canvas-gesture-surface=""
+						aria-pressed={isSelected}
 						onClick={(event) => {
 							if (!isCanvasPanning) onSelect?.(frame.id, event.shiftKey);
 						}}
@@ -204,7 +219,6 @@ export const StudioFrame = memo(function StudioFrame({
 				</div>
 			</div>
 
-			{/* Frame Content Box */}
 			<div
 				className={`relative overflow-hidden ${
 					isMobile ? "rounded-lg" : "rounded-xl"
@@ -215,54 +229,11 @@ export const StudioFrame = memo(function StudioFrame({
 				} bg-obsidian`}
 				style={{ width: presentation.width, height: presentation.height }}
 			>
-				{showsPreview && visual ? (
-					<button
-						type="button"
-						data-canvas-gesture-surface=""
-						aria-label={`Pilih frame ${frame.name}`}
-						aria-pressed={isSelected}
-						onClick={(event) => {
-							if (!isCanvasPanning) onSelect?.(frame.id, event.shiftKey);
-						}}
-						className="block size-full focus-visible:outline-2 focus-visible:outline-snow"
-					>
-						<img
-							src={visual.url}
-							width={visual.width}
-							height={visual.height}
-							alt={`Desain ${frame.name}`}
-							draggable={false}
-							decoding="async"
-							className="size-full object-contain pointer-events-none"
-							onLoad={() => {
-								markVisualLoaded(visual);
-								if (visibleUrl.current === visual.url) return;
-								visibleUrl.current = visual.url;
-								studioJobTiming("preview-image-loaded", Date.now(), {
-									projectId: frame.projectId,
-									frameId: frame.id,
-								});
-								studioJobTiming(
-									"frame-visible",
-									(initialJobTiming?.createdAt ?? frame.createdAt).getTime(),
-									{
-										projectId: frame.projectId,
-										frameId: frame.id,
-										jobId: initialJobTiming?.id,
-									},
-								);
-							}}
-							onError={() => setVisualError("Gambar frame gagal dimuat.")}
-						/>
-					</button>
-				) : artboardMode === "visual-error" ? (
-					<StudioFrameErrorPanel
-						title="Pratinjau belum muncul"
-						description={visualError}
-						actionLabel="Muat ulang pratinjau"
-						onAction={retryVisual}
-					/>
-				) : artboardMode === "generation-failed" ? (
+				{artboardMode === "shimmer" ? (
+					<StudioFrameShimmer viewport={frame.viewport} status={status} />
+				) : null}
+
+				{artboardMode === "generation-failed" ? (
 					<StudioFrameErrorPanel
 						title="Halaman belum berhasil dibuat"
 						description={
@@ -274,72 +245,87 @@ export const StudioFrame = memo(function StudioFrame({
 						onAction={retry}
 						actionPending={isRetryPending}
 					/>
-				) : artboardMode === "preview-unavailable" ? (
-					// Ready but no renderable HTML: a real terminal failure, never
-					// an endless shimmer.
+				) : null}
+
+				{artboardMode === "html-unavailable" ? (
 					<StudioFrameErrorPanel
-						title="Pratinjau tidak tersedia"
+						title="Dokumen tidak tersedia"
 						description={
 							retryError ||
-							"HTML layar ini tidak tersimpan, jadi pratinjau tidak bisa ditampilkan."
+							"HTML layar ini tidak tersimpan, jadi dokumen tidak bisa ditampilkan."
 						}
 						actionLabel="Generate ulang"
 						onAction={retry}
 						actionPending={isRetryPending}
 					/>
-				) : (
-					<StudioFrameShimmer viewport={frame.viewport} status={status} />
-				)}
+				) : null}
 
-				<StudioLiveSurface
-					state={live.state}
-					dispatch={live.dispatch}
-					title={`Tampilan langsung: ${frame.name}`}
-					width={presentation.width}
-					height={presentation.height}
-					visible={presentation.showLive}
-					interactive={presentation.showLive && inspectElement}
-					suspended={isCanvasPanning}
-					target={elementTarget}
-					onSelect={onSelectElement}
-					onAction={onElementAction}
-					actionBusy={elementActionBusy}
-					leftInsetPx={menuLeftInsetPx}
-				/>
-
-				{liveNotice && artboardMode !== "last-good" ? (
-					<StudioFrameStatusStrip
-						message={liveNotice.message}
-						tone={liveNotice.tone}
-						actionLabel={liveNotice.retry ? "Muat ulang tampilan" : undefined}
-						onAction={liveNotice.retry ? live.retry : undefined}
+				{artboardMode === "renderer-failed" ? (
+					<StudioFrameErrorPanel
+						title="Dokumen tidak dapat ditampilkan"
+						description={
+							live.readiness.phase === "failed"
+								? live.readiness.message ||
+									studioFailureCopy(live.readiness.failure)
+								: rendererFailure
+									? studioFailureCopy(rendererFailure)
+									: "Dokumen HTML gagal disiapkan."
+						}
+						actionLabel="Muat ulang dokumen"
+						onAction={live.retry}
 					/>
 				) : null}
 
-				{artboardMode === "last-good" ? (
+				{artboardMode === "html" ? (
+					<>
+						{presentation.showLive ? null : (
+							<div className="pointer-events-none absolute inset-0 z-[6]">
+								<StudioFrameShimmer
+									viewport={frame.viewport}
+									status="preparing"
+								/>
+							</div>
+						)}
+						<StudioLiveSurface
+							state={live.state}
+							dispatch={live.dispatch}
+							title={`Dokumen: ${frame.name}`}
+							width={presentation.width}
+							height={presentation.height}
+							visible={presentation.showLive}
+							interactive={inspectElement && liveEnabled && isCurrent}
+							suspended={isCanvasPanning}
+							target={elementTarget}
+							onSelect={onSelectElement}
+							onAction={onElementAction}
+							actionBusy={elementActionBusy}
+							leftInsetPx={menuLeftInsetPx}
+							viewport={viewportRef?.current}
+							zoom={canvasZoom}
+							onError={onElementError}
+						/>
+					</>
+				) : null}
+
+				{passive && hasRenderableHtml ? (
+					<button
+						type="button"
+						data-canvas-gesture-surface=""
+						aria-label={`Pilih frame ${frame.name}`}
+						aria-pressed={isSelected}
+						onClick={(event) => {
+							if (!isCanvasPanning) onSelect?.(frame.id, event.shiftKey);
+						}}
+						className="absolute inset-0 z-[5] size-full focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-snow"
+					/>
+				) : null}
+
+				{strip && artboardMode === "html" ? (
 					<StudioFrameStatusStrip
-						message={
-							status === "ready"
-								? visualError
-								: frameStatusMessage(status, retryError)
-						}
-						tone={
-							status === "failed" || status === "ready" ? "danger" : "progress"
-						}
-						actionLabel={
-							status === "ready"
-								? "Muat ulang pratinjau"
-								: status === "failed"
-									? "Coba lagi"
-									: undefined
-						}
-						onAction={
-							status === "ready"
-								? retryVisual
-								: status === "failed"
-									? retry
-									: undefined
-						}
+						message={strip.message}
+						tone={strip.tone}
+						actionLabel={strip.actionLabel}
+						onAction={strip.onAction}
 						actionPending={isRetryPending}
 					/>
 				) : null}

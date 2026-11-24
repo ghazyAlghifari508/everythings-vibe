@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	STUDIO_CANVAS_BOTTOM_INSET_PX,
 	STUDIO_CANVAS_HEADER_INSET_PX,
 	STUDIO_CANVAS_OVERLAY_EDGE_PX,
 	STUDIO_CANVAS_TOOLBAR_INSET_PX,
@@ -77,6 +78,20 @@ describe("P9 contextual frame toolbar placement", () => {
 		expect(result.y + STUDIO_FRAME_TOOLBAR_HEIGHT_PX).toBeLessThanOrEqual(
 			canvas.height,
 		);
+	});
+
+	it("keeps the toolbar viewport usable above the zoom row on short screens", () => {
+		const canvas = { width: 430, height: 285 };
+		const result = placement({ canvas, pan: { x: 160, y: 600 } });
+		expect(result).toEqual({
+			x: expect.any(Number),
+			y: STUDIO_CANVAS_HEADER_INSET_PX,
+			side: "left",
+			maxHeight:
+				canvas.height -
+				STUDIO_CANVAS_HEADER_INSET_PX -
+				STUDIO_CANVAS_BOTTOM_INSET_PX,
+		});
 	});
 
 	it("prefers the side with room for the frame gap", () => {

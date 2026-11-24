@@ -2,10 +2,8 @@ import { describe, expect, it } from "vitest";
 import { indexStudioElements } from "../services/studio-element-document";
 import {
 	acceptStudioHoverMessage,
-	acceptStudioInventoryMessage,
 	acceptStudioSelectionMessage,
-	STUDIO_ELEMENT_INVENTORY_MAX,
-	studioSelectionBridgeScript,
+	acceptStudioTextMessage,
 } from "../utils/studio-element-bridge";
 
 const context = { projectId: "p", frameId: "f", baseRevision: 3 };
@@ -28,7 +26,7 @@ const hover = {
 	bounds,
 };
 
-describe("P7 hover and inventory bridge", () => {
+describe("Pencil bridge", () => {
 	it("accepts a hover only for a known element from the exact sandbox", () => {
 		expect(
 			acceptStudioHoverMessage(
@@ -75,52 +73,24 @@ describe("P7 hover and inventory bridge", () => {
 		).toBeNull();
 	});
 
-	it("bounds the one-time overlay inventory and filters unknown ids", () => {
-		const regions = Array.from(
-			{ length: STUDIO_ELEMENT_INVENTORY_MAX + 1 },
-			() => ({
-				elementId: title.elementId,
-				bounds,
-			}),
-		);
-		expect(
-			acceptStudioInventoryMessage(
-				{
-					source,
-					origin: "null",
-					data: { ...envelope, type: "studio:element:inventory", regions },
-				},
-				expected,
-			),
-		).toBeNull();
-		const accepted = acceptStudioInventoryMessage(
-			{
-				source,
-				origin: "null",
-				data: {
-					...envelope,
-					type: "studio:element:inventory",
-					regions: [
-						{ elementId: title.elementId, bounds },
-						{ elementId: "forged", bounds },
-					],
-				},
-			},
-			expected,
-		);
-		expect(accepted?.regions).toEqual([{ elementId: title.elementId, bounds }]);
-	});
-
-	it("emits pointer hover and a capped inventory from the isolated document", () => {
-		const script = studioSelectionBridgeScript(
-			envelope,
-			"https://example.test",
-		);
-		expect(script).toContain("pointermove");
-		expect(script).toContain("studio:element:hover-clear");
-		expect(script).toContain("studio:element:inventory");
-		expect(script).toContain(String(STUDIO_ELEMENT_INVENTORY_MAX));
-		expect(script).toContain("requestAnimationFrame");
-		expect(script).not.toContain("addEventListener('message'");
+	it("rejects delayed commits from another session, channel or frame", () => {
+		const session = "12345678-1234-4234-8234-123456789abe";
+		const data = {
+			...envelope,
+			type: "studio:element:text-commit",
+			session,
+			elementId: title.elementId,
+			text: "new",
+		};
+		const receive = (patch: Partial<typeof data>) =>
+			acceptStudioTextMessage(
+				{ source, origin: "null", data: { ...data, ...patch } },
+				{ ...expected, session, elementId: title.elementId },
+			);
+		expect(receive({})).toMatchObject({ text: "new" });
+		expect(receive({ session: channel })).toBeNull();
+		expect(receive({ channel: session })).toBeNull();
+		expect(receive({ frameId: "other" })).toBeNull();
+		expect(receive({ baseRevision: context.baseRevision + 1 })).toBeNull();
 	});
 });

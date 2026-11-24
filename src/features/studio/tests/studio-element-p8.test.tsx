@@ -1,13 +1,5 @@
 // @vitest-environment jsdom
-import {
-	cleanup,
-	fireEvent,
-	render,
-	screen,
-	waitFor,
-} from "@testing-library/react";
-import type { ComponentProps } from "react";
-import { useState } from "react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { StudioElementEditMenu } from "@/features/studio/components/canvas/studio-element-menu";
@@ -83,105 +75,23 @@ function editing(overrides: Partial<StudioElementEditing> = {}) {
 	};
 	return { ...base, ...overrides };
 }
-function openInlineEditor() {
-	fireEvent.click(screen.getByRole("menuitem", { name: "Edit Text" }));
-}
-function EditableMenu({
-	onAction,
-}: {
-	onAction: ComponentProps<typeof StudioElementEditMenu>["onAction"];
-}) {
-	const [open, setOpen] = useState(true);
-	return (
-		<StudioElementEditMenu
-			target={textTarget}
-			open={open}
-			onOpenChange={setOpen}
-			onAction={onAction}
-			textValue="Lama"
-			textEditable
-		/>
-	);
-}
-function textbox() {
-	const input = screen.getByRole("textbox", { name: "Teks elemen" });
-	if (!(input instanceof HTMLTextAreaElement))
-		throw new Error("Missing inline editor");
-	return input;
-}
 afterEach(() => {
 	cleanup();
 	ai.calls.length = 0;
 });
 
 describe("P8 deterministic text editing", () => {
-	it("commits the exact validated text on Enter without a model request", async () => {
-		const onAction = vi.fn();
-		render(<EditableMenu onAction={onAction} />);
-		openInlineEditor();
-		await waitFor(() => textbox());
-		const input = textbox();
-		fireEvent.change(input, { target: { value: "Baru" } });
-		fireEvent.keyDown(input, { key: "Enter", code: "Enter" });
-		expect(onAction).toHaveBeenCalledWith("edit-text", textTarget, "Baru");
-		expect(ai.calls).toEqual([]);
-	});
-
-	it("commits multiline text and treats markup as literal text", async () => {
-		const onAction = vi.fn();
-		render(<EditableMenu onAction={onAction} />);
-		openInlineEditor();
-		await waitFor(() => textbox());
-		const input = textbox();
-		fireEvent.change(input, {
-			target: { value: "Baris satu\n<script>alert(1)</script>" },
-		});
-		fireEvent.keyDown(input, { key: "Enter", code: "Enter" });
-		expect(onAction).toHaveBeenCalledWith(
-			"edit-text",
-			textTarget,
-			"Baris satu\n<script>alert(1)</script>",
-		);
+	it("persists multiline text as literal text without modifying another section", () => {
 		const result = patchStudioElement(html, context, textTarget, {
 			kind: "text",
-			text: "Baris satu\n<script>alert(1)</script>",
+			text: "Baris satu\n<b>Promo</b>",
 		});
-		expect(result).toContain("&lt;script&gt;");
 		const parsed = new DOMParser().parseFromString(result, "text/html");
-		expect(parsed.querySelector("script")).toBeNull();
+		expect(parsed.querySelector("#hero")?.textContent).toBe(
+			"Baris satu\n<b>Promo</b>",
+		);
+		expect(parsed.querySelector("#hero b")).toBeNull();
 		expect(parsed.querySelector("#stats")?.textContent).toBe("Statistics");
-	});
-
-	it("cancels on Escape without committing the draft", async () => {
-		const onAction = vi.fn();
-		render(<EditableMenu onAction={onAction} />);
-		openInlineEditor();
-		await waitFor(() => textbox());
-		const input = textbox();
-		fireEvent.change(input, { target: { value: "Baru" } });
-		fireEvent.keyDown(input, { key: "Escape", code: "Escape" });
-		expect(onAction).not.toHaveBeenCalled();
-		expect(screen.queryByRole("textbox", { name: "Teks elemen" })).toBeNull();
-	});
-
-	it("treats unchanged text as a no-op", async () => {
-		const onAction = vi.fn();
-		render(<EditableMenu onAction={onAction} />);
-		openInlineEditor();
-		await waitFor(() => textbox());
-		fireEvent.change(textbox(), { target: { value: "Lama" } });
-		fireEvent.keyDown(textbox(), { key: "Enter", code: "Enter" });
-		expect(onAction).not.toHaveBeenCalled();
-	});
-
-	it("treats blank text as a no-op", async () => {
-		const onAction = vi.fn();
-		render(<EditableMenu onAction={onAction} />);
-		openInlineEditor();
-		await waitFor(() => textbox());
-		fireEvent.change(textbox(), { target: { value: "   " } });
-		fireEvent.blur(textbox());
-		expect(onAction).not.toHaveBeenCalled();
 	});
 
 	it("does not advertise direct editing for a component target", () => {
@@ -191,7 +101,6 @@ describe("P8 deterministic text editing", () => {
 				open
 				onOpenChange={vi.fn()}
 				onAction={vi.fn()}
-				textEditable={false}
 			/>,
 		);
 		expect(screen.queryByText("Edit Text")).toBeNull();
@@ -205,6 +114,7 @@ describe("P8 deterministic text editing", () => {
 			tag: "img",
 			selector: "#cover",
 			elementId: "id:cover",
+			textEditable: undefined,
 		};
 		render(
 			<StudioElementEditMenu
@@ -212,7 +122,6 @@ describe("P8 deterministic text editing", () => {
 				open
 				onOpenChange={vi.fn()}
 				onAction={vi.fn()}
-				textEditable
 			/>,
 		);
 		expect(screen.queryByText("Edit Text")).toBeNull();
@@ -284,8 +193,15 @@ describe("P8 scoped design intelligence delivery", () => {
 
 describe("P8 auto apply feedback and attachments", () => {
 	it("offers concise applied feedback with Undo and no Apply dialog", () => {
-		render(<StudioElementFeedback editing={editing({ undo: applied })} />);
-		expect(screen.getByText("Perubahan diterapkan")).toBeTruthy();
+		render(
+			<StudioElementFeedback
+				editing={editing({
+					undo: applied,
+					notice: { row: applied, kind: "text" },
+				})}
+			/>,
+		);
+		expect(screen.getByRole("status").textContent).toContain("Teks diperbarui");
 		expect(screen.getByRole("button", { name: "Undo" })).toBeTruthy();
 		expect(screen.queryByText("Terapkan")).toBeNull();
 		expect(screen.queryByRole("dialog")).toBeNull();

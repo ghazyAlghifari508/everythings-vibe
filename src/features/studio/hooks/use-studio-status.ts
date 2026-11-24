@@ -46,7 +46,8 @@ function reconcile(previous: StudioStatus, next: StudioStatus): StudioStatus {
 	const byId = new Map(previous.frames.map((frame) => [frame.id, frame]));
 	const frames = next.frames.map((frame) => {
 		const stored = byId.get(frame.id);
-		return stored ? retainRow(stored, frame) : frame;
+		if (!stored || frame.revision > stored.revision) return frame;
+		return stored.revision > frame.revision ? stored : retainRow(stored, frame);
 	});
 	const stableFrames =
 		frames.length === previous.frames.length &&
@@ -104,8 +105,22 @@ export function useStudioStatus(initialData: StudioStatus) {
 	const [status, setStatus] = useState<StudioStatus>(initialData);
 	const [error, setError] = useState("");
 	const latestStatus = useRef(initialData);
-	const refresh = useRef<() => Promise<void>>(async () => {});
-	const syncProjectStatus = useCallback(() => refresh.current(), []);
+	const refresh = useRef<
+		(onSuccess?: (status: StudioStatus) => void) => Promise<void>
+	>(async () => {});
+	const publishFrame = useRef<
+		(projectId: string, frameId: string, revision: number, html: string) => void
+	>(() => {});
+	const publishCommitted = useCallback(
+		(projectId: string, frameId: string, revision: number, html: string) => {
+			publishFrame.current(projectId, frameId, revision, html);
+		},
+		[],
+	);
+	const syncProjectStatus = useCallback(
+		(onSuccess?: (status: StudioStatus) => void) => refresh.current(onSuccess),
+		[],
+	);
 	const clearError = useCallback(() => setError(""), []);
 
 	useEffect(() => {
@@ -124,6 +139,28 @@ export function useStudioStatus(initialData: StudioStatus) {
 		latestStatus.current = current;
 		setStatus(current);
 		setError("");
+		publishFrame.current = (projectId, frameId, revision, htmlCode) => {
+			if (disposed || current.project.id !== projectId) return;
+			const frame = current.frames.find((row) => row.id === frameId);
+			if (!frame || frame.revision >= revision) return;
+			current = {
+				...current,
+				frames: current.frames.map((row) =>
+					row === frame
+						? {
+								...row,
+								revision,
+								htmlCode,
+								status: "ready",
+								visualHash: null,
+								error: null,
+							}
+						: row,
+				),
+			};
+			latestStatus.current = current;
+			setStatus(current);
+		};
 
 		const available = () =>
 			document.visibilityState !== "hidden" && navigator.onLine !== false;
@@ -146,7 +183,7 @@ export function useStudioStatus(initialData: StudioStatus) {
 					void request();
 				}, delay);
 		};
-		const request = async () => {
+		const request = async (onSuccess?: (status: StudioStatus) => void) => {
 			cancel();
 			if (disposed || !available()) return;
 			const token = sequence;
@@ -233,6 +270,7 @@ export function useStudioStatus(initialData: StudioStatus) {
 				setStatus(current);
 				setError("");
 				failures = 0;
+				onSuccess?.(current);
 			} catch (failure) {
 				if (disposed || token !== sequence) return;
 				failures = Math.min(failures + 1, STUDIO_STATUS_MAX_FAILURES);
@@ -263,10 +301,10 @@ export function useStudioStatus(initialData: StudioStatus) {
 				}
 			}
 		};
-		const manualRefresh = async () => {
+		const manualRefresh = (onSuccess?: (status: StudioStatus) => void) => {
 			failures = 0;
 			permanent = false;
-			await request();
+			return request(onSuccess);
 		};
 		refresh.current = manualRefresh;
 		const resume = () => {
@@ -281,6 +319,7 @@ export function useStudioStatus(initialData: StudioStatus) {
 			disposed = true;
 			cancel();
 			refresh.current = async () => {};
+			publishFrame.current = () => {};
 			document.removeEventListener("visibilitychange", resume);
 			window.removeEventListener("online", resume);
 			window.removeEventListener("offline", resume);
@@ -291,6 +330,7 @@ export function useStudioStatus(initialData: StudioStatus) {
 		...status,
 		error,
 		syncProjectStatus,
+		publishCommitted,
 		isProcessing: isStudioProcessing(status),
 		clearError,
 	};

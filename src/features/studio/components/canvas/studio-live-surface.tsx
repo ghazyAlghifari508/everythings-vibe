@@ -1,29 +1,51 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import {
-	resolveStudioElementParent,
-	resolveStudioElementTarget,
-} from "../../services/studio-element-targeting";
-import {
-	STUDIO_INSPECTION_ATTR,
-	type StudioElementAction,
-	type StudioElementTarget,
+import { useEffect, useRef, useState } from "react";
+import type {
+	StudioElementAction,
+	StudioElementTarget,
 } from "../../types/studio-element";
 import {
 	acceptStudioHoverMessage,
-	acceptStudioInventoryMessage,
 	acceptStudioRendererMessage,
 	acceptStudioSelectionMessage,
+	acceptStudioTextMessage,
 } from "../../utils/studio-element-bridge";
 import type {
 	StudioLiveDocument,
 	StudioLiveSlotsAction,
 	StudioLiveSlotsState,
 } from "../../utils/studio-live-slots";
+import { clampStudioRectToArtboard } from "../../utils/studio-renderer-geometry";
 import { StudioElementEditMenu } from "./studio-element-menu";
 
-/** Only a small, visible group is revealed; the rest stay on normal hover. */
-const STUDIO_REVEAL_REGIONS_MAX = 12;
-type ElementBounds = { x: number; y: number; width: number; height: number };
+interface InlineSession {
+	document: StudioLiveDocument;
+	source: Window;
+	target: StudioElementTarget;
+	id: string;
+	started: boolean;
+}
+
+function sendText(
+	session: InlineSession,
+	action: "text-start" | "text-cancel",
+) {
+	const { projectId, frameId, baseRevision, baseHash, channel } =
+		session.document;
+	// This iframe has an opaque origin; the receiver authenticates the parent and channel.
+	session.source.postMessage(
+		{
+			type: `studio:element:${action}`,
+			projectId,
+			frameId,
+			baseRevision,
+			baseHash,
+			channel,
+			elementId: session.target.elementId,
+			session: session.id,
+		},
+		"*",
+	);
+}
 
 interface StudioLiveSurfaceProps {
 	state: StudioLiveSlotsState;
@@ -31,14 +53,11 @@ interface StudioLiveSurfaceProps {
 	title: string;
 	width: number;
 	height: number;
-	/** Whether the active document is the visible layer. */
 	visible: boolean;
-	/** Pointer and keyboard reach the document only while inspecting. */
 	interactive: boolean;
 	suspended?: boolean;
 	target?: StudioElementTarget | null;
-	onSelect?: (target: StudioElementTarget | null) => void;
-	/** Present only in the editor canvas; revision comparisons omit it. */
+	onSelect?: (target: StudioElementTarget | null, frameId: string) => void;
 	onAction?: (
 		action: StudioElementAction,
 		target: StudioElementTarget,
@@ -46,45 +65,9 @@ interface StudioLiveSurfaceProps {
 	) => void;
 	actionBusy?: boolean;
 	leftInsetPx?: number;
-}
-
-function LiveFrame({
-	document,
-	title,
-	width,
-	height,
-	hidden,
-	inert,
-	frameRef,
-}: {
-	document: StudioLiveDocument;
-	title: string;
-	width: number;
-	height: number;
-	hidden: boolean;
-	inert: boolean;
-	frameRef: (node: HTMLIFrameElement | null) => void;
-}) {
-	return (
-		<iframe
-			ref={frameRef}
-			title={title}
-			data-live-channel={document.channel}
-			sandbox="allow-scripts"
-			referrerPolicy="no-referrer"
-			srcDoc={document.html}
-			inert={inert}
-			tabIndex={inert ? -1 : undefined}
-			aria-hidden={hidden || undefined}
-			className="absolute top-0 left-0 border-0 bg-white"
-			style={{
-				width,
-				height,
-				visibility: hidden ? "hidden" : "visible",
-				pointerEvents: inert ? "none" : "auto",
-			}}
-		/>
-	);
+	viewport?: HTMLElement | null;
+	zoom?: number;
+	onError?: (message: string) => void;
 }
 
 function messageType(data: unknown): string | null {
@@ -96,323 +79,277 @@ function messageType(data: unknown): string | null {
 		: null;
 }
 
-/**
- * Renders the prepared live documents. The visible document is never replaced
- * until its successor reports ready, so a revision change cannot flash a blank
- * iframe. Switching between canvas and inspect only flips interactivity on the
- * same mounted document; it never remounts it.
- *
- * Hover rectangles are written imperatively to one overlay node: a pointermove
- * cannot re-render the artboard, and the whole overlay lives inside the same
- * transformed container as the iframe, so zoom, pan and iframe scroll stay
- * aligned without any extra geometry math.
- */
-export function StudioLiveSurface({
-	state,
-	dispatch,
-	title,
-	width,
-	height,
-	visible,
-	interactive,
-	suspended = false,
-	target,
-	onSelect,
-	onAction,
-	actionBusy = false,
-	leftInsetPx = 0,
-}: StudioLiveSurfaceProps) {
-	const windows = useRef(new Map<string, Window | null>());
-	const frames = useRef(new Map<string, HTMLIFrameElement>());
-	const select = useRef(onSelect);
-	select.current = onSelect;
-	const activeTarget = useRef(target);
-	activeTarget.current = target;
-	const stateRef = useRef(state);
-	stateRef.current = state;
-	const hoverOutline = useRef<HTMLDivElement>(null);
-	const wasInteractive = useRef(false);
-	const [revealKey, setRevealKey] = useState(0);
-	const [revealRegions, setRevealRegions] = useState<
-		{ elementId: string; bounds: ElementBounds }[]
-	>([]);
-	const inventoryByElement = useRef(new Map<string, ElementBounds>());
-	const [menuOpen, setMenuOpen] = useState(false);
+/** Keeps showing the committed predecessor until its replacement is ready. */
+export function StudioLiveSurface(props: StudioLiveSurfaceProps) {
+	const {
+		state,
+		dispatch,
+		title,
+		width,
+		height,
+		visible,
+		interactive,
+		suspended,
+		target,
+		onSelect,
+		onAction,
+		actionBusy,
+		leftInsetPx,
+		viewport,
+		zoom = 1,
+	} = props;
 	const active = state.active?.document ?? null;
-	const incoming = state.incoming;
-	const editorText = useMemo(() => {
-		const html = active?.html;
-		if (!target || !html) return null;
-		const parsed = new DOMParser().parseFromString(html, "text/html");
-		const node = parsed.querySelector(
-			`[${STUDIO_INSPECTION_ATTR}=${JSON.stringify(target.elementId)}]`,
-		);
-		// A leaf with element children owns markup, icons or formatting: a text
-		// patch would destroy them, so direct editing is not advertised.
-		if (!node || node.children.length > 0) return null;
-		return { value: node.textContent ?? "" };
-	}, [active?.html, target]);
+	const canInspect = Boolean(visible && active && interactive && !suspended);
+	const frames = useRef(new Map<string, HTMLIFrameElement>());
+	const outline = useRef<HTMLDivElement>(null);
+	const session = useRef<InlineSession | null>(null);
+	const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+	const [editing, setEditing] = useState(false);
+	const [menuOpen, setMenuOpen] = useState(false);
+	const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
+	const current = useRef({ ...props, canInspect });
+	current.current = { ...props, canInspect };
 
 	useEffect(() => {
 		function message(event: MessageEvent<unknown>) {
-			const current = stateRef.current;
-			const documents = [current.active?.document, current.incoming];
+			const live = current.current;
 			const type = messageType(event.data);
-			for (const document of documents) {
-				if (!document) continue;
-				const expected = {
-					projectId: document.projectId,
-					frameId: document.frameId,
-					baseRevision: document.baseRevision,
-					baseHash: document.baseHash,
-					channel: document.channel,
-					source:
-						frames.current.get(document.channel)?.contentWindow ??
-						windows.current.get(document.channel),
-				};
-				if (
-					type === "studio:renderer:ready" ||
-					type === "studio:renderer:metrics"
-				) {
-					const renderer = acceptStudioRendererMessage(event, expected);
-					if (renderer) {
-						dispatch({
-							type: renderer.type,
-							channel: document.channel,
-							metrics: renderer.metrics,
-							unresolvedImages: renderer.unresolvedImages,
-						});
-						return;
-					}
-					continue;
-				}
-				const isActiveDocument = document === current.active?.document;
-				if (
-					!isActiveDocument &&
-					type !== "studio:element:hover" &&
-					type !== "studio:element:hover-clear"
-				)
-					continue;
-				if (
-					type === "studio:element:select" ||
-					type === "studio:element:bounds" ||
-					type === "studio:element:clear"
-				) {
-					const result = acceptStudioSelectionMessage(event, {
-						...expected,
-						elements: document.elements,
+			const active = live.state.active?.document;
+			const expected = (document: StudioLiveDocument) => ({
+				...document,
+				source: frames.current.get(document.channel)?.contentWindow,
+			});
+			if (
+				type === "studio:renderer:ready" ||
+				type === "studio:renderer:metrics"
+			) {
+				for (const document of [active, live.state.incoming]) {
+					if (!document) continue;
+					const result = acceptStudioRendererMessage(event, expected(document));
+					if (!result) continue;
+					dispatch({
+						type: result.type,
+						channel: document.channel,
+						metrics: result.metrics,
+						unresolvedImages: result.unresolvedImages,
 					});
-					if (
-						result &&
-						(result.type !== "studio:element:bounds" ||
-							activeTarget.current?.elementId === result.target?.elementId)
-					) {
-						select.current?.(result.target);
-						return;
-					}
-					continue;
+					break;
 				}
-				if (
-					type === "studio:element:hover" ||
-					type === "studio:element:hover-clear"
-				) {
-					const hover = acceptStudioHoverMessage(event, {
-						...expected,
-						elements: document.elements,
-					});
-					const node = hoverOutline.current;
-					if (!node) return;
-					const identity =
-						hover?.type === "hover"
-							? resolveStudioElementTarget(hover.elementId, document.elements)
-							: null;
-					if (!hover || hover.type !== "hover" || !identity) {
-						node.style.display = "none";
-						return;
-					}
-					node.style.display = "block";
-					node.style.left = `${hover.bounds.x}px`;
-					node.style.top = `${hover.bounds.y}px`;
-					node.style.width = `${hover.bounds.width}px`;
-					node.style.height = `${hover.bounds.height}px`;
+				return;
+			}
+			if (!live.canInspect || !active || !type?.startsWith("studio:element:"))
+				return;
+			const sender = expected(active);
+			if (type.startsWith("studio:element:text-")) {
+				const edit = session.current;
+				if (edit?.document !== active) return;
+				const result = acceptStudioTextMessage(event, {
+					...sender,
+					elementId: edit.target.elementId,
+					session: edit.id,
+				});
+				if (!result) return;
+				clearTimeout(timer.current);
+				if (result.type === "studio:element:text-started") {
+					edit.started = true;
 					return;
 				}
-				if (type === "studio:element:inventory") {
-					const inventory = acceptStudioInventoryMessage(event, {
-						...expected,
-						elements: document.elements,
-					});
-					if (inventory) {
-						inventoryByElement.current = new Map(
-							inventory.regions.map((region) => [
-								region.elementId,
-								region.bounds,
-							]),
-						);
-						setRevealRegions(
-							inventory.regions.slice(0, STUDIO_REVEAL_REGIONS_MAX),
-						);
-						return;
-					}
+				session.current = null;
+				setEditing(false);
+				if (result.type === "studio:element:text-commit" && edit.started) {
+					live.onSelect?.(null, active.frameId);
+					live.onAction?.("edit-text", edit.target, result.text);
+				} else if (
+					result.type === "studio:element:text-end" &&
+					result.reason !== "closed"
+				) {
+					live.onError?.(
+						result.reason === "too-long"
+							? "Teks melebihi batas 8.000 karakter."
+							: "Teks tidak tersedia untuk diedit. Pilih ulang elemennya.",
+					);
 				}
+				return;
 			}
+			if (
+				type === "studio:element:hover" ||
+				type === "studio:element:hover-clear"
+			) {
+				const hover = acceptStudioHoverMessage(event, sender);
+				const node = outline.current;
+				if (!hover || !node) return;
+				const rect =
+					!session.current && hover.type === "hover"
+						? clampStudioRectToArtboard(hover.bounds, live)
+						: null;
+				node.style.display = rect ? "block" : "none";
+				if (rect)
+					Object.assign(node.style, {
+						left: `${rect.x}px`,
+						top: `${rect.y}px`,
+						width: `${rect.width}px`,
+						height: `${rect.height}px`,
+					});
+				return;
+			}
+			const selection = acceptStudioSelectionMessage(event, sender);
+			if (!selection) return;
+			if (selection.type === "studio:element:select") {
+				setSelectedChannel(active.channel);
+				setMenuOpen(true);
+			} else if (selection.type === "studio:element:bounds") {
+				if (
+					live.target?.frameId !== active.frameId ||
+					live.target.elementId !== selection.target?.elementId
+				)
+					return;
+			} else setMenuOpen(false);
+			live.onSelect?.(selection.target, active.frameId);
 		}
 		window.addEventListener("message", message);
 		return () => window.removeEventListener("message", message);
 	}, [dispatch]);
 
 	useEffect(() => {
-		if (interactive && !wasInteractive.current) setRevealKey((key) => key + 1);
-		wasInteractive.current = interactive;
-	}, [interactive]);
+		setEditing(false);
+		if (outline.current) outline.current.style.display = "none";
+		if (!canInspect || !active) return;
+		return () => {
+			clearTimeout(timer.current);
+			if (session.current) sendText(session.current, "text-cancel");
+			session.current = null;
+		};
+	}, [active, canInspect]);
 
-	const lastChannel = useRef(active?.channel);
-	useEffect(() => {
-		if (lastChannel.current === active?.channel) return;
-		lastChannel.current = active?.channel;
-		setRevealRegions([]);
-		if (hoverOutline.current) hoverOutline.current.style.display = "none";
-	}, [active?.channel]);
-
-	const targetKey = target
-		? `${target.frameId}:${target.elementId}:${target.baseRevision}`
-		: null;
-	useEffect(() => {
-		setMenuOpen(targetKey !== null);
-	}, [targetKey]);
-
-	const canSelectParent = Boolean(
-		active &&
-			target &&
-			resolveStudioElementParent(target.elementId, active.elements),
-	);
 	function handleAction(
 		action: StudioElementAction,
-		current: StudioElementTarget,
-		text?: string,
+		selected: StudioElementTarget,
 	) {
-		if (action === "select-parent") {
-			const parent = active
-				? resolveStudioElementParent(current.elementId, active.elements)
-				: null;
-			if (parent)
-				select.current?.({
-					...parent,
-					bounds:
-						inventoryByElement.current.get(parent.elementId) ?? current.bounds,
-				});
+		if (!active || !canInspect || actionBusy) return;
+		if (action !== "edit-text") {
+			if (action === "delete") onSelect?.(null, selected.frameId);
+			onAction?.(action, selected);
 			return;
 		}
-		onAction?.(action, current, text);
-	}
-	function track(document: StudioLiveDocument) {
-		return (node: HTMLIFrameElement | null) => {
-			if (node) {
-				frames.current.set(document.channel, node);
-				windows.current.set(document.channel, node.contentWindow);
-			} else {
-				frames.current.delete(document.channel);
-				windows.current.delete(document.channel);
-			}
+		const source = frames.current.get(active.channel)?.contentWindow;
+		if (!source || !selected.textEditable || session.current) return;
+		const edit = {
+			document: active,
+			source,
+			target: selected,
+			id: crypto.randomUUID(),
+			started: false,
 		};
+		session.current = edit;
+		setEditing(true);
+		if (outline.current) outline.current.style.display = "none";
+		sendText(edit, "text-start");
+		timer.current = setTimeout(() => {
+			if (session.current !== edit || edit.started) return;
+			sendText(edit, "text-cancel");
+			session.current = null;
+			setEditing(false);
+			current.current.onError?.(
+				"Editor teks tidak merespons. Pilih ulang elemennya.",
+			);
+		}, 1500);
 	}
 
+	const region =
+		canInspect &&
+		active &&
+		selectedChannel === active.channel &&
+		target &&
+		target.baseHash === active.baseHash &&
+		target.baseRevision === active.baseRevision &&
+		target.frameId === active.frameId &&
+		target.projectId === active.projectId
+			? clampStudioRectToArtboard(target.bounds, { width, height })
+			: null;
 	return (
 		<div
+			data-testid="studio-live-surface"
 			className="absolute inset-0 overflow-hidden"
 			style={{
 				visibility: visible ? "visible" : "hidden",
-				pointerEvents: interactive ? "auto" : "none",
+				pointerEvents: canInspect ? "auto" : "none",
 			}}
-			onPointerDown={(event) => interactive && event.stopPropagation()}
-			onWheel={(event) => interactive && event.stopPropagation()}
+			onPointerDown={(event) => canInspect && event.stopPropagation()}
+			onWheel={(event) => canInspect && event.stopPropagation()}
 		>
-			{active ? (
-				<LiveFrame
-					key={active.channel}
-					document={active}
-					title={title}
-					width={width}
-					height={height}
-					hidden={!visible}
-					inert={!visible || !interactive || suspended}
-					frameRef={track(active)}
-				/>
-			) : null}
-			{incoming ? (
-				<LiveFrame
-					key={incoming.channel}
-					document={incoming}
-					title={`${title} (menyiapkan)`}
-					width={width}
-					height={height}
-					hidden
-					inert
-					frameRef={track(incoming)}
-				/>
-			) : null}
-			{interactive && revealRegions.length > 0 ? (
-				<div
-					key={revealKey}
-					aria-hidden
-					data-ev-editor-overlay
-					className="pointer-events-none absolute inset-0 z-10"
-				>
-					{revealRegions.map((region, index) => (
-						<div
-							key={region.elementId}
-							data-ev-editor-overlay
-							className="studio-element-reveal absolute border border-blue-500/70"
-							style={{
-								left: region.bounds.x,
-								top: region.bounds.y,
-								width: region.bounds.width,
-								height: region.bounds.height,
-								animationDelay: `${Math.min(index, STUDIO_REVEAL_REGIONS_MAX) * 24}ms`,
-							}}
-						/>
-					))}
-				</div>
-			) : null}
+			{[active, state.incoming].map((document) => {
+				if (!document) return null;
+				const isActive = document === active;
+				const inert = !isActive || !canInspect;
+				return (
+					<iframe
+						key={document.channel}
+						ref={(node) => {
+							if (node) frames.current.set(document.channel, node);
+							else frames.current.delete(document.channel);
+						}}
+						title={isActive ? title : `${title} (menyiapkan)`}
+						data-testid="studio-live-document"
+						data-live-document-key={document.keyId}
+						data-live-channel={document.channel}
+						data-studio-passive={inert || undefined}
+						sandbox="allow-scripts"
+						referrerPolicy="no-referrer"
+						srcDoc={document.html}
+						inert={inert}
+						tabIndex={inert ? -1 : undefined}
+						aria-hidden={inert || undefined}
+						className="absolute top-0 left-0 border-0 bg-white"
+						style={{
+							width,
+							height,
+							visibility: isActive && visible ? "visible" : "hidden",
+							pointerEvents: inert ? "none" : "auto",
+						}}
+					/>
+				);
+			})}
 			<div
-				ref={hoverOutline}
+				key={active?.channel}
+				ref={outline}
 				aria-hidden
 				data-ev-editor-overlay
-				className="pointer-events-none absolute z-20 hidden border-2 border-blue-500/90"
+				className="pointer-events-none absolute z-10 hidden border-solid border-blue-500/90"
+				style={{
+					borderWidth: 1 / zoom,
+					visibility: canInspect ? "visible" : "hidden",
+				}}
 			/>
-			{interactive &&
-			active &&
-			target &&
-			state.active?.document.baseHash === target.baseHash ? (
-				<div
-					aria-hidden
-					data-ev-editor-overlay
-					className="pointer-events-none absolute z-10 border-2 border-blue-600"
-					style={{
-						left: target.bounds.x,
-						top: target.bounds.y,
-						width: target.bounds.width,
-						height: target.bounds.height,
-					}}
-				/>
-			) : null}
-			{interactive &&
-			active &&
-			target &&
-			onAction &&
-			state.active?.document.baseHash === target.baseHash ? (
-				<StudioElementEditMenu
-					key={`${target.frameId}:${target.elementId}:${target.baseRevision}`}
-					target={target}
-					open={menuOpen}
-					onOpenChange={setMenuOpen}
-					onAction={handleAction}
-					canSelectParent={canSelectParent}
-					textValue={editorText?.value}
-					textEditable={editorText !== null}
-					busy={actionBusy}
-					leftInsetPx={leftInsetPx}
-				/>
+			{region && target && !editing ? (
+				<>
+					<div
+						aria-hidden
+						data-ev-editor-overlay
+						className="pointer-events-none absolute z-10 border-solid border-blue-600"
+						style={{
+							left: region.x,
+							top: region.y,
+							width: region.width,
+							height: region.height,
+							borderWidth: 2 / zoom,
+						}}
+					/>
+					{onAction ? (
+						<StudioElementEditMenu
+							key={target.elementId}
+							target={target}
+							open={menuOpen}
+							onOpenChange={setMenuOpen}
+							onAction={handleAction}
+							busy={actionBusy}
+							leftInsetPx={leftInsetPx}
+							viewport={viewport}
+							zoom={zoom}
+							width={width}
+							height={height}
+						/>
+					) : null}
+				</>
 			) : null}
 		</div>
 	);

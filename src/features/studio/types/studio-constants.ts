@@ -111,13 +111,17 @@ export const STUDIO_CANVAS_OVERLAY_EDGE_PX = 12;
 // Contextual frame toolbar. Screen-space chrome is deliberately excluded from
 // the canvas transform: the buttons stay readable at every zoom level.
 export const STUDIO_FRAME_TOOLBAR_BUTTON_PX = 44;
-export const STUDIO_FRAME_TOOLBAR_WIDTH_PX = STUDIO_FRAME_TOOLBAR_BUTTON_PX;
+export const STUDIO_FRAME_TOOLBAR_CHROME_PX = 10; // 4px padding and 1px border on each side.
+export const STUDIO_FRAME_TOOLBAR_WIDTH_PX =
+	STUDIO_FRAME_TOOLBAR_BUTTON_PX + STUDIO_FRAME_TOOLBAR_CHROME_PX;
 export const STUDIO_FRAME_TOOLBAR_GROUP_GAP_PX = 8;
 export const STUDIO_FRAME_TOOLBAR_FRAME_GAP_PX = 16;
+export const STUDIO_FRAME_TOOLBAR_BUTTON_GAP_PX = 4;
 export const STUDIO_FRAME_TOOLBAR_HEIGHT_PX =
-	STUDIO_FRAME_TOOLBAR_BUTTON_PX * 3 * 2 +
-	STUDIO_FRAME_TOOLBAR_GROUP_GAP_PX * 4 +
-	STUDIO_FRAME_TOOLBAR_GROUP_GAP_PX;
+	STUDIO_FRAME_TOOLBAR_BUTTON_PX * 6 +
+	STUDIO_FRAME_TOOLBAR_BUTTON_GAP_PX * 4 +
+	STUDIO_FRAME_TOOLBAR_GROUP_GAP_PX +
+	STUDIO_FRAME_TOOLBAR_CHROME_PX;
 export const STUDIO_FRAME_TOOLBAR_BORDER_GAP_PX = 24;
 
 // Focus camera. Reduced motion skips the interpolation entirely.
@@ -147,6 +151,8 @@ export const STUDIO_PLANNING_MAX_TOKENS = 4000;
 export const STUDIO_FRAME_MAX_TOKENS = 12000;
 export const STUDIO_PREVIOUS_HTML_MAX_CHARS = 60000;
 export const STUDIO_CAPTURE_TIMEOUT_MS = 30000;
+/** Hard technical ceiling for an artboard document; the committed HTML is never cut. */
+export const STUDIO_RENDER_DOCUMENT_MAX_HEIGHT = 30_000;
 export const STUDIO_CAPTURE_MAX_HEIGHT = 30000;
 export const STUDIO_CAPTURE_QUALITY = 95;
 export const STUDIO_JOB_MAX_ATTEMPTS = 3;

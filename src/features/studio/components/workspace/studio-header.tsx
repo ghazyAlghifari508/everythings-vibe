@@ -7,13 +7,15 @@ import {
 	Loading01Icon,
 	Menu01Icon,
 	PencilEdit01Icon,
+	UndoIcon,
 	UserIcon,
 } from "@hugeicons/core-free-icons";
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
+	DropdownMenuGroup,
 	DropdownMenuItem,
 	DropdownMenuLabel,
 	DropdownMenuSeparator,
@@ -24,6 +26,8 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { StudioDeleteProjectDialog } from "@/features/studio/components/workspace/studio-delete-project-dialog";
 import { StudioRenameProjectDialog } from "@/features/studio/components/workspace/studio-rename-project-dialog";
 import { useHydratedSession } from "@/features/studio/hooks/use-hydrated-session";
+import type { StudioElementEditing } from "../../hooks/use-studio-element-editing";
+import { StudioElementFeedback } from "./studio-element-feedback";
 
 export function StudioHeader({
 	title,
@@ -31,6 +35,7 @@ export function StudioHeader({
 	exporting,
 	renaming,
 	canExport,
+	elementEditing,
 	onDuplicate,
 	onRename,
 	onExport,
@@ -41,6 +46,7 @@ export function StudioHeader({
 	exporting: boolean;
 	renaming?: boolean;
 	canExport: boolean;
+	elementEditing?: StudioElementEditing;
 	onDuplicate: () => void;
 	onRename: (name: string) => Promise<void>;
 	onExport: () => void;
@@ -49,24 +55,21 @@ export function StudioHeader({
 	const session = useHydratedSession();
 	const [isDeleteOpen, setDeleteOpen] = useState(false);
 	const [isRenameOpen, setRenameOpen] = useState(false);
-	// Each floating control carries its own restrained surface so it stays
-	// legible over the dotted canvas without a full-width navbar background.
-	const surface =
-		"border border-iron/70 bg-charcoal/85 backdrop-blur-sm supports-[backdrop-filter]:bg-charcoal/70";
-	const control = `inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg px-3 text-sm text-snow hover:bg-steel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-snow disabled:opacity-50 ${surface}`;
+	const projectMenuRef = useRef<HTMLButtonElement>(null);
+	const undo = elementEditing?.undo;
+	const control =
+		"inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-iron/70 bg-charcoal px-3 text-sm text-snow hover:bg-steel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-snow disabled:opacity-50";
 	const item = "gap-2 focus:bg-steel";
 	return (
-		// The dotted canvas shows through behind the header: only the individual
-		// controls carry a surface, and the empty middle band is pointer-transparent
-		// so it never swallows canvas pan/selection.
 		<header
-			className="pointer-events-none absolute inset-x-0 top-0 z-30 flex h-[calc(3.5rem+env(safe-area-inset-top))] items-center justify-between gap-3 px-2 pt-[env(safe-area-inset-top)] sm:px-4"
+			className="relative z-30 grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-2 pt-[env(safe-area-inset-top)] sm:px-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
 			data-testid="studio-header"
 		>
-			<div className="pointer-events-auto flex min-w-0 items-center gap-2">
+			<div className="col-start-1 row-start-1 flex min-h-14 min-w-0 items-center gap-2">
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
 						<button
+							ref={projectMenuRef}
 							type="button"
 							className={control}
 							aria-label="Menu project"
@@ -110,6 +113,26 @@ export function StudioHeader({
 							)}
 							{duplicating ? "Menduplikasi project…" : "Duplicate Project"}
 						</DropdownMenuItem>
+						{undo && elementEditing ? (
+							<>
+								<DropdownMenuSeparator />
+								<DropdownMenuGroup aria-label="Riwayat revisi">
+									<DropdownMenuLabel>Riwayat revisi</DropdownMenuLabel>
+									<DropdownMenuItem
+										className={item}
+										disabled={elementEditing.busy}
+										onSelect={() =>
+											void elementEditing.transition(undo, "undo")
+										}
+									>
+										<Icon icon={UndoIcon} size={16} className="shrink-0" />
+										<span className="min-w-0 truncate" title={undo.frameName}>
+											Undo revisi elemen: {undo.frameName}
+										</span>
+									</DropdownMenuItem>
+								</DropdownMenuGroup>
+							</>
+						) : null}
 						{onDelete ? (
 							<>
 								<DropdownMenuSeparator />
@@ -125,13 +148,13 @@ export function StudioHeader({
 					</DropdownMenuContent>
 				</DropdownMenu>
 				<h1
-					className="truncate text-sm font-semibold text-snow [text-shadow:0_1px_2px_var(--color-charcoal)] sm:text-base"
+					className="truncate text-sm font-semibold text-snow sm:text-base"
 					title={title}
 				>
 					{title}
 				</h1>
 			</div>
-			<div className="pointer-events-auto flex shrink-0 items-center gap-1">
+			<div className="col-start-2 row-start-1 flex items-center gap-1 lg:col-start-3">
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
 						<button
@@ -200,6 +223,15 @@ export function StudioHeader({
 					</DropdownMenuContent>
 				</DropdownMenu>
 			</div>
+
+			{elementEditing ? (
+				<div className="col-span-2 row-start-2 grid min-h-12 min-w-0 items-center lg:col-span-1 lg:col-start-2 lg:row-start-1 lg:min-h-0">
+					<StudioElementFeedback
+						editing={elementEditing}
+						onReturnFocus={() => projectMenuRef.current?.focus()}
+					/>
+				</div>
+			) : null}
 
 			<StudioRenameProjectDialog
 				open={isRenameOpen}

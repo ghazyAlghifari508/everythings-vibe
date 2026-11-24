@@ -25,6 +25,12 @@ import {
 	studioNativeDevice,
 } from "../types/studio-renderer";
 
+/** Where a frame the user asked for lives, so only a new request moves the camera. */
+export interface StudioCanvasFocusRequest {
+	frameId: string;
+	nonce: number;
+}
+
 interface UseStudioCanvasViewInput {
 	projectId: string;
 	/** Comfortable scale for this project's viewport class. */
@@ -43,6 +49,8 @@ interface UseStudioCanvasViewInput {
 	maxZoom: number;
 	/** Presentation-only viewport choice per frame; never part of generated HTML. */
 	frameDevices?: Readonly<Record<string, StudioDevice>>;
+	/** A new `nonce` moves the camera to that frame, e.g. from a chat result row. */
+	focusRequest?: StudioCanvasFocusRequest | null;
 	setZoom: (value: number) => void;
 	setPan: (value: { x: number; y: number }) => void;
 	resetZoom: () => void;
@@ -68,6 +76,7 @@ export function useStudioCanvasView({
 	minZoom,
 	maxZoom,
 	frameDevices,
+	focusRequest = null,
 	setZoom,
 	setPan,
 	resetZoom,
@@ -215,6 +224,12 @@ export function useStudioCanvasView({
 			setZoom,
 		],
 	);
+
+	// An explicit request (a chat result row) centres that frame; later bounds,
+	// device or selection changes never re-centre the board on their own.
+	useEffect(() => {
+		if (focusRequest) focusFrame(focusRequest.frameId);
+	}, [focusRequest, focusFrame]);
 
 	// Restored or computed before paint: the canvas never shows the throwaway
 	// preset scale first, and no later frame update may override it.

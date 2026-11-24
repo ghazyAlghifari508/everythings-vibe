@@ -15,6 +15,7 @@ import { getStudioFrameVisual } from "./studio-frame-visual";
 import { enqueueStudioOperation } from "./studio-operation-enqueue";
 import { readStudioPrototypeHttp } from "./studio-prototype-http";
 import { retryStudioFrame, retryStudioPlanning } from "./studio-retry-service";
+import { readStudioThumbnailHttp } from "./studio-thumbnail-http";
 
 function studioErrorResponse(error: unknown): Response {
 	const report = studioFrameErrorReport(error);
@@ -48,6 +49,11 @@ export async function GET({
 		if (prototypeResponse) {
 			status = prototypeResponse.status;
 			return prototypeResponse;
+		}
+		const thumbnailResponse = await readStudioThumbnailHttp(url, user.id);
+		if (thumbnailResponse) {
+			status = thumbnailResponse.status;
+			return thumbnailResponse;
 		}
 		const projectId = url.searchParams.get("projectId");
 		const frameId = url.searchParams.get("frameId");

@@ -10,10 +10,13 @@ import {
 	studioIsolationCsp,
 } from "./studio-document-isolation";
 import {
-	indexStudioElements,
+	indexStudioElementDocument,
 	parseStudioElementDocument,
+	studioDirectText,
 } from "./studio-element-document";
 import { StudioFrameError } from "./studio-frame-errors";
+
+const textEditAttr = "data-ev-edit-text";
 
 export async function buildStudioInspectionDocument(
 	html: string,
@@ -25,22 +28,44 @@ export async function buildStudioInspectionDocument(
 ) {
 	z.uuid().parse(channel);
 	const origin = new URL(parentOrigin).origin;
-	const indexed = indexStudioElements(html, context);
 	const dom = parseStudioElementDocument(html);
 	try {
 		const { document } = dom.window;
-		for (const node of document.querySelectorAll(`[${STUDIO_INSPECTION_ATTR}]`))
+		const indexed = indexStudioElementDocument(dom, html, context);
+		const targets = indexed.entries.map(({ node, entry, text }) => ({
+			node,
+			entry,
+			textNode: text?.node,
+			originalText: text?.node.data,
+		}));
+		for (const node of document.querySelectorAll(
+			`[${STUDIO_INSPECTION_ATTR}], [${textEditAttr}]`,
+		)) {
 			node.removeAttribute(STUDIO_INSPECTION_ATTR);
-		for (const entry of indexed.elements) {
-			const matches = document.querySelectorAll(entry.selector);
-			if (matches.length !== 1) continue;
-			matches[0].setAttribute(STUDIO_INSPECTION_ATTR, entry.elementId);
-			matches[0].setAttribute("tabindex", "0");
+			node.removeAttribute(textEditAttr);
 		}
 		const { unresolvedAssets, unrenderedIcons } = await isolateStudioDocument(
 			document,
 			{ origin, assets, tokens, anchors: "strip" },
 		);
+		// Removed children can turn separate source text nodes into one rendered node.
+		document.body.normalize();
+		const elements = [];
+		for (const { node, entry, textNode, originalText } of targets) {
+			if (!node.isConnected) continue;
+			node.setAttribute(STUDIO_INSPECTION_ATTR, entry.elementId);
+			node.setAttribute("tabindex", "0");
+			if (
+				textNode &&
+				studioDirectText(node) === textNode &&
+				textNode.data === originalText
+			) {
+				node.setAttribute(textEditAttr, "");
+			} else {
+				delete entry.textEditable;
+			}
+			elements.push(entry);
+		}
 		const csp = document.createElement("meta");
 		csp.httpEquiv = "Content-Security-Policy";
 		csp.content = studioIsolationCsp(channel);
@@ -57,7 +82,8 @@ export async function buildStudioInspectionDocument(
 			throw new StudioFrameError("STUDIO_INVALID_INPUT");
 		return {
 			html: output,
-			...indexed,
+			baseHash: indexed.baseHash,
+			elements,
 			unresolvedAssets,
 			unrenderedIcons,
 		};

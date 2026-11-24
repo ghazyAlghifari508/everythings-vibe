@@ -23,7 +23,6 @@ import {
 
 const floatingControl =
 	"flex size-11 shrink-0 items-center justify-center rounded-lg border border-iron/70 bg-charcoal/85 text-snow backdrop-blur-sm hover:bg-steel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-snow supports-[backdrop-filter]:bg-charcoal/70";
-const topBelowHeader = "top-[calc(4rem+env(safe-area-inset-top))]";
 
 interface PanelProps {
 	workspace: StudioWorkspaceState;
@@ -32,6 +31,8 @@ interface PanelProps {
 	onOpenChange: (open: boolean) => void;
 	draft: { prompt: string; setPrompt: Dispatch<SetStateAction<string>> };
 	elementEditing?: StudioElementEditing;
+	/** Selects and focuses the canvas frame a result row names. */
+	onOpenFrame: (frameId: string) => void;
 }
 
 function PanelBody({
@@ -42,6 +43,7 @@ function PanelBody({
 	expandedIds,
 	onToggleExpanded,
 	scrollMemory,
+	onOpenFrame,
 }: Omit<PanelProps, "desktop" | "open"> & {
 	expandedIds: ReadonlySet<string>;
 	onToggleExpanded: (id: string) => void;
@@ -68,6 +70,8 @@ function PanelBody({
 			</div>
 			<StudioChatConversation
 				messages={workspace.messages}
+				frames={workspace.frames}
+				onOpenFrame={onOpenFrame}
 				expandedIds={expandedIds}
 				onToggleExpanded={onToggleExpanded}
 				scrollMemory={scrollMemory}
@@ -129,6 +133,7 @@ export function StudioChatPanel({
 	onOpenChange,
 	draft,
 	elementEditing,
+	onOpenFrame,
 }: PanelProps) {
 	const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(
 		() => new Set(),
@@ -147,6 +152,7 @@ export function StudioChatPanel({
 			onOpenChange={onOpenChange}
 			draft={draft}
 			elementEditing={elementEditing}
+			onOpenFrame={onOpenFrame}
 			expandedIds={expandedIds}
 			onToggleExpanded={toggleExpanded}
 			scrollMemory={scrollMemory}
@@ -162,11 +168,7 @@ export function StudioChatPanel({
 					title="Buka panel chat"
 					aria-expanded={false}
 					onClick={() => onOpenChange(true)}
-					className={cn(
-						"absolute left-3 z-20",
-						topBelowHeader,
-						floatingControl,
-					)}
+					className={cn("absolute top-3 left-3 z-20", floatingControl)}
 				>
 					<Icon icon={BubbleChatIcon} size={18} />
 				</button>
@@ -178,8 +180,7 @@ export function StudioChatPanel({
 					inert={!open}
 					style={{ width: studioChatPanelWidthCss() }}
 					className={cn(
-						"absolute bottom-3 left-3 z-20 flex min-h-0 flex-col overflow-hidden rounded-xl border border-iron/70 bg-obsidian/95 backdrop-blur-sm transition-[opacity,transform,visibility] duration-200 ease-out motion-reduce:transition-none",
-						topBelowHeader,
+						"absolute top-3 bottom-3 left-3 z-20 flex min-h-0 flex-col overflow-hidden rounded-xl border border-iron/70 bg-obsidian/95 backdrop-blur-sm transition-[opacity,transform,visibility] duration-200 ease-out motion-reduce:transition-none",
 						open
 							? "visible translate-x-0 opacity-100"
 							: "pointer-events-none invisible -translate-x-3 opacity-0",

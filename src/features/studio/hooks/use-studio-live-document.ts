@@ -165,6 +165,7 @@ export function useStudioLiveDocument({
 	return {
 		state,
 		dispatch,
+		keyId,
 		readiness: studioLiveReadiness(state),
 		retry: () => setAttempt((value) => value + 1),
 	};

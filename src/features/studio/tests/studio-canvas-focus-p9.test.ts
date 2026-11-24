@@ -3,6 +3,7 @@ import {
 	STUDIO_CANVAS_INITIAL_MIN_ZOOM,
 	STUDIO_CANVAS_MAX_ZOOM,
 	STUDIO_CANVAS_MIN_ZOOM,
+	STUDIO_CANVAS_TOOLBAR_INSET_PX,
 } from "../types/studio-constants";
 import { computeFrameFocus } from "../utils/studio-canvas-fit";
 
@@ -54,5 +55,27 @@ describe("P9 Focus camera", () => {
 			expect(Number.isFinite(result.pan.x)).toBe(true);
 			expect(Number.isFinite(result.pan.y)).toBe(true);
 		}
+	});
+	it("shifts focus geometry right by the visible chat panel inset", () => {
+		const frameBounds = [{ width: 1440, height: 900 }];
+		const withoutPanel = computeFrameFocus({
+			...camera,
+			bounds: frameBounds,
+			frameIndex: 0,
+			available: { width: 1200, height: 800 },
+		});
+		const withPanel = computeFrameFocus({
+			...camera,
+			bounds: frameBounds,
+			frameIndex: 0,
+			available: {
+				width: 1200,
+				height: 800,
+				insetLeft: STUDIO_CANVAS_TOOLBAR_INSET_PX,
+			},
+		});
+		expect(withPanel.pan.x).toBeGreaterThanOrEqual(
+			withoutPanel.pan.x + STUDIO_CANVAS_TOOLBAR_INSET_PX,
+		);
 	});
 });

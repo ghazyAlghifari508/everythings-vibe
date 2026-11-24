@@ -9,7 +9,7 @@ import { z } from "zod";
 export const STUDIO_RENDER_MODES = ["canvas", "inspect", "prototype"] as const;
 export type StudioRenderMode = (typeof STUDIO_RENDER_MODES)[number];
 
-/** Capabilities the parent grants per mode. Prototype wiring lands with P10. */
+/** Capabilities the parent grants per mode. The document is identical in all three. */
 export const STUDIO_RENDER_CAPABILITIES: Record<
 	StudioRenderMode,
 	{ interactive: boolean; inspectable: boolean }
@@ -23,7 +23,7 @@ export const STUDIO_RENDER_CAPABILITIES: Record<
  * Document viewport presets. Presentation metadata only: choosing one resizes
  * the live document's real viewport (media queries respond) and never touches
  * the stored HTML, a revision, a job or credits. `desktop` and `mobile` equal
- * the canonical capture widths, so the native device matches the screenshot.
+ * the canonical capture widths used by thumbnails and export.
  */
 export const STUDIO_DEVICE_PRESETS = {
 	desktop: { width: 1440, height: 900 },
@@ -45,7 +45,10 @@ export function studioNativeDevice(viewport: string): StudioDevice {
 	return viewport === "mobile" ? "mobile" : "desktop";
 }
 
-export const STUDIO_LIVE_SURFACE_MAX = 3;
+/** Safety cap for simultaneously mounted artboard documents. Visible frames fill it first. */
+export const STUDIO_LIVE_SURFACE_MAX = 12;
+/** Prewarm band around the real (transformed) canvas viewport, in screen px. */
+export const STUDIO_LIVE_VISIBILITY_MARGIN_PX = 160;
 export const STUDIO_LIVE_READY_TIMEOUT_MS = 15_000;
 
 export type StudioRendererFailure =

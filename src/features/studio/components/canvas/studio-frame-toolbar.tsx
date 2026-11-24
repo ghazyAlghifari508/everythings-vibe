@@ -7,8 +7,10 @@ import {
 	SmartPhone01Icon,
 	Tablet01Icon,
 } from "@hugeicons/core-free-icons";
+import type { KeyboardEvent } from "react";
 import { Icon } from "@/components/ui/icon";
 import {
+	STUDIO_FRAME_TOOLBAR_BUTTON_PX,
 	STUDIO_FRAME_TOOLBAR_GROUP_GAP_PX,
 	STUDIO_FRAME_TOOLBAR_WIDTH_PX,
 } from "@/features/studio/types/studio-constants";
@@ -62,7 +64,11 @@ function ToolbarButton({
 				aria-pressed={active}
 				disabled={disabled}
 				onClick={onClick}
-				className={`flex size-11 shrink-0 items-center justify-center rounded-md border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-snow disabled:cursor-not-allowed disabled:opacity-40 ${
+				style={{
+					width: STUDIO_FRAME_TOOLBAR_BUTTON_PX,
+					height: STUDIO_FRAME_TOOLBAR_BUTTON_PX,
+				}}
+				className={`flex shrink-0 items-center justify-center rounded-md border focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-snow disabled:cursor-not-allowed disabled:opacity-40 ${
 					active
 						? "border-snow/50 bg-steel text-snow"
 						: "border-transparent text-fog hover:bg-steel hover:text-snow"
@@ -84,10 +90,49 @@ export interface StudioFrameToolbarProps {
 	nativeDevice: StudioDevice;
 	liveReady: boolean;
 	previewTarget: StudioPreviewTarget;
-	onDeviceChange: (device: StudioDevice) => void;
+	onDeviceChange?: (device: StudioDevice) => void;
 	onFocus: () => void;
-	onRefresh: () => void;
+	onRefresh?: () => void;
 	onPreview?: (target: StudioPreviewTarget) => void;
+}
+
+function handleToolbarKeys(event: KeyboardEvent<HTMLDivElement>) {
+	if (
+		!(event.target instanceof HTMLButtonElement) ||
+		event.altKey ||
+		event.ctrlKey ||
+		event.metaKey
+	)
+		return;
+	const { key } = event;
+	if (
+		key !== "ArrowUp" &&
+		key !== "ArrowDown" &&
+		key !== "Home" &&
+		key !== "End"
+	)
+		return;
+	const buttons = Array.from(
+		event.currentTarget.querySelectorAll<HTMLButtonElement>("button:enabled"),
+	);
+	const index = buttons.indexOf(event.target);
+	if (index < 0) return;
+	event.preventDefault();
+	event.stopPropagation();
+	const last = buttons.length - 1;
+	const next =
+		key === "Home"
+			? 0
+			: key === "End"
+				? last
+				: key === "ArrowUp"
+					? index === 0
+						? last
+						: index - 1
+					: index === last
+						? 0
+						: index + 1;
+	buttons[next]?.focus();
 }
 
 /**
@@ -113,19 +158,24 @@ export function StudioFrameToolbar({
 			data-placement-side={placement.side}
 			aria-label={`Kontrol frame ${frameName}`}
 			role="toolbar"
-			className="absolute z-30 flex flex-col rounded-lg border border-iron bg-obsidian p-1 shadow-none"
+			aria-orientation="vertical"
+			className="absolute z-30 flex touch-pan-y touch-pinch-zoom flex-col overflow-y-auto overscroll-contain rounded-lg border border-iron bg-obsidian p-1 [scrollbar-width:none]"
 			style={{
 				left: placement.x,
 				top: placement.y,
-				width: STUDIO_FRAME_TOOLBAR_WIDTH_PX + 8,
+				width: STUDIO_FRAME_TOOLBAR_WIDTH_PX,
+				maxHeight: placement.maxHeight,
 			}}
 			onPointerDown={(event) => event.stopPropagation()}
-			onKeyDown={(event) => event.stopPropagation()}
+			onKeyDown={handleToolbarKeys}
 		>
-			<fieldset aria-label="Ukuran perangkat" className="flex flex-col gap-1">
+			<fieldset
+				aria-label="Ukuran perangkat"
+				className="flex shrink-0 flex-col gap-1"
+			>
 				{STUDIO_DEVICES.map((entry) => {
 					const needsLive = entry !== nativeDevice;
-					const disabled = needsLive && !liveReady;
+					const disabled = !onDeviceChange || (needsLive && !liveReady);
 					const label = `${DEVICE_LABELS[entry]} ${deviceDimensions(entry)}`;
 					return (
 						<ToolbarButton
@@ -133,20 +183,20 @@ export function StudioFrameToolbar({
 							icon={DEVICE_ICONS[entry]}
 							label={`${label} untuk ${frameName}`}
 							tooltip={
-								disabled
+								needsLive && !liveReady
 									? "Menyiapkan tampilan langsung untuk ukuran ini."
 									: label
 							}
 							active={device === entry}
 							disabled={disabled}
-							onClick={() => onDeviceChange(entry)}
+							onClick={() => onDeviceChange?.(entry)}
 						/>
 					);
 				})}
 			</fieldset>
 			<fieldset
 				aria-label="Aksi frame"
-				className="flex flex-col gap-1"
+				className="flex shrink-0 flex-col gap-1"
 				style={{ marginTop: STUDIO_FRAME_TOOLBAR_GROUP_GAP_PX }}
 			>
 				<ToolbarButton
@@ -170,7 +220,8 @@ export function StudioFrameToolbar({
 					icon={RefreshCwIcon}
 					label={`Muat ulang tampilan ${frameName}`}
 					tooltip="Muat ulang tampilan"
-					onClick={onRefresh}
+					onClick={() => onRefresh?.()}
+					disabled={!onRefresh}
 				/>
 			</fieldset>
 		</div>

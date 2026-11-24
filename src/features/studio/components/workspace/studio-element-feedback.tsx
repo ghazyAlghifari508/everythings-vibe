@@ -1,75 +1,133 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { ToastNotice } from "@/components/ui/toast";
 import type { StudioElementEditing } from "../../hooks/use-studio-element-editing";
 
-/**
- * One compact, workspace-level line for element operations. It stays visible
- * whether or not the floating chat is open; there is no candidate modal and no
- * large success panel. Legacy unapproved candidates keep explicit controls and
- * are never auto applied.
- */
+const NOTICE_TIMEOUT_MS = 6000;
+const noticeMessages = {
+	text: "Teks diperbarui",
+	delete: "Elemen dihapus",
+	ai: "Revisi elemen diterapkan",
+};
+
+const feedbackButton =
+	"h-11 shrink-0 px-2 text-snow motion-reduce:transition-none motion-reduce:active:scale-100";
+
 export function StudioElementFeedback({
 	editing,
+	onReturnFocus,
 }: {
 	editing: StudioElementEditing;
+	onReturnFocus?: () => void;
 }) {
-	const pending = editing.pending;
-	const undoRow = editing.undo;
-	if (!pending && !undoRow && !editing.error) return null;
+	const { busy, error, notice, pending, transition, undo } = editing;
+	const [dismissedId, setDismissedId] = useState<string>();
+	const [hoveredId, setHoveredId] = useState<string>();
+	const [focusedId, setFocusedId] = useState<string>();
+	const countdown = useRef({ id: "", remaining: NOTICE_TIMEOUT_MS });
+	const activeNotice = notice?.row.id === dismissedId ? null : notice;
+	const activeId = activeNotice?.row.id;
+	const visibleNotice = error ? null : activeNotice;
+	const noticeId = visibleNotice?.row.id;
+	const paused =
+		!!noticeId && (hoveredId === noticeId || focusedId === noticeId);
+
+	useEffect(() => {
+		if (!activeId) return;
+		if (countdown.current.id !== activeId) {
+			countdown.current = { id: activeId, remaining: NOTICE_TIMEOUT_MS };
+		}
+		if (paused) return;
+		const clock = countdown.current;
+		const started = Date.now();
+		const timer = setTimeout(() => setDismissedId(activeId), clock.remaining);
+		return () => {
+			clearTimeout(timer);
+			clock.remaining = Math.max(0, clock.remaining - (Date.now() - started));
+		};
+	}, [activeId, paused]);
+
+	function dismissNotice() {
+		if (noticeId && focusedId === noticeId) onReturnFocus?.();
+		setHoveredId(undefined);
+		setFocusedId(undefined);
+		setDismissedId(noticeId);
+	}
+
+	const readyPreview = pending?.status === "preview" ? pending : null;
+	const noticeUndo = undo?.id === noticeId ? undo : null;
 	return (
 		<div
 			data-testid="studio-element-feedback"
-			className="absolute right-3 bottom-3 z-30 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center justify-end gap-2 rounded-lg border border-iron bg-obsidian/95 px-3 py-1.5 text-xs text-snow shadow-lg backdrop-blur-sm sm:right-6"
+			className="grid min-w-0 justify-items-end gap-y-1"
 		>
-			{pending?.status === "generating" ? (
-				<span>Menyiapkan revisi elemen…</span>
-			) : pending ? (
-				<>
-					<span className="max-w-64 truncate">{pending.summary}</span>
-					<Button
-						type="button"
-						variant="ghost"
-						size="sm"
-						className="min-h-11"
-						disabled={editing.busy}
-						onClick={() => void editing.transition(pending, "cancel")}
-					>
-						Batalkan
-					</Button>
-					{pending.status === "preview" ? (
+			{pending ? (
+				<ToastNotice
+					compact
+					message={readyPreview?.summary ?? "Menyiapkan revisi elemen…"}
+					action={
+						readyPreview ? (
+							<>
+								<Button
+									type="button"
+									variant="ghost"
+									size="sm"
+									className={feedbackButton}
+									disabled={busy}
+									onClick={() => void transition(readyPreview, "cancel")}
+								>
+									Batalkan
+								</Button>
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									className={feedbackButton}
+									disabled={busy}
+									onClick={() => void transition(readyPreview, "apply")}
+								>
+									Terapkan
+								</Button>
+							</>
+						) : null
+					}
+				/>
+			) : null}
+			<ToastNotice
+				compact
+				message={visibleNotice ? noticeMessages[visibleNotice.kind] : null}
+				onDismiss={visibleNotice ? dismissNotice : undefined}
+				onPointerEnter={(event) => {
+					if (event.pointerType !== "touch") setHoveredId(noticeId);
+				}}
+				onPointerLeave={() => setHoveredId(undefined)}
+				onFocus={() => setFocusedId(noticeId)}
+				onBlur={(event) => {
+					if (!event.currentTarget.contains(event.relatedTarget)) {
+						setFocusedId(undefined);
+					}
+				}}
+				action={
+					noticeUndo ? (
 						<Button
 							type="button"
-							variant="outline"
+							variant="ghost"
 							size="sm"
-							className="min-h-11"
-							disabled={editing.busy}
-							onClick={() => void editing.transition(pending, "apply")}
+							className={feedbackButton}
+							disabled={busy}
+							onClick={() => {
+								dismissNotice();
+								void transition(noticeUndo, "undo");
+							}}
 						>
-							Terapkan
+							Undo
 						</Button>
-					) : null}
-				</>
-			) : undoRow ? (
-				<>
-					<span>Perubahan diterapkan</span>
-					<Button
-						type="button"
-						variant="ghost"
-						size="sm"
-						className="min-h-11"
-						disabled={editing.busy}
-						onClick={() => void editing.transition(undoRow, "undo")}
-					>
-						Undo
-					</Button>
-				</>
-			) : null}
-			{editing.error ? (
-				<span role="alert" className="text-crimson">
-					{editing.error}
-				</span>
-			) : null}
+					) : null
+				}
+			/>
+			{error ? <ToastNotice compact type="error" message={error} /> : null}
 		</div>
 	);
 }

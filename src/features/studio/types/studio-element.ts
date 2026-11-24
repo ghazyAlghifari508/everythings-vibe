@@ -5,14 +5,7 @@ export const STUDIO_ELEMENT_FRAGMENT_MAX = 40_000;
 export const STUDIO_ELEMENT_COUNT_MAX = 2500;
 export const STUDIO_ELEMENT_TIMEOUT_MS = 120_000;
 
-/** Menu actions P7 dispatches; execution stays behind these stable contracts. */
-export const STUDIO_ELEMENT_ACTIONS = [
-	"edit-text",
-	"edit-ai",
-	"delete",
-	"select-parent",
-] as const;
-export type StudioElementAction = (typeof STUDIO_ELEMENT_ACTIONS)[number];
+export type StudioElementAction = "edit-text" | "edit-ai" | "delete";
 export const STUDIO_ELEMENT_ATTR = "data-studio-element-id";
 export const STUDIO_INSPECTION_ATTR = "data-ev-inspect-id";
 const id = z.string().min(1).max(200);
@@ -37,6 +30,7 @@ export const studioElementIdentitySchema = studioElementContextSchema.extend({
 	label: z.string().max(120),
 	signature: hash,
 	parentId: id.nullable(),
+	textEditable: z.literal(true).optional(),
 });
 export const studioElementTargetSchema = studioElementIdentitySchema.extend({
 	bounds: studioElementBoundsSchema,
@@ -78,6 +72,7 @@ export const studioElementPreviewSchema = z.strictObject({
 	before: z.string().max(STUDIO_ELEMENT_HTML_MAX),
 	after: z.string().max(STUDIO_ELEMENT_HTML_MAX).nullable(),
 	summary: z.string(),
+	undoRevision: z.int().nonnegative().nullable().optional(),
 	appliedRevision: z.int().nonnegative().nullable(),
 });
 export type StudioElementContext = z.infer<typeof studioElementContextSchema>;

@@ -15,18 +15,6 @@ import {
 } from "@/features/studio/types/studio-constants";
 import { computeCanvasFit } from "@/features/studio/utils/studio-canvas-fit";
 
-vi.mock("@/features/studio/hooks/use-studio-frame-visual", () => ({
-	useStudioFrameVisual: () => ({
-		visual: null,
-		visualError: "",
-		markVisualLoaded: vi.fn(),
-		setVisualError: vi.fn(),
-		retryVisual: vi.fn(),
-		artboardRef: { current: null },
-		frameHeight: 844,
-	}),
-}));
-
 const mockProject = {
 	id: "project-p5",
 	userId: "user-1",
@@ -194,26 +182,29 @@ describe("P5 — Studio Canvas Minimum Zoom and View Restoration", () => {
 	});
 
 	describe("4. Wheel / Trackpad Gestures", () => {
-		it("clamps repeated wheel zoom-out to 0.35 without letting scale reach 0.20", async () => {
+		it("pans instead of zooming when a wheel delta arrives", async () => {
 			render(<StudioCanvas project={mockProject} frames={createFrames(1)} />);
 
 			const canvas = screen.getByTestId("studio-canvas");
-			for (let i = 0; i < 30; i++) {
-				const event = new WheelEvent("wheel", {
+			const surface = screen.getByTestId("studio-canvas-surface");
+			const beforeTransform = surface.style.transform;
+			const beforeScale = getCanvasScale();
+			const consumed = canvas.dispatchEvent(
+				new WheelEvent("wheel", {
 					bubbles: true,
 					cancelable: true,
 					deltaY: 250,
 					deltaMode: 0,
 					clientX: 200,
 					clientY: 200,
-				});
-				canvas.dispatchEvent(event);
-			}
+				}),
+			);
+			expect(consumed).toBe(false);
 
 			await vi.waitFor(() => {
-				expect(getCanvasScale()).toBe(0.35);
+				expect(surface.style.transform).not.toBe(beforeTransform);
 			});
-			expect(getCanvasScale()).toBeGreaterThanOrEqual(0.35);
+			expect(getCanvasScale()).toBe(beforeScale);
 		});
 	});
 

@@ -159,12 +159,17 @@ it("floats over the canvas with visible margins instead of docking as a sidebar"
 	expect(panel.contains(screen.getByLabelText("Canvas"))).toBe(false);
 });
 
-it("keeps the workspace header free of an opaque bar and of the chat toggle", () => {
+it("reserves the workspace header and its feedback lane before the canvas and chat", () => {
 	render(<StudioWorkspace initialData={fixture(conversation)} />);
 	const header = screen.getByTestId("studio-header");
-	expect(header.className.split(" ")).not.toContain("border-b");
-	expect(header.className.split(" ")).not.toContain("bg-charcoal");
-	expect(header.className).toContain("pointer-events-none");
+	const feedback = within(header).getByTestId("studio-element-feedback");
+	const canvas = screen.getByLabelText("Canvas");
+	const chat = screen.getByRole("complementary", { name: "Design agent" });
+	expect(chat.parentElement?.contains(canvas)).toBe(true);
+	expect(chat.parentElement?.contains(feedback)).toBe(false);
+	expect(
+		header.compareDocumentPosition(chat) & Node.DOCUMENT_POSITION_FOLLOWING,
+	).toBeTruthy();
 	expect(
 		within(header).queryByRole("button", { name: /panel chat/i }),
 	).toBeNull();
@@ -187,7 +192,7 @@ it("collapses to an independent floating control below the header, then restores
 	fireEvent.click(screen.getByRole("button", { name: "Tutup panel chat" }));
 	const reopen = screen.getByRole("button", { name: "Buka panel chat" });
 	expect(screen.getByTestId("studio-header").contains(reopen)).toBe(false);
-	expect(reopen.className).toContain("top-[calc(4rem");
+	expect(reopen.parentElement).toBe(panel.parentElement);
 	// Collapsed means hidden from interaction, not unmounted.
 	expect(panel.hasAttribute("inert")).toBe(true);
 	expect(panel.getAttribute("aria-hidden")).toBe("true");
@@ -292,13 +297,18 @@ it("repeats no author or status label and shows no panel heading", () => {
 	).toHaveLength(1);
 });
 
-it("shows a partial outcome as counts with the failed screen named, never as success", () => {
+it("shows a partial outcome as a real count with the failed screen marked, never as success", () => {
 	render(<StudioWorkspace initialData={fixture(conversation)} />);
 	const reply = screen.getByRole("article", { name: "Balasan design agent" });
-	expect(reply.textContent).toContain("3 dari 4 halaman tersedia");
-	expect(reply.textContent).not.toContain("4 halaman dibuat");
-	fireEvent.click(within(reply).getByRole("button", { name: /Lihat/ }));
-	expect(reply.textContent).toContain("Belum berhasil");
+	const card = within(reply).getByRole("region", { name: "Hasil desain" });
+	expect(within(card).getByRole("heading").textContent).toBe(
+		"3 dari 4 layar dibuat",
+	);
+	expect(reply.textContent).not.toContain("halaman");
+	expect(card.textContent).toContain("Belum berhasil");
+	expect(within(reply).getByRole("status").textContent).toContain(
+		"1 layar perlu dicoba ulang",
+	);
 });
 
 it("keeps stored technical failure detail out of the visible conversation", () => {

@@ -3,14 +3,20 @@ import { db } from "@/db";
 import { studioElementRevisions } from "@/db/schema";
 import {
 	STUDIO_ELEMENT_TIMEOUT_MS,
+	type StudioElementEdit,
+	type StudioElementPreview,
 	type StudioElementRequest,
+	type StudioElementTarget,
 	studioElementRequestSchema,
 } from "../types/studio-element";
 import {
 	resolveStudioElement,
 	studioElementHash,
 } from "./studio-element-document";
-import { generateStudioElementEdit } from "./studio-element-generation";
+import {
+	deterministicStudioElementEdit,
+	generateStudioElementEdit,
+} from "./studio-element-generation";
 import { patchStudioElement } from "./studio-element-patch";
 import {
 	assertStudioElementBase,
@@ -33,13 +39,19 @@ export async function readStudioElementRevisions(
 		studioElementPreview,
 	);
 }
+
+function editSummary(edit: StudioElementEdit, target: StudioElementTarget) {
+	return `${edit.kind === "remove" ? "Hapus" : "Ubah"} ${target.label || target.tag}. Bagian lain dipertahankan.`;
+}
+
 export async function prepareStudioElementRevision(
 	userId: string,
 	raw: StudioElementRequest,
 	signal?: AbortSignal,
-) {
+): Promise<StudioElementPreview | null> {
 	const input = studioElementRequestSchema.parse(raw);
 	const { target } = input;
+	const directEdit = input.edit ?? deterministicStudioElementEdit(input.prompt);
 	const requestHash = studioElementHash(
 		JSON.stringify({ prompt: input.prompt, target, edit: input.edit }),
 	);
@@ -71,17 +83,21 @@ export async function prepareStudioElementRevision(
 			userId,
 		);
 		assertStudioElementBase(frame, target);
+		const beforeHtml = frame.htmlCode ?? "";
+		const context = {
+			projectId: frame.projectId,
+			frameId: frame.id,
+			baseRevision: frame.revision,
+		};
+		const afterHtml = directEdit
+			? patchStudioElement(beforeHtml, context, target, directEdit)
+			: null;
+		if (afterHtml === beforeHtml) return null;
 		await assertStudioElementIdle(tx, target.projectId, userId, target.frameId);
-		const resolved = resolveStudioElement(
-			frame.htmlCode ?? "",
-			{
-				projectId: frame.projectId,
-				frameId: frame.id,
-				baseRevision: frame.revision,
-			},
-			target,
-		);
-		resolved.dom.window.close();
+		if (!directEdit) {
+			const resolved = resolveStudioElement(beforeHtml, context, target);
+			resolved.dom.window.close();
+		}
 		const [row] = await tx
 			.insert(studioElementRevisions)
 			.values({
@@ -95,13 +111,28 @@ export async function prepareStudioElementRevision(
 				baseHash: target.baseHash,
 				target,
 				prompt: input.prompt,
-				status: "generating",
-				beforeHtml: frame.htmlCode ?? "",
+				status: directEdit ? "preview" : "generating",
+				beforeHtml,
+				afterHtml,
+				edit: directEdit,
+				summary: directEdit ? editSummary(directEdit, target) : "",
 			})
 			.returning();
+		if (directEdit) {
+			const applied = await applyStudioElementRevision(
+				tx,
+				row,
+				target.projectId,
+				userId,
+				"apply",
+				true,
+			);
+			return { row: applied, project, fresh: false };
+		}
 		await writeStudioElementMessage(tx, row, true);
 		return { row, project, fresh: true };
 	});
+	if (!accepted) return null;
 	const scope = and(
 		eq(studioElementRevisions.id, accepted.row.id),
 		eq(studioElementRevisions.projectId, target.projectId),
@@ -148,7 +179,9 @@ export async function prepareStudioElementRevision(
 			target,
 			edit,
 		);
-		const summary = `${edit.kind === "remove" ? "Hapus" : "Ubah"} ${target.label || target.tag}. Bagian lain dipertahankan.`;
+		if (afterHtml === accepted.row.beforeHtml)
+			throw new StudioFrameError("STUDIO_INVALID_INPUT");
+		const summary = editSummary(edit, target);
 		return await db.transaction(async (tx) => {
 			await lockStudioElementProject(tx, target.projectId, userId);
 			const { frame } = await readOwnedStudioElementFrame(

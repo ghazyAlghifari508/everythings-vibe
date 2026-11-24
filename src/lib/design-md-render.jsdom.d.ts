@@ -4,10 +4,11 @@ declare module "jsdom" {
 		includeNodeLocations?: boolean;
 		url?: string;
 		runScripts?: "outside-only" | "dangerously" | undefined;
+		pretendToBeVisual?: boolean;
 	}
 	export class JSDOM {
 		constructor(html?: string, options?: JSDOMOptions);
-		readonly window: Window;
+		readonly window: Window & typeof globalThis;
 		nodeLocation(node: Node): {
 			startOffset: number;
 			endOffset: number;

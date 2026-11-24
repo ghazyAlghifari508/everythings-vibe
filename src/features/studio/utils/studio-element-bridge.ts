@@ -9,6 +9,7 @@ import {
 	type StudioRendererMetrics,
 	studioRendererMetricsSchema,
 } from "../types/studio-renderer";
+import { studioInlineTextScript } from "./studio-inline-text-script";
 
 const envelope = {
 	channel: z.uuid(),
@@ -17,12 +18,11 @@ const envelope = {
 	baseRevision: z.int().nonnegative(),
 	baseHash: z.string().regex(/^[a-f0-9]{64}$/),
 };
-const regionSchema = z.strictObject({
+const textSession = {
+	...envelope,
 	elementId: z.string().min(1).max(200),
-	bounds: studioElementBoundsSchema,
-});
-/** Bounded once-per-ready snapshot used only by the pencil activation reveal. */
-export const STUDIO_ELEMENT_INVENTORY_MAX = 48;
+	session: z.uuid(),
+};
 const messageSchema = z.discriminatedUnion("type", [
 	z.strictObject({
 		...envelope,
@@ -48,9 +48,18 @@ const messageSchema = z.discriminatedUnion("type", [
 		type: z.literal("studio:element:hover-clear"),
 	}),
 	z.strictObject({
-		...envelope,
-		type: z.literal("studio:element:inventory"),
-		regions: z.array(regionSchema).max(STUDIO_ELEMENT_INVENTORY_MAX),
+		...textSession,
+		type: z.literal("studio:element:text-started"),
+	}),
+	z.strictObject({
+		...textSession,
+		type: z.literal("studio:element:text-end"),
+		reason: z.enum(["closed", "too-long", "unavailable"]),
+	}),
+	z.strictObject({
+		...textSession,
+		type: z.literal("studio:element:text-commit"),
+		text: z.string().max(8000),
 	}),
 ]);
 const rendererMessageSchema = z.discriminatedUnion("type", [
@@ -172,100 +181,144 @@ export function acceptStudioHoverMessage(
 	return { type: "hover", elementId: data.elementId, bounds: data.bounds };
 }
 
-/** Once-per-ready, bounded overlay inventory for the pencil activation reveal. */
-export function acceptStudioInventoryMessage(
+export function acceptStudioTextMessage(
 	event: { source: unknown; origin: string; data: unknown },
-	expected: StudioBridgeExpectation & {
-		elements: readonly StudioElementIdentity[];
-	},
+	expected: StudioBridgeExpectation & { elementId: string; session: string },
 ) {
 	if (!trustedSender(event, expected)) return null;
 	const parsed = messageSchema.safeParse(event.data);
 	if (!parsed.success || !sameDocument(parsed.data, expected)) return null;
 	const data = parsed.data;
-	if (data.type !== "studio:element:inventory") return null;
-	const known = new Set(expected.elements.map((item) => item.elementId));
-	return {
-		regions: data.regions.filter((region) => known.has(region.elementId)),
-	};
+	if (
+		data.type !== "studio:element:text-started" &&
+		data.type !== "studio:element:text-end" &&
+		data.type !== "studio:element:text-commit"
+	)
+		return null;
+	return data.elementId === expected.elementId &&
+		data.session === expected.session
+		? data
+		: null;
 }
 
 export function studioSelectionBridgeScript(
 	envelope: StudioElementContext & { baseHash: string; channel: string },
 	parentOrigin: string,
 ) {
-	// Only this trusted script executes; no parent-to-child command channel exists.
+	// Only this nonce-authorized script runs. Parent commands are tied to this document.
 	return `(() => {
 const envelope = ${JSON.stringify(envelope).replaceAll("<", "\\u003c")};
 const origin = ${JSON.stringify(parentOrigin)};
+const inspectAttr = 'data-ev-inspect-id';
+const ignored = '[hidden], [inert], [aria-hidden="true" i], [data-ev-editor-overlay], [data-ev-feedback], [data-ev-error]';
+const post = (type, details = {}) => parent.postMessage({...envelope, type, ...details}, origin);
 let selected = null;
-let hovering = null;
+let hoverPoint = null;
+let lastHover = '';
 let scheduled = false;
 let hoverScheduled = false;
+let lastSelection = '';
 const rect = node => { const r = node.getBoundingClientRect(); return {x:r.x,y:r.y,width:r.width,height:r.height}; };
-const send = (type = 'studio:element:bounds') => {
- scheduled = false;
- if (!selected || !selected.isConnected) return;
- parent.postMessage({...envelope, type, elementId:selected.getAttribute('data-ev-inspect-id'), bounds:rect(selected)}, origin);
+const isVisible = node => {
+ if (!node?.isConnected || node.closest(ignored) || !node.getClientRects().length) return false;
+ if (node.checkVisibility && !node.checkVisibility({opacityProperty:true, visibilityProperty:true, contentVisibilityAuto:true})) return false;
+ const style = getComputedStyle(node);
+ if (style.visibility === 'hidden' || style.visibility === 'collapse') return false;
+ for (let ancestor = node; ancestor; ancestor = ancestor.parentElement) {
+  if (getComputedStyle(ancestor).opacity === '0') return false;
+ }
+ const r = rect(node);
+ return r.width > 0 && r.height > 0;
+};
+const resolve = node => {
+ if (!(node instanceof Element) || node.closest(ignored)) return null;
+ const candidate = node.closest('[' + inspectAttr + ']');
+ return isVisible(candidate) ? candidate : null;
+};
+const sendSelection = (type = 'studio:element:bounds') => {
+ if (isVisible(selected)) {
+  const region = {elementId:selected.getAttribute(inspectAttr), bounds:rect(selected)};
+  const key = JSON.stringify(region);
+  if (type !== 'studio:element:bounds' || key !== lastSelection) post(type, region);
+  lastSelection = key;
+ } else if (selected) { selected = null; lastSelection = ''; post('studio:element:clear'); }
+};
+const clearHover = () => {
+ if (!lastHover) return;
+ lastHover = '';
+ post('studio:element:hover-clear');
 };
 const sendHover = () => {
- hoverScheduled = false;
- if (!hovering || !hovering.isConnected) return;
- parent.postMessage({...envelope, type:'studio:element:hover', elementId:hovering.getAttribute('data-ev-inspect-id'), bounds:rect(hovering)}, origin);
+ const node = !editing && hoverPoint ? resolve(document.elementFromPoint(...hoverPoint)) : null;
+ if (!node) { clearHover(); return; }
+ const region = {elementId:node.getAttribute(inspectAttr), bounds:rect(node)};
+ const key = JSON.stringify(region);
+ if (lastHover === key) return;
+ lastHover = key;
+ post('studio:element:hover', region);
 };
-const scheduleHover = () => { if (!hoverScheduled) { hoverScheduled = true; requestAnimationFrame(sendHover); } };
-const clearHover = () => { hovering = null; parent.postMessage({...envelope, type:'studio:element:hover-clear'}, origin); };
-const update = () => { if (!scheduled) { scheduled = true; requestAnimationFrame(() => { send(); metrics(); if (hovering) sendHover(); }); } };
+const update = () => {
+ if (scheduled) return;
+ scheduled = true;
+ requestAnimationFrame(() => { scheduled = false; sendSelection(); metrics(); sendHover(); });
+};
+${studioInlineTextScript}
 const measure = () => ({
  scrollWidth: Math.ceil(document.documentElement.scrollWidth),
  scrollHeight: Math.ceil(Math.max(document.body.scrollHeight, document.body.getBoundingClientRect().bottom + window.scrollY)),
 });
 let lastMetrics = '';
+document.addEventListener('beforeinput', event => {
+ if (!editing?.host.contains(event.target)) event.preventDefault();
+}, true);
 const metrics = () => {
+ if (editing) return;
  const m = measure();
  const key = m.scrollWidth + 'x' + m.scrollHeight;
  if (key === lastMetrics) return;
  lastMetrics = key;
  parent.postMessage({...envelope, type:'${STUDIO_RENDERER_MESSAGE_TYPES.metrics}', ...m}, origin);
 };
-const settled = Promise.all([
+void Promise.all([
  document.fonts.ready,
- ...Array.from(document.images, image => image.complete ? null : new Promise(done => { image.addEventListener('load', done, {once:true}); image.addEventListener('error', done, {once:true}); })),
+ ...Array.from(document.images, image => image.complete || image.loading === 'lazy' ? null : new Promise(done => { image.addEventListener('load', done, {once:true}); image.addEventListener('error', done, {once:true}); })),
 ]).then(() => {
+ if (!document?.body) return;
  const unresolvedImages = Array.from(document.images).filter(image => image.complete && image.naturalWidth === 0 && image.getAttribute('src')).length;
  const m = measure();
  lastMetrics = m.scrollWidth + 'x' + m.scrollHeight;
- parent.postMessage({...envelope, type:'${STUDIO_RENDERER_MESSAGE_TYPES.ready}', ...m, unresolvedImages}, origin);
- const regions = Array.from(document.querySelectorAll('[data-ev-inspect-id]')).filter(node => {
-  const r = node.getBoundingClientRect();
-  return r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < window.innerHeight;
- }).slice(0, ${STUDIO_ELEMENT_INVENTORY_MAX}).map(node => ({elementId:node.getAttribute('data-ev-inspect-id'), bounds:rect(node)}));
- if (regions.length) parent.postMessage({...envelope, type:'studio:element:inventory', regions}, origin);
+ post('${STUDIO_RENDERER_MESSAGE_TYPES.ready}', {...m, unresolvedImages});
  update();
 });
 document.addEventListener('pointermove', event => {
- const target = event.target instanceof Element ? event.target.closest('[data-ev-inspect-id]') : null;
- if (target === hovering) { scheduleHover(); return; }
- if (target) hovering = target;
- else clearHover();
+ hoverPoint = [event.clientX, event.clientY];
+ if (!hoverScheduled) {
+  hoverScheduled = true;
+  requestAnimationFrame(() => { hoverScheduled = false; sendHover(); });
+ }
 }, true);
-document.documentElement.addEventListener('pointerleave', clearHover);
+document.documentElement.addEventListener('pointerleave', () => { hoverPoint = null; clearHover(); });
 document.addEventListener('click', event => {
+ if (editing?.host.contains(event.target)) return;
  event.preventDefault(); event.stopImmediatePropagation();
- const target = event.target instanceof Element ? event.target.closest('[data-ev-inspect-id]') : null;
- if (target) { selected = target; send('studio:element:select'); }
+ selected = resolve(event.target);
+ if (selected) sendSelection('studio:element:select');
+ else post('studio:element:clear');
 }, true);
 document.addEventListener('submit', event => event.preventDefault(), true);
 document.addEventListener('keydown', event => {
- if (event.key === 'Escape') { selected = null; parent.postMessage({...envelope,type:'studio:element:clear'}, origin); }
- if ((event.key === 'Enter' || event.key === ' ') && event.target instanceof Element && event.target.hasAttribute('data-ev-inspect-id')) {
-  event.preventDefault(); selected = event.target; send('studio:element:select');
+ if (textKey(event)) return;
+ if (event.key === 'Escape') { selected = null; post('studio:element:clear'); }
+ if (event.key === 'Enter' || event.key === ' ') {
+  const target = resolve(event.target);
+  if (target && target === event.target) {
+   event.preventDefault(); selected = target; sendSelection('studio:element:select');
+  }
  }
 }, true);
 document.addEventListener('scroll', update, true);
 window.addEventListener('resize', update);
 new ResizeObserver(update).observe(document.body);
 document.addEventListener('load', update, true);
-void settled;
 })();`;
 }

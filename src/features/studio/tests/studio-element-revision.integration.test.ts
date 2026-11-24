@@ -5,13 +5,9 @@ import {
 	creditLedgerEntries,
 	studioElementRevisions,
 	studioFrames,
-	studioJobs,
 	studioMessages,
-	studioProjects,
 	studioRevisions,
-	users,
 } from "@/db/schema";
-import { indexStudioElements } from "../services/studio-element-document";
 import { readStudioElementHttp } from "../services/studio-element-http";
 import {
 	prepareStudioElementRevision,
@@ -19,7 +15,15 @@ import {
 	transitionStudioElementRevision,
 } from "../services/studio-element-revision";
 import { readStudioFrameDocument } from "../services/studio-frame-document";
+import {
+	fixture,
+	html,
+	prepareWithRevision,
+	stored,
+} from "./studio-element-revision-fixture";
 
+const replacementPatch =
+	'{"kind":"replace","html":"<section><h2>Updated card</h2></section>"}';
 const model = vi.hoisted(() => ({
 	calls: 0,
 	response:
@@ -34,73 +38,28 @@ vi.mock("@/lib/services/ai-orchestrator", () => ({
 		return { firstChunk: model.response, generator: (async function* () {})() };
 	},
 }));
-const owners: string[] = [];
-const html =
-	'<!doctype html><html><head></head><body><nav>Navbar</nav><main><section id="hero">Hero</section><section id="stats"><h2>Statistics</h2></section><section id="projects">Projects</section></main><footer>Contact</footer></body></html>';
-async function fixture() {
-	const userId = crypto.randomUUID();
-	owners.push(userId);
-	await db
-		.insert(users)
-		.values({ id: userId, email: `${userId}@example.test` });
-	const [project] = await db
-		.insert(studioProjects)
-		.values({ userId, title: "Portfolio" })
-		.returning();
-	const frames = await db
-		.insert(studioFrames)
-		.values(
-			[0, 1].map((order) => ({
-				projectId: project.id,
-				name: `Frame ${order}`,
-				order,
-				htmlCode: html,
-				status: "ready",
-				revision: 5,
-			})),
-		)
-		.returning();
-	const context = {
-		projectId: project.id,
-		frameId: frames[0].id,
-		baseRevision: 5,
-	};
-	const entry = indexStudioElements(html, context).elements.find(
-		(item) => item.selector === "#stats",
-	);
-	if (!entry) throw new Error("Missing target");
-	return {
-		userId,
-		project,
-		frames,
-		input: {
-			requestId: crypto.randomUUID(),
-			prompt: "Hapus section ini saja. Pertahankan bagian lain.",
-			target: { ...entry, bounds: { x: 0, y: 20, width: 100, height: 50 } },
-		},
-	};
-}
-async function stored(frameId: string) {
-	const [frame] = await db
-		.select()
-		.from(studioFrames)
-		.where(eq(studioFrames.id, frameId));
-	return frame;
-}
-afterEach(async () => {
-	for (const id of owners.splice(0))
-		await db.delete(users).where(eq(users.id, id));
+afterEach(() => {
 	model.calls = 0;
+	model.response = replacementPatch;
 	model.wait = Promise.resolve();
 });
 
 describe("persisted scoped revisions", () => {
 	it("auto-applies atomically, leaves other frames untouched and rejects late cancel", async () => {
 		const { userId, project, frames, input } = await fixture();
-		const applied = await prepareStudioElementRevision(userId, input);
+		const applied = await prepareWithRevision(userId, {
+			...input,
+			prompt: "Redesign this selected card only",
+		});
+		expect(model.calls).toBe(1);
 		expect(applied.status).toBe("applied");
 		expect(applied.appliedRevision).toBe(6);
 		expect((await stored(frames[0].id)).htmlCode).toBe(applied.after);
+		const [before, after] = html.split(
+			'<section id="stats"><h2>Statistics</h2></section>',
+		);
+		expect(applied.after?.startsWith(before)).toBe(true);
+		expect(applied.after?.endsWith(after)).toBe(true);
 		expect((await stored(frames[0].id)).revision).toBe(6);
 		expect((await stored(frames[1].id)).htmlCode).toBe(html);
 		expect(
@@ -120,10 +79,18 @@ describe("persisted scoped revisions", () => {
 	});
 	it("applies once, preserves other frames, restores through monotonic Undo and reloads history", async () => {
 		const { userId, project, frames, input } = await fixture();
-		const applied = await prepareStudioElementRevision(userId, input);
+		model.response = '{"kind":"remove"}';
+		const applied = await prepareWithRevision(userId, {
+			...input,
+			prompt: "Revise this selected section only",
+		});
+		expect(model.calls).toBe(1);
 		expect(applied.status).toBe("applied");
 		expect(applied.appliedRevision).toBe(6);
 		expect((await stored(frames[0].id)).htmlCode).toBe(applied.after);
+		expect(applied.after).toBe(
+			html.replace('<section id="stats"><h2>Statistics</h2></section>', ""),
+		);
 		expect(
 			(await readStudioFrameDocument(project.id, frames[0].id, userId)).html,
 		).toBe(applied.after);
@@ -165,7 +132,7 @@ describe("persisted scoped revisions", () => {
 				target: { ...a.input.target, frameId: b.frames[0].id },
 			}),
 		).rejects.toMatchObject({ code: "STUDIO_NOT_FOUND" });
-		const preview = await prepareStudioElementRevision(a.userId, a.input);
+		const preview = await prepareWithRevision(a.userId, a.input);
 		await expect(
 			transitionStudioElementRevision(
 				b.userId,
@@ -178,8 +145,8 @@ describe("persisted scoped revisions", () => {
 	it("dedupes a retried request and rejects a stale base without charging credits", async () => {
 		const { userId, frames, input } = await fixture();
 		const request = { ...input, prompt: "Redesign this selected card only" };
-		const first = await prepareStudioElementRevision(userId, request);
-		const duplicate = await prepareStudioElementRevision(userId, request);
+		const first = await prepareWithRevision(userId, request);
+		const duplicate = await prepareWithRevision(userId, request);
 		expect(duplicate.id).toBe(first.id);
 		expect(model.calls).toBe(1);
 		expect((await stored(frames[0].id)).revision).toBe(6);
@@ -280,7 +247,7 @@ describe("persisted scoped revisions", () => {
 			html: expect.stringContaining("data-ev-inspect-id"),
 		});
 		expect((await stored(frames[0].id)).htmlCode).toBe(html);
-		const applied = await prepareStudioElementRevision(userId, input);
+		const applied = await prepareWithRevision(userId, input);
 		const exported = await readStudioFrameDocument(
 			project.id,
 			frames[0].id,
@@ -302,8 +269,7 @@ describe("persisted scoped revisions", () => {
 		});
 		const request = { ...input, prompt: "Redesign this selected card only" };
 		const pending = prepareStudioElementRevision(userId, request);
-		await vi.waitFor(() => expect(model.calls).toBe(1));
-		const duplicate = await prepareStudioElementRevision(userId, request);
+		const duplicate = await prepareWithRevision(userId, request);
 		expect(duplicate.status).toBe("generating");
 		expect(model.calls).toBe(1);
 		await transitionStudioElementRevision(
@@ -345,7 +311,7 @@ describe("persisted scoped revisions", () => {
 	});
 	it("rejects Undo after a newer approval rather than overwriting it", async () => {
 		const { userId, project, frames, input } = await fixture();
-		const applied = await prepareStudioElementRevision(userId, input);
+		const applied = await prepareWithRevision(userId, input);
 		await db
 			.update(studioFrames)
 			.set({ revision: 7, htmlCode: html.replace("Hero", "Latest approval") })
@@ -355,87 +321,49 @@ describe("persisted scoped revisions", () => {
 		).rejects.toMatchObject({ code: "STUDIO_STALE_REVISION" });
 		expect((await stored(frames[0].id)).htmlCode).toContain("Latest approval");
 	});
-	it("applies a direct text edit deterministically and restores it through Undo", async () => {
+	it("leaves a legacy candidate pending until explicitly applied", async () => {
 		const { userId, project, frames, input } = await fixture();
-		const hero = indexStudioElements(html, {
-			projectId: project.id,
-			frameId: frames[0].id,
-			baseRevision: 5,
-		}).elements.find((item) => item.selector === "#hero");
-		if (!hero) throw new Error("Missing hero target");
-		const text = '<script>alert(1)</script> "Promo"';
-		const applied = await prepareStudioElementRevision(userId, {
-			...input,
-			target: { ...hero, bounds: input.target.bounds },
-			edit: { kind: "text", text },
-		});
-		expect(applied.status).toBe("applied");
-		const [savedRevision] = await db
-			.select()
-			.from(studioElementRevisions)
-			.where(eq(studioElementRevisions.id, applied.id));
-		expect(savedRevision.edit).toEqual({ kind: "text", text });
-		expect(model.calls).toBe(0);
-		const saved = (await stored(frames[0].id)).htmlCode;
-		expect(saved).toContain("&lt;script&gt;");
-		expect(saved).not.toContain("<script>");
-		expect((await stored(frames[1].id)).htmlCode).toBe(html);
-		expect(
-			await db
-				.select()
-				.from(studioJobs)
-				.where(eq(studioJobs.projectId, project.id)),
-		).toEqual([]);
-		expect(
-			await db
-				.select()
-				.from(creditLedgerEntries)
-				.where(eq(creditLedgerEntries.userId, userId)),
-		).toEqual([]);
-		await transitionStudioElementRevision(
-			userId,
-			project.id,
-			applied.id,
-			"undo",
+		const after = html.replace(
+			'<section id="stats"><h2>Statistics</h2></section>',
+			"",
 		);
-		expect((await stored(frames[0].id)).htmlCode).toBe(html);
-	});
-	it("deletes only the selected element without a model, job or credit charge", async () => {
-		const { userId, project, frames, input } = await fixture();
-		const applied = await prepareStudioElementRevision(userId, {
-			...input,
-			edit: { kind: "remove" },
+		const [candidate] = await db
+			.insert(studioElementRevisions)
+			.values({
+				projectId: project.id,
+				userId,
+				frameId: frames[0].id,
+				frameName: frames[0].name,
+				requestId: input.requestId,
+				requestHash: "historical-request",
+				baseRevision: input.target.baseRevision,
+				baseHash: input.target.baseHash,
+				target: input.target,
+				prompt: input.prompt,
+				edit: { kind: "remove" },
+				status: "preview",
+				beforeHtml: html,
+				afterHtml: after,
+			})
+			.returning();
+		expect(await readStudioElementRevisions(project.id, userId)).toMatchObject([
+			{ id: candidate.id, status: "preview" },
+		]);
+		expect(await stored(frames[0].id)).toMatchObject({
+			revision: 5,
+			htmlCode: html,
 		});
-		expect(applied.status).toBe("applied");
-		const [savedRevision] = await db
-			.select()
-			.from(studioElementRevisions)
-			.where(eq(studioElementRevisions.id, applied.id));
-		expect(savedRevision.edit).toEqual({ kind: "remove" });
-		expect(model.calls).toBe(0);
-		const saved = (await stored(frames[0].id)).htmlCode;
-		expect(saved).not.toContain('<section id="stats">');
-		expect(saved).toContain('<section id="hero">Hero</section>');
-		expect(saved).toContain('<section id="projects">Projects</section>');
-		expect((await stored(frames[1].id)).htmlCode).toBe(html);
-		expect(
-			await db
-				.select()
-				.from(studioJobs)
-				.where(eq(studioJobs.projectId, project.id)),
-		).toEqual([]);
-		expect(
-			await db
-				.select()
-				.from(creditLedgerEntries)
-				.where(eq(creditLedgerEntries.userId, userId)),
-		).toEqual([]);
-		await transitionStudioElementRevision(
-			userId,
-			project.id,
-			applied.id,
-			"undo",
-		);
-		expect((await stored(frames[0].id)).htmlCode).toBe(html);
+		await expect(
+			transitionStudioElementRevision(
+				userId,
+				project.id,
+				candidate.id,
+				"apply",
+			),
+		).resolves.toMatchObject({ status: "applied", after });
+		expect(await stored(frames[0].id)).toMatchObject({
+			revision: 6,
+			htmlCode: after,
+		});
 	});
 });

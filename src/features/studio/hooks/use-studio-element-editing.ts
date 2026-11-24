@@ -4,6 +4,7 @@ import {
 	readStudioChatStorage,
 	writeStudioChatStorage,
 } from "../services/studio-chat-storage";
+import { mutateStudioElement } from "../services/studio-element-client";
 import { readStudioApiError } from "../services/studio-frame-retry-client";
 import {
 	STUDIO_ELEMENT_TIMEOUT_MS,
@@ -16,12 +17,20 @@ import {
 const revisionsSchema = z.object({
 	revisions: z.array(studioElementPreviewSchema),
 });
-const responseSchema = z.object({ revision: studioElementPreviewSchema });
 const pendingSchema = z.object({ signature: z.string(), id: z.uuid() });
+type ElementNotice = {
+	row: StudioElementPreview;
+	kind: "text" | "delete" | "ai";
+};
+
+function withRevision(rows: StudioElementPreview[], row: StudioElementPreview) {
+	return [...rows.filter((item) => item.id !== row.id), row];
+}
 export interface StudioElementEditing {
 	target: StudioElementTarget | null;
 	pending: StudioElementPreview | null;
 	undo: StudioElementPreview | null;
+	notice?: ElementNotice | null;
 	busy: boolean;
 	error: string;
 	selectTarget: (next: StudioElementTarget) => void;
@@ -44,6 +53,7 @@ export function useStudioElementEditing({
 	selectedFrameIds,
 	setError,
 	syncProjectStatus,
+	publishCommitted,
 }: {
 	projectId: string;
 	userId: string;
@@ -51,10 +61,27 @@ export function useStudioElementEditing({
 	selectedFrameIds: string[];
 	setError: (message: string) => void;
 	syncProjectStatus: () => Promise<void>;
+	publishCommitted?: (
+		projectId: string,
+		frameId: string,
+		revision: number,
+		html: string,
+	) => void;
 }): StudioElementEditing {
 	const [target, setTarget] = useState<StudioElementTarget | null>(null);
 	const [pending, setPending] = useState<StudioElementPreview | null>(null);
-	const [undo, setUndo] = useState<StudioElementPreview | null>(null);
+	const [history, setHistory] = useState<StudioElementPreview[]>([]);
+	const [notice, setNotice] = useState<ElementNotice | null>(null);
+	let undo: StudioElementPreview | null = null;
+	for (let i = history.length - 1; i >= 0; i--) {
+		const row = history[i];
+		if (row.status !== "applied" || row.appliedRevision === null) continue;
+		const frame = frames.find(({ id }) => id === row.frameId);
+		if (frame && frame.revision <= row.appliedRevision) {
+			undo = row;
+			break;
+		}
+	}
 	const [busy, setBusy] = useState(false);
 	const [error, setLocalError] = useState("");
 	const working = useRef(false);
@@ -67,7 +94,14 @@ export function useStudioElementEditing({
 			try {
 				const response = await fetch(
 					`/api/studio/frame?projectId=${encodeURIComponent(projectId)}&elementRevisions=1`,
-					{ signal },
+					{
+						signal: signal
+							? AbortSignal.any([
+									signal,
+									AbortSignal.timeout(STUDIO_ELEMENT_TIMEOUT_MS),
+								])
+							: AbortSignal.timeout(STUDIO_ELEMENT_TIMEOUT_MS),
+					},
 				);
 				if (!response.ok)
 					throw new Error(
@@ -92,10 +126,7 @@ export function useStudioElementEditing({
 						)
 						.at(-1) ?? null,
 				);
-				setUndo(
-					parsed.revisions.filter((row) => row.status === "applied").at(-1) ??
-						null,
-				);
+				setHistory(parsed.revisions);
 				setLocalError("");
 			} catch (failure) {
 				if (
@@ -115,7 +146,8 @@ export function useStudioElementEditing({
 	useEffect(() => {
 		setTarget(null);
 		setPending(null);
-		setUndo(null);
+		setHistory([]);
+		setNotice(null);
 		setLocalError("");
 		const controller = new AbortController();
 		void refresh(controller.signal);
@@ -152,6 +184,7 @@ export function useStudioElementEditing({
 			if (!chosen || working.current) return { accepted: false };
 			working.current = true;
 			sequence.current++;
+			setNotice(null);
 			setBusy(true);
 			setLocalError("");
 			setError("");
@@ -175,10 +208,8 @@ export function useStudioElementEditing({
 					: crypto.randomUUID();
 			writeStudioChatStorage(key, JSON.stringify({ signature, id: requestId }));
 			try {
-				const response = await fetch("/api/studio/frame", {
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({
+				const revision = await mutateStudioElement(
+					{
 						action: "element-prepare",
 						request: {
 							requestId,
@@ -186,37 +217,62 @@ export function useStudioElementEditing({
 							prompt,
 							edit: options?.edit,
 						},
-					}),
-					signal: AbortSignal.timeout(STUDIO_ELEMENT_TIMEOUT_MS),
-				});
-				if (!response.ok) {
-					writeStudioChatStorage(key, "");
-					throw new Error(
-						await readStudioApiError(
-							response,
-							"Revisi belum berhasil disiapkan. Pilih ulang elemen lalu coba lagi.",
-						),
-					);
-				}
-				const { revision } = responseSchema.parse(await response.json());
+					},
+					() => writeStudioChatStorage(key, ""),
+				);
 				if (currentProject.current !== projectId) return { accepted: false };
-				if (revision.status === "applied") {
-					setUndo(revision);
-					setPending(null);
+				writeStudioChatStorage(key, "");
+				if (!revision) return { accepted: true };
+				if (
+					revision.target.projectId !== projectId ||
+					revision.frameId !== snapshot.frameId ||
+					revision.baseRevision !== snapshot.baseRevision ||
+					revision.baseHash !== snapshot.baseHash
+				)
+					throw new Error("Respons revisi tidak cocok. Pilih ulang elemennya.");
+				if (
+					revision.status === "applied" &&
+					revision.appliedRevision !== null &&
+					revision.after !== null
+				) {
+					publishCommitted?.(
+						projectId,
+						revision.frameId,
+						revision.appliedRevision,
+						revision.after,
+					);
+					setHistory((rows) => withRevision(rows, revision));
+					setPending((row) => (row?.id === revision.id ? null : row));
+					setNotice({
+						row: revision,
+						kind:
+							options?.edit?.kind === "text"
+								? "text"
+								: options?.edit?.kind === "remove"
+									? "delete"
+									: "ai",
+					});
+					setTarget((previous) =>
+						previous?.frameId === revision.frameId ? null : previous,
+					);
 				} else if (
 					revision.status === "generating" ||
 					revision.status === "preview"
 				) {
 					setPending(revision);
 				} else {
-					setPending(null);
+					throw new Error(
+						"Revisi elemen tidak diterapkan. Pilih ulang elemen lalu coba lagi.",
+					);
 				}
-				writeStudioChatStorage(key, "");
-				// The mutation response is authoritative. Do not follow it with a
-				// history read that could arrive late and erase the new undo state.
 				await syncProjectStatus();
 				return { accepted: true };
 			} catch (failure) {
+				if (currentProject.current === projectId) {
+					// A dropped response can follow a successful commit; read, never replay the edit.
+					await syncProjectStatus();
+					await refresh();
+				}
 				if (currentProject.current === projectId)
 					setLocalError(
 						failure instanceof Error
@@ -229,47 +285,78 @@ export function useStudioElementEditing({
 				setBusy(false);
 			}
 		},
-		[target, userId, projectId, setError, syncProjectStatus],
+		[
+			target,
+			userId,
+			projectId,
+			setError,
+			syncProjectStatus,
+			publishCommitted,
+			refresh,
+		],
 	);
 	const transition = useCallback(
 		async (row: StudioElementPreview, action: "apply" | "cancel" | "undo") => {
 			if (working.current) return;
 			working.current = true;
 			sequence.current++;
+			setNotice(null);
 			setBusy(true);
 			setLocalError("");
 			try {
-				const response = await fetch("/api/studio/frame", {
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({
-						action: "element-transition",
-						projectId,
-						revisionId: row.id,
-						transition: action,
-					}),
+				const revision = await mutateStudioElement({
+					action: "element-transition",
+					projectId,
+					revisionId: row.id,
+					transition: action,
 				});
-				if (!response.ok)
-					throw new Error(
-						await readStudioApiError(
-							response,
-							"Aksi revisi belum berhasil. Pilih ulang elemen jika versi berubah.",
-						),
-					);
-				const { revision } = responseSchema.parse(await response.json());
 				if (currentProject.current !== projectId) return;
-				setPending(null);
-				if (action === "apply") {
-					setUndo(revision);
-					setTarget(null);
+				if (
+					!revision ||
+					revision.id !== row.id ||
+					revision.frameId !== row.frameId ||
+					revision.target.projectId !== projectId
+				)
+					throw new Error("Respons riwayat revisi tidak cocok.");
+				setPending((previous) =>
+					previous?.id === revision.id ? null : previous,
+				);
+				if (
+					action === "apply" &&
+					revision.status === "applied" &&
+					revision.appliedRevision !== null &&
+					revision.after !== null
+				) {
+					publishCommitted?.(
+						projectId,
+						revision.frameId,
+						revision.appliedRevision,
+						revision.after,
+					);
+					setHistory((rows) => withRevision(rows, revision));
+					setNotice({ row: revision, kind: "ai" });
 				}
-				if (action === "undo") {
-					setUndo(null);
-					setTarget(null);
+				if (action === "undo" && revision.status === "undone") {
+					if (
+						revision.undoRevision !== null &&
+						revision.undoRevision !== undefined
+					)
+						publishCommitted?.(
+							projectId,
+							revision.frameId,
+							revision.undoRevision,
+							revision.before,
+						);
+					setHistory((rows) => withRevision(rows, revision));
 				}
+				if (action !== "cancel") setTarget(null);
 				await syncProjectStatus();
 				await refresh();
 			} catch (failure) {
+				if (currentProject.current === projectId) {
+					await syncProjectStatus();
+					await refresh();
+				}
 				if (currentProject.current === projectId)
 					setLocalError(
 						failure instanceof Error
@@ -281,12 +368,13 @@ export function useStudioElementEditing({
 				setBusy(false);
 			}
 		},
-		[projectId, syncProjectStatus, refresh],
+		[projectId, syncProjectStatus, refresh, publishCommitted],
 	);
 	return {
 		target,
 		pending,
 		undo,
+		notice,
 		busy,
 		error,
 		selectTarget,

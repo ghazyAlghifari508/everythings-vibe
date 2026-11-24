@@ -5,7 +5,7 @@ import { StudioFrameToolbar } from "../components/canvas/studio-frame-toolbar";
 import { buildStudioPreviewTarget } from "../types/studio-preview-contract";
 
 const baseProps = {
-	placement: { x: 100, y: 120, side: "right" as const },
+	placement: { x: 100, y: 120, side: "right" as const, maxHeight: 400 },
 	frameName: "Layar 1",
 	device: "desktop" as const,
 	nativeDevice: "desktop" as const,

@@ -7,10 +7,7 @@ import {
 	screen,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-	computeCanvasFit,
-	StudioCanvas,
-} from "@/features/studio/components/canvas/studio-canvas";
+import { StudioCanvas } from "@/features/studio/components/canvas/studio-canvas";
 import { writeStudioCanvasView } from "@/features/studio/services/studio-canvas-view";
 import {
 	STUDIO_CANVAS_HEADER_INSET_PX,
@@ -18,6 +15,7 @@ import {
 	STUDIO_CANVAS_MAX_ZOOM,
 	STUDIO_CANVAS_MIN_ZOOM,
 } from "@/features/studio/types/studio-constants";
+import { computeCanvasFit } from "@/features/studio/utils/studio-canvas-fit";
 import { canvasZoomRowBottomCss } from "@/features/studio/utils/studio-canvas-layout";
 
 describe("StudioCanvas", () => {
@@ -127,7 +125,7 @@ describe("StudioCanvas", () => {
 			/>,
 		);
 
-		const cursor = screen.getByRole("button", { name: /Pilih frame/i });
+		const cursor = screen.getByRole("button", { name: /Pilih frame \(V\)/i });
 		const hand = screen.getByRole("button", { name: /Geser canvas/i });
 		// Both tools live in one compact vertical group on the right edge.
 		const toolbar = cursor.parentElement;
@@ -161,7 +159,7 @@ describe("StudioCanvas", () => {
 		expect(group?.style.bottom).toBe(canvasZoomRowBottomCss());
 		// The tools must not share the zoom group's anchor.
 		const cursorToolbar = screen.getByRole("button", {
-			name: /Pilih frame/i,
+			name: /Pilih frame \(V\)/i,
 		}).parentElement;
 		expect(cursorToolbar?.style.bottom).toBe("");
 	});
@@ -176,7 +174,7 @@ describe("StudioCanvas", () => {
 			/>,
 		);
 
-		const cursor = screen.getByRole("button", { name: /Pilih frame/i });
+		const cursor = screen.getByRole("button", { name: /Pilih frame \(V\)/i });
 		const hand = screen.getByRole("button", { name: /Geser canvas/i });
 		expect(cursor.getAttribute("aria-pressed")).toBe("true");
 		expect(hand.getAttribute("aria-pressed")).toBe("false");
@@ -204,7 +202,7 @@ describe("StudioCanvas", () => {
 		fireEvent.keyDown(input, { key: "h" });
 		expect(
 			screen
-				.getByRole("button", { name: /Pilih frame/i })
+				.getByRole("button", { name: /Pilih frame \(V\)/i })
 				.getAttribute("aria-pressed"),
 		).toBe("true");
 		input.remove();
@@ -373,7 +371,9 @@ describe("StudioCanvas", () => {
 		expect(container.querySelector('[data-testid$="-shimmer"]')).toBeNull();
 		// The canvas surface and its controls stay available immediately.
 		expect(screen.getByTestId("studio-canvas")).toBeDefined();
-		expect(screen.getByRole("button", { name: /Pilih frame/i })).toBeDefined();
+		expect(
+			screen.getByRole("button", { name: /Pilih frame \(V\)/i }),
+		).toBeDefined();
 		expect(screen.getByRole("button", { name: /Geser canvas/i })).toBeDefined();
 		expect(screen.getByRole("button", { name: /Perbesar/i })).toBeDefined();
 	});
@@ -744,19 +744,13 @@ describe("StudioCanvas", () => {
 			expect(renderedScale()).toBeLessThan(STUDIO_CANVAS_INITIAL_MIN_ZOOM);
 		});
 
-		it("lets the user zoom after initialization without being overridden", async () => {
+		it("lets the user zoom after initialization without being overridden", () => {
 			const { rerender } = render(
 				<StudioCanvas project={mockProject} frames={longMobileFrames} />,
 			);
 			const opening = renderedScale();
-			fireEvent.wheel(screen.getByTestId("studio-canvas"), {
-				deltaX: 0,
-				deltaY: -120,
-				deltaMode: 0,
-				clientX: 400,
-				clientY: 300,
-			});
-			await vi.waitFor(() => expect(renderedScale()).toBeGreaterThan(opening));
+			fireEvent.click(screen.getByRole("button", { name: /Perbesar/i }));
+			expect(renderedScale()).toBeGreaterThan(opening);
 			const userScale = renderedScale();
 			// A screen arriving later must not reset the zoom the user chose.
 			rerender(
@@ -856,7 +850,7 @@ describe("StudioCanvas", () => {
 		addEventListener.mockRestore();
 	});
 
-	it("zooms on physical mouse wheel scroll without needing modifier keys", async () => {
+	it("pans on a large mouse wheel notch without changing zoom", async () => {
 		render(
 			<StudioCanvas
 				project={mockProject}
@@ -868,6 +862,7 @@ describe("StudioCanvas", () => {
 		const canvas = screen.getByTestId("studio-canvas");
 		const surface = screen.getByTestId("studio-canvas-surface");
 		const before = surface.style.transform;
+		const beforeScale = before.match(/scale\(([^)]+)\)/)?.[1];
 
 		fireEvent.wheel(canvas, {
 			deltaX: 0,
@@ -879,9 +874,12 @@ describe("StudioCanvas", () => {
 		await vi.waitFor(() => {
 			expect(surface.style.transform).not.toBe(before);
 		});
+		expect(surface.style.transform.match(/scale\(([^)]+)\)/)?.[1]).toBe(
+			beforeScale,
+		);
 	});
 
-	it("pans instead of zooming when 2D trackpad gesture has horizontal delta", () => {
+	it("pans instead of zooming when 2D trackpad gesture has horizontal delta", async () => {
 		render(
 			<StudioCanvas
 				project={mockProject}
@@ -901,7 +899,9 @@ describe("StudioCanvas", () => {
 			clientX: 400,
 			clientY: 300,
 		});
-		expect(surface.style.transform).not.toBe(before);
+		await vi.waitFor(() => {
+			expect(surface.style.transform).not.toBe(before);
+		});
 		const beforeScale = before.match(/scale\(([^)]+)\)/)?.[1];
 		const afterScale = surface.style.transform.match(/scale\(([^)]+)\)/)?.[1];
 		expect(afterScale).toBe(beforeScale);

@@ -1,14 +1,21 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { isDeepStrictEqual } from "node:util";
+import { and, asc, desc, eq, inArray, or } from "drizzle-orm";
 import {
 	type StudioJobRow,
+	type StudioMessageRow,
 	studioFrames,
 	studioJobs,
 	studioMessages,
 	studioProjects,
+	studioRevisions,
 } from "@/db/schema";
 import type { StudioMessageAttachment } from "../types/studio-conversation";
 import { composeStudioAssistantContent } from "./studio-conversation-content";
-import { resolveStudioMessageProgress } from "./studio-conversation-progress";
+import {
+	resolveStudioMessageProgress,
+	type StudioRevisionHtml,
+	studioMessageHistoryNeeds,
+} from "./studio-conversation-progress";
 import { StudioFrameError } from "./studio-frame-errors";
 import type { StudioJobTransaction } from "./studio-job-lease";
 
@@ -82,11 +89,54 @@ export async function appendStudioConversation(
 			...common,
 			order: order + 1,
 			role: "assistant",
-			content: "Permintaan diterima. Menunggu giliran.",
+			content: "",
 			status: "queued",
 		},
 	]);
 	await synchronizeStudioConversation(tx, projectId, userId);
+}
+
+/**
+ * Committed HTML a revise turn still has to compare. Frozen results are never
+ * read again, so a normal progress tick issues no extra query.
+ */
+async function readRevisionHistory(
+	tx: StudioJobTransaction,
+	projectId: string,
+	messages: StudioMessageRow[],
+	jobs: StudioJobRow[],
+): Promise<StudioRevisionHtml[]> {
+	const jobIds = new Set<string>();
+	const before: { frameId: string; revision: number }[] = [];
+	for (const message of messages) {
+		const needs = studioMessageHistoryNeeds(message, jobs);
+		for (const id of needs.jobIds) jobIds.add(id);
+		before.push(...needs.before);
+	}
+	if (!jobIds.size) return [];
+	return tx
+		.select({
+			frameId: studioRevisions.frameId,
+			frameRevision: studioRevisions.frameRevision,
+			jobId: studioRevisions.jobId,
+			htmlCode: studioRevisions.htmlCode,
+		})
+		.from(studioRevisions)
+		.where(
+			and(
+				eq(studioRevisions.projectId, projectId),
+				or(
+					inArray(studioRevisions.jobId, [...jobIds]),
+					...before.map((entry) =>
+						and(
+							eq(studioRevisions.frameId, entry.frameId),
+							eq(studioRevisions.frameRevision, entry.revision),
+						),
+					),
+				),
+			),
+		)
+		.orderBy(asc(studioRevisions.version));
 }
 
 /** Materializes public progress in the same commit as job/frame state, independent of any browser. */
@@ -131,6 +181,7 @@ export async function synchronizeStudioConversation(
 			and(eq(studioProjects.id, projectId), eq(studioProjects.userId, userId)),
 		);
 	const deferred = project?.blueprint?.initialScope?.deferred;
+	const history = await readRevisionHistory(tx, projectId, messages, jobs);
 	for (const message of messages) {
 		if (!message.jobIds.length) continue;
 		const progress = resolveStudioMessageProgress(
@@ -138,21 +189,29 @@ export async function synchronizeStudioConversation(
 			jobs,
 			frames.map((row) => row.studio_frames),
 			deferred,
+			history,
 		);
 		// Composed from persisted plan and frame results only; no model call.
 		const request = turns.find(
 			(turn) =>
 				turn.role === "user" && turn.operationId === message.operationId,
 		);
-		const content = composeStudioAssistantContent({
+		const composed = composeStudioAssistantContent({
 			progress,
 			blueprint: project?.blueprint,
 			request: request?.content ?? "",
 		});
+		// Authored explanation is kept if its frames are no longer reportable
+		// (for example deleted); it is never swapped for a shorter template.
+		const content =
+			composed ||
+			(message.progress?.frames?.some((frame) => frame.status === "ready")
+				? message.content
+				: "");
 		if (
 			message.status === progress.phase &&
 			message.content === content &&
-			JSON.stringify(message.progress) === JSON.stringify(progress)
+			isDeepStrictEqual(message.progress, progress)
 		)
 			continue;
 		await tx

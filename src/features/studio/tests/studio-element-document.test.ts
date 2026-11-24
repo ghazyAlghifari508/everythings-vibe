@@ -4,7 +4,9 @@ import {
 	indexStudioElements,
 	resolveStudioElement,
 } from "../services/studio-element-document";
+import { buildStudioInspectionDocument } from "../services/studio-element-inspection";
 import { patchStudioElement } from "../services/studio-element-patch";
+import { STUDIO_INSPECTION_ATTR } from "../types/studio-element";
 
 const html =
 	'<!doctype html><html><head><style>.card{color:red}</style></head><body><nav id="nav">Navigation</nav><main><section id="hero">Hero</section><section id="stats"><h2>Statistics</h2><p>24 projects</p></section><section id="projects">Projects</section></main><footer>Contact</footer></body></html>';
@@ -44,14 +46,35 @@ describe("version-bound element identity", () => {
 			resolveStudioElement(html.replace("Hero", "New Hero"), context, selected),
 		).toThrow();
 	});
-	it("rejects ambiguous selectors rather than picking the first matching node", () => {
-		const duplicate = html.replace('id="hero"', 'id="stats"');
+	it("resolves duplicate IDs through unique paths and keeps audited parent identities", () => {
+		const duplicate =
+			'<section id="card"><div><p id="title">First</p></div></section><section id="card"><div><p id="title">Second</p></div></section>';
+		const { elements } = indexStudioElements(duplicate, context);
+		const cards = elements.filter((element) => element.tag === "section");
+		const titles = elements.filter((element) => element.tag === "p");
+		expect(cards).toHaveLength(2);
+		expect(titles.map((entry) => entry.parentId)).toEqual(
+			cards.map((entry) => entry.elementId),
+		);
+		expect(new Set(elements.map((entry) => entry.elementId)).size).toBe(4);
+		for (const title of titles) {
+			const resolved = resolveStudioElement(duplicate, context, {
+				...title,
+				bounds,
+			});
+			try {
+				expect(resolved.node.textContent).toBe(title.label);
+			} finally {
+				resolved.dom.window.close();
+			}
+		}
 		expect(() =>
 			resolveStudioElement(duplicate, context, {
-				...target(duplicate, "#stats"),
-				selector: "section",
+				...titles[0],
+				bounds,
+				selector: "#title",
 			}),
-		).toThrow();
+		).toThrowError(expect.objectContaining({ code: "STUDIO_STALE_REVISION" }));
 	});
 	it("requires reselection when the target is removed or its identity is forged", () => {
 		expect(() =>
@@ -67,6 +90,56 @@ describe("version-bound element identity", () => {
 				signature: "0".repeat(64),
 			}),
 		).toThrow();
+	});
+});
+
+describe("inspection DOM markers", () => {
+	it("instruments only selectable nodes and maps editability to a surviving source text node", async () => {
+		const source = `<article data-studio-element-id="authored">
+			<div class="layout" data-ev-inspect-id="spoof" data-ev-edit-text><span id="caption" contenteditable="true">Edit me <em>Keep emphasis</em></span></div>
+			<p id="split">Before <a>link</a> after</p>
+			<p id="removed">Text <iframe></iframe> </p>
+			<p id="hidden" hidden>Hidden</p>
+		</article>`;
+		const inspection = await buildStudioInspectionDocument(
+			source,
+			context,
+			crypto.randomUUID(),
+			"https://app.test",
+		);
+		const dom = new JSDOM(inspection.html);
+		try {
+			const document = dom.window.document;
+			const marked = document.querySelectorAll(`[${STUDIO_INSPECTION_ATTR}]`);
+			expect(
+				[...marked].map((node) => node.getAttribute(STUDIO_INSPECTION_ATTR)),
+			).toEqual(inspection.elements.map((entry) => entry.elementId));
+			expect(
+				document.querySelector(".layout")?.getAttribute("tabindex"),
+			).toBeNull();
+			const flags = (selector: string) => ({
+				hasMarker: document
+					.querySelector(selector)
+					?.hasAttribute("data-ev-edit-text"),
+				textEditable: inspection.elements.find(
+					(entry) => entry.selector === selector,
+				)?.textEditable,
+			});
+			expect(
+				document.querySelector("#caption")?.hasAttribute("contenteditable"),
+			).toBe(false);
+			expect(flags("#caption")).toEqual({
+				hasMarker: true,
+				textEditable: true,
+			});
+			for (const selector of [".layout", "#split", "#removed"])
+				expect(flags(selector)).toEqual({
+					hasMarker: false,
+					textEditable: undefined,
+				});
+		} finally {
+			dom.window.close();
+		}
 	});
 });
 
@@ -104,6 +177,38 @@ describe("structural scoped patches", () => {
 				text: "Would destroy children",
 			}),
 		).toThrow();
+	});
+	it("patches only the source text range in mixed markup, including when cleared", () => {
+		const source =
+			'<button id="cta" class="signup"><svg><path /></svg><!--keep-->  Join &amp; save  <em>today</em></button>';
+		const selected = target(source, "#cta");
+		expect(
+			patchStudioElement(source, context, selected, {
+				kind: "text",
+				text: "Join <now>",
+			}),
+		).toBe(source.replace("  Join &amp; save  ", "Join &lt;now&gt;"));
+		expect(
+			patchStudioElement(source, context, selected, { kind: "text", text: "" }),
+		).toBe(source.replace("  Join &amp; save  ", ""));
+	});
+	it("treats unchanged decoded text as a no-op without rewriting source entities", () => {
+		const source = '<p id="count">&#49; &amp; counting</p>';
+		expect(
+			patchStudioElement(source, context, target(source, "#count"), {
+				kind: "text",
+				text: "1 & counting",
+			}),
+		).toBe(source);
+	});
+	it("rejects a text patch when multiple direct text nodes surround inline markup", () => {
+		const source = '<p id="summary">Start <a>link</a> end</p>';
+		expect(() =>
+			patchStudioElement(source, context, target(source, "#summary"), {
+				kind: "text",
+				text: "Changed",
+			}),
+		).toThrowError(expect.objectContaining({ code: "STUDIO_INVALID_INPUT" }));
 	});
 	it("replaces a component only within its root and retains its authored anchor", () => {
 		const result = patchStudioElement(html, context, target(), {

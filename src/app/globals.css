@@ -1180,32 +1180,3 @@ input.bg-steel:autofill:active {
 		opacity: 0;
 	}
 }
-
-/* Pencil activation briefly reveals a bounded set of real element rectangles.
-   Only overlay opacity animates; iframe content and the artboard never fade. */
-.studio-element-reveal {
-	opacity: 0;
-	animation: studioElementReveal 1.6s ease-out both;
-}
-
-@keyframes studioElementReveal {
-	0% {
-		opacity: 0;
-	}
-	15% {
-		opacity: 0.85;
-	}
-	60% {
-		opacity: 0.6;
-	}
-	100% {
-		opacity: 0;
-	}
-}
-
-@media (prefers-reduced-motion: reduce) {
-	.studio-element-reveal {
-		animation: none;
-		opacity: 0;
-	}
-}

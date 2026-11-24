@@ -22,6 +22,12 @@ const components: Components = {
 		) : (
 			<span>{children}</span>
 		),
+	// Separators and quote blocks are noise in a narrow chat column.
+	hr: () => null,
+	blockquote: ({ children }) => (
+		<div className="mt-2 text-sm leading-relaxed text-fog">{children}</div>
+	),
+	em: ({ children }) => <em className="italic">{children}</em>,
 	h1: heading,
 	h2: heading,
 	h3: heading,
@@ -59,6 +65,7 @@ const components: Components = {
 			<table className="w-full text-left text-xs text-snow">{children}</table>
 		</div>
 	),
+	li: ({ children }) => <li className="min-w-0">{children}</li>,
 	th: ({ children }) => (
 		<th className="border-b border-iron px-2 py-1 font-semibold">{children}</th>
 	),

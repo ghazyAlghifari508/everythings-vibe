@@ -136,27 +136,44 @@ function StudioCanvasPlanningStatus({
 	);
 }
 
-interface StudioCanvasQueueReadoutProps {
-	activeJob: StudioJobRow;
-	/** Width the floating chat panel covers, so the readout stays visible beside it. */
-	leftInsetPx?: number;
-}
-
-/**
- * Queue health is the only canvas-level copy left. Queued/planning/generating
- * progress already lives in the chat panel, and the frames carry their own
- * shimmer plus a screen-reader status, so repeating the same phase here would
- * print one progress message twice. Health problems are not progress messages:
- * a dead lease or a long unclaimed wait still surfaces next to the canvas.
- */
-export function StudioCanvasQueueReadout({
+export function StudioCanvasStatusOverlays({
 	activeJob,
-	leftInsetPx = 0,
-}: StudioCanvasQueueReadoutProps) {
-	const queueHealth = resolveStudioQueueHealth(activeJob);
-	if (!queueHealth) return null;
+	inconsistent,
+	leftInsetPx,
+	onRefreshStatus,
+}: {
+	activeJob: StudioJobRow | null;
+	inconsistent: boolean;
+	leftInsetPx: number;
+	onRefreshStatus?: () => void;
+}) {
+	const queueHealth = activeJob ? resolveStudioQueueHealth(activeJob) : null;
 	return (
-		<StudioCanvasPlanningStatus label={queueHealth} leftInsetPx={leftInsetPx} />
+		<>
+			{inconsistent && (
+				<output
+					className="pointer-events-none absolute top-20 z-20 max-w-md rounded-xl border border-graphite bg-obsidian p-4 text-sm text-fog"
+					style={{ left: leftInsetPx + STUDIO_CANVAS_OVERLAY_EDGE_PX }}
+				>
+					<p>Proses selesai, tetapi sebagian data desain belum tersedia.</p>
+					{onRefreshStatus && (
+						<button
+							type="button"
+							onClick={onRefreshStatus}
+							className="pointer-events-auto mt-2 rounded px-2 py-1 text-snow focus-visible:outline-2 focus-visible:outline-snow"
+						>
+							Muat ulang status
+						</button>
+					)}
+				</output>
+			)}
+			{queueHealth && (
+				<StudioCanvasPlanningStatus
+					label={queueHealth}
+					leftInsetPx={leftInsetPx}
+				/>
+			)}
+		</>
 	);
 }
 

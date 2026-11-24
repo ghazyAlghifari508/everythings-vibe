@@ -1,24 +1,14 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { StudioCanvas } from "@/features/studio/components/canvas/studio-canvas";
 import {
-	STUDIO_CANVAS_MAX_ZOOM,
-	STUDIO_CANVAS_MIN_ZOOM,
-} from "@/features/studio/types/studio-constants";
-
-// The frame preview is produced by a capture round trip. Serving a visual for
-// every frame keeps the test on the pointer handling it verifies.
-vi.mock("@/features/studio/hooks/use-studio-frame-visual", () => ({
-	useStudioFrameVisual: () => ({
-		visual: { url: "blob:frame", width: 390, height: 844 },
-		visualError: "",
-		setVisualError: () => {},
-		retryVisual: () => {},
-		artboardRef: { current: null },
-		frameHeight: 844,
-	}),
-}));
+	act,
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+} from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { StudioCanvas } from "@/features/studio/components/canvas/studio-canvas";
+import { WHEEL_LINE_HEIGHT_PX } from "@/lib/constants";
 
 const project = {
 	id: "p-1",
@@ -123,35 +113,154 @@ afterEach(() => {
 });
 
 describe("StudioCanvas wheel gestures", () => {
-	it("zooms on the canvas background", async () => {
+	let rafQueue = new Map<number, FrameRequestCallback>();
+	let frameId = 0;
+
+	function flushFrames(now = performance.now() + 16) {
+		const pending = [...rafQueue.entries()];
+		act(() => {
+			for (const [id, callback] of pending) {
+				if (rafQueue.delete(id)) callback(now);
+			}
+		});
+	}
+
+	beforeEach(() => {
+		rafQueue = new Map();
+		vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+			rafQueue.set(++frameId, callback);
+			return frameId;
+		});
+		vi.stubGlobal("cancelAnimationFrame", (id: number) => rafQueue.delete(id));
+	});
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	it("pans once and never zooms for a large integer wheel delta", () => {
 		renderCanvas();
 		const canvas = screen.getByTestId("studio-canvas");
 		const before = geometry();
-		wheelOn(canvas);
-		await vi.waitFor(() => {
-			expect(geometry().zoom).toBeGreaterThan(before.zoom);
-		});
+
+		const event = wheelOn(canvas, { deltaY: -120 });
+		expect(event.defaultPrevented).toBe(true);
+		flushFrames();
+
+		const after = geometry();
+		expect(after.x).toBe(before.x);
+		expect(after.y).toBe(before.y + 120);
+		expect(after.zoom).toBe(before.zoom);
 	});
 
-	it("zooms while the pointer is over the frame preview", async () => {
+	it("pans while the pointer is over the frame preview", () => {
 		renderCanvas();
 		const before = geometry();
-		wheelOn(previewButton());
-		await vi.waitFor(() => {
-			expect(geometry().zoom).toBeGreaterThan(before.zoom);
-		});
+		wheelOn(previewButton(), { deltaY: 120 });
+		flushFrames();
+
+		const after = geometry();
+		expect(after.y).toBe(before.y - 120);
+		expect(after.zoom).toBe(before.zoom);
 	});
 
-	it("zooms while the pointer is over the frame title bar", async () => {
+	it("pans while the pointer is over the frame title bar", () => {
 		renderCanvas();
 		const before = geometry();
-		wheelOn(screen.getByRole("button", { name: /^Dashboard$/i }));
-		await vi.waitFor(() => {
-			expect(geometry().zoom).toBeGreaterThan(before.zoom);
+		wheelOn(screen.getByRole("button", { name: /^Dashboard$/i }), {
+			deltaY: -120,
+		});
+		flushFrames();
+
+		expect(geometry().y).toBe(before.y + 120);
+		expect(geometry().zoom).toBe(before.zoom);
+	});
+
+	it("pans for fractional trackpad deltas", () => {
+		renderCanvas();
+		const before = geometry();
+		wheelOn(screen.getByTestId("studio-canvas"), { deltaY: -14.28 });
+		flushFrames();
+
+		expect(geometry().y).toBeCloseTo(before.y + 14.28, 3);
+		expect(geometry().zoom).toBe(before.zoom);
+	});
+
+	it("pans on both axes for diagonal two-finger scroll", () => {
+		renderCanvas();
+		const before = geometry();
+		wheelOn(screen.getByTestId("studio-canvas"), { deltaX: 5, deltaY: 100 });
+		flushFrames();
+
+		const after = geometry();
+		expect(after.x).toBe(before.x - 5);
+		expect(after.y).toBe(before.y - 100);
+		expect(after.zoom).toBe(before.zoom);
+	});
+
+	it("normalizes line deltas and uses the canvas dimensions for page deltas", () => {
+		renderCanvas();
+		const canvas = screen.getByTestId("studio-canvas");
+		Object.defineProperties(canvas, {
+			clientWidth: { value: 1100 },
+			clientHeight: { value: 640 },
+		});
+		const before = geometry();
+		wheelOn(canvas, { deltaX: 1, deltaY: -3, deltaMode: 1 });
+		wheelOn(canvas, { deltaX: -1, deltaY: 1, deltaMode: 2 });
+		flushFrames();
+
+		expect(geometry()).toEqual({
+			x: before.x - WHEEL_LINE_HEIGHT_PX + 1100,
+			y: before.y + 3 * WHEEL_LINE_HEIGHT_PX - 640,
+			zoom: before.zoom,
 		});
 	});
 
-	it("leaves the wheel to real controls inside the canvas", async () => {
+	it("does not pan again for a wheel consumed by another control", () => {
+		renderCanvas();
+		const before = geometry();
+		const surface = screen.getByTestId("studio-canvas-surface");
+		surface.addEventListener("wheel", (event) => event.preventDefault(), {
+			once: true,
+		});
+		wheelOn(surface);
+		flushFrames();
+		expect(geometry()).toEqual(before);
+	});
+
+	it("a manual wheel pan interrupts Focus at the current scale", () => {
+		renderCanvas({ selectedFrameId: "f-1" });
+		const canvas = screen.getByTestId("studio-canvas");
+		vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue(
+			new DOMRect(0, 0, 1200, 800),
+		);
+		fireEvent(window, new Event("resize"));
+		fireEvent.click(
+			screen.getByRole("button", { name: /Fokus ke Dashboard/i }),
+		);
+		const before = geometry();
+		wheelOn(canvas, { deltaX: 42, deltaY: 0 });
+		flushFrames(performance.now() + 1000);
+		expect(geometry()).toEqual({ ...before, x: before.x - 42 });
+	});
+
+	it("leaves Ctrl/Cmd wheel to the browser without panning or zooming", () => {
+		renderCanvas();
+		const canvas = screen.getByTestId("studio-canvas");
+		const before = geometry();
+
+		for (const modifier of ["ctrlKey", "metaKey"] as const) {
+			expect(
+				wheelOn(canvas, { deltaY: -120, [modifier]: true }).defaultPrevented,
+			).toBe(false);
+		}
+		flushFrames();
+
+		expect(geometry()).toEqual(before);
+	});
+
+	it("leaves the wheel to real controls inside the canvas", () => {
 		renderCanvas();
 		const canvas = screen.getByTestId("studio-canvas");
 		const before = geometry();
@@ -180,6 +289,7 @@ describe("StudioCanvas wheel gestures", () => {
 		for (const target of [textarea, option, close, overlayControl]) {
 			expect(wheelOn(target).defaultPrevented).toBe(false);
 		}
+		flushFrames();
 		expect(geometry()).toEqual(before);
 
 		composer.remove();
@@ -188,60 +298,51 @@ describe("StudioCanvas wheel gestures", () => {
 		overlayControl.remove();
 	});
 
+	it("leaves scrolling inside a genuinely scrollable overlay untouched", () => {
+		renderCanvas();
+		const canvas = screen.getByTestId("studio-canvas");
+		const before = geometry();
+		const scroller = document.createElement("div");
+		scroller.style.overflowY = "auto";
+		Object.defineProperty(scroller, "scrollHeight", { value: 600 });
+		Object.defineProperty(scroller, "clientHeight", { value: 200 });
+		const content = document.createElement("p");
+		scroller.appendChild(content);
+		canvas.appendChild(scroller);
+
+		expect(wheelOn(content, { deltaY: 120 }).defaultPrevented).toBe(false);
+		flushFrames();
+		expect(geometry()).toEqual(before);
+		scroller.remove();
+	});
+
 	it("prevents the page scroll only for a wheel it consumes", () => {
 		renderCanvas();
 		const canvas = screen.getByTestId("studio-canvas");
 		expect(wheelOn(canvas).defaultPrevented).toBe(true);
 	});
 
-	it("keeps the point under the pointer anchored while zooming", async () => {
+	it("never changes zoom no matter how many wheel deltas arrive", () => {
 		renderCanvas();
 		const canvas = screen.getByTestId("studio-canvas");
-		const canvasRect = {
-			left: 200,
-			top: 60,
-			right: 1640,
-			bottom: 960,
-			width: 1440,
-			height: 900,
-			x: 200,
-			y: 60,
-			toJSON: () => ({}),
-		} as DOMRect;
-		canvas.getBoundingClientRect = () => canvasRect;
-
 		const before = geometry();
-		// Viewport point rebased onto the canvas origin.
-		const anchor = { x: 100, y: 140 };
-		wheelOn(canvas, {
-			clientX: canvasRect.left + anchor.x,
-			clientY: canvasRect.top + anchor.y,
-		});
-		await vi.waitFor(() => {
-			expect(geometry().zoom).toBeGreaterThan(before.zoom);
-		});
+		for (let i = 0; i < 20; i++) wheelOn(canvas, { deltaY: -120 });
+		for (let i = 0; i < 40; i++) wheelOn(canvas, { deltaY: 300 });
+		flushFrames();
 
-		const after = geometry();
-		const world = {
-			x: (anchor.x - before.x) / before.zoom,
-			y: (anchor.y - before.y) / before.zoom,
-		};
-		expect(after.x + world.x * after.zoom).toBeCloseTo(anchor.x, 3);
-		expect(after.y + world.y * after.zoom).toBeCloseTo(anchor.y, 3);
+		expect(geometry().zoom).toBe(before.zoom);
+		expect(Number.isFinite(geometry().x)).toBe(true);
+		expect(Number.isFinite(geometry().y)).toBe(true);
 	});
 
-	it("keeps zoom inside its bounds on repeated wheel gestures", async () => {
+	it("keeps the explicit zoom buttons working after wheel panning", () => {
 		renderCanvas();
-		const canvas = screen.getByTestId("studio-canvas");
-		for (let i = 0; i < 20; i++) wheelOn(canvas);
-		await vi.waitFor(() => {
-			expect(geometry().zoom).toBe(STUDIO_CANVAS_MAX_ZOOM);
-		});
+		const before = geometry();
+		wheelOn(screen.getByTestId("studio-canvas"));
+		flushFrames();
 
-		for (let i = 0; i < 40; i++) wheelOn(canvas, { deltaY: 300 });
-		await vi.waitFor(() => {
-			expect(geometry().zoom).toBe(STUDIO_CANVAS_MIN_ZOOM);
-		});
+		fireEvent.click(screen.getByRole("button", { name: /Perbesar/i }));
+		expect(geometry().zoom).toBeGreaterThan(before.zoom);
 	});
 });
 
@@ -342,13 +443,13 @@ describe("StudioCanvas hand-tool pan", () => {
 		overlay.remove();
 	});
 
-	it("keeps panning after a wheel zoom", async () => {
+	it("keeps hand panning after a wheel pan", async () => {
 		renderCanvas();
 		const canvas = screen.getByTestId("studio-canvas");
 		const initial = geometry();
 		wheelOn(canvas);
 		await vi.waitFor(() => {
-			expect(geometry().zoom).toBeGreaterThan(initial.zoom);
+			expect(geometry().y).toBe(initial.y + 120);
 		});
 		const zoomed = geometry();
 		activateHandTool();
@@ -374,6 +475,7 @@ describe("StudioCanvas hand-tool pan", () => {
 		await vi.waitFor(() => {
 			const after = geometry();
 			expect(after.x).toBe(before.x + 40);
+			expect(after.y).toBe(before.y - 10);
 			expect(after.zoom).toBe(before.zoom);
 		});
 		fireEvent.pointerUp(canvas, { pointerId: 6 });

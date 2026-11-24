@@ -49,6 +49,7 @@ function setup() {
 	});
 	vi.stubGlobal("fetch", fetcher);
 	const refresh = vi.fn(async () => {});
+	const publishCommitted = vi.fn();
 	const error = vi.fn();
 	const hook = renderHook(() =>
 		useStudioElementEditing({
@@ -58,9 +59,10 @@ function setup() {
 			selectedFrameIds: ["f", "other"],
 			setError: error,
 			syncProjectStatus: refresh,
+			publishCommitted,
 		}),
 	);
-	return { ...hook, fetcher, requests, refresh, error };
+	return { ...hook, fetcher, requests, refresh, error, publishCommitted };
 }
 it("prioritizes one scoped element, applies the validated result and snapshots the request", async () => {
 	const hook = setup();
@@ -79,6 +81,11 @@ it("prioritizes one scoped element, applies the validated result and snapshots t
 	expect(hook.result.current.undo?.status).toBe("applied");
 	expect(hook.result.current.pending).toBeNull();
 	expect(hook.refresh).toHaveBeenCalledTimes(1);
+	expect(hook.publishCommitted).toHaveBeenCalledWith("p", "f", 6, "After");
+	expect(hook.result.current.notice).toMatchObject({
+		row: applied,
+		kind: "ai",
+	});
 });
 it("detaching a target does not discard applied feedback", async () => {
 	const hook = setup();
@@ -95,6 +102,29 @@ it("detaching a target does not discard applied feedback", async () => {
 	expect(hook.result.current.undo?.id).toBe(applied.id);
 	expect(hook.requests).toHaveLength(1);
 });
+
+it("reports a lost mutation response without replaying or publishing an unconfirmed edit", async () => {
+	const hook = setup();
+	const prepare = vi.fn(async (_url: string, init?: RequestInit) => {
+		if (init?.method === "POST") throw new Error("Koneksi terputus");
+		return Response.json({ revisions: [] });
+	});
+	vi.stubGlobal("fetch", prepare);
+	await act(async () => {
+		const result = await hook.result.current.submit(
+			"Replace selected text directly",
+			{ target, edit: { kind: "text", text: "Changed" } },
+		);
+		expect(result).toEqual({ accepted: false });
+	});
+	expect(
+		prepare.mock.calls.filter(([, init]) => init?.method === "POST"),
+	).toHaveLength(1);
+	expect(hook.publishCommitted).not.toHaveBeenCalled();
+	expect(hook.result.current.notice).toBeNull();
+	expect(hook.result.current.error).toBe("Koneksi terputus");
+});
+
 it("restores a persisted applied revision after reload without resubmitting generation", async () => {
 	vi.stubGlobal(
 		"fetch",
@@ -104,13 +134,14 @@ it("restores a persisted applied revision after reload without resubmitting gene
 		useStudioElementEditing({
 			projectId: "p",
 			userId: "u",
-			frames: [{ id: "f", revision: 5 }],
+			frames: [{ id: "f", revision: 6 }],
 			selectedFrameIds: ["f"],
 			setError: vi.fn(),
 			syncProjectStatus: vi.fn(async () => {}),
 		}),
 	);
 	await waitFor(() => expect(hook.result.current.undo?.id).toBe(applied.id));
+	expect(hook.result.current.notice).toBeNull();
 });
 it("does not erase a new applied state when an older history read arrives late", async () => {
 	let resolveHistory = (_response: Response) => {};
@@ -197,4 +228,24 @@ it("keeps a scoped target detached after its frame version changes", async () =>
 	hook.rerender({ revision: 6 });
 	await waitFor(() => expect(hook.result.current.target).toBeNull());
 	expect(error).toHaveBeenCalled();
+});
+
+it("does not expose an Undo from a superseded frame revision", async () => {
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async () => Response.json({ revisions: [applied] })),
+	);
+	const hook = renderHook(() =>
+		useStudioElementEditing({
+			projectId: "p",
+			userId: "u",
+			frames: [{ id: "f", revision: 7 }],
+			selectedFrameIds: ["f"],
+			setError: vi.fn(),
+			syncProjectStatus: vi.fn(async () => {}),
+		}),
+	);
+	await act(async () => hook.result.current.refresh());
+	expect(hook.result.current.undo).toBeNull();
+	expect(hook.result.current.notice).toBeNull();
 });

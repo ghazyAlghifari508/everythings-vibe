@@ -101,17 +101,16 @@ export function reduceStudioLiveSlots(
 		}
 		case "timeout": {
 			if (state.incoming?.channel !== action.channel) return state;
-			// The replaced revision is no longer the current one; keep neither
-			// stale document interactive, and let the preview carry the frame.
+			// Keep the last committed document visible, but never call it current.
 			return {
-				active: null,
+				active: state.active,
 				incoming: null,
 				failure: { failure: "bridge-timeout", message: action.message },
 			};
 		}
 		case "failed":
 			return {
-				active: null,
+				active: state.active,
 				incoming: null,
 				failure: { failure: action.failure, message: action.message },
 			};

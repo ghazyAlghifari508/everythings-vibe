@@ -6,12 +6,13 @@ import {
 	type StudioPrototypeScreen,
 	type StudioPrototypeState,
 	studioPrototypeInteractionSchema,
-	studioPrototypeStateKeySchema,
-	studioPrototypeStateSchema,
-	studioPrototypeStateValueSchema,
 } from "../types/studio-prototype";
 import type { StudioDesignBlueprint } from "./studio-design-blueprint";
 import { resolveStudioPrototypeTarget } from "./studio-prototype-screens";
+import {
+	readStudioPrototypeState,
+	STUDIO_PROTOTYPE_SENSITIVE_ATTR,
+} from "./studio-prototype-state";
 
 /**
  * Declarative attributes generated HTML may carry. They are inert text: only
@@ -41,15 +42,9 @@ const ATTR = {
 	region: "data-proto-region",
 	form: "data-proto-form",
 	collection: "data-proto-collection",
-	defaultKey: "data-proto-default-key",
-	defaultValue: "data-proto-default-value",
 } as const;
 
 export const STUDIO_PROTOTYPE_IX_ATTR = "data-ev-ix";
-export const STUDIO_PROTOTYPE_SENSITIVE_ATTR = "data-ev-sensitive";
-
-const SENSITIVE_FIELD =
-	/(?:password|passwd|kata-?sandi|card|kartu|cvv|cvc|otp|\bpin\b|account-?number|rekening|iban|\bssn\b|\bnik\b)/i;
 const NATIVE_INTERACTIVE = /^(?:a|button|input|select|textarea|summary)$/;
 
 export interface StudioPrototypeManifestResult {
@@ -288,6 +283,15 @@ export function extractStudioPrototypeManifest(
 		const interaction = parsed.data;
 		const missing = missingTarget(document, interaction);
 		if (missing) {
+			if (interaction.type === "select_tab") {
+				// Raw tab triggers also drive runtime initialization and roving focus.
+				element.removeAttribute(ATTR.tab);
+				element.removeAttribute(ATTR.tabGroup);
+				if (element.getAttribute("role") === "tab")
+					element.removeAttribute("role");
+				element.removeAttribute("aria-controls");
+				element.removeAttribute("aria-selected");
+			}
 			report({ code: "MISSING_TARGET_ELEMENT", message: missing });
 			return;
 		}
@@ -371,37 +375,7 @@ export function extractStudioPrototypeManifest(
 		if (next > before) legacyMapped += 1;
 	}
 
-	for (const field of document.querySelectorAll("input,textarea")) {
-		const hint = `${field.getAttribute("type") ?? ""} ${field.getAttribute("name") ?? ""} ${field.id} ${field.getAttribute("autocomplete") ?? ""}`;
-		if (
-			(field.getAttribute("type") ?? "").toLowerCase() === "password" ||
-			SENSITIVE_FIELD.test(hint)
-		) {
-			field.setAttribute(STUDIO_PROTOTYPE_SENSITIVE_ATTR, "1");
-			field.setAttribute("autocomplete", "off");
-			report({
-				code: "SENSITIVE_FIELD",
-				message:
-					"Kolom data sensitif ditandai; prototipe tidak menyimpan nilainya.",
-			});
-		}
-	}
-	// Documented initial mock state, bounded and validated as a whole.
-	const rawDefaults: Record<string, unknown> = {};
-	for (const element of document.querySelectorAll(`[${ATTR.defaultKey}]`)) {
-		const key = attr(element, ATTR.defaultKey) ?? "";
-		const value = studioPrototypeStateValueSchema.safeParse(
-			attr(element, ATTR.defaultValue) ?? "",
-		);
-		if (studioPrototypeStateKeySchema.safeParse(key).success && value.success)
-			rawDefaults[key] = value.data;
-	}
-	const parsedDefaults = studioPrototypeStateSchema.safeParse(rawDefaults);
-	if (!parsedDefaults.success && Object.keys(rawDefaults).length > 0)
-		report({
-			code: "INVALID_PARAMETER",
-			message: "State awal prototipe melebihi batas dan diabaikan.",
-		});
+	const defaults = readStudioPrototypeState(document, report);
 	// Links that stay inert: honest count, never pretended to work.
 	let inertLinks = 0;
 	for (const element of document.querySelectorAll("a")) {
@@ -414,7 +388,7 @@ export function extractStudioPrototypeManifest(
 	}
 	return {
 		interactions,
-		defaults: parsedDefaults.success ? parsedDefaults.data : {},
+		defaults,
 		issues,
 		legacyMapped,
 		inertLinks,

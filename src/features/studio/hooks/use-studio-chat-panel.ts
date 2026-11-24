@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { STUDIO_CHAT_PANEL_DESKTOP_QUERY } from "../types/studio-constants";
 import { studioChatPanelInsetPx } from "../utils/studio-chat-layout";
 
@@ -10,7 +10,7 @@ import { studioChatPanelInsetPx } from "../utils/studio-chat-layout";
  */
 export function useStudioChatPanel() {
 	const [desktop, setDesktop] = useState(false);
-	const [ready, setReady] = useState(false);
+	const [viewportWidth, setViewportWidth] = useState<number | null>(null);
 	const [desktopOpen, setDesktopOpen] = useState(true);
 	const [mobileOpen, setMobileOpen] = useState(false);
 	useEffect(() => {
@@ -18,25 +18,27 @@ export function useStudioChatPanel() {
 		const update = () => {
 			setDesktop(media.matches);
 			setMobileOpen(false);
-			setReady(true);
+			setViewportWidth(window.innerWidth);
 		};
+		const resize = () => setViewportWidth(window.innerWidth);
 		update();
 		media.addEventListener("change", update);
-		return () => media.removeEventListener("change", update);
+		window.addEventListener("resize", resize);
+		return () => {
+			media.removeEventListener("change", update);
+			window.removeEventListener("resize", resize);
+		};
 	}, []);
 	const open = desktop ? desktopOpen : mobileOpen;
 	// Left space the canvas must keep clear when it frames content. `null` until
 	// the breakpoint is known, so the opening view is never computed against a
 	// guessed layout.
-	const insetPx = useMemo(
-		() =>
-			ready
-				? desktop && desktopOpen
-					? studioChatPanelInsetPx(window.innerWidth)
-					: 0
-				: null,
-		[ready, desktop, desktopOpen],
-	);
+	const insetPx =
+		viewportWidth === null
+			? null
+			: desktop && desktopOpen
+				? studioChatPanelInsetPx(viewportWidth)
+				: 0;
 	return {
 		desktop,
 		open,

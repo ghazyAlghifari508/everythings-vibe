@@ -98,9 +98,20 @@ const screenCompositionSchema = z.object({
 		"workspace",
 	]),
 	hierarchy: z.array(z.string().trim().min(1).max(240)).min(1).max(6),
-	patterns: z
-		.array(z.enum(STUDIO_COMPONENT_PATTERNS.map(({ id }) => id)))
-		.max(8),
+	// Patterns are advisory hints. A model that names an unknown pattern
+	// must not fail the whole plan: keep the closed server-owned set and
+	// drop values it cannot act on.
+	patterns: z.preprocess(
+		(value) => {
+			if (value === null || value === undefined) return [];
+			if (!Array.isArray(value)) return value;
+			const allowed = new Set(STUDIO_COMPONENT_PATTERNS.map(({ id }) => id));
+			return value.filter(
+				(id): id is string => typeof id === "string" && allowed.has(id),
+			);
+		},
+		z.array(z.enum(STUDIO_COMPONENT_PATTERNS.map(({ id }) => id))).max(8),
+	),
 	responsive: z.enum([
 		"reflow",
 		"stack",
@@ -185,8 +196,18 @@ export const studioDesignBlueprintSchema = z.object({
 			z.object({
 				name: z.string().min(1).max(100),
 				role: z.string().min(1).max(500),
-				navigationRole: z.enum(["primary", "contextual"]).optional(),
-				destinationId: z.string().optional(),
+				// Models routinely emit `null` for "no destination" (the prompt
+				// itself uses null for parentDestinationId). Normalize it to
+				// absent instead of rejecting an otherwise valid plan.
+				navigationRole: z
+					.preprocess(
+						(value) => (value === null ? undefined : value),
+						z.enum(["primary", "contextual"]).optional(),
+					),
+				destinationId: z.preprocess(
+					(value) => (value === null ? undefined : value),
+					z.string().optional(),
+				),
 				parentDestinationId: z.string().nullable().optional(),
 				// Persisted legacy screens and deterministic additions can retain role-only intent.
 				composition: screenCompositionSchema.optional(),
@@ -308,7 +329,20 @@ export function validateBlueprint(
 				ok: false,
 				error: "Photography requires at least one planned photo slot.",
 			};
-		const destinationIds = blueprint.screenPlan.flatMap((screen) =>
+		// A contextual screen may repeat its parent's destinationId even though
+		// the prompt says only the owning primary screen does. Treat that as the
+		// parent relationship it describes instead of rejecting a usable plan.
+		const screenPlan = blueprint.screenPlan.map((screen) =>
+			screen.navigationRole !== "primary" && screen.destinationId
+				? {
+						...screen,
+						destinationId: undefined,
+						parentDestinationId:
+							screen.parentDestinationId ?? screen.destinationId,
+					}
+				: screen,
+		);
+		const destinationIds = screenPlan.flatMap((screen) =>
 			screen.destinationId ? [screen.destinationId] : [],
 		);
 		if (
@@ -316,7 +350,7 @@ export function validateBlueprint(
 			destinationIds.length !== destinations.length ||
 			new Set(destinationIds).size !== destinations.length ||
 			!destinations.every((id) => destinationIds.includes(id)) ||
-			blueprint.screenPlan.some(
+			screenPlan.some(
 				(screen) =>
 					!screen.navigationRole ||
 					(screen.destinationId && screen.navigationRole !== "primary") ||
@@ -347,6 +381,7 @@ export function validateBlueprint(
 			ok: true,
 			blueprint: {
 				...blueprint,
+				screenPlan,
 				productIdentity: { ...blueprint.productIdentity, layoutIntent },
 			},
 		};

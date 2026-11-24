@@ -17,7 +17,6 @@ import type {
 } from "@/features/studio/types/studio-element";
 import type { StudioPreviewTarget } from "@/features/studio/types/studio-preview-contract";
 import { useStudioElementEditing } from "../../hooks/use-studio-element-editing";
-import { StudioElementFeedback } from "./studio-element-feedback";
 
 export function StudioWorkspace({
 	initialData,
@@ -33,12 +32,22 @@ export function StudioWorkspace({
 		selectedFrameIds: workspace.selectedFrameIds,
 		setError: workspace.setError,
 		syncProjectStatus: workspace.syncProjectStatus,
+		publishCommitted: workspace.publishCommitted,
 	});
 	const draft = useStudioChatDraft(
 		`studio-chat-draft:${workspace.project.userId}:${workspace.project.id}`,
 	);
 	const [selectedElement, setSelectedElement] =
 		useState<StudioElementTarget | null>(null);
+	const currentElement =
+		selectedElement &&
+		workspace.frames.some(
+			(frame) =>
+				frame.id === selectedElement.frameId &&
+				frame.revision === selectedElement.baseRevision,
+		)
+			? selectedElement
+			: null;
 	const frameIdKey = workspace.frames.map((frame) => frame.id).join("|");
 	// biome-ignore lint/correctness/useExhaustiveDependencies: frameIdKey is the stable identity of workspace.frames
 	const frameIdList = useMemo(
@@ -55,13 +64,46 @@ export function StudioWorkspace({
 	>({});
 	const handleRefreshFrame = useCallback(
 		(frameId: string) => {
-			setFrameRefreshTokens((previous) => ({
-				...previous,
-				[frameId]: (previous[frameId] ?? 0) + 1,
-			}));
-			void workspace.syncProjectStatus();
+			const previousFrame = workspace.frames.find(
+				(frame) => frame.id === frameId,
+			);
+			void workspace.syncProjectStatus(({ frames }) => {
+				const currentFrame = frames.find((frame) => frame.id === frameId);
+				// A new renderer key already loads new committed HTML. Only force a
+				// refetch when that document did not change during the status read.
+				if (
+					!currentFrame ||
+					currentFrame.revision !== previousFrame?.revision ||
+					currentFrame.htmlCode !== previousFrame.htmlCode
+				)
+					return;
+				setFrameRefreshTokens((previous) => ({
+					...previous,
+					[frameId]: (previous[frameId] ?? 0) + 1,
+				}));
+			});
 		},
-		[workspace.syncProjectStatus],
+		[workspace.frames, workspace.syncProjectStatus],
+	);
+	const [focusRequest, setFocusRequest] = useState<{
+		frameId: string;
+		nonce: number;
+	} | null>(null);
+	const { selectFrame, frames: workspaceFrames } = workspace;
+	const { desktop: chatDesktop, setOpen: setChatOpen } = chat;
+	// A result row may only open a frame of this project that still exists.
+	const handleOpenResultFrame = useCallback(
+		(frameId: string) => {
+			if (!workspaceFrames.some((frame) => frame.id === frameId)) return;
+			selectFrame(frameId);
+			// The mobile drawer is modal and would cover the frame it opens.
+			if (!chatDesktop) setChatOpen(false);
+			setFocusRequest((previous) => ({
+				frameId,
+				nonce: (previous?.nonce ?? 0) + 1,
+			}));
+		},
+		[workspaceFrames, selectFrame, chatDesktop, setChatOpen],
 	);
 	const navigate = useNavigate();
 	// The viewer is a sibling route: leaving unmounts the canvas, and the camera,
@@ -78,8 +120,15 @@ export function StudioWorkspace({
 	);
 	const { selectTarget, submit, busy: elementBusy } = elementEditing;
 	const handleSelectElement = useCallback(
-		(target: StudioElementTarget | null) => setSelectedElement(target),
-		[],
+		(target: StudioElementTarget | null, frameId?: string) => {
+			if (target && workspace.selectedFrameId !== target.frameId)
+				workspace.selectFrame(target.frameId);
+			setSelectedElement(
+				(current) =>
+					target ?? (!frameId || current?.frameId === frameId ? null : current),
+			);
+		},
+		[workspace.selectedFrameId, workspace.selectFrame],
 	);
 	const handleElementAction = useCallback(
 		(
@@ -87,8 +136,6 @@ export function StudioWorkspace({
 			target: StudioElementTarget,
 			text?: string,
 		) => {
-			// Resolved inside the live surface where the indexed parent exists.
-			if (action === "select-parent") return;
 			// Clicking an element only opens the menu. Chat receives the target
 			// when the user explicitly chooses "Edit with AI".
 			if (action === "edit-ai") {
@@ -122,20 +169,37 @@ export function StudioWorkspace({
 				onRename={workspace.handleRename}
 				onExport={() => void workspace.handleDownloadAllZip()}
 				onDelete={workspace.handleDelete}
+				elementEditing={elementEditing}
 			/>
 
-			{/* The canvas fills the viewport behind the floating header and chat
-			    panel; the panel never takes layout space from it. */}
-			<div className="absolute inset-0 overflow-hidden">
+			{workspace.error && !chat.open && (
+				<div
+					role="alert"
+					className="z-40 flex shrink-0 items-center gap-2 border-y border-crimson bg-obsidian px-3 text-sm text-crimson"
+				>
+					<Icon icon={AlertCircleIcon} size={15} aria-hidden />
+					<span className="min-w-0 flex-1 break-words">{workspace.error}</span>
+					<button
+						type="button"
+						onClick={() => workspace.setError("")}
+						aria-label="Tutup pesan error"
+						className="min-h-11 shrink-0 rounded px-2 text-xs font-medium focus-visible:outline-2 focus-visible:outline-snow"
+					>
+						Tutup
+					</button>
+				</div>
+			)}
+			<div className="relative min-h-0 flex-1 overflow-hidden">
 				<StudioCanvas
 					project={workspace.project}
 					frames={workspace.frames}
 					activeJob={workspace.activeJob}
 					selectedFrameId={workspace.selectedFrameId}
-					elementTarget={selectedElement}
+					elementTarget={currentElement}
 					onSelectElement={handleSelectElement}
 					onElementAction={handleElementAction}
 					elementActionBusy={elementBusy}
+					onElementError={workspace.setError}
 					selectedFrameIds={workspace.selectedFrameIds}
 					onSelectFrame={workspace.selectFrame}
 					onSelectFrames={workspace.selectFrames}
@@ -154,38 +218,20 @@ export function StudioWorkspace({
 					frameRefreshTokens={frameRefreshTokens}
 					onRefreshFrame={handleRefreshFrame}
 					onOpenPreview={handleOpenPreview}
+					focusRequest={focusRequest}
 					leftInsetPx={chat.insetPx}
 					className="size-full"
 				/>
+				<StudioChatPanel
+					workspace={workspace}
+					desktop={chat.desktop}
+					open={chat.open}
+					onOpenChange={chat.setOpen}
+					elementEditing={elementEditing}
+					onOpenFrame={handleOpenResultFrame}
+					draft={draft}
+				/>
 			</div>
-			<StudioChatPanel
-				workspace={workspace}
-				desktop={chat.desktop}
-				open={chat.open}
-				onOpenChange={chat.setOpen}
-				elementEditing={elementEditing}
-				draft={draft}
-			/>
-			<StudioElementFeedback editing={elementEditing} />
-
-			{workspace.error && !chat.open && (
-				<div
-					role="alert"
-					className="absolute left-1/2 z-40 flex w-[calc(100%-24px)] max-w-xl -translate-x-1/2 items-center gap-2 rounded-xl border border-crimson bg-obsidian px-4 py-2.5 text-sm text-crimson"
-					style={{ top: "calc(4rem + env(safe-area-inset-top))" }}
-				>
-					<Icon icon={AlertCircleIcon} size={15} aria-hidden />
-					<span>{workspace.error}</span>
-					<button
-						type="button"
-						onClick={() => workspace.setError("")}
-						aria-label="Tutup pesan error"
-						className="ml-2 min-h-11 shrink-0 rounded px-2 text-xs font-medium text-crimson hover:bg-crimson/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-snow"
-					>
-						Tutup
-					</button>
-				</div>
-			)}
 		</main>
 	);
 }

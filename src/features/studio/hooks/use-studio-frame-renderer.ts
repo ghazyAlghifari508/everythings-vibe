@@ -1,7 +1,9 @@
-import { useEffect } from "react";
-import type { StudioFrameRow } from "@/db/schema";
-import type { StudioFrameVisual } from "@/features/studio/types/studio-preview";
+import { useEffect, useEffectEvent, useRef } from "react";
+import type { StudioFrameRow, StudioJobRow } from "@/db/schema";
+import { studioJobTiming } from "../services/studio-timing";
+import { STUDIO_VISUAL_FALLBACK_HEIGHT } from "../types/studio-constants";
 import {
+	STUDIO_LIVE_VISIBILITY_MARGIN_PX,
 	type StudioDevice,
 	studioNativeDevice,
 } from "../types/studio-renderer";
@@ -10,43 +12,40 @@ import {
 	resolveStudioLiveNotice,
 } from "../utils/studio-renderer";
 import { useStudioLiveDocument } from "./use-studio-live-document";
+import type { StudioVisibilityReporter } from "./use-studio-live-pool";
 
 interface UseStudioFrameRendererInput {
 	frame: StudioFrameRow;
-	status: string;
 	hasRenderableHtml: boolean;
 	cleanHtml: string;
-	artboardMode: string;
 	artboardRef: React.RefObject<HTMLElement | null>;
-	visual: StudioFrameVisual | null;
-	frameHeight: number;
+	/** The real canvas viewport; observer geometry follows zoom and pan. */
+	viewportRef?: React.RefObject<HTMLElement | null>;
 	liveEnabled: boolean;
-	inspectElement: boolean;
 	device?: StudioDevice;
 	refreshToken?: number;
+	initialJobTiming?: Pick<StudioJobRow, "id" | "createdAt">;
 	onReadinessChange?: (frameId: string, ready: boolean) => void;
 	onMeasure?: (id: string, width: number, height: number) => void;
-	onVisibilityChange?: (frameId: string, visible: boolean) => void;
+	onVisibilityChange?: StudioVisibilityReporter;
 }
 
 /**
- * Resolves what one artboard shows from real signals: the persisted preview,
- * the live document's readiness and the requested device. Presentation only;
- * nothing here can create a job, a revision or a request to an AI model.
+ * Resolves what one artboard shows from the committed HTML and the isolated
+ * document prepared for it. Normal canvas and Pencil share this exact document;
+ * only the parent-granted capabilities differ. Presentation only: nothing here
+ * can create a job, a revision or a request to an AI model.
  */
 export function useStudioFrameRenderer({
 	frame,
-	status,
 	hasRenderableHtml,
 	cleanHtml,
-	artboardMode,
 	artboardRef,
-	visual,
-	frameHeight,
+	viewportRef,
 	liveEnabled,
-	inspectElement,
 	device,
 	refreshToken,
+	initialJobTiming,
 	onReadinessChange,
 	onMeasure,
 	onVisibilityChange,
@@ -58,59 +57,100 @@ export function useStudioFrameRenderer({
 		frameId: frame.id,
 		revision: frame.revision,
 		html: cleanHtml || null,
-		enabled: liveEnabled && hasRenderableHtml && status === "ready",
+		enabled: liveEnabled && hasRenderableHtml,
 		refreshToken,
 	});
+	const hasActiveDocument = live.state.active !== null;
+	// A predecessor may remain visible while a replacement loads or fails. It is
+	// never reported as the completed revision while its key is not current.
+	const pending =
+		live.state.incoming !== null ||
+		(hasActiveDocument && live.state.active?.document.keyId !== live.keyId);
+	const fallbackHeight =
+		STUDIO_VISUAL_FALLBACK_HEIGHT[activeDevice === "mobile" ? "mobile" : "web"];
 	const presentation = resolveStudioFramePresentation({
-		mode: inspectElement ? "inspect" : "canvas",
-		recoverPreview: artboardMode === "visual-error",
 		device: activeDevice,
 		native,
 		readiness: live.readiness,
-		visualSize: visual ? { width: visual.width, height: visual.height } : null,
-		fallbackHeight: frameHeight,
+		hasActiveDocument,
+		pending,
+		fallbackHeight,
 	});
 	const liveNotice = resolveStudioLiveNotice({
-		wantsLive: presentation.wantsLive && liveEnabled,
+		wantsLive: hasRenderableHtml,
+		pending,
 		device: activeDevice,
 		native,
 		readiness: live.readiness,
 	});
-	const onVisibility = onVisibilityChange;
+	const isCurrent = presentation.isCurrent;
+
+	useEffect(() => {
+		onReadinessChange?.(frame.id, isCurrent);
+	}, [frame.id, isCurrent, onReadinessChange]);
+
+	const markVisible = useEffectEvent(() => {
+		const startedAt = (
+			initialJobTiming?.createdAt ?? frame.createdAt
+		).getTime();
+		studioJobTiming("frame-visible", startedAt, {
+			projectId: frame.projectId,
+			frameId: frame.id,
+			jobId: initialJobTiming?.id,
+		});
+		studioJobTiming("document-ready", Date.now(), {
+			projectId: frame.projectId,
+			frameId: frame.id,
+		});
+	});
+	const reportedKey = useRef<string | null>(null);
+	useEffect(() => {
+		if (!isCurrent || reportedKey.current === live.keyId) return;
+		reportedKey.current = live.keyId;
+		markVisible();
+	}, [isCurrent, live.keyId]);
+
 	const frameId = frame.id;
 	useEffect(() => {
 		const node = artboardRef.current;
-		if (!node || !onVisibility || typeof IntersectionObserver === "undefined")
+		if (!node || !onVisibilityChange) return;
+		if (typeof IntersectionObserver === "undefined") {
+			// No viewport signal: stay unmounted instead of loading every frame.
 			return;
-		const observer = new IntersectionObserver(
-			(entries) => {
-				for (const entry of entries)
-					onVisibility(frameId, entry.isIntersecting);
-			},
-			{ rootMargin: "600px" },
-		);
-		observer.observe(node);
-		return () => observer.disconnect();
-	}, [artboardRef, onVisibility, frameId]);
-	const isLiveReady = live.readiness.phase === "ready";
-	useEffect(() => {
-		onReadinessChange?.(frame.id, isLiveReady);
-	}, [frame.id, isLiveReady, onReadinessChange]);
+		}
+		const root = viewportRef?.current ?? null;
+		let observing = true;
+		const observers = (["visible", "prewarm"] as const).map((region) => {
+			const observer = new IntersectionObserver(
+				(entries) => {
+					if (!observing) return;
+					for (const entry of entries)
+						onVisibilityChange(frameId, entry.isIntersecting, region);
+				},
+				{
+					root,
+					rootMargin:
+						region === "visible"
+							? "0px"
+							: `${STUDIO_LIVE_VISIBILITY_MARGIN_PX}px`,
+				},
+			);
+			observer.observe(node);
+			return observer;
+		});
+		return () => {
+			observing = false;
+			for (const observer of observers) observer.disconnect();
+			onVisibilityChange(frameId, false, "visible");
+			onVisibilityChange(frameId, false, "prewarm");
+		};
+	}, [artboardRef, viewportRef, onVisibilityChange, frameId]);
+
 	const measuredWidth = presentation.width;
 	const measuredHeight = presentation.height;
 	useEffect(() => {
-		if (presentation.showLive && presentation.device !== native)
-			onMeasure?.(frameId, measuredWidth, measuredHeight);
-		else if (visual) onMeasure?.(frameId, visual.width, visual.height);
-	}, [
-		presentation.showLive,
-		presentation.device,
-		native,
-		measuredWidth,
-		measuredHeight,
-		visual,
-		onMeasure,
-		frameId,
-	]);
-	return { native, live, presentation, liveNotice };
+		if (hasActiveDocument) onMeasure?.(frameId, measuredWidth, measuredHeight);
+	}, [hasActiveDocument, measuredWidth, measuredHeight, onMeasure, frameId]);
+
+	return { native, live, presentation, liveNotice, pending, isCurrent };
 }

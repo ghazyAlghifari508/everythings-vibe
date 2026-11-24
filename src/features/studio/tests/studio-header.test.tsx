@@ -48,22 +48,18 @@ describe("StudioHeader", () => {
 		);
 	}
 
-	it("floats above the canvas without a full-width navbar surface", () => {
-		const { container } = renderHeader();
-		const header = container.querySelector("header");
-		expect(header).not.toBeNull();
-		const className = header?.className ?? "";
-		// The canvas must show through behind the header: no opaque full-width
-		// background, no divider border, and the band must be positioned as an
-		// overlay rather than occupying layout space.
-		expect(className).toContain("absolute");
-		expect(className).toContain("inset-x-0");
-		expect(className).toContain("top-0");
-		expect(className).not.toContain("border-b");
-		expect(className).toContain("pointer-events-none");
-		// The header band must not paint its own full-width surface.
-		expect(className.split(" ")).not.toContain("bg-charcoal");
-		expect(className.split(" ")).not.toContain("bg-obsidian");
+	it("opens the export menu without exposing project actions", async () => {
+		renderHeader();
+		fireEvent.pointerDown(
+			screen.getByRole("button", { name: "Export project" }),
+			{ button: 0, ctrlKey: false, pointerType: "mouse" },
+		);
+		expect(
+			await screen.findByRole("menuitem", { name: "Download ZIP" }),
+		).toBeTruthy();
+		expect(
+			screen.queryByRole("menuitem", { name: /Duplicate Project/i }),
+		).toBeNull();
 	});
 
 	it("keeps project menu, title, export and account controls reachable", () => {
@@ -128,18 +124,15 @@ describe("StudioHeader", () => {
 		await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 	});
 
-	it("gives every interactive control a pointer-enabled surface", () => {
+	it("opens the project menu from the keyboard", async () => {
 		renderHeader();
-		for (const name of [
-			"Menu project",
-			"Export project",
-			"Profil dan tampilan",
-		]) {
-			const button = screen.getByRole("button", { name });
-			// Controls must opt back into pointer events so they stay clickable
-			// while the surrounding header band stays pointer-transparent.
-			expect(button.closest(".pointer-events-auto")).not.toBeNull();
-		}
+		const trigger = screen.getByRole("button", { name: "Menu project" });
+		trigger.focus();
+		fireEvent.keyDown(trigger, { key: "Enter" });
+		expect(
+			await screen.findByRole("menuitem", { name: /Duplicate Project/i }),
+		).toBeTruthy();
+		expect(trigger.getAttribute("aria-expanded")).toBe("true");
 	});
 
 	it("surfaces the exporting state on the export control", () => {

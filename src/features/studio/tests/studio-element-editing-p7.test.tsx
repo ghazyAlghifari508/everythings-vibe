@@ -109,6 +109,33 @@ const target: StudioElementTarget = {
 	bounds: { x: 20, y: 40, width: 120, height: 30 },
 };
 
+function postBridge(iframe: HTMLIFrameElement, body: Record<string, unknown>) {
+	fireEvent(
+		window,
+		new MessageEvent("message", {
+			source: iframe.contentWindow,
+			origin: "null",
+			data: {
+				projectId: project.id,
+				frameId: frame.id,
+				baseRevision: frame.revision,
+				baseHash: indexed.baseHash,
+				channel: iframe.dataset.liveChannel,
+				...body,
+			},
+		}),
+	);
+}
+
+function postReady(iframe: HTMLIFrameElement) {
+	postBridge(iframe, {
+		type: "studio:renderer:ready",
+		scrollWidth: 1440,
+		scrollHeight: 900,
+		unresolvedImages: 0,
+	});
+}
+
 beforeAll(() => {
 	class ResizeObserverStub implements ResizeObserver {
 		observe(): void {}
@@ -183,8 +210,10 @@ describe("P7 context menu", () => {
 		expect(screen.getByText("Edit Text")).toBeTruthy();
 		expect(screen.getByText("Edit with AI")).toBeTruthy();
 		expect(screen.getByText("Delete")).toBeTruthy();
+		expect(screen.getAllByRole("menuitem")).toHaveLength(3);
+		expect(screen.queryByText("Pilih induk")).toBeNull();
 		fireEvent.click(screen.getByText("Edit with AI"));
-		expect(onAction).toHaveBeenCalledWith("edit-ai", target, undefined);
+		expect(onAction).toHaveBeenCalledWith("edit-ai", target);
 		await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
 	});
 
@@ -203,6 +232,8 @@ describe("P7 context menu", () => {
 			/>,
 		);
 		expect(screen.queryByText("Edit Text")).toBeNull();
+		expect(screen.getAllByRole("menuitem")).toHaveLength(2);
+		expect(screen.queryByText("Pilih induk")).toBeNull();
 		screen.getByText("Edit with AI").focus();
 		fireEvent.keyDown(document, { key: "Escape", code: "Escape", keyCode: 27 });
 		await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
@@ -240,9 +271,7 @@ describe("P7 context menu", () => {
 describe("P7 live surface lifecycle", () => {
 	it("keeps the same mounted iframe and request when pencil inspection is enabled", async () => {
 		const calls = stubInspection();
-		const view = render(
-			<StudioFrame frame={frame} liveEnabled priorityPreview />,
-		);
+		const view = render(<StudioFrame frame={frame} liveEnabled />);
 		await waitFor(() =>
 			expect(view.container.querySelector("iframe")).not.toBeNull(),
 		);
@@ -250,9 +279,7 @@ describe("P7 live surface lifecycle", () => {
 		const requestCount = calls.filter((url) =>
 			url.includes("inspect=1"),
 		).length;
-		view.rerender(
-			<StudioFrame frame={frame} liveEnabled priorityPreview inspectElement />,
-		);
+		view.rerender(<StudioFrame frame={frame} liveEnabled inspectElement />);
 		const after = view.container.querySelector("iframe");
 		expect(after).toBe(before);
 		expect(calls.filter((url) => url.includes("inspect=1")).length).toBe(
@@ -263,7 +290,7 @@ describe("P7 live surface lifecycle", () => {
 	it("draws hover outlines outside the isolated document without changing its HTML", async () => {
 		const calls = stubInspection();
 		const view = render(
-			<StudioFrame frame={frame} liveEnabled priorityPreview inspectElement />,
+			<StudioFrame frame={frame} liveEnabled inspectElement />,
 		);
 		await waitFor(() =>
 			expect(view.container.querySelector("iframe")).not.toBeNull(),
@@ -271,6 +298,7 @@ describe("P7 live surface lifecycle", () => {
 		const iframe = view.container.querySelector("iframe");
 		if (!iframe?.contentWindow) throw new Error("Missing live frame window");
 		const srcDoc = iframe.getAttribute("srcdoc");
+		postReady(iframe);
 		fireEvent(
 			window,
 			new MessageEvent("message", {
@@ -293,5 +321,57 @@ describe("P7 live surface lifecycle", () => {
 		expect(overlay instanceof HTMLElement && overlay.style.left).toBe("12px");
 		expect(iframe.getAttribute("srcdoc")).toBe(srcDoc);
 		expect(calls.filter((url) => url.includes("inspect=1")).length).toBe(1);
+	});
+
+	it("starts inline only from Edit Text and ignores commits after inspection stops", async () => {
+		stubInspection();
+		const onElementAction = vi.fn();
+		const view = render(
+			<StudioFrame
+				frame={frame}
+				liveEnabled
+				inspectElement
+				elementTarget={target}
+				onElementAction={onElementAction}
+			/>,
+		);
+		const iframe = await waitFor(() => {
+			const node = view.container.querySelector("iframe");
+			if (!node?.contentWindow) throw new Error("Missing live document");
+			return node;
+		});
+		const send = vi.spyOn(iframe.contentWindow ?? window, "postMessage");
+		postReady(iframe);
+		postBridge(iframe, {
+			type: "studio:element:select",
+			elementId: target.elementId,
+			bounds: target.bounds,
+		});
+		expect(send).not.toHaveBeenCalled();
+		fireEvent.click(screen.getByRole("menuitem", { name: "Edit Text" }));
+		expect(view.container.querySelector("textarea")).toBeNull();
+		const command: unknown = send.mock.calls[0]?.[0];
+		expect(command).toMatchObject({
+			type: "studio:element:text-start",
+			elementId: target.elementId,
+			baseRevision: frame.revision,
+		});
+		if (!command || typeof command !== "object")
+			throw new Error("Missing bridge command");
+		postBridge(iframe, { ...command, type: "studio:element:text-started" });
+		view.rerender(
+			<StudioFrame
+				frame={frame}
+				liveEnabled
+				elementTarget={target}
+				onElementAction={onElementAction}
+			/>,
+		);
+		postBridge(iframe, {
+			...command,
+			type: "studio:element:text-commit",
+			text: "Stale",
+		});
+		expect(onElementAction).not.toHaveBeenCalled();
 	});
 });

@@ -31,6 +31,7 @@ export async function applyStudioElementRevision(
 	projectId: string,
 	userId: string,
 	action: "apply" | "undo",
+	initialMessage = false,
 ) {
 	const { frame } = await readOwnedStudioElementFrame(
 		tx,
@@ -112,7 +113,7 @@ export async function applyStudioElementRevision(
 			),
 		)
 		.returning();
-	await writeStudioElementMessage(tx, updated);
+	await writeStudioElementMessage(tx, updated, initialMessage);
 	return updated;
 }
 

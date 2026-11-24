@@ -115,18 +115,22 @@ export function patchStudioElement(
 	input: StudioElementEdit,
 ): string {
 	const edit = studioElementEditSchema.parse(input);
-	const { dom, node, location } = resolveStudioElement(html, context, target);
+	const { dom, node, location, text } = resolveStudioElement(
+		html,
+		context,
+		target,
+	);
 	try {
+		let { startOffset, endOffset } = location;
 		let replacement = "";
 		if (edit.kind === "replace")
 			replacement = validateReplacement(edit.html, node);
 		if (edit.kind === "text") {
-			if (node.children.length || !location.startTag || !location.endTag)
-				invalid();
-			replacement =
-				html.slice(location.startOffset, location.startTag.endOffset) +
-				escapeStudioHtml(edit.text) +
-				html.slice(location.endTag.startOffset, location.endOffset);
+			if (!text) invalid();
+			if (text.node.data === edit.text) return html;
+			({ startOffset, endOffset } = text.location);
+			replacement = escapeStudioHtml(edit.text);
+			text.node.data = edit.text;
 		}
 		if (edit.kind === "attribute") {
 			if (
@@ -138,15 +142,12 @@ export function patchStudioElement(
 			replacement = node.outerHTML;
 		}
 		const candidate =
-			html.slice(0, location.startOffset) +
-			replacement +
-			html.slice(location.endOffset);
+			html.slice(0, startOffset) + replacement + html.slice(endOffset);
 		if (candidate === html) invalid();
 		const parsed = parseStudioElementDocument(candidate);
 		try {
 			if (edit.kind === "remove") node.remove();
 			else if (edit.kind === "replace") node.outerHTML = replacement;
-			else if (edit.kind === "text") node.textContent = edit.text;
 			// Normalize adjacent text nodes after live DOM mutations (such as removing
 			// an element bordered by whitespace on both sides) so `isEqualNode` matches
 			// a fresh parse without allowing parser reparenting or malformed boundaries.

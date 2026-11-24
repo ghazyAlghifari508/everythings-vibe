@@ -34,7 +34,7 @@ export function StudioFrameRetryButton({
 				event.stopPropagation();
 				onRetry();
 			}}
-			className="shrink-0 gap-1.5 border border-graphite bg-charcoal px-2.5 text-snow hover:bg-steel"
+			className="pointer-events-auto relative z-10 shrink-0 gap-1.5 border border-graphite bg-charcoal px-2.5 text-snow hover:bg-steel"
 		>
 			<Icon
 				icon={pending ? Loading03Icon : Refresh01Icon}
@@ -110,7 +110,7 @@ export function StudioFrameStatusStrip({
 	actionPending,
 }: StudioFrameStatusStripProps) {
 	return (
-		<div className="absolute inset-x-0 bottom-0 z-10 flex items-center justify-between gap-2 border-t border-graphite bg-obsidian/95 px-2.5 py-1.5">
+		<div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-center justify-between gap-2 border-t border-graphite bg-obsidian/95 px-2.5 py-1.5">
 			<p
 				role={tone === "danger" ? "alert" : "status"}
 				className={`min-w-0 text-xs leading-4 ${

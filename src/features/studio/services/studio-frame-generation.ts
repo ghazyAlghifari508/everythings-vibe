@@ -319,6 +319,11 @@ export async function generateValidatedFrameHtml(
 			round++;
 			continue;
 		}
+		if (process.env.STUDIO_DEBUG_ISSUES === "1")
+			console.info(
+				"[studio-issues]",
+				JSON.stringify(issues.map((issue) => `${issue.stage}: ${issue.message}`)),
+			);
 		throw new StudioFrameError(
 			"STUDIO_CONTRACT_VIOLATION",
 			issues.map((issue) => issue.message).join(" "),
@@ -326,3 +331,4 @@ export async function generateValidatedFrameHtml(
 	}
 	throw new ScrapeError("AI_GENERATION_FAILED", "Gagal generate frame.");
 }
+

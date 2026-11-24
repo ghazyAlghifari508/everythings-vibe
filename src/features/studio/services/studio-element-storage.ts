@@ -95,6 +95,7 @@ export function studioElementPreview(
 		after: row.afterHtml,
 		summary: row.summary,
 		appliedRevision: row.appliedRevision,
+		undoRevision: row.undoRevision,
 	};
 }
 export async function writeStudioElementMessage(

@@ -1,4 +1,4 @@
-import { STUDIO_CAPTURE_MAX_HEIGHT } from "../types/studio-constants";
+import { STUDIO_RENDER_DOCUMENT_MAX_HEIGHT } from "../types/studio-constants";
 import {
 	STUDIO_DEVICE_PRESETS,
 	STUDIO_LIVE_SURFACE_MAX,
@@ -6,7 +6,6 @@ import {
 	type StudioRendererFailure,
 	type StudioRendererKey,
 	type StudioRendererReadiness,
-	type StudioRenderMode,
 } from "../types/studio-renderer";
 
 /** FNV-1a over the persisted HTML: a cheap content stamp, not a security hash. */
@@ -38,72 +37,56 @@ export function studioRendererKeyId(key: StudioRendererKey): string {
 }
 
 export interface StudioFramePresentationInput {
-	mode: StudioRenderMode;
-	/** The screenshot failed but valid HTML exists: the live document recovers it. */
-	recoverPreview?: boolean;
 	device: StudioDevice;
 	native: StudioDevice;
 	readiness: StudioRendererReadiness;
-	visualSize: { width: number; height: number } | null;
-	/** Height used when the screenshot or nothing live is shown. */
+	/** A previously committed document remains visible until its replacement is ready. */
+	hasActiveDocument: boolean;
+	/** A newer renderer key is still preparing or failed; active is not current. */
+	pending: boolean;
 	fallbackHeight: number;
 }
 
 export interface StudioFramePresentation {
-	/** Whether the live document is the visible layer. */
+	/** Whether the prepared HTML layer may be shown at all. */
 	showLive: boolean;
-	/** Whether the current mode or device needs a live document at all. */
-	wantsLive: boolean;
+	/** Whether that layer is the committed revision, not a retained predecessor. */
+	isCurrent: boolean;
+	/** HTML-first: every renderable frame wants the same isolated document. */
+	wantsLive: true;
 	device: StudioDevice;
 	width: number;
 	height: number;
 }
 
 /**
- * Decides what the artboard shows. The ready screenshot stays visible until the
- * live document reports ready; the artboard only adopts a non-native device
- * once real content can fill it, so a screenshot is never stretched or
- * shrunk to fake a responsive layout.
+ * The artboard is sized by the real isolated document, never by a screenshot.
+ * A retained predecessor may stay on screen while a replacement prepares, but
+ * `isCurrent` stays false so the UI cannot call it the completed revision.
  */
 export function resolveStudioFramePresentation(
 	input: StudioFramePresentationInput,
 ): StudioFramePresentation {
-	const wantsLive =
-		input.mode !== "canvas" ||
-		input.device !== input.native ||
-		Boolean(input.recoverPreview);
-	const showLive = wantsLive && input.readiness.phase === "ready";
-	const device = showLive ? input.device : input.native;
-	const preset = STUDIO_DEVICE_PRESETS[device];
-	const nativeShown = device === input.native && input.visualSize !== null;
-	if (!showLive && nativeShown && input.visualSize)
-		return {
-			showLive,
-			wantsLive,
-			device,
-			width: input.visualSize.width,
-			height: input.fallbackHeight,
-		};
-	if (!showLive)
-		return {
-			showLive,
-			wantsLive,
-			device,
-			width: preset.width,
-			height: input.fallbackHeight,
-		};
+	const preset = STUDIO_DEVICE_PRESETS[input.device];
+	const showLive = input.hasActiveDocument;
+	const isCurrent =
+		showLive && !input.pending && input.readiness.phase === "ready";
 	const measured =
 		input.readiness.phase === "ready" ? input.readiness.scrollHeight : 0;
-	// Same artboard height as the screenshot while on the native device, so the
-	// swap to the live document cannot shift layout.
-	const height =
-		nativeShown && input.visualSize
-			? input.visualSize.height
-			: Math.min(
-					Math.max(preset.height, Math.ceil(measured)),
-					STUDIO_CAPTURE_MAX_HEIGHT,
-				);
-	return { showLive, wantsLive, device, width: preset.width, height };
+	const height = showLive
+		? Math.min(
+				Math.max(preset.height, Math.ceil(measured)),
+				STUDIO_RENDER_DOCUMENT_MAX_HEIGHT,
+			)
+		: input.fallbackHeight;
+	return {
+		showLive,
+		isCurrent,
+		wantsLive: true,
+		device: input.device,
+		width: preset.width,
+		height,
+	};
 }
 
 export interface StudioLiveNotice {
@@ -113,11 +96,9 @@ export interface StudioLiveNotice {
 }
 
 const FAILURE_COPY: Record<StudioRendererFailure, string> = {
-	"html-unavailable": "HTML layar ini tidak tersedia untuk tampilan langsung.",
-	"document-failed":
-		"Tampilan langsung belum dapat dimuat. Pratinjau tetap tersedia.",
-	"bridge-timeout":
-		"Tampilan langsung tidak merespons. Pratinjau tetap tersedia.",
+	"html-unavailable": "HTML layar ini tidak tersedia untuk dirender.",
+	"document-failed": "Dokumen HTML gagal disiapkan.",
+	"bridge-timeout": "Dokumen HTML tidak merespons.",
 };
 
 export function studioFailureCopy(failure: StudioRendererFailure) {
@@ -125,11 +106,13 @@ export function studioFailureCopy(failure: StudioRendererFailure) {
 }
 
 /**
- * A single honest note about the live document, derived only from real
- * readiness signals. It never changes the frame's generation status.
+ * A single honest note about the renderer, derived only from real signals. It
+ * never changes the frame's generation status. Screenshot capture is not a
+ * renderer signal and is never consulted here.
  */
 export function resolveStudioLiveNotice(input: {
 	wantsLive: boolean;
+	pending: boolean;
 	device: StudioDevice;
 	native: StudioDevice;
 	readiness: StudioRendererReadiness;
@@ -142,9 +125,22 @@ export function resolveStudioLiveNotice(input: {
 			tone: "danger",
 			retry: true,
 		};
+	if (input.pending)
+		return {
+			message:
+				"Menyiapkan revisi terbaru. Dokumen sebelumnya masih ditampilkan.",
+			tone: "progress",
+			retry: false,
+		};
 	if (readiness.phase !== "ready")
 		return {
-			message: "Menyiapkan tampilan langsung.",
+			message: "Menyiapkan dokumen HTML terisolasi.",
+			tone: "progress",
+			retry: false,
+		};
+	if (readiness.scrollHeight > STUDIO_RENDER_DOCUMENT_MAX_HEIGHT)
+		return {
+			message: `Dokumen melebihi batas tampilan ${STUDIO_RENDER_DOCUMENT_MAX_HEIGHT}px. HTML tersimpan utuh tanpa pemotongan.`,
 			tone: "progress",
 			retry: false,
 		};
@@ -157,13 +153,13 @@ export function resolveStudioLiveNotice(input: {
 		};
 	if (readiness.unresolvedAssets > 0)
 		return {
-			message: `${readiness.unresolvedAssets} gambar tidak tersedia pada tampilan langsung.`,
+			message: `${readiness.unresolvedAssets} gambar tidak tersedia pada dokumen terisolasi.`,
 			tone: "progress",
 			retry: false,
 		};
 	if (readiness.unrenderedIcons > 0)
 		return {
-			message: `${readiness.unrenderedIcons} ikon Lucide tidak dirender pada tampilan langsung.`,
+			message: `${readiness.unrenderedIcons} ikon Lucide tidak dirender pada dokumen terisolasi.`,
 			tone: "progress",
 			retry: false,
 		};
@@ -171,43 +167,42 @@ export function resolveStudioLiveNotice(input: {
 }
 
 export interface StudioLivePlanInput {
-	/** Previously live ids, most recent first. */
-	previous: readonly string[];
+	/** Selected frames are kept even when they drift just outside the viewport. */
 	selected: readonly string[];
-	/** Frames that have valid HTML and finished generating. */
+	/** Frames reported inside the real canvas viewport by the observer. */
+	visible: ReadonlySet<string>;
+	/** Frames within the prewarm margin, including any actually visible frames. */
+	prewarm?: ReadonlySet<string>;
+	/** Frames that have committed HTML and can render. */
 	eligible: ReadonlySet<string>;
-	/** Frames reported as off-screen by their artboard observer. */
-	hidden: ReadonlySet<string>;
-	/** Frames that must stay live even off-screen, e.g. while inspecting. */
+	/** Inspected frames must stay live even off-screen. */
 	pinned?: ReadonlySet<string>;
+	inspectMode?: boolean;
 	max?: number;
 }
 
-/**
- * Bounded live-surface pool. Selected frames are prewarmed first, then recent
- * frames that are still on screen; everything else is released so its iframe
- * and fetched document are dropped.
- */
+/** Pencil's visible and pinned documents may overflow the normal renderer budget. */
 export function planStudioLiveSurfaces({
-	previous,
 	selected,
+	visible,
+	prewarm,
 	eligible,
-	hidden,
 	pinned,
+	inspectMode = false,
 	max = STUDIO_LIVE_SURFACE_MAX,
 }: StudioLivePlanInput): string[] {
-	const ordered: string[] = [];
-	const add = (id: string) => {
-		if (!ordered.includes(id)) ordered.push(id);
+	const pool = new Set<string>();
+	const add = (ids: Iterable<string> | undefined, limit: number) => {
+		if (!ids) return;
+		for (const id of ids) {
+			if (pool.size >= limit) break;
+			if (eligible.has(id)) pool.add(id);
+		}
 	};
-	for (const id of selected)
-		if (eligible.has(id) && (!hidden.has(id) || pinned?.has(id))) add(id);
-	const keepSelected = ordered.slice(0, max);
-	const pool = [...keepSelected];
-	for (const id of previous) {
-		if (pool.length >= max) break;
-		if (pool.includes(id) || !eligible.has(id) || hidden.has(id)) continue;
-		pool.push(id);
-	}
-	return pool;
+	const inspectLimit = inspectMode ? Infinity : max;
+	add(pinned, inspectLimit);
+	add(selected, max);
+	add(visible, inspectLimit);
+	add(prewarm, max);
+	return [...pool];
 }

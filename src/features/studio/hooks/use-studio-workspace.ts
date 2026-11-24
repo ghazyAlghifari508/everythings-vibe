@@ -19,6 +19,7 @@ import { extractDesignSystemTokens } from "@/features/studio/services/studio-des
 import { STUDIO_DESIGN_PRESETS } from "@/features/studio/services/studio-presets";
 import type { StudioScreenSuggestion } from "@/features/studio/services/studio-screen-suggestions";
 import type { StudioDetailLoaderData } from "@/features/studio/types/studio";
+import type { StudioStatus } from "@/features/studio/types/studio-status";
 import { pruneStudioFrameSelection } from "@/features/studio/utils/studio-frame-selection";
 import { deriveStudioLifecycle } from "@/features/studio/utils/studio-lifecycle";
 
@@ -66,7 +67,15 @@ export interface StudioWorkspaceState {
 	handleRetryFrame: (frameId: string) => Promise<void>;
 	handleRetryPlanning: () => Promise<void>;
 	handleDownloadAllZip: () => Promise<void>;
-	syncProjectStatus: () => Promise<void>;
+	syncProjectStatus: (
+		onSuccess?: (status: StudioStatus) => void,
+	) => Promise<void>;
+	publishCommitted: (
+		projectId: string,
+		frameId: string,
+		revision: number,
+		html: string,
+	) => void;
 }
 
 export function useStudioWorkspace(
@@ -79,12 +88,14 @@ export function useStudioWorkspace(
 		messages,
 		isProcessing,
 		syncProjectStatus,
+		publishCommitted,
 		error: syncError,
 		clearError: clearSyncError,
 	} = useStudioStatus(initialData);
 	const lifecycle = deriveStudioLifecycle({ project, frames, activeJob });
-	const [selectedFrameId, setSelectedFrameId] = useState<string | null>(null);
 	const [selectedFrameIds, setSelectedFrameIds] = useState<string[]>([]);
+	const selectedFrameId =
+		selectedFrameIds.length === 1 ? selectedFrameIds[0] : null;
 	const [error, setActionError] = useState("");
 	const setError = useCallback(
 		(message: string) => {
@@ -97,7 +108,6 @@ export function useStudioWorkspace(
 	useEffect(() => {
 		if (loader.current === initialData) return;
 		if (loader.current.project.id !== initialData.project.id) {
-			setSelectedFrameId(null);
 			setSelectedFrameIds([]);
 		}
 		loader.current = initialData;
@@ -116,7 +126,6 @@ export function useStudioWorkspace(
 		const parsed = selectedFrameIdsSchema.safeParse(stored);
 		const ids = parsed.success ? [...new Set(parsed.data)] : [];
 		setSelectedFrameIds(ids);
-		setSelectedFrameId(ids.length === 1 ? ids[0] : null);
 		setLoadedSelectionKey(selectionKey);
 	}, [selectionKey]);
 	useEffect(() => {
@@ -134,7 +143,6 @@ export function useStudioWorkspace(
 						: [...previous, id]
 					: [id],
 		);
-		setSelectedFrameId(additive ? null : id);
 	}, []);
 
 	// Marquee selection reports the whole id set at once. Deduping and keeping
@@ -143,7 +151,6 @@ export function useStudioWorkspace(
 	const selectFrames = useCallback((ids: string[]) => {
 		const unique = [...new Set(ids)];
 		setSelectedFrameIds(unique);
-		setSelectedFrameId(unique.length === 1 ? unique[0] : null);
 	}, []);
 
 	const readyFramesCount = useMemo(
@@ -189,12 +196,10 @@ export function useStudioWorkspace(
 
 	const removeSelectedFrame = useCallback((id: string) => {
 		setSelectedFrameIds((previous) => previous.filter((entry) => entry !== id));
-		setSelectedFrameId((previous) => (previous === id ? null : previous));
 	}, []);
 
 	const clearSelectedFrames = useCallback(() => {
 		setSelectedFrameIds([]);
-		setSelectedFrameId(null);
 	}, []);
 
 	// A card may only attach a frame that actually exists. An unknown name
@@ -219,12 +224,8 @@ export function useStudioWorkspace(
 	// setters bail out when nothing changed, so a poll never re-renders.
 	const liveFrameIds = useMemo(() => frames.map((frame) => frame.id), [frames]);
 	useEffect(() => {
-		const live = new Set(liveFrameIds);
 		setSelectedFrameIds((previous) =>
 			pruneStudioFrameSelection(previous, liveFrameIds),
-		);
-		setSelectedFrameId((previous) =>
-			previous && !live.has(previous) ? null : previous,
 		);
 	}, [liveFrameIds]);
 
@@ -323,5 +324,6 @@ export function useStudioWorkspace(
 		handleRetryPlanning: planningRetry.handleRetryPlanning,
 		handleDownloadAllZip: actions.handleDownloadAllZip,
 		syncProjectStatus,
+		publishCommitted,
 	};
 }

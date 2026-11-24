@@ -1,14 +1,14 @@
-import { type RefObject, useCallback, useEffect } from "react";
+import { type RefObject, useCallback, useEffect, useRef } from "react";
 import {
-	classifyWheelGesture,
 	isScrollableOrEditableTarget,
+	normalizeWheelPanDelta,
+	type WheelPanDelta,
 } from "@/features/studio/utils/studio-canvas-gesture";
-import { normalizeWheelDelta } from "@/hooks/use-canvas-zoom";
 
 interface UseStudioCanvasInputInput {
 	canvasRef: RefObject<HTMLElement | null>;
-	onWheel: (event: WheelEvent) => void;
 	setPan: React.Dispatch<React.SetStateAction<{ x: number; y: number }>>;
+	cancelFocusAnimation: () => void;
 	nudgePan: (key: string) => void;
 	endPan: () => void;
 	setTool: (tool: "select" | "hand" | "element") => void;
@@ -22,17 +22,16 @@ interface UseStudioCanvasInputInput {
 /**
  * Wheel and keyboard input for the Studio canvas.
  *
- * Wheel handling must be a non-passive native listener: React attaches `wheel`
- * passively, so a Ctrl/Cmd + wheel gesture cannot be prevented and the browser
- * applies its own page zoom on top of the canvas zoom. Registering the listener
- * with `{ passive: false }` keeps the gesture inside the canvas and lets the
- * pointer-anchored zoom work as intended, while plain two-axis scrolling still
- * pans.
+ * The wheel listener is non-passive because React attaches `wheel` passively.
+ * Ctrl/Cmd + wheel is left untouched for browser/OS accessibility zoom. Every
+ * other wheel event — mouse notch or two-finger trackpad scroll — pans both
+ * axes. Deltas are coalesced into one animation frame so a high-frequency
+ * trackpad cannot schedule a state update per native event.
  */
 export function useStudioCanvasInput({
 	canvasRef,
-	onWheel,
 	setPan,
+	cancelFocusAnimation,
 	nudgePan,
 	endPan,
 	setTool,
@@ -42,6 +41,9 @@ export function useStudioCanvasInput({
 	cancelMarquee,
 	hasActiveGesture,
 }: UseStudioCanvasInputInput): void {
+	const pendingPan = useRef<WheelPanDelta>({ x: 0, y: 0 });
+	const pendingFrame = useRef<number | null>(null);
+
 	const blur = useCallback(() => {
 		setSpacePan(false);
 		setIsPanning(false);
@@ -53,39 +55,48 @@ export function useStudioCanvasInput({
 	useEffect(() => {
 		const canvas = canvasRef.current;
 		if (!canvas) return;
-		function handleWheel(event: WheelEvent) {
+
+		const commitPan = () => {
+			pendingFrame.current = null;
+			const { x, y } = pendingPan.current;
+			pendingPan.current = { x: 0, y: 0 };
+			if (x === 0 && y === 0) return;
+			setPan((previous) => ({
+				x: previous.x - x,
+				y: previous.y - y,
+			}));
+		};
+
+		const handleWheel = (event: WheelEvent) => {
+			// Browser/OS zoom is an accessibility affordance; intercepting it
+			// would produce both a page zoom and a canvas pan.
+			if (event.defaultPrevented || event.ctrlKey || event.metaKey) return;
 			// Do not intercept scrolling inside active textareas, dropdowns,
 			// real controls, or other scrollable overlays. Frame artboards are
 			// gesture surfaces and are excluded from that guard.
-			if (isScrollableOrEditableTarget(event.target, canvas)) {
-				return;
-			}
+			if (isScrollableOrEditableTarget(event.target, canvas)) return;
 
-			const gesture = classifyWheelGesture(event);
-			if (gesture === "zoom") {
-				// preventDefault only for a gesture the canvas actually
-				// consumes, so the page never scrolls behind a zoom.
-				event.preventDefault();
-				onWheel(event);
-				return;
+			const delta = normalizeWheelPanDelta(event, canvas);
+			if (delta.x === 0 && delta.y === 0) return;
+			if (event.cancelable) event.preventDefault();
+			cancelFocusAnimation();
+			pendingPan.current.x += delta.x;
+			pendingPan.current.y += delta.y;
+			if (pendingFrame.current === null) {
+				pendingFrame.current = requestAnimationFrame(commitPan);
 			}
+		};
 
-			const deltaX = normalizeWheelDelta({
-				deltaY: event.deltaX,
-				deltaMode: event.deltaMode,
-			});
-			const deltaY = normalizeWheelDelta(event);
-			if (deltaX === 0 && deltaY === 0) return;
-			// Two-axis trackpad scrolling pans the board.
-			event.preventDefault();
-			setPan((previous) => ({
-				x: previous.x - deltaX,
-				y: previous.y - deltaY,
-			}));
-		}
 		canvas.addEventListener("wheel", handleWheel, { passive: false });
-		return () => canvas.removeEventListener("wheel", handleWheel);
-	}, [canvasRef, onWheel, setPan]);
+		return () => {
+			canvas.removeEventListener("wheel", handleWheel);
+			if (pendingFrame.current !== null) {
+				cancelAnimationFrame(pendingFrame.current);
+				pendingFrame.current = null;
+			}
+			pendingPan.current = { x: 0, y: 0 };
+		};
+	}, [canvasRef, cancelFocusAnimation, setPan]);
 
 	useEffect(() => {
 		// Arrow-key panning is a window-level affordance because the canvas

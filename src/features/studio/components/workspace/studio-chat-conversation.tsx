@@ -1,21 +1,13 @@
-import { Disclosure, ScrollShadow } from "@heroui/react";
-import {
-	AlertCircleIcon,
-	ArrowDown01Icon,
-	ArrowUp01Icon,
-	Tick02Icon,
-} from "@hugeicons/core-free-icons";
+import { ScrollShadow } from "@heroui/react";
+import { ArrowDown01Icon, ArrowUp01Icon } from "@hugeicons/core-free-icons";
 import { type MutableRefObject, useEffect, useRef } from "react";
 import { Icon } from "@/components/ui/icon";
-import { Spinner } from "@/components/ui/spinner";
-import type { StudioMessageRow } from "@/db/schema";
+import type { StudioFrameRow, StudioMessageRow } from "@/db/schema";
 import { useIsomorphicLayoutEffect } from "@/hooks/use-isomorphic-layout-effect";
 import { cn } from "@/lib/utils";
-import {
-	describeStudioResult,
-	isLongStudioUserMessage,
-} from "../../utils/studio-chat-message";
+import { isLongStudioUserMessage } from "../../utils/studio-chat-message";
 import { StudioChatMarkdown } from "./studio-chat-markdown";
+import { StudioChatResult } from "./studio-chat-result";
 
 /** Scroll position lives above the conversation so a remounted drawer reopens where it was. */
 export type StudioChatScrollMemory = MutableRefObject<{
@@ -25,6 +17,8 @@ export type StudioChatScrollMemory = MutableRefObject<{
 
 interface ConversationProps {
 	messages: StudioMessageRow[];
+	frames: readonly StudioFrameRow[];
+	onOpenFrame: (frameId: string) => void;
 	expandedIds: ReadonlySet<string>;
 	onToggleExpanded: (id: string) => void;
 	scrollMemory: StudioChatScrollMemory;
@@ -94,86 +88,33 @@ function UserBubble({
 	);
 }
 
-function ResultCard({ message }: { message: StudioMessageRow }) {
-	const progress = message.progress;
-	const result = progress ? describeStudioResult(progress) : null;
-	if (!progress || !result) return null;
-	const failed = new Set(progress.failedScreens ?? []);
-	const lead = result.running ? (
-		<Spinner size={12} />
-	) : (
-		<Icon
-			icon={progress.phase === "completed" ? Tick02Icon : AlertCircleIcon}
-			size={14}
-			className="shrink-0 text-fog"
-		/>
-	);
-	const label = (
-		<span className="flex min-w-0 items-center gap-2">
-			{lead}
-			<span className="truncate">{result.label}</span>
-		</span>
-	);
-	const card =
-		"mt-3 rounded-xl border border-iron/70 bg-charcoal/60 text-sm text-snow";
-	if (!progress.screenNames.length)
-		return (
-			<div className={cn(card, "flex min-h-11 items-center px-3")}>{label}</div>
-		);
-	return (
-		<Disclosure className={card}>
-			<Disclosure.Heading>
-				<Disclosure.Trigger className="flex min-h-11 w-full items-center justify-between gap-3 rounded-xl px-3 text-left focus-visible:outline-2 focus-visible:outline-snow">
-					{label}
-					<span className="flex shrink-0 items-center gap-1 text-xs text-fog">
-						Lihat
-						<Disclosure.Indicator />
-					</span>
-				</Disclosure.Trigger>
-			</Disclosure.Heading>
-			<Disclosure.Content>
-				<Disclosure.Body>
-					<ul className="space-y-1 px-3 pb-3 text-xs text-fog">
-						{progress.screenNames.map((name) => (
-							<li
-								key={name}
-								className="flex items-baseline justify-between gap-2"
-							>
-								<span className="min-w-0 truncate text-snow">{name}</span>
-								{failed.has(name) ? (
-									<span className="shrink-0">Belum berhasil</span>
-								) : null}
-							</li>
-						))}
-					</ul>
-				</Disclosure.Body>
-			</Disclosure.Content>
-		</Disclosure>
-	);
-}
-
-function AssistantMessage({ message }: { message: StudioMessageRow }) {
-	const progress = message.progress;
-	const hasResult = Boolean(progress && describeStudioResult(progress));
-	const working =
-		message.status === "queued" ||
-		message.status === "planning" ||
-		message.status === "generating";
+function AssistantMessage({
+	message,
+	frames,
+	onOpenFrame,
+}: {
+	message: StudioMessageRow;
+	frames: readonly StudioFrameRow[];
+	onOpenFrame: (frameId: string) => void;
+}) {
 	return (
 		<article aria-label="Balasan design agent" className="min-w-0">
-			<StudioChatMarkdown content={message.content} />
-			<ResultCard message={message} />
-			{working && !hasResult ? (
-				<div className="mt-2 text-fog">
-					<Spinner size={14} label="Sedang diproses" />
-				</div>
+			{message.content.trim() ? (
+				<StudioChatMarkdown content={message.content} />
 			) : null}
+			<StudioChatResult
+				message={message}
+				frames={frames}
+				onOpenFrame={onOpenFrame}
+			/>
 		</article>
 	);
 }
 
 export function StudioChatConversation({
 	messages,
+	frames,
+	onOpenFrame,
 	expandedIds,
 	onToggleExpanded,
 	scrollMemory,
@@ -222,7 +163,12 @@ export function StudioChatConversation({
 								onToggle={() => onToggleExpanded(message.id)}
 							/>
 						) : (
-							<AssistantMessage key={message.id} message={message} />
+							<AssistantMessage
+								key={message.id}
+								message={message}
+								frames={frames}
+								onOpenFrame={onOpenFrame}
+							/>
 						),
 					)}
 				</div>

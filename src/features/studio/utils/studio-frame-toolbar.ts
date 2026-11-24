@@ -5,6 +5,7 @@ import {
 	STUDIO_CANVAS_OVERLAY_EDGE_PX,
 	STUDIO_CANVAS_TOOLBAR_INSET_PX,
 	STUDIO_FRAME_TOOLBAR_BORDER_GAP_PX,
+	STUDIO_FRAME_TOOLBAR_BUTTON_PX,
 	STUDIO_FRAME_TOOLBAR_FRAME_GAP_PX,
 	STUDIO_FRAME_TOOLBAR_HEIGHT_PX,
 	STUDIO_FRAME_TOOLBAR_WIDTH_PX,
@@ -31,6 +32,7 @@ export interface StudioFrameScreenRect {
 export interface StudioFrameToolbarPlacement {
 	x: number;
 	y: number;
+	maxHeight: number;
 	side: "left" | "right";
 }
 
@@ -75,11 +77,20 @@ export function computeFrameToolbarPlacement(
 ): StudioFrameToolbarPlacement | null {
 	const rect = computeFrameScreenRect(input);
 	if (!rect) return null;
-	const leftBound = input.leftInsetPx + STUDIO_CANVAS_OVERLAY_EDGE_PX;
-	const rightBound = Math.max(
-		leftBound,
-		input.canvas.width - STUDIO_CANVAS_TOOLBAR_INSET_PX,
+	// The collapsed chat launcher still occupies the left edge.
+	const leftBound =
+		Math.max(
+			input.leftInsetPx,
+			STUDIO_FRAME_TOOLBAR_BUTTON_PX + STUDIO_CANVAS_OVERLAY_EDGE_PX,
+		) + STUDIO_CANVAS_OVERLAY_EDGE_PX;
+	const rightBound = input.canvas.width - STUDIO_CANVAS_TOOLBAR_INSET_PX;
+	const topBound = STUDIO_CANVAS_HEADER_INSET_PX;
+	const maxHeight = Math.min(
+		STUDIO_FRAME_TOOLBAR_HEIGHT_PX,
+		input.canvas.height - topBound - STUDIO_CANVAS_BOTTOM_INSET_PX,
 	);
+	if (rightBound - leftBound < STUDIO_FRAME_TOOLBAR_WIDTH_PX || maxHeight <= 0)
+		return null;
 	const rightX = rect.x + rect.width + STUDIO_FRAME_TOOLBAR_FRAME_GAP_PX;
 	const leftX =
 		rect.x - STUDIO_FRAME_TOOLBAR_FRAME_GAP_PX - STUDIO_FRAME_TOOLBAR_WIDTH_PX;
@@ -89,34 +100,25 @@ export function computeFrameToolbarPlacement(
 		rightX >= leftBound && rightX + STUDIO_FRAME_TOOLBAR_WIDTH_PX <= rightBound;
 	const fitsLeft =
 		leftX >= leftBound && leftX + STUDIO_FRAME_TOOLBAR_WIDTH_PX <= rightBound;
-	const side: "left" | "right" =
-		fitsRight && fitsLeft
-			? rightSpace >= leftSpace
+	const side =
+		fitsLeft !== fitsRight
+			? fitsLeft
+				? "left"
+				: "right"
+			: rightSpace >= leftSpace
 				? "right"
-				: "left"
-			: fitsRight
-				? "right"
-				: fitsLeft
-					? "left"
-					: rightSpace >= leftSpace
-						? "right"
-						: "left";
+				: "left";
 	const x = clamp(
 		side === "right" ? rightX : leftX,
 		leftBound,
-		Math.max(leftBound, rightBound - STUDIO_FRAME_TOOLBAR_WIDTH_PX),
+		rightBound - STUDIO_FRAME_TOOLBAR_WIDTH_PX,
 	);
-	const topBound = STUDIO_CANVAS_HEADER_INSET_PX;
-	const bottomBound = Math.max(
-		topBound,
-		input.canvas.height -
-			STUDIO_CANVAS_BOTTOM_INSET_PX -
-			STUDIO_FRAME_TOOLBAR_HEIGHT_PX,
-	);
+	const bottomBound =
+		input.canvas.height - STUDIO_CANVAS_BOTTOM_INSET_PX - maxHeight;
 	const y = clamp(
 		rect.y + Math.min(STUDIO_FRAME_TOOLBAR_BORDER_GAP_PX, rect.height * 0.1),
 		topBound,
 		bottomBound,
 	);
-	return { x, y, side };
+	return { x, y, side, maxHeight };
 }

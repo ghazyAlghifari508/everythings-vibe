@@ -4,9 +4,10 @@ import { devtools } from "@tanstack/devtools-vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import { nitro } from "nitro/vite";
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
+import { resolveStudioDevtoolsConfig } from "./src/lib/devtools-policy";
 
-const config = defineConfig({
+const config = defineConfig(({ command, mode, isPreview }) => ({
 	resolve: {
 		tsconfigPaths: true,
 	},
@@ -32,19 +33,21 @@ const config = defineConfig({
 		},
 	},
 	plugins: [
-		devtools({ consolePiping: { enabled: false } }),
+		devtools(
+			resolveStudioDevtoolsConfig(
+				command === "serve" && mode === "development" && !isPreview
+					? loadEnv(mode, process.cwd(), "VITE_")
+					: {},
+			),
+		),
 		tailwindcss(),
-		// ponytail: TS type for tanstackStart's router option is narrower than the
-		// runtime schema (zod parse accepts autoCodeSplitting). Cast bypasses TS;
-		// verified against start-plugin-core vite/schema.d.ts which includes the field.
 		tanstackStart({
 			router: {
-				autoCodeSplitting: true,
 				// Test files beside routes otherwise log a route-tree warning on
 				// every dev startup; they are already excluded from generation.
 				routeFileIgnorePattern: "\\.test\\.",
 			},
-		} as never),
+		}),
 		viteReact(),
 		nitro({ rollupConfig: { external: ["jsdom"] } }),
 	],
@@ -67,6 +70,6 @@ const config = defineConfig({
 			},
 		},
 	},
-});
+}));
 
 export default config;
