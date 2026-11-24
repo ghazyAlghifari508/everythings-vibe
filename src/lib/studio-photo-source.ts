@@ -2,6 +2,7 @@ import type { fetchAsset } from "./fetch-html";
 import { resolveOpenversePhoto } from "./openverse-photos";
 import { resolvePexelsPhoto } from "./pexels-photos";
 import type { PhotoRequest, PhotoResult } from "./photo-asset";
+import { normalizePhotoQuery } from "./photo-query";
 
 /**
  * Provider order. Pexels is preferred when a credential is configured because
@@ -30,13 +31,20 @@ export function createStudioPhotoSource(
 	/**
 	 * One request per slot. A provider that timed out, ran out of budget or was
 	 * busy is not retried against the next one: a slow answer must fail honestly
-	 * instead of spending the frame budget twice.
+	 * instead of spending the frame budget twice. The planner may emit a long
+	 * descriptive query, but provider search needs the short public subject.
 	 */
 	return async (request: PhotoRequest): Promise<PhotoResult> => {
-		const preferred = await pexels(request);
+		const searchable: PhotoRequest = {
+			...request,
+			query:
+				normalizePhotoQuery(request.query) ||
+				request.query.trim().toLowerCase(),
+		};
+		const preferred = await pexels(searchable);
 		if (typeof preferred !== "string" || !noAsset.includes(preferred))
 			return preferred;
-		const fallback = await openverse(request);
+		const fallback = await openverse(searchable);
 		return fallback === "not-configured" ? preferred : fallback;
 	};
 }
