@@ -309,9 +309,10 @@ TanStack Router bundle-split advisory for `bantuan.tsx`, `templates.tsx` and
 
 1. Trackpad pinch / two-finger momentum and touch pinch were not synthesized; wheel
    policies (pixel/line, Ctrl) were.
-2. Journeys 1 and 3 produced no committed frames in this session (strict Fix 06
-   contracts vs. model output, plus the single-initial-job queue); their design
-   quality is therefore not claimed.
+2. Journey 1 produced no committed frames and Journey 3 produced one of four in
+   this session (strict Fix 06 contracts against the reachable model output, plus
+   the single-initial-job queue); their design quality is claimed only for the
+   frames that actually rendered.
 3. Inline code, code blocks, blockquotes and links inside chat explanations were
    not produced by the model during the session, so only bold/list/heading
    rendering was observed in the browser.
