@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { studioInitialScopeSchema } from "../types/studio-prompts";
-import { STUDIO_COMPONENT_PATTERNS } from "./studio-component-patterns";
+import { STUDIO_COMPONENT_PATTERN_IDS } from "./studio-component-patterns";
 
 const canonicalIconIds = new Set([
 	"home",
@@ -105,12 +105,13 @@ const screenCompositionSchema = z.object({
 		(value) => {
 			if (value === null || value === undefined) return [];
 			if (!Array.isArray(value)) return value;
-			const allowed = new Set(STUDIO_COMPONENT_PATTERNS.map(({ id }) => id));
+			const allowed = new Set<string>(STUDIO_COMPONENT_PATTERN_IDS);
 			return value.filter(
-				(id): id is string => typeof id === "string" && allowed.has(id),
+				(id): id is (typeof STUDIO_COMPONENT_PATTERN_IDS)[number] =>
+					typeof id === "string" && allowed.has(id),
 			);
 		},
-		z.array(z.enum(STUDIO_COMPONENT_PATTERNS.map(({ id }) => id))).max(8),
+		z.array(z.enum(STUDIO_COMPONENT_PATTERN_IDS)).max(8),
 	),
 	responsive: z.enum([
 		"reflow",
@@ -120,6 +121,15 @@ const screenCompositionSchema = z.object({
 		"expand",
 	]),
 	media: z.enum(["none", "whole-product", "photography", "project-work"]),
+});
+
+const shortFact = z.string().trim().min(1).max(120);
+export const studioSampleDataSchema = z.object({
+	currency: z.string().trim().min(1).max(24).optional(),
+	dateFormat: z.string().trim().min(1).max(40).optional(),
+	sampleDates: z.array(z.string().trim().min(1).max(40)).max(8).optional(),
+	sampleStatuses: z.array(shortFact).max(8).optional(),
+	note: z.string().trim().min(1).max(240).optional(),
 });
 export const studioDesignBlueprintSchema = z.object({
 	initialScope: studioInitialScopeSchema.optional(),
@@ -139,6 +149,7 @@ export const studioDesignBlueprintSchema = z.object({
 		visualDirection: z.string().min(1).max(500),
 		brandTone: z.string().trim().min(1).max(200).optional(),
 	}),
+	sampleData: studioSampleDataSchema.optional(),
 	designTokens: z
 		.object({
 			primary: color,
@@ -199,11 +210,10 @@ export const studioDesignBlueprintSchema = z.object({
 				// Models routinely emit `null` for "no destination" (the prompt
 				// itself uses null for parentDestinationId). Normalize it to
 				// absent instead of rejecting an otherwise valid plan.
-				navigationRole: z
-					.preprocess(
-						(value) => (value === null ? undefined : value),
-						z.enum(["primary", "contextual"]).optional(),
-					),
+				navigationRole: z.preprocess(
+					(value) => (value === null ? undefined : value),
+					z.enum(["primary", "contextual"]).optional(),
+				),
 				destinationId: z.preprocess(
 					(value) => (value === null ? undefined : value),
 					z.string().optional(),

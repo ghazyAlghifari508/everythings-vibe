@@ -79,6 +79,7 @@ Return only a valid JSON object, without Markdown or commentary:
       "layoutIntent": "public-website | web-application | mobile-application",
       "visualDirection": "Concise visual direction", "brandTone": "Specific voice and mood"
     },
+    "sampleData": { "currency": "Currency label when sample prices appear", "dateFormat": "Format once", "sampleDates": ["Contoh tanggal"], "sampleStatuses": ["Contoh status alur"], "note": "Sample data, not verified facts" },
     "designTokens": {
       "primary": "Hex", "secondary": "Hex", "background": "Hex", "surface": "Hex",
       "ink": "Accessible text hex", "muted": "Accessible muted text hex", "onPrimary": "Accessible action text hex",
@@ -91,7 +92,7 @@ Return only a valid JSON object, without Markdown or commentary:
       "media": "Subject treatment, whole-product fit, photography crop and fallback"
     },
     "navigationContract": {
-      "destinations": ["home"], "labels": ["Home"], "iconMapping": { "home": "home" }, "ordering": ["home"],
+      "destinations": ["primary-task"], "labels": ["Primary task"], "iconMapping": { "primary-task": "circle" }, "ordering": ["primary-task"],
       "activeItemRule": "Highlight the item matching the active screen"
     },
     "screenPlan": [{
@@ -108,11 +109,12 @@ Return only a valid JSON object, without Markdown or commentary:
   }
 }
 - Scope is required for adaptive plans; optional for historical fixed-count jobs. Use the same names and order in screens and blueprint.screenPlan, sequential from 0, with the requested viewport.
-- Use zero to eight real primary destinations; one screen owns each destinationId. Set destinationId only on that primary owner: contextual screens set parentDestinationId and omit destinationId entirely. Contextual screens may have a primary parent but cannot occupy a primary destination. Include primaryAction {id, label, goal, target} only for a genuine goal targeting a planned screen. Omit canonicalShell and ctaDestination.
+- Use zero to eight real primary destinations; one screen owns each destinationId. Set destinationId only on that primary owner: contextual screens set parentDestinationId and omit destinationId entirely. Top-level destinations describe actual product areas; there is no mandatory Home/Beranda and no fixed link count or presentation. Detail, form, checkout and confirmation screens are contextual with a parent destination chosen from the real journey, not a tab of their own. Contextual screens may have a primary parent but cannot occupy a primary destination. Include primaryAction {id, label, goal, target} only for a genuine goal targeting a planned screen. Omit canonicalShell and ctaDestination.
 - Include brandTone, layout, sharedComponents.media, and composition plus navigationRole for each screen. Use actual enum values. Pattern ids: search, segments, field, table, metric, alert, actions, stepper, carousel, options, product-row, action-area; choose none when irrelevant. Distinct tasks need distinct hierarchies, not repeated grids.
 - Use public-website for marketing, portfolio, editorial and storefront; web-application for workspaces; mobile-application for mobile apps. Let the generator choose chrome and arrangement per task and breakpoint.
-- At most three essential photos per screen. Stock is for generic subjects or public landmarks; exact client work, branded products, book covers, portraits of specific people and private material require user assets. Queries contain public subject terms only, never URLs or confidential text. Use [] if not needed; photography-led screens need at least one slot.
+- At most three essential photos per screen. Stock is for generic subjects or public landmarks; exact client work, branded products, book covers, portraits of specific people and private material require user assets. Queries are public English provider terms: two or three words naming the landmark or subject, not a sentence about composition ("Labuan Bajo", not "Labuan Bajo Padar Island landscape Indonesia"); never URLs or confidential text. Use [] if not needed; photography-led screens need at least one slot.
 - projectTitle identifies the product and purpose in the user's language, in up to 8 words and 60 characters. Example: "Jelajahin: Domestic Travel Booking App". Never return just the brand, a generic platform label, a sentence copied from the brief, or marketing superlatives.
+- sampleData is optional shared continuity data. Fill it when the brief or PRD supplies sample prices, dates or workflow statuses: record the currency, date format and exact sample strings once so every screen reuses them and labels them as samples. Leave it absent when the brief has no such data; never invent metrics, reviews or verified records.
 - productName is the short UI brand, not projectTitle; preserve user spelling. Without a brand use a short domain-specific UI label. Screen names are individual domain-specific UI labels.`;
 
 // Studio has exactly one internal generation standard. The base quality contract

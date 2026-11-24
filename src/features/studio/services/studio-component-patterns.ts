@@ -67,6 +67,18 @@ export const STUDIO_COMPONENT_PATTERNS = [
 	},
 ] as const;
 
+/** Nonempty literal tuple required by Zod's enum, derived from the one source of truth. */
+export function componentPatternIds<
+	T extends readonly { readonly id: string }[],
+>(patterns: T): [T[number]["id"], ...T[number]["id"][]] {
+	const [first, ...rest] = patterns;
+	return [first.id, ...rest.map(({ id }) => id)];
+}
+
+export const STUDIO_COMPONENT_PATTERN_IDS = componentPatternIds(
+	STUDIO_COMPONENT_PATTERNS,
+);
+
 export const STUDIO_COMPONENT_STYLE = `<style id="studio-component-patterns">
 :where([data-ui="search"]){display:flex;align-items:center;gap:4px;min-width:0;width:100%;border:var(--app-border);border-radius:var(--app-radius);background:var(--app-surface)}
 :where([data-ui="search"]>input){flex:1;min-width:0;width:0;border:0;background:transparent}

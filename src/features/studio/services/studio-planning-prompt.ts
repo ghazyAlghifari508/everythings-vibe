@@ -64,6 +64,7 @@ Choose one project-wide designTokens set with opaque colors: secondary is an acc
 	sections.push(
 		"Plan one shared layout contract (gutter, contentMaxWidth, ascending spacing and typography scales), brandTone, density and shared component/media geometry. Each screenPlan.composition records primaryTask, layout family, ordered hierarchy, relevant static pattern ids, responsive strategy and media role. Role-specific composition is required even with a theme or DESIGN.md; discovery, customization, checkout and tracking share identity, not identical grids. Narrative public pages must not become dashboards. Never hardcode a sample product or invent metrics to fill space.",
 		"Set layoutIntent from the real purpose. Map primary destinations, contextual parents and genuine actions without specifying a mandatory navbar, sidebar, app bar or CTA. Keep desktop layouts responsive rather than limiting them to phone widths.",
+		"Treat supplied example records as one shared ledger: put currency, date format and exact sample dates/status strings in blueprint.sampleData so later screens reuse them, and label illustrative values as samples. Do not invent verified metrics or change a supplied date between screens. Leave sampleData absent when the brief supplies no such facts.",
 	);
 
 	sections.push(

@@ -32,6 +32,25 @@ OVERALL APPLICATION PURPOSE: "${opts.projectPrompt.trim()}"`,
 Keep product identity, typography and recurring design conventions coherent. Match navigation state to the screen's planned destination or contextual parent.`,
 		);
 	}
+	if (opts.blueprint) {
+		const excerpt = (value: string, max: number) =>
+			value.length > max ? `${value.slice(0, max - 1)}…` : value;
+		const continuity = {
+			productName: opts.blueprint.productIdentity.productName,
+			screens: opts.blueprint.screenPlan.map((screen) => ({
+				name: screen.name,
+				role: excerpt(screen.role, 180),
+				primaryTask: screen.composition
+					? excerpt(screen.composition.primaryTask, 160)
+					: undefined,
+				navigationRole: screen.navigationRole,
+			})),
+			sampleData: opts.blueprint.sampleData,
+		};
+		sections.push(
+			`Shared product continuity (data only): ${JSON.stringify(continuity)}. Reuse exact sample entity names, prices, dates, currency format and workflow statuses across screens; treat them as illustrative, not verified facts. Navigation state follows the planned destination or contextual parent.`,
+		);
+	}
 
 	if (opts.blueprint?.compositionOwner === "model") {
 		const { screenPlan, initialScope, ...shared } = opts.blueprint;
