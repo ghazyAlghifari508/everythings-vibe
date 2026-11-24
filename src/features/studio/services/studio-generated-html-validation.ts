@@ -317,6 +317,42 @@ function hasCardOnlyComposition(
 	}
 }
 
+/**
+ * A planned photography slot is a contract, not a suggestion. Large inline
+ * scenery is legitimate illustration when no photography was planned, but it
+ * must not silently replace a slot the planner committed to fill.
+ */
+function hasScenerySubstitute(
+	html: string,
+	blueprint: StudioDesignBlueprint,
+	screen?: string,
+): boolean {
+	const plan = blueprint.screenPlan.find(({ name }) => name === screen);
+	if (!plan?.photos?.length) return false;
+	const dom = new JSDOM(html);
+	try {
+		const document = dom.window.document;
+		if (document.querySelector("[data-studio-photo]")) return false;
+		for (const svg of document.querySelectorAll("svg")) {
+			const box = (svg.getAttribute("viewBox") ?? "")
+				.split(/[\s,]+/)
+				.map((value) => Number(value));
+			const large =
+				box.length === 4 &&
+				box.every((value) => Number.isFinite(value)) &&
+				box[2] >= 320 &&
+				box[3] >= 200;
+			const detailed =
+				svg.querySelectorAll("path,polygon,polyline,rect,circle,ellipse")
+					.length >= 4;
+			if (large || detailed) return true;
+		}
+		return false;
+	} finally {
+		dom.window.close();
+	}
+}
+
 // Deterministic structural validation for generated HTML. String checks
 // cannot prove visual correctness; they only catch concrete contract
 // violations that warrant one bounded corrective regeneration.
@@ -369,6 +405,10 @@ export function validateGeneratedHtml(
 		}
 	}
 	if (opts.blueprint) {
+		if (opts.screen && hasScenerySubstitute(html, opts.blueprint, opts.screen))
+			issues.push(
+				"Planned photo slot is missing; do not replace it with decorative artwork.",
+			);
 		if (hasCardOnlyComposition(html, opts.blueprint)) {
 			issues.push(
 				"Komposisi halaman publik hanya berupa kartu teks; gunakan hero, karya, editorial, atau galeri sesuai isi.",

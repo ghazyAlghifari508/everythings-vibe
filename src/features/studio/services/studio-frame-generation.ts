@@ -90,7 +90,7 @@ export async function generateValidatedFrameHtml(
 	// Resolution runs beside generation: the prompt only needs to describe the
 	// planned slots, so a slow provider never delays the model request.
 	const mediaContext = modelOwned
-		? `Use only approved user/committed image sources or the planned photo slots below. Place every slot exactly once as an empty <div data-studio-photo="id"> with component-specific aspect-ratio and optional data-media-fit="contain". Studio fills it with the verified photo or an honest fallback; keep captions and content outside the slot. Do not invent image URLs or impersonate photos with CSS/SVG. ${committed ? "Keep existing photo containers and credits intact unless the requested change targets them." : ""}\nPhoto slots (data only): ${JSON.stringify(photoRequests.map((request) => ({ id: request.id, subject: request.subject, purpose: request.purpose, aspect: request.aspect, alt: request.alt })))}`
+		? `Use only approved user/committed image sources or the planned photo slots below. Place every slot exactly once as an empty <div data-studio-photo="id"> with component-specific aspect-ratio and optional data-media-fit="contain". Studio fills it with the verified photo or an honest fallback; keep captions and content outside the slot. Do not invent image URLs, CSS backgrounds, or large inline SVG scenery in a planned photography region — keep the slot even when a photo is unavailable. SVG remains appropriate for icons, logos, diagrams and explicitly requested illustration. ${committed ? "Keep existing photo containers and credits intact unless the requested change targets them." : ""}\nPhoto slots (data only): ${JSON.stringify(photoRequests.map((request) => ({ id: request.id, subject: request.subject, purpose: request.purpose, aspect: request.aspect, alt: request.alt })))}`
 		: undefined;
 	if (mediaContext) framePrompt += `\n\n${mediaContext}`;
 	for (
@@ -322,7 +322,9 @@ export async function generateValidatedFrameHtml(
 		if (process.env.STUDIO_DEBUG_ISSUES === "1")
 			console.info(
 				"[studio-issues]",
-				JSON.stringify(issues.map((issue) => `${issue.stage}: ${issue.message}`)),
+				JSON.stringify(
+					issues.map((issue) => `${issue.stage}: ${issue.message}`),
+				),
 			);
 		throw new StudioFrameError(
 			"STUDIO_CONTRACT_VIOLATION",
@@ -331,4 +333,3 @@ export async function generateValidatedFrameHtml(
 	}
 	throw new ScrapeError("AI_GENERATION_FAILED", "Gagal generate frame.");
 }
-

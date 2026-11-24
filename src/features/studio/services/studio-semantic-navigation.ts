@@ -59,7 +59,7 @@ export function validateStudioSemanticNavigation(
 			issues.push("Name the primary navigation landmark.");
 		const seen = new Set<string>();
 		for (const link of document.querySelectorAll(
-			"[data-destination], [data-studio-action], [data-studio-back], [data-studio-navigation] a",
+			'[data-destination], [data-studio-action], [data-studio-back], [data-studio-navigation] a, nav a, [role="navigation"] a',
 		)) {
 			const id = link.getAttribute("data-destination");
 			const action = link.getAttribute("data-studio-action");
@@ -101,6 +101,24 @@ export function validateStudioSemanticNavigation(
 				)
 					issues.push(`Incorrect current destination: ${id}.`);
 			}
+		}
+		for (const input of document.querySelectorAll('input[type="search"]')) {
+			const target = input.getAttribute("data-proto-target");
+			const bound =
+				input.getAttribute("data-proto-action") === "filter_collection" &&
+				target &&
+				Array.from(document.querySelectorAll("[data-proto-collection]")).some(
+					(collection) =>
+						collection.getAttribute("data-proto-collection") === target,
+				);
+			if (
+				!bound &&
+				!input.hasAttribute("disabled") &&
+				!input.hasAttribute("readonly")
+			)
+				issues.push(
+					"Search control must filter a real collection or be a disabled prototype field.",
+				);
 		}
 		if (
 			logoUrl &&
