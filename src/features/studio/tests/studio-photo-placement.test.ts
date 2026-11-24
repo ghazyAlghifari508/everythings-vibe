@@ -1,4 +1,5 @@
 import { expect, it } from "vitest";
+import { enforceDesignSystemOnHtml } from "../services/studio-design-system-html";
 import { listExternalDependencies } from "../services/studio-export";
 import { applyStudioPhotoSlots } from "../services/studio-photo-slots";
 
@@ -89,4 +90,33 @@ it("rejects invented img, alternate candidates and CSS image sources", () => {
 			"Use approved photo slots instead of CSS image URLs.",
 		]),
 	);
+});
+
+it("sanctions the design-system font host but keeps other external stylesheets rejected", () => {
+	const plain =
+		"<!doctype html><html><head></head><body><main data-studio-content><p>Cerita studio.</p></main></body></html>";
+	const withFont = plain.replace(
+		"<head>",
+		'<head><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700&display=swap" rel="stylesheet">',
+	);
+	const stylesheetIssue =
+		"Use standalone CSS; external stylesheets cannot introduce unapproved images.";
+	expect(applyStudioPhotoSlots(withFont, [], new Set()).issues).toContain(
+		stylesheetIssue,
+	);
+	const normalized = enforceDesignSystemOnHtml(withFont, null, null, null);
+	expect(normalized).toContain('data-studio-font="1"');
+	expect(applyStudioPhotoSlots(normalized, [], new Set()).issues).toEqual([]);
+
+	const otherHost = plain.replace(
+		"<head>",
+		'<head><link href="https://cdn.example.org/theme.css" rel="stylesheet">',
+	);
+	expect(
+		applyStudioPhotoSlots(
+			enforceDesignSystemOnHtml(otherHost, null, null, null),
+			[],
+			new Set(),
+		).issues,
+	).toContain(stylesheetIssue);
 });

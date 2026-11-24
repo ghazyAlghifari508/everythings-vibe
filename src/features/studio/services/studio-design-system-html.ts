@@ -4,6 +4,24 @@ import { canonicalGutter, canonicalPalette } from "./studio-canonical-style";
 import type { StudioDesignBlueprint } from "./studio-design-blueprint";
 import type { CanonicalDesignSystem } from "./studio-design-tokens";
 
+// The only external stylesheet host the design system itself uses for fonts
+// (`CanonicalDesignSystem.typography.googleFontUrl`). Anything else stays an
+// unmarked external stylesheet, which the photo contract rejects.
+const STUDIO_FONT_STYLESHEET_HOSTS = new Set(["fonts.googleapis.com"]);
+
+function isStudioFontStylesheet(href: string | null): boolean {
+	if (!href) return false;
+	try {
+		const url = new URL(href, "https://studio.invalid");
+		return (
+			url.protocol === "https:" &&
+			STUDIO_FONT_STYLESHEET_HOSTS.has(url.hostname)
+		);
+	} catch {
+		return false;
+	}
+}
+
 export function generateDesignSystemHtmlHeader(
 	tokens: CanonicalDesignSystem,
 	usesTailwind = true,
@@ -109,6 +127,14 @@ export function enforceDesignSystemOnHtml(
 			"#studio-design-tokens, #studio-tailwind-tokens, #studio-blueprint-tokens, [data-studio-font]",
 		))
 			element.remove();
+		// A model-authored font stylesheet from the sanctioned font host is not an
+		// image channel. Mark it like the injected token font link so the photo
+		// contract can distinguish it from arbitrary external CSS.
+		for (const link of document.querySelectorAll(
+			'link[rel="stylesheet"]:not([data-studio-font])',
+		))
+			if (isStudioFontStylesheet(link.getAttribute("href")))
+				link.setAttribute("data-studio-font", "1");
 		if (tokens) {
 			const fragment = document.createElement("template");
 			fragment.innerHTML = generateDesignSystemHtmlHeader(
