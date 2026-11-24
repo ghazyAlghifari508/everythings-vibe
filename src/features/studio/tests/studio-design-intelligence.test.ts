@@ -580,4 +580,37 @@ describe("card-only public composition stays a bounded structural signal", () =>
 		expect(repairable).toEqual([]);
 		expect(warnings.length).toBeGreaterThan(0);
 	});
+
+	it("classifies the semantic-navigation and photo-contract complaints", () => {
+		const expected: Array<[string, string]> = [
+			["Duplicate project chrome: header.", "DUPLICATE_PROJECT_CHROME"],
+			["Model-owned screens must not execute scripts.", "UNSAFE_SCRIPT"],
+			["Provide one nonempty screen content region.", "CONTENT_REGION_INVALID"],
+			["Name the primary navigation landmark.", "NAVIGATION_LANDMARK_MISSING"],
+			["Duplicate primary destination: explore.", "DUPLICATE_NAVIGATION"],
+			[
+				"Incorrect current destination: explore.",
+				"NAVIGATION_CURRENT_MISMATCH",
+			],
+			[
+				"Search control must filter a real collection or be a disabled prototype field.",
+				"SEARCH_UNBOUND",
+			],
+			[
+				"Planned photo slot is missing; do not replace it with decorative artwork.",
+				"PHOTO_SLOT_MISSING",
+			],
+			["Missing planned photo slot: hero.", "PHOTO_SLOT_MISSING"],
+			[
+				"Use standalone CSS; external stylesheets cannot introduce unapproved images.",
+				"EXTERNAL_STYLESHEET",
+			],
+			[
+				"Declared carousel allows cards to shrink; preserve readable item width.",
+				"CAROUSEL_SHRINK",
+			],
+		];
+		for (const [message, code] of expected)
+			expect(studioIssueCode(message)).toBe(code);
+	});
 });

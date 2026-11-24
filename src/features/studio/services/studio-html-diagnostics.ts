@@ -305,6 +305,25 @@ const ISSUE_CODE_PATTERNS: Array<[RegExp, string]> = [
 	[/wide data table without/i, "UNCONTAINED_WIDE_TABLE"],
 	[/Posisi fixed tidak diizinkan/, "DISALLOWED_FIXED_POSITION"],
 	[/Posisi sticky tidak diizinkan/, "DISALLOWED_STICKY_POSITION"],
+	// P11 Fix 06 semantic-navigation and photo-contract complaints. Without these
+	// the structured log reported them all as UNCLASSIFIED, hiding which contract
+	// a frame actually broke.
+	[/Duplicate project chrome/i, "DUPLICATE_PROJECT_CHROME"],
+	[/must not execute scripts/i, "UNSAFE_SCRIPT"],
+	[/Unsafe executable URL/i, "UNSAFE_URL"],
+	[/one nonempty screen content region/i, "CONTENT_REGION_INVALID"],
+	[/Name the primary navigation landmark/i, "NAVIGATION_LANDMARK_MISSING"],
+	[/Duplicate primary destination/i, "DUPLICATE_NAVIGATION"],
+	[/Incorrect current destination/i, "NAVIGATION_CURRENT_MISMATCH"],
+	[/Search control must filter a real collection/i, "SEARCH_UNBOUND"],
+	[/supplied product logo/i, "LOGO_MISSING"],
+	[/Planned photo slot is missing/i, "PHOTO_SLOT_MISSING"],
+	[/Missing planned photo slot/i, "PHOTO_SLOT_MISSING"],
+	[/each planned photo slot once/i, "PHOTO_SLOT_DUPLICATE"],
+	[/Unapproved image reference/i, "UNAPPROVED_IMAGE"],
+	[/CSS image URLs/i, "UNAPPROVED_IMAGE"],
+	[/external stylesheets cannot introduce/i, "EXTERNAL_STYLESHEET"],
+	[/Declared carousel allows cards to shrink/i, "CAROUSEL_SHRINK"],
 ];
 
 /**
