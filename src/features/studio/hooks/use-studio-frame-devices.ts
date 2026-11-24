@@ -33,11 +33,13 @@ export function useStudioFrameDevices({
 	const validIds = useMemo(() => new Set(frameIds), [frameIdsKey]);
 	const [frameDevices, setFrameDevices] = useState<
 		Readonly<Record<string, StudioDevice>>
-	>(() => readStudioFrameDevices(key, frameIdsRef.current));
-	const [loadedKey, setLoadedKey] = useState(key);
+	>({});
+	const [loadedKey, setLoadedKey] = useState<string | null>(null);
 
 	// A different workspace owns a different session bucket. Load before any
 	// write so the previous project's map can never leak into the new one.
+	// This deliberately runs after mount: the first client render must match the
+	// server markup, which cannot see the per-session viewport preference.
 	useEffect(() => {
 		setFrameDevices(readStudioFrameDevices(key, frameIdsRef.current));
 		setLoadedKey(key);
