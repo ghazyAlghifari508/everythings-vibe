@@ -284,9 +284,11 @@ write still persists.
 
 **Browser effect:** reload of the same workspace now reports **0 console errors**
 (the `Detail Paket` frame still re-renders at 1440 px from its preset), and the
-38 tests of the canvas/toolbar selection suites still pass. The only remaining
-console output is the pre-existing TanStack Router bundle-split advisory for
-`bantuan.tsx`, `templates.tsx` and `plan/index.tsx`, which are outside Studio.
+38 tests of the canvas/toolbar selection suites still pass. Both generated
+projects (`39199f74`, `c3f94438`) were reloaded afterwards with the console
+cleared: **0 errors each**. The only remaining console output is the pre-existing
+TanStack Router bundle-split advisory for `bantuan.tsx`, `templates.tsx` and
+`plan/index.tsx`, which are outside Studio.
 
 ---
 
