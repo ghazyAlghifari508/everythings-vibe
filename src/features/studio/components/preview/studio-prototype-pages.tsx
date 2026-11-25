@@ -73,8 +73,15 @@ export function StudioPrototypeDrawer({
 	...list
 }: PageListProps & { open: boolean; onOpenChange: (open: boolean) => void }) {
 	return (
-		<Drawer.Backdrop isOpen={open} onOpenChange={onOpenChange}>
-			<Drawer.Content placement="right">
+		<Drawer.Backdrop
+			isOpen={open}
+			onOpenChange={onOpenChange}
+			className="fixed inset-0 z-50 h-dvh w-full bg-black/60"
+		>
+			<Drawer.Content
+				className="pointer-events-none fixed inset-0 z-50 flex h-dvh w-full justify-end"
+				placement="right"
+			>
 				<Drawer.Dialog className="flex h-full w-80 max-w-[85vw] flex-col border-l border-graphite bg-obsidian text-snow">
 					<Drawer.Header className="flex h-12 shrink-0 items-center justify-between border-b border-graphite px-4">
 						<Drawer.Heading className="text-xs font-semibold uppercase tracking-wider text-fog">
