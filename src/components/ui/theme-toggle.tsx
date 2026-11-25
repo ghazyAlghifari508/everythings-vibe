@@ -23,7 +23,7 @@ export function ThemeToggle() {
 		<button
 			type="button"
 			onClick={() => setTheme(isDark ? "light" : "dark")}
-			className="flex h-8 w-8 items-center justify-center rounded-md text-fog transition-colors duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-white/5 hover:text-snow focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-fog/40"
+			className="flex h-11 w-11 items-center justify-center rounded-md text-fog transition-colors duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-white/5 hover:text-snow focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-fog/40 md:h-8 md:w-8"
 			aria-label={actionLabel}
 			title={actionLabel}
 		>

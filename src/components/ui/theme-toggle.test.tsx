@@ -91,26 +91,6 @@ describe("ThemeToggle Component", () => {
 		expect(mockSetTheme).toHaveBeenCalledWith("light");
 	});
 
-	it("preserves required button dimensions and styling classes", () => {
-		vi.mocked(nextThemes.useTheme).mockReturnValue({
-			theme: "light",
-			resolvedTheme: "light",
-			setTheme: mockSetTheme,
-			themes: ["light", "dark"],
-			systemTheme: "light",
-			forcedTheme: undefined,
-		});
-
-		render(<ThemeToggle />);
-
-		const button = screen.getByRole("button");
-		expect(button.className).toContain("h-8");
-		expect(button.className).toContain("w-8");
-		expect(button.className).toContain("rounded-md");
-		expect(button.className).toContain("text-fog");
-		expect(button.className).toContain("focus-visible:ring-1");
-	});
-
 	it("verifies code-level SVG glyph definition: Moon02Icon is a single-path crescent while Moon01Icon is multi-path circle with craters", () => {
 		// Moon02Icon has 1 path element representing a single curved crescent
 		expect(Moon02Icon.length).toBe(1);

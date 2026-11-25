@@ -18,7 +18,7 @@ import {
 	useNavigate,
 	useRouter,
 } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { canShowNavbarTopUp } from "@/components/layout/navbar-topup-helper";
 import { Icon } from "@/components/ui/icon";
 import { Logo } from "@/components/ui/logo";
@@ -43,6 +43,16 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 	const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 	const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 	const [isTopUpOpen, setIsTopUpOpen] = useState(false);
+	useEffect(() => {
+		if (!isMobileMenuOpen) return;
+
+		function handleKeyDown(event: KeyboardEvent) {
+			if (event.key === "Escape") setIsMobileMenuOpen(false);
+		}
+
+		document.addEventListener("keydown", handleKeyDown);
+		return () => document.removeEventListener("keydown", handleKeyDown);
+	}, [isMobileMenuOpen]);
 	const router = useRouter();
 	const navigate = useNavigate();
 	const pathname = useLocation({ select: (l) => l.pathname });
@@ -206,7 +216,7 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 					{!isFlowStepRoute && !isCodebaseSyncRoute && (
 						<button
 							type="button"
-							className="md:hidden p-2 text-fog hover:text-snow transition-colors shrink-0"
+							className="md:hidden inline-flex h-11 w-11 items-center justify-center text-fog transition-colors hover:text-snow shrink-0"
 							onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
 							aria-label="Toggle menu"
 							aria-expanded={isMobileMenuOpen}
