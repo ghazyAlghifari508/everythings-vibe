@@ -1,5 +1,6 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render as renderBase, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StudioLandingPage } from "../components/workspace/studio-landing-page";
 
@@ -14,6 +15,25 @@ vi.mock("@tanstack/react-router", () => ({
 vi.mock("@/lib/auth-client", () => ({
 	authClient: { useSession: () => ({ data: null }) },
 }));
+
+const queryClient = new QueryClient({
+	defaultOptions: { queries: { retry: false } },
+});
+
+// The Studio workspace reads plan state through react-query, so every render
+// and rerender keeps the provider mounted.
+function render(ui: React.ReactElement) {
+	const view = renderBase(
+		<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+	);
+	return {
+		...view,
+		rerender: (next: React.ReactElement) =>
+			view.rerender(
+				<QueryClientProvider client={queryClient}>{next}</QueryClientProvider>,
+			),
+	};
+}
 
 describe("StudioLandingPage Layout Geometry", () => {
 	const mockHistory = [

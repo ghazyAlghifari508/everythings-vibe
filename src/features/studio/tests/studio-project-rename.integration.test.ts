@@ -114,9 +114,12 @@ const BRIEF = 'Dasbor penjualan harian untuk tim growth "Aroma"';
 
 async function createUser(): Promise<string> {
 	const userId = crypto.randomUUID();
-	await db
-		.insert(users)
-		.values({ id: userId, email: `${userId}@example.test` });
+	await db.insert(users).values({
+		id: userId,
+		email: `${userId}@example.test`,
+		// Planning behaviour under test; exempt owners skip the Free trial.
+		billingExempt: true,
+	});
 	return userId;
 }
 

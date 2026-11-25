@@ -243,7 +243,9 @@ describe("Studio and Scrape domain boundary", () => {
 		expect(scriptEntryFile("scrape:worker")).toBe(
 			"src/features/scrape/services/scrape-worker.ts",
 		);
-		expect(scriptEntryFile("dev:all")).toBe(
+		// `dev:all` first builds the Studio skill assets, then delegates to the
+		// scrape orchestrator entry point.
+		expect(scriptValue("dev:all") ?? "").toContain(
 			"src/features/scrape/services/scrape-dev-all.ts",
 		);
 		expect(scriptValue("scrape:worker") ?? "").not.toContain("vite");

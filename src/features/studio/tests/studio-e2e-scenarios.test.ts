@@ -144,7 +144,11 @@ const sampleDesignMd = `# MindMarket — Style Reference
 describe("End-to-End Multi-Screen Generation Scenarios", () => {
 	// Helper to get or create a real user in the DB
 	async function getTestUserId(): Promise<string> {
-		const [u] = await db.select({ id: users.id }).from(users).limit(1);
+		const [u] = await db
+			.select({ id: users.id })
+			.from(users)
+			.where(eq(users.email, "e2e@example.com"))
+			.limit(1);
 		if (u) return u.id;
 		const [created] = await db
 			.insert(users)
@@ -152,6 +156,7 @@ describe("End-to-End Multi-Screen Generation Scenarios", () => {
 				id: `e2e-test-user-${Date.now()}`,
 				name: "E2E Test User",
 				email: "e2e@example.com",
+				billingExempt: true,
 			})
 			.returning();
 		return created.id;

@@ -17,6 +17,7 @@ describe("Studio PRD Persistence & Ownership", () => {
 			id: userId,
 			email: `${userId}@example.test`,
 			name: "PRD Test User",
+			billingExempt: true,
 		});
 
 		const prdContent = `# CatatDompet PRD\n\n## 1. Overview\nPersonal finance tracking app.\n\n## 2. Core Features\n- Catat Pengeluaran\n- Anggaran Bulanan\n- Laporan Keuangan`;
@@ -76,6 +77,7 @@ describe("Studio PRD Persistence & Ownership", () => {
 			id: userId,
 			email: `${userId}@example.test`,
 			name: "Legacy User",
+			billingExempt: true,
 		});
 
 		const { project } = await createStudioProjectWithJob(userId, {
@@ -103,6 +105,7 @@ describe("Studio PRD Persistence & Ownership", () => {
 			id: userId,
 			email: `${userId}@example.test`,
 			name: "Dedup Test User",
+			billingExempt: true,
 		});
 
 		const prompt = "Buat aplikasi marketplace produk lokal Indonesia";

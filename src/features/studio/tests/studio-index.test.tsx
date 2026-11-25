@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
 	cleanup,
 	fireEvent,
-	render,
+	render as renderBase,
 	screen,
 	waitFor,
 	within,
@@ -28,9 +29,14 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 
 vi.mock("@tanstack/react-start", () => ({
-	createServerFn: () => ({
-		handler: (fn: unknown) => fn,
-	}),
+	createServerFn: () => {
+		// Server functions chain .validator(...) before .handler(...).
+		const builder = {
+			validator: () => builder,
+			handler: (fn: unknown) => fn,
+		};
+		return builder;
+	},
 	createServerOnlyFn: (fn: unknown) => fn,
 }));
 
@@ -43,6 +49,25 @@ vi.mock("@/lib/auth-client", () => ({
 }));
 
 import { Route } from "@/routes/design/index";
+
+const queryClient = new QueryClient({
+	defaultOptions: { queries: { retry: false } },
+});
+
+// The Studio workspace reads plan state through react-query, so every render
+// and rerender keeps the provider mounted.
+function render(ui: React.ReactElement) {
+	const view = renderBase(
+		<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+	);
+	return {
+		...view,
+		rerender: (next: React.ReactElement) =>
+			view.rerender(
+				<QueryClientProvider client={queryClient}>{next}</QueryClientProvider>,
+			),
+	};
+}
 
 describe("StudioPage UI & Workflow", () => {
 	const defaultHistory = [

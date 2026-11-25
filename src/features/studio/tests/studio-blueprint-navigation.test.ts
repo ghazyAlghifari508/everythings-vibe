@@ -127,9 +127,13 @@ const owners: string[] = [];
 async function seedThreeScreenProject() {
 	const userId = crypto.randomUUID();
 	owners.push(userId);
-	await db
-		.insert(users)
-		.values({ id: userId, email: `${userId}@example.test` });
+	await db.insert(users).values({
+		id: userId,
+		email: `${userId}@example.test`,
+		// These suites cover frame behaviour, not billing; exempt owners take
+		// the paid path instead of the one-shot Free trial.
+		billingExempt: true,
+	});
 
 	const [project] = await db
 		.insert(studioProjects)
