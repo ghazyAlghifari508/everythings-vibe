@@ -180,7 +180,7 @@ Berdasarkan audit riil codebase setelah refactor credit modal (per Oktober 2026)
 
 - [ ] Seluruh file kode produksi di bawah `src/` berukuran $\le$ 400 baris. Tersisa `codebase-resync-modal.tsx` (467 baris); `routeTree.gen.ts` dikecualikan sebagai generated source.
 - [x] Nol type bypass (`as any`, `as never`, `@ts-ignore` dilarang per `no-type-bypass.md`): terverifikasi nol pada source produksi authored.
-- [ ] Seluruh test suite Vitest tetap hijau tanpa pelunakan assertions. 5259 lulus, 3 gagal pre-existing di luar scope refactor: `agent-thinking.test.tsx` (timeout), `scrap.$id.test.tsx` (timeout), dan `payment-service.test.ts` (membaca facade `src/db/schema.ts` yang sudah dimodularisasi; tabel `payments`/`subscriptions` kini di `src/db/schema/billing.ts`).
+- [ ] Seluruh test suite Vitest tetap hijau tanpa pelunakan assertions. Status p16 (2026-11-25): 670 file, 6696 tes, 6665 lulus, 6 gagal. Sisa kegagalan bukan cacat kode: `studio-worker-lock.integration.test.ts` dan `studio-e2e-scenarios.test.ts` menunggu worker `dev:all` berhenti karena worker aktif memegang advisory lock dispatch, dan `agent-thinking.test.tsx` flaky di bawah beban paralel (lulus 17/17 saat dijalankan sendiri). `scrap.$id.test.tsx` sudah ditutup dengan timeout realistis, dan `payment-service.test.ts` lulus.
 
 ---
 
