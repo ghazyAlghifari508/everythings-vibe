@@ -315,6 +315,10 @@ const ISSUE_CODE_PATTERNS: Array<[RegExp, string]> = [
 	[/Name the primary navigation landmark/i, "NAVIGATION_LANDMARK_MISSING"],
 	[/Duplicate primary destination/i, "DUPLICATE_NAVIGATION"],
 	[/Incorrect current destination/i, "NAVIGATION_CURRENT_MISMATCH"],
+	// The most frequent model-owned rejection ("Link must name a valid local
+	// section, destination, parent, or planned action.") had no pattern, so the
+	// structured log reported the actual contract breach as UNCLASSIFIED.
+	[/Link must name a valid local section/i, "NAVIGATION_LINK_INVALID"],
 	[/Search control must filter a real collection/i, "SEARCH_UNBOUND"],
 	[/supplied product logo/i, "LOGO_MISSING"],
 	[/Planned photo slot is missing/i, "PHOTO_SLOT_MISSING"],

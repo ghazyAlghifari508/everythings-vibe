@@ -593,6 +593,10 @@ describe("card-only public composition stays a bounded structural signal", () =>
 				"NAVIGATION_CURRENT_MISMATCH",
 			],
 			[
+				"Link must name a valid local section, destination, parent, or planned action.",
+				"NAVIGATION_LINK_INVALID",
+			],
+			[
 				"Search control must filter a real collection or be a disabled prototype field.",
 				"SEARCH_UNBOUND",
 			],
