@@ -4,7 +4,15 @@
 requirements transferred out of P11 (`p12.md` §2) and the P11 Fix 01–06 claims.
 **Branch:** `feature/vibedesign-design-studio`
 **Date:** 2026-11-25 (local +07).
-**Verdict:** Browser QA completed for the observed surfaces; **five product defects were found and fixed** (§5). The result is **not a full acceptance pass**: the 60-second frame target was missed, Journey 1 produced one of five frames, and physical trackpad gestures, several Markdown nodes, and uploaded imagery remain unverified. One browser accessibility advisory remains (§7). No claim of zero bugs or complete acceptance is made.
+**Verdict:** Browser QA was run twice. The first pass is §1–§8; the continuation
+run that re-verified every transferred requirement after the fixes is §9, and
+§9 supersedes the journey and verdict tables above it where they disagree.
+Across both runs **eleven product defects were found and fixed** (§5, §9.4). The
+result is still **not a blanket acceptance pass**: the 60-second first-frame
+target is missed for a measured provider reason (§9.6), one cross-screen sample
+data inconsistency remains open (§9.5), and physical trackpad pinch plus four
+Markdown node types could not be produced in this environment (§9.7). No claim of
+zero bugs or complete acceptance is made.
 
 ---
 
@@ -353,6 +361,11 @@ the drawer. The post-fix console had no `PressResponder` warning. Screenshot:
 
 ## 7. Residual gaps (explicit)
 
+> This list is the first pass. §9 re-checked it: the accessibility advisory (5)
+> is resolved by D6/D11, and uploaded imagery (1) is verified in Journey 5.
+> Trackpad pinch, the Markdown node types, the runtime script and the missing
+> Pexels key still stand — see §9.7.
+
 1. Physical trackpad pinch, two-finger momentum, touch pinch, and an uploaded user
    logo/reference image were not exercised.
 2. The live preview includes a Studio-injected Pencil message bridge in an iframe
@@ -387,3 +400,152 @@ the drawer. The post-fix console had no `PressResponder` warning. Screenshot:
   without committed frames were deleted after the run. The legacy project `f595b052`
   keeps its original HTML; the two Pencil edits were reverted through the product's
   durable undo (revision 3 = original bytes).
+---
+
+## 9. Continuation run — second real-browser pass
+
+The first pass (§1–§8) recorded every requirement, then six further product
+defects were found while re-driving the same surface; the worker was restarted
+with the fixed code and every transferred requirement was re-checked. Where §9
+and §1–§8 disagree, §9 is the current result.
+
+### 9.1 Environment and harness notes
+
+| Component | Value |
+|:--|:--|
+| App server | existing `vite dev --port 3001` instance (module-level fixes hot-reload on request) |
+| Studio worker | restarted `11:50:35` as `studio-worker-p12b` with `STUDIO_DEBUG_ISSUES=1`; the first worker had been running since `09:18` and could not show post-fix behaviour |
+| Browser | Chrome DevTools MCP, same profile; page rendered at **1707×917 CSS px, DPR 1.125** while the MCP reported a 557×920 emulation |
+| Database | local PostgreSQL `novaplan` (real frames, real ledger) |
+| Model gateway | `prdfy-combo`, answered as `gemini-3.8-flash-n` |
+
+Harness limitation, stated so the method is auditable: because the MCP's viewport
+metadata disagreed with the real viewport, `click` refused every control beyond
+x≈557 with *"element did not become interactive"*. Those controls were activated
+through the page's own handlers (`element.click()`) and every effect was then read
+back from the DOM, the network log, or the database — no state was written
+directly. `take_screenshot` intermittently exceeded 120 s; only completed captures
+are listed in §9.8.
+
+### 9.2 Journeys after the fixes
+
+| Journey | Project | Result | Evidence |
+|:--|:--|:--|:--|
+| 1 — Jelajahin mobile | `fff7e4f0` | **4 of 5 frames ready** | Ready: Jelajah Destinasi (30,955 chars), Detail Paket Wisata (40,475), Pembayaran Paket (27,159), Tiket Saya (28,009). Formulir Pemesanan stayed failed after a retry that hit a real provider timeout (§9.6). Preview listed 4 pages; chat reported “4 dari 5 layar dibuat” and “1 layar perlu dicoba ulang”. |
+| 2 — Public portfolio | `39199f74` | **3 of 3 ready** | The failed “Beranda & Narasi Studio” retry completed; Jurnal Studi Kasus 48,369 and Jadwal Konsultasi 48,444 were already ready. |
+| 3 — Finance workspace | `c3f94438` | **1 of 4 ready** | Ringkasan Saldo & Kategori is the only ready frame (47,872 chars). Buku Kas & Transaksi, Input Transaksi Baru and Ekspor Laporan Bulanan were all retried through the canvas; each failed with `STUDIO_CONTRACT_VIOLATION` after the single bounded correction round, and each now reports the honest copy “Gagal memproses desain. Silakan coba lagi.” (12:08:38→12:23:20). Verdicts below are limited to the ready frame. |
+| 4 — Revision and export | `f595b052` | PASS (mechanics) | Earlier pass: Pencil scoped edit, durable undo to the original bytes, ZIP export with 0 authored scripts. This pass re-exercised the shared document path through tests only; the export bytes were not re-downloaded. |
+| 5 — Uploaded imagery | `68ced19e` (new) | **1 of 1 ready** | Real upload through *Pilih tampilan → Punya Saya*: DESIGN.md + `favicon.png`. Frame “Beranda” (52,534 chars) references the signed asset `…/api/studio/asset?id=9e3f19ff…`; the preview serves exactly one inlined `data:image/png;base64,iVBOR…` and renders it. |
+
+### 9.3 Requirement-by-requirement verdict (second pass)
+
+Legend as §2: **PASS**, **PARTIAL**, **FAIL**.
+
+| Requirement | Verdict | Evidence |
+|:--|:--|:--|
+| First frame is real HTML, not a JPEG/screenshot | **PASS** | Preview iframe renders `about:srcdoc` documents of 49,488 / 71,440 chars; no image-as-artboard. Canvas artboards size themselves from the isolated document. |
+| Generated HTML standalone and valid after capture/export | **PASS** | Same committed document feeds canvas, preview and export (§5 Fix 02 finalize path); export cleanliness test asserts 0 scripts. |
+| No script execution or unsafe URL in the preview | **PARTIAL** | Rendered srcdoc: **0 event-handler attributes, 0 `javascript:`/`vbscript:`/`data:` URLs**, but exactly **1** Studio runtime script (Pencil/prototype bridge) under `sandbox="allow-scripts"`. Exported HTML has 0 scripts. Unchanged from the first pass: the live sandbox is not script-free by design. |
+| Canvas pan/zoom and frame selection | **PASS** | Toolbar zoom moved 50 % → 60 %; wheel pan moved the track from `translate(440px,16px)` to `translate(440px,-224px)` at constant `scale(0.6)`. Selection and marquee behaviour are unchanged from §2.2. Ctrl/Cmd+wheel is intentionally left to the browser (accessibility zoom) — verified: five synthetic Ctrl+wheel events changed neither zoom nor transform. |
+| Toolbar actions apply to the selected frame only | **PASS** | Unchanged from §2.2 (single-frame reflow, 0 network requests). |
+| Result cards open the correct frame with a truthful preview | **PASS** | Focusing “Detail Paket Wisata” from the chat row mounted that frame (`iframe` count 1, title matches); rows without HTML show the failure panel, never a fabricated preview. |
+| Pencil edits scoped to the intended frame | **PASS** | Unchanged from §2.3 (revision 1→2 in one frame, other frames byte-identical). |
+| Revisions preserve content, credits and screen ids | **PASS** | Unchanged from §2.3; durable undo restored the original bytes. |
+| Failed/partial revisions report honestly | **PASS** | A retried frame that hit a provider timeout now reports **“Gagal memproses desain. Silakan coba lagi.”** in the frame panel and the chat row (“Belum berhasil.”), not the planning message. Previously this exact path reported “Rencana layar belum berhasil disusun.” |
+| Explanations grounded in real screens | **PASS** | Explanation names committed screens and their DOM facts (“Terlihat di layar: …”) plus the prototype disclaimer. |
+| Operational status separate from explanatory content | **PASS** | `<output>` “1 layar perlu dicoba ulang” and per-row states are separate from the prose. |
+| Single/multi/add/revision/failed/partial distinguishable | **PASS** | “4 dari 5 layar dibuat”, per-row “Belum berhasil”, “Sedang dibuat”, and the failure sentence naming the screen. |
+| Safe Markdown: paragraphs, lists, bold, headings, inline code, links | **PARTIAL** | Rendered turn: 6 `<strong>`, 4 `<ul>`, 9 `<li>`, 1 `<h2>`, 1 `<h3>`, 0 `<script>`. Inline code, fenced code, blockquote and links did not occur because the composer has no non-generating “explain” intent (`add_screen` / `revise_selected` / `revise_project` / `clarify`); asking for an explanation would create a paid revision job, so this was not forced. |
+| Long messages keep the composer in view; prompt recoverable | **PASS** | Unchanged from §2.4 (composer stayed on screen at both scroll extremes). |
+| Stale updates cannot replace newer explanations; no duplicates after reload | **PASS** | Reload produced exactly 5 result rows and one heading — no duplicated frames or messages. |
+| Suggestions vertical, submit the correct prompt | **PASS** | Unchanged from §2.5. |
+| Composer usable during jobs | **PASS** | Unchanged from §2.5. |
+| No credit charge for displaying explanations | **PASS** | Unchanged from §2.5 (no ledger write on open/scroll/reload). |
+| Navigation follows the product journey | **PASS** | Blueprint destinations = `jelajah`, `tiket-saya`; Detail/Formulir/Pembayaran are contextual with parent `jelajah`. All 4 ready frames render both primary labels and no Home tab. |
+| No forced navbar/hero/KPI/card-quota/back-bar defaults | **PASS** | Unchanged from §2.6; Finance frames are tables/forms, portfolio frames editorial. |
+| Search controls filter a real collection or are absent/disabled | **PASS** | Jelajahin search is `disabled` with `aria-label`; the prototype audit shows **`id="studio-search-1" name="studio-search-1"`** on the rendered document — the accessibility advisory of §7.5 is resolved on this surface. |
+| Sample names/prices/dates/currency/statuses consistent and illustrative | **FAIL** | Same package is `Rp 2.850.000` on Jelajah and Detail but `Rp2.450.000` on Pembayaran (also different spacing); booking id is `#JLJ-88429` on Pembayaran and `JLJ-LBJ-88291` on Tiket. Dates and statuses do come from the declared ledger (18/20/24 Agu 2025, 3H2M ⇒ 22 Agu end date). See §9.5. |
+| Approved photography resolved into the planned slot with ratio/alt/attribution | **PASS** | Jelajah: 3 slots, 2 resolved Flickr photos (natural width available) with visible “Foto: dany13 · Openverse — CC BY 2.0” credits and links; Detail: 4 slots with credits. |
+| Provider failure → honest fallback, no SVG/gradient impersonation | **PASS** | One planned slot renders “Foto tidak tersedia: Labuan Bajo Komodo Island”; 0 `<svg>` scenery substitutes in the region. |
+| User-provided imagery remains usable | **PASS** | Journey 5: uploaded PNG is carried through planning and generation and is served inline in the preview. |
+| Legacy projects keep their shell; model-owned keep model chrome | **PASS** | Unchanged from §2.6. |
+
+### 9.4 Defects found and fixed in this pass
+
+| # | Defect | Reproduction | Cause | Fix / test | Browser effect |
+|:--|:--|:--|:--|:--|:--|
+| D6 | A model-owned search field had no `id`/`name` in the canvas preview | Open a model-owned frame whose search input has only `aria-label` | The deterministic repair ran during generation but not when the persisted document was served | `finalizeStudioFrameDetail` repairs model-owned documents; `studio-document-persistence-p5.integration.test.ts` | Advisory cleared on the served document |
+| D7 | A frame retry failure was described as a planning failure | Fail a retry job (provider timeout) | `sharedPlanningCompleted` started `false` for every job type | `studio-job-pipeline.ts` initialises it from `jobType`; recovery integration test asserts the public copy | “Gagal memproses desain. Silakan coba lagi.” visible in frame and chat |
+| D8 | The most frequent contract breach logged as `UNCLASSIFIED` | Fail a model-owned frame on “Link must name a valid local section…” | `studioIssueCode()` had no pattern for it | pattern + classification test | Worker log now reports `NAVIGATION_LINK_INVALID` for those issues |
+| D9 | Repairable structural findings logged as `UNCLASSIFIED` | Any frame with a clipped/clipped-row/atomic-label finding | same re-derivation from message text | five patterns (`ESSENTIAL_TEXT_CLIPPED`, `CRITICAL_CONTENT_HIDDEN`, `ATOMIC_LABEL_BROKEN`, `MEDIA_FRAME_CONFLICT`, `NARROW_COMPOSITION`) | Structured logs name the actual finding |
+| D10 | Uploaded logo preview was broken | Upload any image in *Pilih tampilan → Punya Saya* | The preview used the bare base64 payload as `src`, so the browser resolved it as a relative path | `src={data:${mimeType};base64,${data}}`; picker test asserts the data URL | Preview decoded (`naturalWidth: 64`) and the apply button enabled |
+| D11 | The prototype viewer skipped the accessibility repair | Open a model-owned frame in `/design/$id/preview` | The viewer builds its own isolated document and never called the repair | repair applied before isolation; `studio-prototype-server-p10.test.ts` | Rendered srcdoc gained `id="studio-search-1" name="studio-search-1"` |
+
+All six are committed separately: `e9fcfd58` (D6), `e8d76ef7` (D7), `64470fd2`
+(D8), `1c813b44` (D9), `56a2d5e2` (D10), `e589fb99` (D11).
+
+### 9.5 Open defect: cross-screen sample data drifts
+
+The planner records a shared ledger (`blueprint.sampleData`) but only for
+`currency`, `dateFormat`, `sampleDates` and `sampleStatuses`. Frames are asked to
+reuse it; nothing validates the reuse, and the ledger carries no price or
+identifier, so those drift:
+
+| Field | Jelajah Destinasi | Detail Paket Wisata | Pembayaran Paket | Tiket Saya |
+|:--|:--|:--|:--|:--|
+| Package price | `Rp 2.850.000` | `Rp 2.850.000` | **`Rp2.450.000`** | — |
+| Total shown | — | — | `Rp4.900.000` (= 2 × 2.450.000) | — |
+| Booking id | — | — | **`#JLJ-88429`** | **`JLJ-LBJ-88291`** |
+| Departure | 20 Agu 2025 | 18 Agu 2025 | 18 Agu 2025 | 20 Agu 2025 |
+| Duration end | — | 3H2M | — | 22 Agu 2025 (derived, consistent) |
+
+Reproduction: open `fff7e4f0` → preview → compare the package card on *Jelajah
+Destinasi*/*Detail Paket Wisata* with the “Rincian Tagihan” block on *Pembayaran
+Paket* and the ticket code on *Tiket Saya*.
+
+This is left open deliberately. Closing it means extending the planning contract
+with sample entities (name/price/booking id) and rejecting a frame that contradicts
+them — a contract change with its own false-positive surface, not a one-line
+repair. The first pass recorded the same class as a minor date-spelling deviation
+(§2.6); with the full five-screen flow it is larger.
+
+### 9.6 Performance (real timings, unmodified)
+
+| Measurement | Value |
+|:--|:--|
+| Target: first valid, visibly rendered HTML frame < 60 s | **NOT MET** |
+| Fastest observed single frame request (one attempt) | first token 21.3 s + 83.2 s output = **104.5 s**; this is the floor before any planning or correction |
+| New project `68ced19e`: submit → first ready frame | **577,537 ms (9 m 37.5 s)**; planning 22.4 s (two attempts, first invalid), frame 159.4 s + correction 180.1 s |
+| `fff7e4f0` Detail Paket retry | 303,000 ms total: attempt 1 first token 57.6 s / output 133.5 s (invalid), attempt 2 first token 89.8 s / output 133.4 s (valid) |
+| `fff7e4f0` Pembayaran / Tiket retries | 253,000 ms and 193,000 ms |
+| `fff7e4f0` Formulir retry under the fixed worker | 374,228 ms; attempt 1 output 83.2 s then a wrapped `STUDIO_PROVIDER_TIMEOUT` on attempt 2 (retried once, classified `provider-request`) |
+| Prompt sizes | frame system 14,116 chars; frame request 18,824–30,085 chars; correction request 45,826–59,726 chars; planning system 17,387, request 6,248–14,971 |
+| Photo resolution | parallel slot events 408–1,647 ms; Openverse only (`STUDIO_PEXELS_API_KEY` unset) |
+| Output vs requested cap | provider returned 14,166–25,259 output tokens against `requestedMaxTokens: 12000` (`accountingAboveRequested: true`, `ceilingReached: false`) |
+
+The 60-second target cannot be met on this combo: the provider alone spends
+21–90 s before the first token and 83–133 s per document, and a frame may need one
+correction round. The unchanged target and the unchanged timestamps are recorded
+here as measured.
+
+### 9.7 Residual gaps
+
+1. Physical trackpad pinch and two-finger momentum were not synthesized (no
+   hardware). Wheel pan and toolbar zoom were verified; Ctrl/Cmd+wheel is
+   intentionally the browser's zoom, verified unchanged.
+2. Inline code, fenced code, blockquote and links were not rendered in chat,
+   because no non-generating explanation intent exists (see §9.3).
+3. The live preview keeps one Studio runtime script under `sandbox="allow-scripts"`;
+   exported documents have none.
+4. `STUDIO_PEXELS_API_KEY` is unset; only the keyless Openverse route ran.
+5. §9.5 cross-screen sample data inconsistency is open.
+6. DevTools screenshot latency prevented a few extra captures; the interactions
+   behind them were still read from the DOM.
+
+### 9.8 Continuation artefacts
+
+- [`journey1-final-preview-state.png`](./p12-evidence/journey1-final-preview-state.png) — Jelajahin prototype preview, real HTML in the phone frame, honest photo fallback.
+- [`journey1-continuation-two-frames.png`](./p12-evidence/journey1-continuation-two-frames.png) — canvas after the Detail Paket retry committed, with the remaining failures still honest.
+- [`journey1-continuation-before.png`](./p12-evidence/journey1-continuation-before.png) — canvas state before the continuation retries.
+- [`journey5-uploaded-logo-frame.png`](./p12-evidence/journey5-uploaded-logo-frame.png) — the new project rendered in the preview with the uploaded logo.
+- Projects touched: `fff7e4f0` (4/5 ready), `39199f74` (3/3 ready), `c3f94438` (1/4 ready; three retries failed on a hard contract), `68ced19e` (new, 1/1 ready, uploaded logo).
