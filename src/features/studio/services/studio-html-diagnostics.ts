@@ -302,6 +302,14 @@ const ISSUE_CODE_PATTERNS: Array<[RegExp, string]> = [
 	[/collisions with canonical shell/i, "SHELL_COLLISION"],
 	[/empty content section/i, "EMPTY_SECTION"],
 	[/suspiciously sparse/i, "SPARSE_CONTENT"],
+	// Structural quality findings already carry a stable code, but the timing
+	// log re-derives it from the message; without these the frame's repairable
+	// defects all read as UNCLASSIFIED.
+	[/Essential control\/option text has an ellipsis/, "ESSENTIAL_TEXT_CLIPPED"],
+	[/Essential content is inside a zero-sized clipping box/, "CRITICAL_CONTENT_HIDDEN"],
+	[/Price or quantity contains forced line tracks/, "ATOMIC_LABEL_BROKEN"],
+	[/Image height exceeds its clipping media frame/, "MEDIA_FRAME_CONFLICT"],
+	[/Nonwrapping action\/option row/, "NARROW_COMPOSITION"],
 	[/wide data table without/i, "UNCONTAINED_WIDE_TABLE"],
 	[/Posisi fixed tidak diizinkan/, "DISALLOWED_FIXED_POSITION"],
 	[/Posisi sticky tidak diizinkan/, "DISALLOWED_STICKY_POSITION"],

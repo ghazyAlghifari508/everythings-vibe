@@ -613,6 +613,26 @@ describe("card-only public composition stays a bounded structural signal", () =>
 				"Declared carousel allows cards to shrink; preserve readable item width.",
 				"CAROUSEL_SHRINK",
 			],
+			[
+				"Essential control/option text has an ellipsis clipping rule; allow full labels to reflow and keep price in its own track.",
+				"ESSENTIAL_TEXT_CLIPPED",
+			],
+			[
+				"Essential content is inside a zero-sized clipping box; restore content-sized flow, not overflow hiding.",
+				"CRITICAL_CONTENT_HIDDEN",
+			],
+			[
+				"Price or quantity contains forced line tracks; keep currency, amount and unit in one atomic group.",
+				"ATOMIC_LABEL_BROKEN",
+			],
+			[
+				"Image height exceeds its clipping media frame without an intentional crop; size the image to the frame and select contain/cover by subject.",
+				"MEDIA_FRAME_CONFLICT",
+			],
+			[
+				"Nonwrapping action/option row has child minimum widths larger than its declared width; stack or wrap tracks without clipping price, quantity or labels.",
+				"NARROW_COMPOSITION",
+			],
 		];
 		for (const [message, code] of expected)
 			expect(studioIssueCode(message)).toBe(code);
