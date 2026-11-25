@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { StudioFrameRow } from "@/db/schema";
 import { GET } from "@/routes/api/studio.frame";
 import { exportProjectAsZip } from "../services/studio-export";
+import { portfolioBlueprint } from "./fixtures/studio-evaluation-fixtures";
 
 const CHANNEL = "11111111-1111-4111-8111-111111111111";
 const OWNER = "user-owner";
@@ -205,6 +206,29 @@ describe("P10 prototype document endpoint", () => {
 		expect(body.interactionCount).toBe(0);
 		expect(body.inertLinks).toBe(1);
 		expect(body.html).toContain("Halo");
+	});
+
+	it("repairs a model-authored search field before the viewer isolates it", async () => {
+		state.project = {
+			...state.project,
+			designBlueprint: {
+				...portfolioBlueprint,
+				compositionOwner: "model",
+			},
+		};
+		state.frames = [
+			frameRow(
+				"f1",
+				"Jelajah",
+				'<!doctype html><html><body><main><input type="search" aria-label="Cari tujuan" disabled></main></body></html>',
+			),
+		];
+		const body = await (await request("f1")).json();
+		const input = new JSDOM(body.html).window.document.querySelector(
+			'input[type="search"]',
+		);
+		expect(input?.id).toBe("studio-search-1");
+		expect(input?.getAttribute("name")).toBe("studio-search-1");
 	});
 
 	it("is read-only: no write, job, credit or generation path is touched", async () => {

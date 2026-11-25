@@ -8,6 +8,7 @@ import {
 } from "../types/studio-prototype";
 import { extractCleanHtml } from "../utils/clean-html";
 import { studioPrototypeRuntimeScript } from "../utils/studio-prototype-runtime";
+import { repairStudioAccessibleLabels } from "./studio-accessible-repair";
 import { extractDesignSystemTokens } from "./studio-design-tokens";
 import {
 	isolateStudioDocument,
@@ -53,9 +54,18 @@ export async function buildStudioPrototypeDocument(
 	const frame = frames.find((entry) => entry.id === input.frameId);
 	if (!frame?.htmlCode || frame.status !== "ready")
 		throw new StudioFrameError("STUDIO_NOT_FOUND");
-	const html = extractCleanHtml(frame.htmlCode);
-	if (!html || html.length > HTML_MAX)
-		throw new StudioFrameError("STUDIO_INVALID_INPUT");
+	const clean = extractCleanHtml(frame.htmlCode);
+	if (!clean) throw new StudioFrameError("STUDIO_INVALID_INPUT");
+	// The canvas and the ZIP export read this same committed document through
+	// `finalizeStudioFrameDetail`, which repairs a model-authored search field
+	// missing an id/name. The prototype viewer builds its own isolated document,
+	// so it must apply the identical repair or the accessibility audit fires on
+	// one surface while the canvas is clean.
+	const html =
+		project.designBlueprint?.compositionOwner === "model"
+			? repairStudioAccessibleLabels(clean)
+			: clean;
+	if (html.length > HTML_MAX) throw new StudioFrameError("STUDIO_INVALID_INPUT");
 	const screens = deriveStudioPrototypeScreens(frames, project.designBlueprint);
 	if (!screens.some((screen) => screen.id === frame.id))
 		throw new StudioFrameError("STUDIO_NOT_FOUND");
