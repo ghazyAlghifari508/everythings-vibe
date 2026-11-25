@@ -318,6 +318,7 @@ Persiapan lokal pada Inisiatif 12 dikerjakan melalui `docs/prompt-random/p4.md`;
 - **Status:** `In Progress` (TASK 06 selesai: fondasi ledger dan registry; rollout belum selesai)
 - **Dokumen:** `docs/universal-credit-ledger.md`
 - [x] TASK 06: ledger `credit_operations` mendukung resource Studio/Scrape, `product`, `funding_source`, `allocation_epoch`, migrasi 0045, registry operasi dengan harga `unconfigured`.
+- [x] Migrasi 0045, 0046, 0047, 0048, 0049 diterapkan ke database dev lokal (`localhost:5432/novaplan`) pada p16; `pnpm db:migrate` bersih dan `analysis-credit.integration.test.ts` lulus. Staging dan production belum.
 - [ ] Terapkan migrasi 0045 ke staging dan production (hentikan writer web dan worker selama migrasi).
 - [ ] TASK 07/09: benchmark dan tarif Studio/Scrape. Tidak ada tarif aktif; jangan isi 0 sebagai placeholder.
 - [x] TASK 10: Trial Studio dan Scrape independen, satu kali per akun Free; reservasi atomik, settlement berdasarkan hasil, dan billing paid tetap legacy.

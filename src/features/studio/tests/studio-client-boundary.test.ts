@@ -190,6 +190,10 @@ describe("Studio client module boundary", () => {
 		);
 		expect(
 			scanRuntimeGraph(roots, {
+				// TanStack Start compiles every `*.functions.ts` module into an RPC
+				// stub in the client build, so its server imports never ship. The
+				// boundary stops the walk there and keeps routes through it honest.
+				boundary: (path) => /\.functions\.ts$/.test(path),
 				violation: (specifier, next) =>
 					SERVER_ONLY_SPECIFIERS.test(specifier) ||
 					Boolean(next && SERVER_ONLY_PATHS.test(next)),

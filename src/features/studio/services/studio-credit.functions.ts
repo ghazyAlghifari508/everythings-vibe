@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { loadStudioQuoteView } from "./studio-credit-adapter.server";
 
 const studioQuoteScopeSchema = z.object({
 	operation: z.enum([
@@ -18,7 +17,12 @@ const studioQuoteScopeSchema = z.object({
 export const loadStudioQuote = createServerFn({ method: "GET" })
 	.validator((input: unknown) => studioQuoteScopeSchema.parse(input))
 	.handler(async ({ data }) => {
-		const { requireUserServer } = await import("@/lib/session");
+		// Server-only modules stay out of the client import graph: the session
+		// and the credit adapter are loaded inside the handler.
+		const [{ requireUserServer }, { loadStudioQuoteView }] = await Promise.all([
+			import("@/lib/session"),
+			import("./studio-credit-adapter.server"),
+		]);
 		const user = await requireUserServer();
 		return loadStudioQuoteView(user.id, data);
 	});

@@ -45,6 +45,10 @@ vi.mock("drizzle-orm", () => ({
 		recorder.ops.push({ op: "ilike", col, value });
 		return { op: "ilike", col, value };
 	},
+	isNull: (col: unknown) => {
+		recorder.ops.push({ op: "isNull", col });
+		return { op: "isNull", col };
+	},
 	or: (...args: unknown[]) => {
 		recorder.ops.push({ op: "or", args });
 		return { op: "or", args };
@@ -64,29 +68,71 @@ vi.mock("drizzle-orm", () => ({
 	),
 }));
 
-vi.mock("@/db", () => ({
-	db: {
-		select: (shape: Record<string, unknown>) => {
-			if (shape && "total" in shape) {
-				return {
-					from: () => ({
+vi.mock("@/db", () => {
+	interface FakeChain {
+		orderBy: (...orderArgs: unknown[]) => {
+			limit: (limit: number) => {
+				offset: (offset: number) => Promise<typeof recorder.listRows>;
+			};
+			for: () => Promise<Array<Record<string, unknown>>>;
+		};
+		limit: () => Promise<Array<Record<string, unknown>>>;
+		for: () => Promise<Array<Record<string, unknown>>>;
+	}
+	interface FakeTx {
+		select: (shape?: Record<string, unknown>) => {
+			from: () => {
+				where: (
+					cond: unknown,
+				) => FakeChain | Promise<Array<Record<string, unknown>>>;
+			};
+		};
+		update: (table?: unknown) => {
+			set: (values: unknown) => {
+				where: (cond: unknown) => Promise<unknown[]>;
+			};
+		};
+		delete: (table?: unknown) => {
+			where: (cond: unknown) => {
+				returning: () => Promise<Array<{ id: string }>>;
+			};
+		};
+	}
+	// The delete flow locks each owned row before choosing a tombstone or a hard
+	// delete, so the locked rows mirror the rows the fake delete returns. Trial
+	// and charge lookups resolve empty so the flow takes the hard-delete path.
+	const billingLookup = (cond: unknown) => {
+		const text = JSON.stringify(cond);
+		return (
+			text.includes("credit_operations.") || text.includes("product_trials.")
+		);
+	};
+	const lockedRows = (cond?: unknown) =>
+		cond && billingLookup(cond)
+			? []
+			: recorder.deleted.map((row) => ({
+					...row,
+					userId: "owner-1",
+					mode: "html",
+					status: "failed",
+					html: null,
+				}));
+	const tx: FakeTx = {
+		select: (shape?: Record<string, unknown>) => ({
+			from: () => {
+				if (shape && "total" in shape) {
+					return {
 						where: (cond: unknown) => {
 							recorder.lastCountWhere = cond;
 							return Promise.resolve([{ total: recorder.countTotal }]);
 						},
-					}),
-				};
-			}
-			if (shape && "scrapeId" in shape) {
+					};
+				}
+				if (shape && "scrapeId" in shape) {
+					return { where: () => Promise.resolve([]) };
+				}
 				return {
-					from: () => ({
-						where: () => Promise.resolve([]),
-					}),
-				};
-			}
-			return {
-				from: () => ({
-					where: (cond: unknown) => ({
+					where: (cond: unknown): FakeChain => ({
 						orderBy: (...orderArgs: unknown[]) => ({
 							limit: (limit: number) => ({
 								offset: (offset: number) => {
@@ -101,19 +147,25 @@ vi.mock("@/db", () => ({
 							}),
 						}),
 					}),
-				}),
-			};
-		},
-		delete: () => ({
-			where: (cond: unknown) => {
-				recorder.lastCountWhere = cond;
-				return {
-					returning: () => Promise.resolve(recorder.deleted),
 				};
 			},
 		}),
-	},
-}));
+		update: () => ({
+			set: () => ({ where: () => Promise.resolve([]) }),
+		}),
+		delete: () => ({
+			where: (cond: unknown) => {
+				recorder.lastCountWhere = cond;
+				return { returning: () => Promise.resolve(recorder.deleted) };
+			},
+		}),
+	};
+	const dbMock = {
+		...tx,
+		transaction: (run: (inner: FakeTx) => Promise<unknown>) => run(tx),
+	};
+	return { db: dbMock };
+});
 
 vi.mock("@/db/schema", () => ({
 	scrapes: {
@@ -135,6 +187,19 @@ vi.mock("@/db/schema", () => ({
 	},
 	scrapeDocuments: { scrapeId: "scrape_documents.scrape_id" },
 	scrapePages: { id: "scrape_pages.id" },
+	creditOperations: {
+		id: "credit_operations.id",
+		userId: "credit_operations.user_id",
+		scrapeId: "credit_operations.scrape_id",
+		idempotencyKey: "credit_operations.idempotency_key",
+	},
+	productTrials: {
+		id: "product_trials.id",
+		product: "product_trials.product",
+		userId: "product_trials.user_id",
+		jobId: "product_trials.job_id",
+		state: "product_trials.state",
+	},
 	users: { id: "users.id" },
 }));
 
