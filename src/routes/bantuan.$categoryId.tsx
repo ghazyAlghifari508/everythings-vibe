@@ -1,4 +1,9 @@
-import { createFileRoute, notFound } from "@tanstack/react-router";
+import {
+	createFileRoute,
+	notFound,
+	Outlet,
+	useMatch,
+} from "@tanstack/react-router";
 import { HelpCategoryPage } from "@/features/help/components/help-category-page";
 import { resolveCategoryRoute } from "@/features/help/lib/resolve-route";
 
@@ -13,5 +18,13 @@ export const Route = createFileRoute("/bantuan/$categoryId")({
 
 function HelpCategoryRoute() {
 	const { category, articles } = Route.useLoaderData();
+	// The article route is nested under this category route, so the parent must
+	// render the child outlet when an article segment is present.
+	const articleMatch = useMatch({
+		from: "/bantuan/$categoryId/$articleId",
+		shouldThrow: false,
+	});
+	if (articleMatch) return <Outlet />;
+
 	return <HelpCategoryPage category={category} articles={articles} />;
 }
