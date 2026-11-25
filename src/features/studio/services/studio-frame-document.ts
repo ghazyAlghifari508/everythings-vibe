@@ -10,6 +10,7 @@ import {
 import { extractCleanHtml } from "@/features/studio/utils/clean-html";
 import { ScrapeError } from "@/lib/design-errors";
 import type { StudioProjectFullDetail } from "../types/studio-service";
+import { repairStudioAccessibleLabels } from "./studio-accessible-repair";
 import { validateCanonicalShell } from "./studio-canonical-shell";
 import { enforceDesignSystemOnHtml } from "./studio-design-system-html";
 import { extractDesignSystemTokens } from "./studio-design-tokens";
@@ -43,8 +44,9 @@ export async function finalizeStudioFrameDetail(
 		repairCount: 0,
 		source: "persisted",
 	};
-	if (!persisted || project.designBlueprint?.compositionOwner === "model")
-		return base;
+	if (!persisted) return base;
+	if (project.designBlueprint?.compositionOwner === "model")
+		return { ...base, html: repairStudioAccessibleLabels(persisted) };
 	const [approved] = await db
 		.select()
 		.from(studioElementRevisions)

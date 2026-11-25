@@ -98,6 +98,42 @@ it("persists refreshed canonical HTML once, keeps revision history, rejects anot
 		})),
 	).toEqual([{ htmlCode: html, version: 1 }]);
 });
+it("repairs persisted model-owned search controls before preview and export", async () => {
+	const userId = crypto.randomUUID();
+	owners.push(userId);
+	await db
+		.insert(users)
+		.values({ id: userId, email: `${userId}@p5.test`, name: "P5" });
+	const [project] = await db
+		.insert(studioProjects)
+		.values({
+			userId,
+			title: "P5 model-owned",
+			designMode: "mobile",
+			designBlueprint: { ...webSaaSBlueprint, compositionOwner: "model" },
+		})
+		.returning();
+	const html =
+		'<!doctype html><html><head></head><body><main><input type="search" aria-label="Cari tujuan"></main></body></html>';
+	const [frame] = await db
+		.insert(studioFrames)
+		.values({
+			projectId: project.id,
+			name: "Destinations",
+			viewport: "mobile",
+			status: "ready",
+			order: 0,
+			htmlCode: html,
+			revision: 1,
+		})
+		.returning();
+
+	const document = await finalizeStudioFrameDetail(project, frame, null);
+
+	expect(document.html).toContain('id="studio-search-1"');
+	expect(document.html).toContain('name="studio-search-1"');
+	expect(document.html).toContain('aria-label="Cari tujuan"');
+});
 
 it("does not overwrite a concurrent content revision while refreshing the shell", async () => {
 	const userId = crypto.randomUUID();
