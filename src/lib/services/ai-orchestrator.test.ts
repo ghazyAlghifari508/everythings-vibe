@@ -183,4 +183,29 @@ describe("tryStreamWithFallback thinking", () => {
 		expect(resets).toBe(0);
 		expect(result.firstChunk).toBe("AC ");
 	});
+
+	it("preserves the last provider failure as the wrapper cause", async () => {
+		streamChatMock.mockImplementation(() => ({
+			next: async () => {
+				throw new DOMException("AI tidak merespons", "TimeoutError");
+			},
+			return: async () => ({ value: undefined, done: true }),
+			[Symbol.asyncIterator]() {
+				return this;
+			},
+		}));
+
+		const request = tryStreamWithFallback(
+			["prdfy-combo"],
+			[{ role: "user", content: "hi" }],
+			undefined,
+			100,
+			undefined,
+			undefined,
+			{ maxAttempts: 1 },
+		);
+		await expect(request).rejects.toMatchObject({
+			cause: { name: "TimeoutError" },
+		});
+	});
 });

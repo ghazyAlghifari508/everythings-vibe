@@ -116,12 +116,20 @@ export async function* streamChat(
 	let yieldedText = false;
 	let lastProgress = Date.now();
 	const totalDeadline = Date.now() + AI_TOTAL_TIMEOUT_MS;
-	const mkStallError = () =>
-		new Error("AI tidak merespons dalam 2 menit. Coba generate ulang.");
-	const mkTotalError = () =>
-		new Error(
+	const mkStallError = () => {
+		const error = new Error(
+			"AI tidak merespons dalam 2 menit. Coba generate ulang.",
+		);
+		error.name = "TimeoutError";
+		return error;
+	};
+	const mkTotalError = () => {
+		const error = new Error(
 			"Generasi melebihi batas waktu. Coba lagi dengan prompt lebih ringkas.",
 		);
+		error.name = "TimeoutError";
+		return error;
+	};
 	try {
 		const iterator = result.fullStream[Symbol.asyncIterator]();
 		const done = false;

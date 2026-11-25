@@ -36,10 +36,27 @@ export async function runWithConcurrency<T>(
 }
 
 export function isRetryableProviderError(error: unknown): boolean {
-	const message = error instanceof Error ? error.message : String(error);
-	return /429|5\d\d|rate.?limit|too many requests|timeout|timed out|econn|socket|fetch failed|temporar|unavailable|overloaded|try again/i.test(
-		message,
-	);
+	let current: unknown = error;
+	for (let depth = 0; depth < 4; depth++) {
+		if (current instanceof Error && current.name === "TimeoutError")
+			return true;
+		const message =
+			current instanceof Error ? current.message : String(current);
+		if (
+			/429|5\d\d|rate.?limit|too many requests|timeout|timed out|econn|socket|fetch failed|temporar|unavailable|overloaded|try again/i.test(
+				message,
+			)
+		)
+			return true;
+		if (
+			typeof current !== "object" ||
+			current === null ||
+			!("cause" in current)
+		)
+			return false;
+		current = Reflect.get(current, "cause");
+	}
+	return false;
 }
 
 export type StudioStreamCompletion =

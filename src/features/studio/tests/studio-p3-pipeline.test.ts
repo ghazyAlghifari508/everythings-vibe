@@ -187,6 +187,13 @@ describe("P3 Mandatory Pipeline & Benchmark Requirements", () => {
 				new Error("AI stream timeout: Gateway timed out"),
 			),
 		).toBe(true);
+		expect(
+			isRetryableProviderError(
+				new Error("provider stream failed", {
+					cause: new DOMException("AI tidak merespons", "TimeoutError"),
+				}),
+			),
+		).toBe(true);
 		expect(isRetryableProviderError(new Error("ECONNRESET"))).toBe(true);
 		expect(isRetryableProviderError(new Error("Rate limit exceeded 429"))).toBe(
 			true,

@@ -263,6 +263,13 @@ function namedErrorField(error: unknown, field: string): string | null {
 }
 
 export function studioFrameErrorCodeFor(error: unknown): StudioFrameErrorCode {
+	return classifyStudioFrameError(error, 0);
+}
+
+function classifyStudioFrameError(
+	error: unknown,
+	depth: number,
+): StudioFrameErrorCode {
 	if (error instanceof StudioFrameError) return error.code;
 	if (error instanceof ScrapeError) {
 		const mapped = SHARED_CODE_MAP[error.code];
@@ -281,6 +288,18 @@ export function studioFrameErrorCodeFor(error: unknown): StudioFrameErrorCode {
 	}
 	if (kind === "TimeoutError") return "STUDIO_PROVIDER_TIMEOUT";
 	if (kind === "AbortError") return "STUDIO_CANCELLED";
+	if (
+		depth < 4 &&
+		typeof error === "object" &&
+		error !== null &&
+		"cause" in error
+	) {
+		const cause = Reflect.get(error, "cause");
+		if (cause !== null && cause !== undefined) {
+			const causeCode = classifyStudioFrameError(cause, depth + 1);
+			if (causeCode !== "STUDIO_FRAME_FAILED") return causeCode;
+		}
+	}
 	const message = error instanceof Error ? error.message : String(error);
 	if (/unauthorized|forbidden|not authenticated/i.test(message))
 		return "STUDIO_UNAUTHORIZED";
