@@ -171,14 +171,26 @@ Berdasarkan audit riil codebase setelah refactor credit modal (per Oktober 2026)
    - [x] Ringankan file modal menjadi orchestrator tipis $\le$ 250 baris (226 baris).
    - Catatan: kontrak `POST /api/payments/create` (`planId`, `returnUrl`, `projectId`), resume-intent, aturan eligibility, dan redirect tidak berubah. Test `credit-exhausted-modal.test.tsx` diperluas menjadi 21 kasus.
 
-3. **`src/features/codebase/components/planning/codebase-resync-modal.tsx` (467 baris):** Belum selesai.
-   - Menampung step indicator 3 langkah, blok salin prompt re-sync, monitoring status snapshot, dan footer verifikasi.
-   - [ ] Ekstraksi step indicator dan blok "Salin instruksi" ke sub-komponen terpisah.
-   - [ ] Ringankan file modal hingga $\le$ 400 baris.
+3. **`src/features/codebase/components/planning/codebase-resync-modal.tsx`:** $\checkmark$ Selesai 2026-11-25. File kini **227 baris**, dengan step indicator dan blok salin instruksi sudah pindah ke `codebase-resync-modal-steps.tsx` (341 baris). Catatan lama "467 baris" sudah tidak berlaku.
+
+#### Sisa Pelanggaran Batas 400 Baris (Terverifikasi p16, 2026-11-25)
+
+Audit `wc -l` atas seluruh file produksi di bawah `src/` (tanpa file tes, tanpa `routeTree.gen.ts`) menemukan 8 file yang masih melewati batas keras 400 baris:
+
+1. `src/features/codebase/services/library.ts` (619)
+2. `src/features/codebase/services/stack.ts` (433)
+3. `src/features/studio/services/studio-design-skill-registry.server.ts` (426)
+4. `src/features/studio/components/workspace/studio-landing-page.tsx` (407)
+5. `src/features/scrape/utils/design-md-render-components.ts` (406)
+6. `src/features/admin/components/admin-credit-usage-panel.tsx` (405)
+7. `src/features/admin/components/admin-projects-view.tsx` (402)
+8. `src/features/studio/services/studio-design-tokens.ts` (399 setelah ekstraksi helper di p16, sebelumnya 401)
+
+Item 8 sudah dikembalikan ke bawah batas. Tujuh file lainnya adalah utang modularitas yang sudah ada sebelum audit p16 dan belum dipecah.
 
 #### Acceptance Criteria Refactor
 
-- [ ] Seluruh file kode produksi di bawah `src/` berukuran $\le$ 400 baris. Tersisa `codebase-resync-modal.tsx` (467 baris); `routeTree.gen.ts` dikecualikan sebagai generated source.
+- [ ] Seluruh file kode produksi di bawah `src/` berukuran $\le$ 400 baris. Tersisa 7 file (619, 433, 426, 407, 406, 405, 402 baris) sesuai daftar "Sisa Pelanggaran Batas 400 Baris"; `routeTree.gen.ts` dikecualikan sebagai generated source.
 - [x] Nol type bypass (`as any`, `as never`, `@ts-ignore` dilarang per `no-type-bypass.md`): terverifikasi nol pada source produksi authored.
 - [ ] Seluruh test suite Vitest tetap hijau tanpa pelunakan assertions. Status p16 (2026-11-25): 670 file, 6696 tes, 6665 lulus, 6 gagal. Sisa kegagalan bukan cacat kode: `studio-worker-lock.integration.test.ts` dan `studio-e2e-scenarios.test.ts` menunggu worker `dev:all` berhenti karena worker aktif memegang advisory lock dispatch, dan `agent-thinking.test.tsx` flaky di bawah beban paralel (lulus 17/17 saat dijalankan sendiri). `scrap.$id.test.tsx` sudah ditutup dengan timeout realistis, dan `payment-service.test.ts` lulus.
 
