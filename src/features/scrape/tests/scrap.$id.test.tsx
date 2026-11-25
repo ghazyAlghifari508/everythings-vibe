@@ -97,7 +97,9 @@ describe("scrape detail route preview loading", () => {
 			srcDoc: '<img src="https://app.example/api/scrape/asset?cap=preview">',
 			expiresAt: expect.any(Number),
 		});
-	});
+		// The loader mounts the real route module graph; on a loaded machine the
+		// first resolve exceeds the 5s default.
+	}, 20_000);
 
 	it("returns a null preview while the scrape is still processing", async () => {
 		mocks.buildPreviewSrcDoc.mockReturnValue(null);
