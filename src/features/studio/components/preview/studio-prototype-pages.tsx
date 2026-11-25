@@ -73,33 +73,31 @@ export function StudioPrototypeDrawer({
 	...list
 }: PageListProps & { open: boolean; onOpenChange: (open: boolean) => void }) {
 	return (
-		<Drawer isOpen={open} onOpenChange={onOpenChange}>
-			<Drawer.Backdrop>
-				<Drawer.Content placement="right">
-					<Drawer.Dialog className="flex h-full w-80 max-w-[85vw] flex-col border-l border-graphite bg-obsidian text-snow">
-						<Drawer.Header className="flex h-12 shrink-0 items-center justify-between border-b border-graphite px-4">
-							<Drawer.Heading className="text-xs font-semibold uppercase tracking-wider text-fog">
-								Halaman ({list.screens.length})
-							</Drawer.Heading>
-							<Drawer.CloseTrigger
-								aria-label="Tutup daftar halaman"
-								className="flex size-11 items-center justify-center rounded-md text-fog hover:text-snow"
-							>
-								<Icon icon={Cancel01Icon} size={16} aria-hidden />
-							</Drawer.CloseTrigger>
-						</Drawer.Header>
-						<Drawer.Body className="min-h-0 flex-1 overflow-y-auto p-0 custom-scrollbar">
-							<PageList
-								{...list}
-								onSelect={(id) => {
-									list.onSelect(id);
-									onOpenChange(false);
-								}}
-							/>
-						</Drawer.Body>
-					</Drawer.Dialog>
-				</Drawer.Content>
-			</Drawer.Backdrop>
-		</Drawer>
+		<Drawer.Backdrop isOpen={open} onOpenChange={onOpenChange}>
+			<Drawer.Content placement="right">
+				<Drawer.Dialog className="flex h-full w-80 max-w-[85vw] flex-col border-l border-graphite bg-obsidian text-snow">
+					<Drawer.Header className="flex h-12 shrink-0 items-center justify-between border-b border-graphite px-4">
+						<Drawer.Heading className="text-xs font-semibold uppercase tracking-wider text-fog">
+							Halaman ({list.screens.length})
+						</Drawer.Heading>
+						<Drawer.CloseTrigger
+							aria-label="Tutup daftar halaman"
+							className="flex size-11 items-center justify-center rounded-md text-fog hover:text-snow"
+						>
+							<Icon icon={Cancel01Icon} size={16} aria-hidden />
+						</Drawer.CloseTrigger>
+					</Drawer.Header>
+					<Drawer.Body className="min-h-0 flex-1 overflow-y-auto p-0 custom-scrollbar">
+						<PageList
+							{...list}
+							onSelect={(id) => {
+								list.onSelect(id);
+								onOpenChange(false);
+							}}
+						/>
+					</Drawer.Body>
+				</Drawer.Dialog>
+			</Drawer.Content>
+		</Drawer.Backdrop>
 	);
 }
