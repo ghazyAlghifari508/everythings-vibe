@@ -99,7 +99,9 @@ export function ResyncStep1Prompt({
 	onRequestNewToken?: () => void;
 	onCopy: () => void;
 	/** Replaces the prompt when the account cannot start a billed sync. */
-	lockedPrompt?: import("../workspace/locked-prompt-state").LockedPromptState | null;
+	lockedPrompt?:
+		| import("../workspace/locked-prompt-state").LockedPromptState
+		| null;
 }) {
 	return (
 		<div

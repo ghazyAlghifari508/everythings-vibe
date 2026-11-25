@@ -145,7 +145,10 @@ vi.mock("@/db", () => {
 									return Promise.resolve(recorder.listRows);
 								},
 							}),
+							for: () => Promise.resolve(lockedRows(cond)),
 						}),
+						limit: () => Promise.resolve(lockedRows(cond)),
+						for: () => Promise.resolve(lockedRows(cond)),
 					}),
 				};
 			},
