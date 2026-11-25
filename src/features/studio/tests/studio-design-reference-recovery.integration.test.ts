@@ -100,6 +100,42 @@ describe("design reference failure recovery", () => {
 		const retriedPrompt = aiCalls("frame").at(-1)?.[1]?.content ?? "";
 		expect(retriedPrompt).toContain(documentHead(CANONICAL));
 	}, 30_000);
+	it("reports a frame retry failure as generation failure, not planning failure", async () => {
+		const userId = await createStudioUser();
+		const { project, job } = await createStudioProjectWithJob(userId, {
+			prompt: "Sample application brief with exactly 2 pages",
+			designReference: { kind: "custom", filename: "acme.md" },
+			designMd: CANONICAL,
+		});
+		studioProvider.frameError = (screenName) =>
+			screenName === "Screen 1"
+				? new Error("synthetic validation failure")
+				: null;
+		await runStudioJobPipeline(job.id, project.id, userId);
+
+		const failed = await getStudioProjectDetail(project.id, userId);
+		const frame = failed.frames.find(({ name }) => name === "Screen 1");
+		if (!frame) throw new Error("planned frame missing");
+		expect(frame.status).toBe("failed");
+		expect(failed.activeJob?.status).toBe("partial");
+		expect((await retryStudioFrame(project.id, userId, frame.id)).retry).toBe(
+			"queued",
+		);
+		const queued = await getStudioProjectDetail(project.id, userId);
+		if (!queued.activeJob) throw new Error("retry job missing");
+
+		await runStudioJobPipeline(queued.activeJob.id, project.id, userId);
+
+		const retried = await getStudioProjectDetail(project.id, userId);
+		expect(retried.frames.find(({ id }) => id === frame.id)?.status).toBe(
+			"failed",
+		);
+		expect(retried.frames.find(({ id }) => id === frame.id)?.error).toBe(
+			"Gagal memproses desain. Silakan coba lagi.",
+		);
+		expect(retried.activeJob?.status).toBe("failed");
+		expect(retried.activeJob?.error).not.toBe(PLANNING_COPY);
+	}, 30_000);
 
 	it("fails the whole plan without slots and recovers the original request", async () => {
 		const userId = await createStudioUser();

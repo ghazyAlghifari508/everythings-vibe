@@ -44,7 +44,7 @@ export async function runStudioJobPipeline(
 	const startedAt = Date.now();
 	// A failure before the shared blueprint exists is a planning failure, not a
 	// screen failure: the recovery the user needs is the whole plan, not one frame.
-	let sharedPlanningCompleted = false;
+	let sharedPlanningCompleted = job.jobType !== "initial";
 	studioJobTiming("queue-wait", job.createdAt.getTime(), {
 		jobId,
 		projectId,
