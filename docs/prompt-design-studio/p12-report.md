@@ -4,10 +4,7 @@
 requirements transferred out of P11 (`p12.md` §2) and the P11 Fix 01–06 claims.
 **Branch:** `feature/vibedesign-design-studio`
 **Date:** 2026-11-25 (local +07).
-**Verdict:** browser QA executed end to end; **three product defects found and fixed**
-(§5), every transferred requirement is classified below as PASS, PARTIAL or
-BLOCKED with the evidence that supports it. No requirement is claimed without a
-browser observation.
+**Verdict:** Browser QA completed for the observed surfaces; **five product defects were found and fixed** (§5). The result is **not a full acceptance pass**: the 60-second frame target was missed, Journey 1 produced one of five frames, and physical trackpad gestures, several Markdown nodes, and uploaded imagery remain unverified. One browser accessibility advisory remains (§7). No claim of zero bugs or complete acceptance is made.
 
 ---
 
@@ -73,22 +70,20 @@ this environment, with the reason.
 | Requirement | Verdict | Evidence |
 |:--|:--|:--|
 | First frame is real HTML, not a JPEG/screenshot | **PASS** | Legacy project `f595b052`: 5 `iframe[data-testid="studio-live-document"]` with `srcdoc` 84,345 / 94,701 / 72,194 / 61,304 / 64,757 chars. Model-owned project `39199f74`: ready frame rendered from `srcdoc` 70,779 chars. No `<img>`-as-screenshot artboard anywhere. |
-| Generated HTML stays standalone and valid after capture/export | **PASS** | Export ZIP (`jelajahin-screens.zip`, 325,428 bytes): 5 screen files + `index.html` + `project-manifest.json`; every file starts with `<!DOCTYPE html>`, contains 0 `<script>` tags, and the manifest declares `fonts.googleapis.com`/`fonts.gstatic.com` with `offlineReady: false`. |
-| No script execution or unsafe URL survives into the preview | **PASS** | Frames are `sandbox="allow-scripts"` isolated documents served from committed HTML; export audit found no `javascript:`, `data:text/html`, or inline `onclick`; message markdown rendered 0 `<script>` elements. |
+| No authored script or unsafe URL survives into the preview | **PARTIAL** | The generated frame content audited in DevTools had no event-handler attributes or unsafe URLs. The preview `srcdoc` contains one Studio-injected Pencil message-bridge script and uses `sandbox="allow-scripts"`; therefore the runtime preview is not script-free. Exported HTML contained 0 `<script>` tags. |
 
 ### 2.2 Canvas, toolbar and trackpad
 
 | Requirement | Verdict | Evidence |
 |:--|:--|:--|
-| Canvas pan/zoom with mouse and trackpad | **PASS** | Plain wheel at scale 0.5 panned `translate(16,16)` → `translate(-134,-444)` with zoom fixed at 50 %; `deltaMode=1` (line) wheel panned to `(346,1156)`; zoom buttons reached the 35 % floor. Ctrl+wheel changed nothing (single native browser zoom, no Studio pan). |
+| Canvas pan/zoom and frame selection with mouse and trackpad | **PARTIAL** | Mouse wheel pan/zoom policies, Ctrl+wheel, single/Shift selection, and marquee were exercised. Physical trackpad pinch/two-finger gestures could not be synthesized, so trackpad gesture acceptance remains unverified. |
 | Frame selection (single, shift-additive, marquee) | **PASS** | Click selects one frame (`aria-pressed=true`, toolbar appears); marquee drag from empty canvas selected the 3 intersecting frames and cleared the previous single selection; Shift+click toggles a frame in/out of the ordered set. |
 | Toolbar actions apply to the selected frame only | **PASS** | "Desktop 1440 × 900 untuk Detail Paket" reflowed only that frame (195 px → 720 px at 0.5 scale = 1440 CSS px) and issued **0 network requests** (no fetch, job, revision or credit). Toolbar `aria-label` always names the selected frame (`Kontrol frame <name>`). |
 | Frame result cards open the correct canvas frame with a truthful preview | **PASS** | Clicking "Tiket Saya, Mobile UI. Buka di canvas": selection moved Profil→Tiket Saya, toolbar relabelled, camera moved `translate(-207,16)@0.35` → `translate(-439.5,16)@0.5`; rows with no preview show a neutral placeholder, never a fabricated image. |
 | Toolbar hidden while Pencil/marquee/pan owns the pointer | **PASS** | Entering Pencil removed `[data-testid="studio-frame-toolbar"]` from the DOM and mounted 5 editor overlays. |
 
-Trackpad pinch and physical two-finger gestures cannot be synthesized by this
-harness; wheel deltas for pixel/line modes and the Ctrl+wheel policy were
-exercised instead. Recorded as a **residual gap**, not a pass.
+Physical trackpad pinch, two-finger momentum and touch pinch were not synthesized;
+only wheel deltas for pixel/line modes and the Ctrl+wheel policy were exercised.
 
 ### 2.3 Pencil and editing
 
@@ -131,8 +126,12 @@ Bandung”, model-owned blueprint, 3 planned screens, **2 ready frames**.
 | Sample names, prices, dates, currency, statuses consistent across screens and visibly illustrative | **PARTIAL** | Blueprint `sampleData` (`IDR`, `D MMMM YYYY`, dates 14 September 2024 / 28 Oktober 2024 / 15 Februari 2025) reused verbatim in frames; legacy project shows one package (Bali Escape 4H3M, Rp3.900.000) and one booking code (JLHI-8X42KI) across Detail Paket / Pemesanan / Tiket Saya, with `Contoh` labels on illustrative fields. Finance frame keeps one currency format (`Rp 1.630.100.000`, dot grouping) and the declared statuses (`Menunggu Persetujuan`, `Lunas`, …) but renders the table period labels as `Per 31 Okt 2024` while quoting the same dates as `31 Oktober 2024` elsewhere in the frame — same values, two month spellings against the declared `DD MMMM YYYY`. Recorded as a minor deviation, not a data inconsistency. |
 | Approved photography resolved into the planned slot with ratio, cropping, alt text, attribution | **PASS** | Ready frame: 2 slots filled with resolved Openverse/Flickr photos (`live.staticflickr.com/...`), `object-fit:cover`, `width/height`, planned alt text, and visible credit “Foto: Tejal Patel · Openverse — CC BY 2.0” linking source + licence. |
 | Provider failure → honest fallback text, never SVG/gradient impersonating a photo | **PASS** | The third planned slot (`heirloom-rings`) resolved to **no** image and renders “Foto tidak tersedia” inside the slot with 0 `<svg>` and no CSS background substitute. |
-| User-provided imagery remains usable | **PASS** | The approved-image set (committed sources + logo) is the only allowance; no unapproved image reference appeared in validated frames. Not exercised with an uploaded logo in this session (**residual gap**). |
+| User-provided imagery remains usable | **PARTIAL** | The browser run found no unapproved image references, but did not upload or use a user-provided logo/reference image. Usability of uploaded imagery is unverified. |
 | Legacy canonical projects keep their shell; model-owned projects keep model chrome | **PASS** | Legacy `f595b052` (no blueprint) still renders the canonical shell with its 5 destination labels; model-owned `39199f74` renders its own 3-link chrome. The scenery substitute rule is gated to `compositionOwner === "model"`. |
+
+Chrome DevTools reported one accessibility issue on the generated travel frame:
+its disabled search input has an `aria-label`, but no `id` or `name`. It is not a
+JavaScript console exception and the input is disabled, but the markup issue remains.
 
 ---
 
@@ -140,14 +139,14 @@ Bandung”, model-owned blueprint, 3 planned screens, **2 ready frames**.
 
 ### Journey 1 — Jelajahin mobile (domestic travel booking, “Gunakan foto destinasi asli”)
 
-Project `fff7e4f0` (mobile, 301-char prompt). Planning succeeded and produced the
-journey-derived plan (5 screens, no Home tab). Frame generation did **not**
-produce a committed frame in this environment: repeated `STUDIO_CONTRACT_VIOLATION`
-on `DISALLOWED_FIXED_POSITION`/`DISALLOWED_STICKY_POSITION` (mobile artboards),
-`UNSAFE_EVENT_HANDLER` (inline handler), and model-inserted unplanned chrome.
-The UI reported each failure honestly per frame (“Desain belum berhasil dibuat.
-Coba lagi.”) and kept the rest of the canvas usable.
-**Result: BLOCKED (generation) / PASS (honest failure reporting).**
+Project `fff7e4f0` (mobile, 301-char prompt). Planning produced the intended five-screen
+journey with no Home tab. After a real browser retry through the frame's **Coba lagi**
+action, *Jelajah Destinasi* became a committed HTML frame; the other four frames did not
+complete in this run. Browser preview showed two resolved Openverse photos with visible
+attribution, one provider-unavailable photo slot with honest fallback text, a disabled
+search input, and primary navigation limited to “Jelajah” and “Tiket Saya”. The canvas
+continued to display honest frame-specific errors for the remaining screens.
+**Result: PARTIAL (1/5 frames ready); the ready frame's observed Fix 06 contracts pass.**
 
 ### Journey 2 — Public website / portfolio
 
@@ -197,20 +196,21 @@ Journey 1.**
 
 | Measurement | Value |
 |:--|:--|
-| Target: first valid, visibly rendered HTML frame < 60 s | **NOT MET** in this environment |
-| `39199f74` submit → first ready frame | 1,554 s (provider 429 phase + queueing + 2 correction rounds) |
-| `39199f74` frame retry burst start → first ready frame | 147 s |
-| Per-frame model output | 25,048–33,807 chars (mobile), 48,369–48,444 chars committed web frames |
-| Frame prompt size | system 14,116 chars; user request 18,310–20,762 chars |
-| Planning prompt size | system 17,387 chars; user request 6,483 chars |
-| Photo resolution | runs beside generation (one `photo-resolution` event per planned slot; provider failure surfaced as honest fallback) |
+| Target: first valid, visibly rendered HTML frame < 60 s | **NOT MET** |
+| Jelajahin submit → frame valid pertama (`frame-visible`) | 21,003,694 ms (5 h 50 min 3.694 s) from the original job creation; includes queueing and unsuccessful earlier attempts. |
+| Final retry job queue wait | 8,254,459 ms (2 h 17 min 34 s) before worker acquisition. |
+| Final retry job total | 245,665 ms (4 min 5.7 s); includes one correction round. Still exceeds target. |
+| Final retry frame prompt size | system 14,116 chars; initial user request 19,509 chars; correction request 41,302 chars. |
+| Final retry frame output | 28,591 chars on attempt 1; 28,363 chars on corrected attempt 2; validation passed on attempt 2. |
+| Photo resolution during that job | Three parallel slot events: 595 ms, 640 ms and 1,647 ms; two resolved and one returned `provider-unavailable` with honest fallback. |
+| Other measured journeys | `39199f74` submit → first ready frame 1,554 s; retry burst 147 s. Frame prompts 18,310–20,762 user chars in the earlier acceptance runs. |
+| Planning prompt (earlier measured journey) | system 17,387 chars; user request 6,483 chars. |
 
-Timings are read from `studio_jobs`/`studio_frames` timestamps and the worker's
-structured timing events; no timestamp was edited. The 60-second target is
-missed because each accepted frame costs one model generation (and a correction
-round when the strict Fix 06 contracts fail), while the reachable model routes
-return 25–48 k chars of HTML per frame. This is a provider/latency limitation,
-not a change to the target.
+The successful Jelajahin frame required a second generation attempt after the first
+output failed HTML validation. The original queued job also accumulated 2 h 17 min of
+queue wait. All timings and prompt sizes above come from the browser's `frame-visible`
+event and worker structured events; no timestamps were changed. The 60-second target
+remains unchanged and is **not met**, including on the corrected retry alone.
 
 ---
 
@@ -282,13 +282,59 @@ preset applies immediately after mount.
 contains no stored preset, the preset applies after mount, and the following
 write still persists.
 
-**Browser effect:** reload of the same workspace now reports **0 console errors**
+**Browser effect:** reload of the same workspace now reports **0 JavaScript console errors**
 (the `Detail Paket` frame still re-renders at 1440 px from its preset), and the
 38 tests of the canvas/toolbar selection suites still pass. Both generated
-projects (`39199f74`, `c3f94438`) were reloaded afterwards with the console
-cleared: **0 errors each**. The only remaining console output is the pre-existing
-TanStack Router bundle-split advisory for `bantuan.tsx`, `templates.tsx` and
-`plan/index.tsx`, which are outside Studio.
+projects (`39199f74`, `c3f94438`) were reloaded afterwards with the console cleared:
+**0 JavaScript console errors each**. The only remaining console output is the
+pre-existing TanStack Router bundle-split advisory for `bantuan.tsx`, `templates.tsx`
+and `plan/index.tsx`, outside Studio. The later Jelajahin retry produced no JavaScript
+console exception, but Chrome DevTools flagged its disabled search field for missing
+`id`/`name` (§2.6).
+
+### D4 — Provider no-progress watchdog timeout was not preserved through retry classification
+
+**Repro:** when the 120-second no-progress watchdog fired during a Studio stream,
+`streamChat()` emitted a generic `Error`. `tryStreamWithFallback()` then wrapped the
+provider error, and downstream retry/error classification could lose the timeout type
+because it inspected only the wrapper.
+
+**Fix:** watchdog stall and total-deadline errors now carry `name = "TimeoutError"`;
+the orchestrator retains the last provider error as `cause`. Studio's retryability and
+public error classifiers inspect a bounded cause chain so wrapped provider timeouts
+remain retryable and surface as `STUDIO_PROVIDER_TIMEOUT`, distinct from the Studio job
+lease timeout.
+
+**Regression coverage:** `ai-client.test.ts` advances fake timers through the 120-second
+watchdog; `ai-orchestrator.test.ts` asserts the timeout remains as the wrapper cause;
+`studio-p3-pipeline.test.ts` and `studio-frame-error-classification.test.ts` assert
+retryability and error taxonomy for wrapped timeouts.
+
+**Browser effect:** reran the Jelajahin frame retry from the canvas action. The corrected
+attempt passed validation and rendered real HTML; generation took 245,665 ms total and
+did not meet the under-60-second target (§4).
+
+### D5 — Mobile prototype drawer opened outside the viewport
+
+**Cause:** `StudioPrototypeDrawer` initially supplied controlled open-state props to the
+`Drawer` root rather than `Drawer.Backdrop`, producing a `PressResponder` warning.
+After moving the state props to the backdrop, Chrome still placed the dialog below
+the viewport: its computed position was `static`, at `y=920` in a 557×920 viewport.
+The drawer compound classes had no active positioning rules in this app.
+
+**Fix:** moved `isOpen` and `onOpenChange` to `Drawer.Backdrop`, then added explicit
+viewport positioning and sizing to the backdrop and right-side content. Selecting a
+page still calls the page-selection handler and closes the drawer.
+
+**Regression coverage:** `studio-prototype-pages.test.tsx` opens the drawer,
+selects a page, asserts it closes, and checks that no `PressResponder` warning
+was logged.
+
+**Browser effect:** Chrome DevTools opened the drawer at a 557×920 viewport.
+The captured screenshot shows the backdrop covering the viewport and the panel
+fully visible against the right edge at full height. Selecting its page closed
+the drawer. The post-fix console had no `PressResponder` warning. Screenshot:
+`p12-evidence/mobile-prototype-page-drawer.png`.
 
 ---
 
@@ -296,48 +342,48 @@ TanStack Router bundle-split advisory for `bantuan.tsx`, `templates.tsx` and
 
 | Fix | Browser observation |
 |:--|:--|
-| 01 HTML-first rendering | Real isolated HTML documents per frame; no screenshot substitution; export ships the same HTML. |
-| 02 Canvas/toolbar/trackpad | Wheel pans at every scale, Ctrl+wheel does not pan, marquee + Shift selection work, toolbar is per-selected-frame, 6 actions, 0 `data-tsd-source` overlays in the app DOM. |
-| 03 Pencil and undo | Scoped element selection, 1 px hover / 2 px selection outlines in screen space, menu actions correct, inline text edit committed to one frame, durable undo restored the previous revision exactly. |
-| 04 Explanations and result cards | Grounded copy, separate status rows, per-row “Buka di canvas” focus, partial success wording, Markdown elements, no duplicate rows after reload. |
-| 05 Suggestions and composer | Vertical chips fill the correct scoped prompt, composer usable during jobs, no ledger write for explanations. |
-| 06 Design generation and photography | Journey-derived navigation, no forced shell/hero/KPI, sample-data ledger reused across screens, resolved photos with alt text and attribution, honest fallback for the failed slot, legacy canonical shell preserved. |
+| 01 HTML-first rendering | Real isolated HTML documents per frame; export contains no authored script or unsafe URL. The live preview has a Studio-injected Pencil bridge under `sandbox="allow-scripts"`, so the literal no-script runtime requirement is only partial (§2.1). |
+| 02 Canvas/toolbar/trackpad | Wheel pan/zoom, Ctrl+wheel, marquee + Shift selection, and per-selected-frame toolbar were exercised; physical trackpad gestures remain unverified. |
+| 03 Pencil and undo | Scoped element selection, 1 px hover / 2 px selection outlines, inline text edit committed to one frame, durable undo restored previous content. |
+| 04 Explanations and result cards | Grounded copy, separate status rows, per-row “Buka di canvas” focus, partial-success wording, observed Markdown elements, no duplicate rows after reload. |
+| 05 Suggestions and composer | Vertical chips fill the scoped prompt, composer remains usable during jobs, and explanation display makes no ledger write. |
+| 06 Design generation and photography | One retried Jelajahin frame demonstrates journey-derived navigation, real resolved photos with attribution and an honest provider fallback; full five-frame consistency is not claimed. |
 
 ---
 
 ## 7. Residual gaps (explicit)
 
-1. Trackpad pinch / two-finger momentum and touch pinch were not synthesized; wheel
-   policies (pixel/line, Ctrl) were.
-2. Journey 1 produced no committed frames and Journey 3 produced one of four in
-   this session (strict Fix 06 contracts against the reachable model output, plus
-   the single-initial-job queue); their design quality is claimed only for the
-   frames that actually rendered.
-3. Inline code, code blocks, blockquotes and links inside chat explanations were
-   not produced by the model during the session, so only bold/list/heading
-   rendering was observed in the browser.
-4. A user-uploaded logo/reference image was not exercised in the browser.
-5. `STUDIO_PEXELS_API_KEY` is unset; photography used the keyless Openverse route.
+1. Physical trackpad pinch, two-finger momentum, touch pinch, and an uploaded user
+   logo/reference image were not exercised.
+2. The live preview includes a Studio-injected Pencil message bridge in an iframe
+   sandboxed with `allow-scripts`. The generated frame HTML and exported files were
+   audited separately; the runtime preview does not meet a literal no-script requirement.
+3. Journey 1 produced one of five ready frames after retry; Journey 3 produced one
+   of four in its measured run. Neither full multi-screen journey passed browser
+   acceptance.
+4. The session did not produce inline code, code blocks, blockquotes, or links in
+   chat, so those Markdown node types were not observed in the browser.
+5. Chrome DevTools reported the disabled generated search input without an `id` or
+   `name`. It has an `aria-label`, but the markup issue remains unresolved.
+6. `STUDIO_PEXELS_API_KEY` is unset; this run exercised the keyless Openverse route.
 
 ---
 
 ## 8. Artefacts
 
-- `docs/prompt-design-studio/p12-evidence/*.webp` — browser screenshots for every
-  claim in §2 (canvas, toolbar scope, marquee, pencil menu, committed edit,
-  durable undo, chat/result rows, suggestions, export menu, failed frames):
-  `legacy-1440-loaded`, `legacy-toolbar-device-desktop`, `legacy-marquee-selection`,
-  `legacy-pencil-mode`, `legacy-pencil-element-menu`, `legacy-pencil-edit-committed`,
-  `legacy-durable-undo`, `legacy-project-menu`, `legacy-chat-scrolled-top`,
-  `legacy-chat-suggestions`, `legacy-suggestion-clicked`,
-  `legacy-result-card-focus`, `legacy-export-menu-2`, `journey2-ready-frame`,
-  `journey2-chat-partial`, `journey2-failed-frames`.
-- `.p12-qa/` — QA harness (model-rewrite proxy, planning reproducer, issue-code
-  audit, exported ZIPs) was scratch-only and is removed from the tree; its
-  outputs are quoted in this report.
+- `docs/prompt-design-studio/p12-evidence/*.webp` and `*.png` — real-browser screenshots
+  for the canvas, toolbar scope, marquee, Pencil editing, durable undo, chat/result
+  rows, suggestions, export, failed frames, and the Jelajahin retry. Retry artefacts:
+  [`journey1-retry-canvas-ready.png`](./p12-evidence/journey1-retry-canvas-ready.png),
+  [`journey1-retry-ready-frame.png`](./p12-evidence/journey1-retry-ready-frame.png),
+  [`journey1-retry-prototype-preview.png`](./p12-evidence/journey1-retry-prototype-preview.png),
+  [`journey1-retry-partial.webp`](./p12-evidence/journey1-retry-partial.webp), and
+  [`mobile-prototype-page-drawer.png`](./p12-evidence/mobile-prototype-page-drawer.png).
+- `.p12-qa/` — temporary QA harness and exported files were scratch-only and removed
+  from the repository; the report records their observed outputs.
 - Studio projects created or touched by the QA run remain in the owner's account:
   `39199f74` (Kalyana Studio, 2 ready frames), `c3f94438` (FinBook, 1 ready frame),
-  `fff7e4f0` (Jelajahin mobile, honest failure evidence). Four additional
-  throwaway projects without committed frames were deleted after the run. The
-  legacy project `f595b052` keeps its original HTML; the two Pencil edits were
-  reverted through the product's own durable undo (revision 3 = original bytes).
+  `fff7e4f0` (Jelajahin, 1 ready frame after retry). Four additional throwaway projects
+  without committed frames were deleted after the run. The legacy project `f595b052`
+  keeps its original HTML; the two Pencil edits were reverted through the product's
+  durable undo (revision 3 = original bytes).
