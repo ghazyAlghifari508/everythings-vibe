@@ -313,6 +313,9 @@ const ISSUE_CODE_PATTERNS: Array<[RegExp, string]> = [
 	[/Price or quantity contains forced line tracks/, "ATOMIC_LABEL_BROKEN"],
 	[/Image height exceeds its clipping media frame/, "MEDIA_FRAME_CONFLICT"],
 	[/Nonwrapping action\/option row/, "NARROW_COMPOSITION"],
+	// Cross-screen sample ledger (§ sample-data consistency).
+	[/Harga di luar data contoh/, "SAMPLE_PRICE_UNDECLARED"],
+	[/Referensi pesanan di luar data contoh/, "SAMPLE_REFERENCE_UNDECLARED"],
 	[/wide data table without/i, "UNCONTAINED_WIDE_TABLE"],
 	[/Posisi fixed tidak diizinkan/, "DISALLOWED_FIXED_POSITION"],
 	[/Posisi sticky tidak diizinkan/, "DISALLOWED_STICKY_POSITION"],

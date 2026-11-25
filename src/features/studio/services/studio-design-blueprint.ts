@@ -124,11 +124,19 @@ const screenCompositionSchema = z.object({
 });
 
 const shortFact = z.string().trim().min(1).max(120);
+/** One verbatim sample value: a currency amount or an order reference. */
+const sampleLiteral = z.string().trim().min(1).max(40);
 export const studioSampleDataSchema = z.object({
 	currency: z.string().trim().min(1).max(24).optional(),
 	dateFormat: z.string().trim().min(1).max(40).optional(),
 	sampleDates: z.array(z.string().trim().min(1).max(40)).max(8).optional(),
 	sampleStatuses: z.array(shortFact).max(8).optional(),
+	// The closed ledger of grouped currency amounts and order references the
+	// screens may show. Frames copy these verbatim; validation rejects any
+	// grouped amount or reference-shaped token that is not listed here, so the
+	// same package cannot cost two different prices on two screens.
+	samplePrices: z.array(sampleLiteral).max(12).optional(),
+	sampleReferences: z.array(sampleLiteral).max(8).optional(),
 	note: z.string().trim().min(1).max(240).optional(),
 });
 export const studioDesignBlueprintSchema = z.object({

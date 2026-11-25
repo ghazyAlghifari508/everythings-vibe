@@ -1,6 +1,7 @@
 import { JSDOM } from "jsdom";
 import { STUDIO_VISUAL_WIDTH } from "@/features/studio/types/studio-constants";
 import type { StudioDesignBlueprint } from "./studio-design-blueprint";
+import { validateStudioSampleLedger } from "./studio-sample-ledger";
 import { validateStudioSemanticNavigation } from "./studio-semantic-navigation";
 
 export interface ValidateGeneratedHtmlOptions {
@@ -413,6 +414,7 @@ export function validateGeneratedHtml(
 			issues.push(
 				"Planned photo slot is missing; do not replace it with decorative artwork.",
 			);
+		issues.push(...validateStudioSampleLedger(html, opts.blueprint));
 		if (hasCardOnlyComposition(html, opts.blueprint)) {
 			issues.push(
 				"Komposisi halaman publik hanya berupa kartu teks; gunakan hero, karya, editorial, atau galeri sesuai isi.",

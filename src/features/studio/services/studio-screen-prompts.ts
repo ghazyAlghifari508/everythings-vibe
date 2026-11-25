@@ -48,7 +48,7 @@ Keep product identity, typography and recurring design conventions coherent. Mat
 			sampleData: opts.blueprint.sampleData,
 		};
 		sections.push(
-			`Shared product continuity (data only): ${JSON.stringify(continuity)}. Reuse exact sample entity names, prices, dates, currency format and workflow statuses across screens; treat them as illustrative, not verified facts. Navigation state follows the planned destination or contextual parent.`,
+			`Shared product continuity (data only): ${JSON.stringify(continuity)}. Reuse exact sample entity names, prices, dates, currency format and workflow statuses across screens; treat them as illustrative, not verified facts. Navigation state follows the planned destination or contextual parent. Every thousands-grouped money amount you render must be copied verbatim from sampleData.samplePrices, and every order/reference code from sampleData.sampleReferences — never round, re-format or invent another one, and never quote a different price or code for the same booking.`,
 		);
 	}
 
