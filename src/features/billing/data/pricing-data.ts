@@ -12,7 +12,6 @@ export interface PriceTier {
 	/** Monthly price in IDR. Credits reset every BILLING_PERIOD_DAYS. */
 	price: number;
 	credits: number;
-	isPopular: boolean;
 	buttonLabel: string;
 	features: Feature[];
 }
@@ -56,7 +55,6 @@ export const prdFyPlans: [PriceTier, PriceTier, PriceTier] = [
 			"VibePlan dasar, trial Studio dan Scrape, VibeTemplate. 2 kredit per 30 hari.",
 		price: 0,
 		credits: 2,
-		isPopular: false,
 		buttonLabel: "Mulai Gratis",
 		features: buildFeatures([
 			"vibeplan",
@@ -75,7 +73,6 @@ export const prdFyPlans: [PriceTier, PriceTier, PriceTier] = [
 			"VibePlan penuh, Studio, Scrape, dan VibeTemplate. 30 kredit per 30 hari.",
 		price: 49000,
 		credits: 30,
-		isPopular: true,
 		buttonLabel: "Berlangganan Pro",
 		features: buildFeatures([
 			"vibeplan",
@@ -100,7 +97,6 @@ export const prdFyPlans: [PriceTier, PriceTier, PriceTier] = [
 			"VibePlan prioritas, Studio, Scrape, dan VibeTemplate. 105 kredit per 30 hari.",
 		price: 149000,
 		credits: 105,
-		isPopular: false,
 		buttonLabel: "Berlangganan Hengker",
 		features: buildFeatures(FEATURE_ROWS.map((row) => row.key)),
 	},

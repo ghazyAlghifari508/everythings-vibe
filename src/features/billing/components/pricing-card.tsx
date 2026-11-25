@@ -2,7 +2,6 @@
 
 import { Cancel01Icon, Tick01Icon } from "@hugeicons/core-free-icons";
 import type * as React from "react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -95,26 +94,16 @@ export const PricingComponent: React.FC<PricingComponentProps> = ({
 	const PricingCards = (
 		<div className="grid gap-6 md:grid-cols-3">
 			{plans.map((plan) => {
-				const isFeatured = plan.isPopular;
-
 				return (
 					<Card
 						key={plan.id}
-						className={cn(
-							"flex flex-col transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-1",
-							isFeatured &&
-								"border border-indigo/40 shadow-[inset_0_0_0_1px_rgba(94,106,210,0.8),var(--shadow-linear-xl)] md:scale-[1.02]",
-						)}
+						className="flex flex-col transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-1"
 					>
 						<CardHeader className="p-6 pb-4 relative">
-							{isFeatured && (
-								<div className="absolute left-0 top-0 h-1 w-full rounded-t-xl bg-indigo"></div>
-							)}
 							<div className="flex justify-between items-start mt-2">
 								<CardTitle className="text-2xl font-normal">
 									{plan.name}
 								</CardTitle>
-								{isFeatured && <Badge variant="secondary">Paling Laris</Badge>}
 							</div>
 							<CardDescription className="text-sm mt-1">
 								{plan.description}
@@ -179,11 +168,9 @@ export const PricingComponent: React.FC<PricingComponentProps> = ({
 											isDisabled
 												? "opacity-50 cursor-not-allowed"
 												: "cursor-pointer",
-											isFeatured && !isDisabled
-												? "btn-primary hover:brightness-105"
-												: !isDisabled
-													? "border border-snow/70 bg-transparent text-snow hover:bg-white/5"
-													: "bg-steel/30 text-slate",
+											!isDisabled
+												? "border border-snow/70 bg-transparent text-snow hover:bg-white/5"
+												: "bg-steel/30 text-slate",
 										)}
 										size="lg"
 										aria-label={`Pilih paket ${plan.name}`}
@@ -216,7 +203,6 @@ export const PricingComponent: React.FC<PricingComponentProps> = ({
 								scope="col"
 								className={cn(
 									"whitespace-nowrap px-6 py-4 text-center font-inter text-sm font-[510] text-snow",
-									plan.isPopular && "bg-indigo/10",
 								)}
 							>
 								{plan.name}
@@ -249,7 +235,6 @@ export const PricingComponent: React.FC<PricingComponentProps> = ({
 										key={`${plan.id}-${featureName}`}
 										className={cn(
 											"px-6 py-3 text-center transition-all duration-150",
-											plan.isPopular && "bg-indigo/10",
 										)}
 									>
 										<Icon
