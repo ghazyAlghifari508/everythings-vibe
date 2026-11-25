@@ -322,8 +322,8 @@ Persiapan lokal pada Inisiatif 12 dikerjakan melalui `docs/prompt-random/p4.md`;
 - [ ] TASK 07/09: benchmark dan tarif Studio/Scrape. Tidak ada tarif aktif; jangan isi 0 sebagai placeholder.
 - [x] TASK 10: Trial Studio dan Scrape independen, satu kali per akun Free; reservasi atomik, settlement berdasarkan hasil, dan billing paid tetap legacy.
 - [ ] Terapkan migrasi 0047 sebelum mengaktifkan versi web dan worker yang baru di staging dan production.
-- [ ] TASK 11/12: integrasi Studio dan Scrape, termasuk tombstone untuk project/job/scrape yang sudah ditagih (FK menolak hard delete).
-- [ ] TASK 13/08: UI billing dan Admin Kredit multi-produk.
+- [x] TASK 11/12: integrasi kredit Studio dan Scrape nonaktif, termasuk tombstone untuk project/job/scrape yang sudah ditagih. Kode dan tes terverifikasi pada p16; aktivasi tarif tetap menunggu TASK 07/09.
+- [x] TASK 13/08: UI billing dan Admin Kredit multi-produk. Terverifikasi p16: 78 tes billing/credit lulus, `/pricing` bebas klaim popularitas tanpa bukti.
 
 ---
 
