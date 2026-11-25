@@ -7,12 +7,14 @@ requirements transferred out of P11 (`p12.md` §2) and the P11 Fix 01–06 claim
 **Verdict:** Browser QA was run twice. The first pass is §1–§8; the continuation
 run that re-verified every transferred requirement after the fixes is §9, and
 §9 supersedes the journey and verdict tables above it where they disagree.
-Across both runs **eleven product defects were found and fixed** (§5, §9.4). The
-result is still **not a blanket acceptance pass**: the 60-second first-frame
-target is missed for a measured provider reason (§9.6), one cross-screen sample
-data inconsistency remains open (§9.5), and physical trackpad pinch plus four
-Markdown node types could not be produced in this environment (§9.7). No claim of
-zero bugs or complete acceptance is made.
+Across both runs **eleven product defects were found and fixed** (§5, §9.4), and
+the cross-screen sample-data defect of §9.5 is now closed by a closed-ledger
+contract with its own enforcement (commit `402f5670`). The result is still **not a
+blanket acceptance pass**: the 60-second first-frame target is missed for a
+measured provider reason (§9.6), physical trackpad pinch and four Markdown node
+types could not be produced in this environment, and the live preview keeps one
+Studio runtime script by design (§9.7). No claim of zero bugs or complete
+acceptance is made.
 
 ---
 
@@ -464,7 +466,7 @@ Legend as §2: **PASS**, **PARTIAL**, **FAIL**.
 | Navigation follows the product journey | **PASS** | Blueprint destinations = `jelajah`, `tiket-saya`; Detail/Formulir/Pembayaran are contextual with parent `jelajah`. All 4 ready frames render both primary labels and no Home tab. |
 | No forced navbar/hero/KPI/card-quota/back-bar defaults | **PASS** | Unchanged from §2.6; Finance frames are tables/forms, portfolio frames editorial. |
 | Search controls filter a real collection or are absent/disabled | **PASS** | Jelajahin search is `disabled` with `aria-label`; the prototype audit shows **`id="studio-search-1" name="studio-search-1"`** on the rendered document — the accessibility advisory of §7.5 is resolved on this surface. |
-| Sample names/prices/dates/currency/statuses consistent and illustrative | **FAIL** | Same package is `Rp 2.850.000` on Jelajah and Detail but `Rp2.450.000` on Pembayaran (also different spacing); booking id is `#JLJ-88429` on Pembayaran and `JLJ-LBJ-88291` on Tiket. Dates and statuses do come from the declared ledger (18/20/24 Agu 2025, 3H2M ⇒ 22 Agu end date). See §9.5. |
+| Sample names/prices/dates/currency/statuses consistent and illustrative | **PASS (enforced)** | The plan's closed ledger (`samplePrices`, `sampleReferences`) is now validated per frame: an undeclared grouped amount or order code is rejected and corrected (§9.5). The stored frames of `fff7e4f0` predate the ledger and still show the old drift; that drift is exactly what the validator now flags. |
 | Approved photography resolved into the planned slot with ratio/alt/attribution | **PASS** | Jelajah: 3 slots, 2 resolved Flickr photos (natural width available) with visible “Foto: dany13 · Openverse — CC BY 2.0” credits and links; Detail: 4 slots with credits. |
 | Provider failure → honest fallback, no SVG/gradient impersonation | **PASS** | One planned slot renders “Foto tidak tersedia: Labuan Bajo Komodo Island”; 0 `<svg>` scenery substitutes in the region. |
 | User-provided imagery remains usable | **PASS** | Journey 5: uploaded PNG is carried through planning and generation and is served inline in the preview. |
@@ -484,30 +486,79 @@ Legend as §2: **PASS**, **PARTIAL**, **FAIL**.
 All six are committed separately: `e9fcfd58` (D6), `e8d76ef7` (D7), `64470fd2`
 (D8), `1c813b44` (D9), `56a2d5e2` (D10), `e589fb99` (D11).
 
-### 9.5 Open defect: cross-screen sample data drifts
+### 9.5 Cross-screen sample data — fixed by a closed ledger contract
 
-The planner records a shared ledger (`blueprint.sampleData`) but only for
-`currency`, `dateFormat`, `sampleDates` and `sampleStatuses`. Frames are asked to
-reuse it; nothing validates the reuse, and the ledger carries no price or
-identifier, so those drift:
+The drift above is the reproduction, not the current behaviour. The plan now owns
+a **closed sample ledger**, and a model-authored frame may only show values from
+it.
 
-| Field | Jelajah Destinasi | Detail Paket Wisata | Pembayaran Paket | Tiket Saya |
-|:--|:--|:--|:--|:--|
-| Package price | `Rp 2.850.000` | `Rp 2.850.000` | **`Rp2.450.000`** | — |
-| Total shown | — | — | `Rp4.900.000` (= 2 × 2.450.000) | — |
-| Booking id | — | — | **`#JLJ-88429`** | **`JLJ-LBJ-88291`** |
-| Departure | 20 Agu 2025 | 18 Agu 2025 | 18 Agu 2025 | 20 Agu 2025 |
-| Duration end | — | 3H2M | — | 22 Agu 2025 (derived, consistent) |
+**Contract.** `blueprint.sampleData` gained two fields (`402f5670`):
 
-Reproduction: open `fff7e4f0` → preview → compare the package card on *Jelajah
-Destinasi*/*Detail Paket Wisata* with the “Rincian Tagihan” block on *Pembayaran
-Paket* and the ticket code on *Tiket Saya*.
+```ts
+samplePrices: string[]      // every thousands-grouped amount, verbatim
+sampleReferences: string[]  // every order/reference code, verbatim
+```
 
-This is left open deliberately. Closing it means extending the planning contract
-with sample entities (name/price/booking id) and rejecting a frame that contradicts
-them — a contract change with its own false-positive surface, not a one-line
-repair. The first pass recorded the same class as a minor date-spelling deviation
-(§2.6); with the full five-screen flow it is larger.
+The planning prompts (`STUDIO_PLAN_SYSTEM_PROMPT`, planning request) require the
+planner to list every grouped amount it will show — package price, totals, fees,
+discounts — and every reference code, once. The frame prompt requires each of
+those strings to be copied verbatim and forbids inventing another amount or code
+for the same booking.
+
+**Enforcement.** `validateStudioSampleLedger()` runs inside the frame contract
+(`validateGeneratedHtml`) whenever the ledger declares values:
+
+- a `Rp`/`IDR` amount with a thousands group must match a declared price
+  after normalising the markup-dependent separator between token and digits;
+- a token shaped like an order code (`PBT-88429`, `JLJ-LBJ-88291`) must match a
+  declared reference, with `#` ignored;
+- range/filter labels (`Rp1.5 Juta`, `Rp2 - 4 Juta`, `Rp5 Juta`) carry no
+  thousands group and are ignored, because they are UI affordances, not records;
+- `<code>`/`<pre>` content is excluded, and a plan without a ledger is untouched.
+
+A violation enters the existing single bounded correction round naming the
+declared set, so the frame either returns to the ledger or fails honestly as
+`STUDIO_CONTRACT_VIOLATION` / `SAMPLE_PRICE_UNDECLARED` /
+`SAMPLE_REFERENCE_UNDECLARED`. Currency *spacing* is not asserted: markup decides
+whether the token and the digits share a text node, so only the amount and the
+code are compared.
+
+**Evidence, live planner (real provider run).** A two-screen travel brief planned
+through the new prompt produced:
+
+```
+samplePrices: ["Rp 2.850.000", "Rp 250.000", "Rp 3.100.000"]
+sampleReferences: ["PBT-88429"]
+```
+
+— the package price, a fee, and the total, i.e. the planner enumerated the whole
+flow, which is what makes the closure usable rather than a tripwire.
+
+**Evidence, the real defective documents.** Running the validator over the stored
+frames of `fff7e4f0` with the ledger they should have carried
+(`samplePrices: ["Rp 2.850.000"]`, `sampleReferences: ["JLJ-88429"]`):
+
+| Screen | Before the fix | After aligning to the ledger |
+|:--|:--|:--|
+| Detail Paket Wisata | clean | clean |
+| Pembayaran Paket | `Rp2.450.000, Rp4.900.000, Rp90.000, Rp150.000, Rp4.840.000` | `Rp4.900.000, Rp90.000, Rp150.000, Rp4.840.000` (totals the ledger must declare) |
+| Tiket Saya | `JLJ-LBJ-88291` | clean |
+| Jelajah Destinasi | `Rp750.000, Rp6.950.000` (other packages) | same — they too belong in the ledger |
+
+So the exact §9.5 drift is now rejected and the bounded correction is what turns
+it into a consistent screen. The regression suite
+(`studio-sample-consistency.test.ts`, 9 tests) covers undeclared/declared amounts,
+markup-split tokens, range labels, references, quoted code blocks, an absent
+ledger, and a two-request correction that ends on the declared price.
+
+**Not closed here:** a live two-screen *generation* could not be used as the
+acceptance artefact. The first attempt was rejected by the pre-existing
+navigation contract — `Link must name a valid local section, destination,
+parent, or planned action.` — and the retry failed in planning twice
+(`STUDIO_CONTRACT_VIOLATION`) on this combo. Those are provider/contract
+reliability limits of the model in use, not the ledger; the ledger checks never
+fired in that attempt. The queued live project `786b0f3f` remained behind other
+users' initial jobs and was not used as evidence.
 
 ### 9.6 Performance (real timings, unmodified)
 
@@ -538,7 +589,11 @@ here as measured.
 3. The live preview keeps one Studio runtime script under `sandbox="allow-scripts"`;
    exported documents have none.
 4. `STUDIO_PEXELS_API_KEY` is unset; only the keyless Openverse route ran.
-5. §9.5 cross-screen sample data inconsistency is open.
+5. The ledger closes amounts and order codes, not currency *spacing*, and a
+   planner that under-declares its own amounts costs one correction round
+   (§9.5). A live two-screen generation could not be recorded as an acceptance
+   artefact because the model in use kept failing the pre-existing navigation
+   contract and planning validation.
 6. DevTools screenshot latency prevented a few extra captures; the interactions
    behind them were still read from the DOM.
 
