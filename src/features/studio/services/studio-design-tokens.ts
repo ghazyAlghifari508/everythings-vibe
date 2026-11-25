@@ -38,6 +38,15 @@ export interface CanonicalDesignSystem {
 // Anything outside those tables (hand-written or legacy documents) still parses
 // through the keyword fallbacks below, so a custom DESIGN.md is not narrowed to
 // the VibeScrape shape.
+/** Markdown section body: from its heading to the next heading line. */
+function sectionAfter(source: string, heading: RegExp): string | null {
+	const found = heading.exec(source);
+	if (!found) return null;
+	const rest = source.slice(found.index + found[0].length);
+	const nextHeading = rest.search(/\n#{2,3}\s/);
+	return nextHeading === -1 ? rest : rest.slice(0, nextHeading);
+}
+
 export function extractDesignSystemTokens(
 	designMd?: string | null,
 ): CanonicalDesignSystem | null {
@@ -261,20 +270,9 @@ export function extractDesignSystemTokens(
 	}
 
 	// The current model renderer names the typeface inside a "Fonts & Type
-	// Faces" section (`**Inter**`, `- CSS stack: Inter, sans-serif`) and states
-	// it per role in the typography scale table, so neither the "Fonts & Type
-	// Scale" heading nor a "Font:" line exists to match.
+	// Faces" section and states it per role in the typography scale table, so
+	// neither the "Fonts & Type Scale" heading nor a "Font:" line matches.
 	if (!typography.fontFamily) {
-		// `$` inside a multiline regex also matches before a newline, which would
-		// end the section capture on the heading itself; slice to the next
-		// heading line instead.
-		const sectionAfter = (source: string, heading: RegExp): string | null => {
-			const found = heading.exec(source);
-			if (!found) return null;
-			const rest = source.slice(found.index + found[0].length);
-			const nextHeading = rest.search(/\n#{2,3}\s/);
-			return nextHeading === -1 ? rest : rest.slice(0, nextHeading);
-		};
 		const fontsSection = sectionAfter(text, /^#{2,3}[^\n]*Fonts?[^\n]*/im);
 		if (fontsSection) {
 			const stack = fontsSection.match(/- CSS stack:\s*`?([^`,\n]+)/);
