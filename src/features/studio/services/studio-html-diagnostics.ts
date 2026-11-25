@@ -306,7 +306,10 @@ const ISSUE_CODE_PATTERNS: Array<[RegExp, string]> = [
 	// log re-derives it from the message; without these the frame's repairable
 	// defects all read as UNCLASSIFIED.
 	[/Essential control\/option text has an ellipsis/, "ESSENTIAL_TEXT_CLIPPED"],
-	[/Essential content is inside a zero-sized clipping box/, "CRITICAL_CONTENT_HIDDEN"],
+	[
+		/Essential content is inside a zero-sized clipping box/,
+		"CRITICAL_CONTENT_HIDDEN",
+	],
 	[/Price or quantity contains forced line tracks/, "ATOMIC_LABEL_BROKEN"],
 	[/Image height exceeds its clipping media frame/, "MEDIA_FRAME_CONFLICT"],
 	[/Nonwrapping action\/option row/, "NARROW_COMPOSITION"],

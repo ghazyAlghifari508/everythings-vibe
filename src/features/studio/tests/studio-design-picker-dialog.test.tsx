@@ -283,9 +283,9 @@ describe("StudioDesignPickerDialog", () => {
 
 		// The attached payload is bare base64; the preview needs a real data URL,
 		// otherwise the browser resolves it as a relative path and shows nothing.
-		expect(
-			screen.getByAltText("Preview logo").getAttribute("src"),
-		).toMatch(/^data:image\/png;base64,/);
+		expect(screen.getByAltText("Preview logo").getAttribute("src")).toMatch(
+			/^data:image\/png;base64,/,
+		);
 
 		const removeLogoBtn = screen.getByRole("button", { name: "Hapus logo" });
 		fireEvent.click(removeLogoBtn);

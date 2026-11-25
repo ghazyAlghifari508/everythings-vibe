@@ -65,7 +65,8 @@ export async function buildStudioPrototypeDocument(
 		project.designBlueprint?.compositionOwner === "model"
 			? repairStudioAccessibleLabels(clean)
 			: clean;
-	if (html.length > HTML_MAX) throw new StudioFrameError("STUDIO_INVALID_INPUT");
+	if (html.length > HTML_MAX)
+		throw new StudioFrameError("STUDIO_INVALID_INPUT");
 	const screens = deriveStudioPrototypeScreens(frames, project.designBlueprint);
 	if (!screens.some((screen) => screen.id === frame.id))
 		throw new StudioFrameError("STUDIO_NOT_FOUND");
