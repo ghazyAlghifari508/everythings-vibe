@@ -377,7 +377,9 @@ describe("ImagesResult gallery", () => {
 		// Opening disclosure reveals the typed group and affected items
 		fireEvent.click(toggleButton);
 		expect(toggleButton.getAttribute("aria-expanded")).toBe("true");
-		expect(screen.getByText("Format belum didukung (23)")).toBeDefined();
+		// The count lives in a numeric badge, the label in a category badge.
+		expect(screen.getByText("Format belum didukung")).toBeDefined();
+		expect(screen.getByLabelText("23 gambar gagal")).toBeDefined();
 		expect(screen.getAllByText("images.ctfassets.net").length).toBeGreaterThan(
 			0,
 		);
@@ -421,9 +423,12 @@ describe("ImagesResult gallery", () => {
 		fireEvent.click(
 			screen.getByRole("button", { name: /Lihat rincian kegagalan/ }),
 		);
-		expect(screen.getByText("Akses tidak tersedia (4)")).toBeDefined();
-		expect(screen.getByText("Format belum didukung (2)")).toBeDefined();
-		expect(screen.getByText("Gangguan sementara (1)")).toBeDefined();
+		expect(screen.getByText("Akses tidak tersedia")).toBeDefined();
+		expect(screen.getByLabelText("4 gambar gagal")).toBeDefined();
+		expect(screen.getByText("Format belum didukung")).toBeDefined();
+		expect(screen.getByLabelText("2 gambar gagal")).toBeDefined();
+		expect(screen.getByText("Gangguan sementara")).toBeDefined();
+		expect(screen.getByLabelText("1 gambar gagal")).toBeDefined();
 	});
 
 	it("owns the all-failed state with real counts, causes and no empty gallery chrome", () => {

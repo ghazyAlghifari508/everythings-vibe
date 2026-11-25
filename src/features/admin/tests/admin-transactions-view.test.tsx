@@ -144,13 +144,13 @@ describe("AdminTransactionsView Component", () => {
 
 		expect(container.textContent).toContain("ORD-2026-001");
 		expect(container.textContent).toContain("Pengguna 1");
-		expect(container.textContent).toContain("pro");
+		expect(container.textContent).toContain("Pro");
 		expect(container.textContent).toContain("Rp 49.000");
 		expect(container.textContent).toContain("Berhasil");
 
 		expect(container.textContent).toContain("ORD-2026-002");
 		expect(container.textContent).toContain("Pengguna 2");
-		expect(container.textContent).toContain("hengker");
+		expect(container.textContent).toContain("Hengker");
 		expect(container.textContent).toContain("Rp 149.000");
 		expect(container.textContent).toContain("Menunggu");
 	});

@@ -11,18 +11,55 @@ vi.mock("@/lib/rate-limit", () => ({
 vi.mock("../services/analysis-route-scope.server", () => ({
 	resolvePlan: async () => "free",
 }));
+// This spec covers credential hashing, so the analysis credit preflight that
+// gates a real sync start is stubbed to "can start".
+vi.mock("../services/analysis-credit-preflight.server", () => ({
+	checkPreSyncCredit: async () => ({
+		status: { canStart: true },
+		response: null,
+	}),
+}));
 vi.mock("@/db", () => ({
 	db: {
 		select: () => ({
 			from: () => ({
-				where: () => ({ limit: async () => [{ id: "codebase" }] }),
+				innerJoin: () => ({
+					where: () => ({
+						limit: async () => [{ id: "codebase", createdAt: null }],
+						for: async () => [{ id: "codebase", createdAt: null }],
+						orderBy: () => ({
+							limit: async () => [{ id: "codebase", createdAt: null }],
+						}),
+					}),
+				}),
+				where: () => ({
+					limit: async () => [{ id: "codebase" }],
+					for: async () => [{ id: "codebase" }],
+					orderBy: () => ({
+						limit: async () => [{ id: "codebase" }],
+						for: async () => [{ id: "codebase" }],
+					}),
+				}),
 			}),
 		}),
 		transaction: async (run: (tx: unknown) => Promise<unknown>) =>
 			run({
 				execute: async () => {},
 				select: () => ({
-					from: () => ({ where: () => ({ orderBy: async () => [] }) }),
+					from: () => ({
+						where: () => ({
+							orderBy: async () => [],
+							for: async () => [],
+							limit: async () => [],
+						}),
+					}),
+				}),
+				update: () => ({
+					set: () => ({
+						where: () => ({
+							returning: async () => [{ id: state.values.id }],
+						}),
+					}),
 				}),
 				insert: () => ({
 					values: (values: Record<string, unknown>) => {

@@ -50,9 +50,11 @@ test("real PostgreSQL allowance, concurrency, release, isolation, and paid accou
 	// The free initial allowance needs no approval: it is priced at zero.
 	assert.equal((await checkPreSyncCredit(otherUser, {})).response, null);
 	assert.equal(
-		(await checkPreSyncCredit(otherUser, {
-			creditConsent: { maximumCredits: 0, pricingVersion: "adaptive-v1" },
-		})).response,
+		(
+			await checkPreSyncCredit(otherUser, {
+				creditConsent: { maximumCredits: 0, pricingVersion: "adaptive-v1" },
+			})
+		).response,
 		null,
 	);
 

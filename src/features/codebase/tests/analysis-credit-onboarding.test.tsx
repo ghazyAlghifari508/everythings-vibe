@@ -162,15 +162,18 @@ test("top-up opens the real billing flow and unlocks from server state", async (
 	});
 	render(<PlanCodebasePage />);
 
-	fireEvent.click(await screen.findByRole("button", { name: "Tambahkan Kredit" }));
+	fireEvent.click(
+		await screen.findByRole("button", { name: "Tambahkan Kredit" }),
+	);
 	assert.ok(await screen.findByText("Isi Ulang Kredit"));
 	fireEvent.click(screen.getByRole("button", { name: /Tutup modal/i }));
 
 	await screen.findByRole("button", { name: "Salin prompt untuk AI agent" });
 	assert.equal(preflightCount, 2);
 	assert.equal(
-		calls.filter((call) => call.method === "POST" && call.url === "/api/codebases")
-			.length,
+		calls.filter(
+			(call) => call.method === "POST" && call.url === "/api/codebases",
+		).length,
 		1,
 	);
 });
