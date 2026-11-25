@@ -1,6 +1,13 @@
 import { Cancel01Icon, Search01Icon } from "@hugeicons/core-free-icons";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { type KeyboardEvent, useId, useMemo, useState } from "react";
+import {
+	type KeyboardEvent,
+	useEffect,
+	useId,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { Badge } from "@/components/ui/badge";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
@@ -13,23 +20,46 @@ const MAX_RESULTS = 6;
 export function HelpSearch({ compact = false }: { compact?: boolean }) {
 	const [query, setQuery] = useState("");
 	const [activeIndex, setActiveIndex] = useState(0);
+	const [isOpen, setIsOpen] = useState(false);
 	const navigate = useNavigate();
 	const listId = useId();
+	const rootRef = useRef<HTMLDivElement>(null);
 	const trimmed = query.trim();
 	const results = useMemo(
 		() => searchHelpArticles(query, HELP_ARTICLES).slice(0, MAX_RESULTS),
 		[query],
 	);
-	const showResults = trimmed.length > 0;
+	const showResults = isOpen && trimmed.length > 0;
+
+	useEffect(() => {
+		if (!isOpen) return;
+		function handlePointerDown(event: PointerEvent) {
+			if (
+				event.target instanceof Node &&
+				!rootRef.current?.contains(event.target)
+			) {
+				setIsOpen(false);
+			}
+		}
+
+		document.addEventListener("pointerdown", handlePointerDown);
+		return () => document.removeEventListener("pointerdown", handlePointerDown);
+	}, [isOpen]);
 
 	function clear() {
 		setQuery("");
 		setActiveIndex(0);
+		setIsOpen(false);
 	}
 
 	function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
 		if (event.key === "Escape") {
 			if (query) clear();
+			return;
+		}
+		if (event.key === "Enter") {
+			event.preventDefault();
+			handleSubmit();
 			return;
 		}
 		if (results.length === 0) return;
@@ -46,9 +76,9 @@ export function HelpSearch({ compact = false }: { compact?: boolean }) {
 		const target = results[activeIndex];
 		if (target) navigate({ href: articleHref(target.article) });
 	}
-
 	return (
 		<div
+			ref={rootRef}
 			className={cn(
 				"relative mx-auto w-full",
 				compact ? "max-w-xl" : "max-w-2xl",
@@ -73,7 +103,9 @@ export function HelpSearch({ compact = false }: { compact?: boolean }) {
 						onChange={(event) => {
 							setQuery(event.target.value);
 							setActiveIndex(0);
+							setIsOpen(true);
 						}}
+						onFocus={() => setIsOpen(true)}
 						onKeyDown={handleKeyDown}
 						placeholder="Cari panduan atau masalah..."
 						aria-label="Cari panduan bantuan"

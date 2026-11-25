@@ -158,6 +158,18 @@ describe("Help Center local search", () => {
 		expect(screen.queryByRole("listbox")).toBeNull();
 	});
 
+	it("opens the active guide when Enter is pressed in the search input", () => {
+		render(<HelpHome />);
+
+		const input = searchInput();
+		fireEvent.change(input, { target: { value: "revisi desain" } });
+		fireEvent.keyDown(input, { key: "Enter" });
+
+		expect(navigateMock).toHaveBeenCalledWith({
+			href: "/bantuan/studio/revisi-desain",
+		});
+	});
+
 	it("supports keyboard navigation and Enter to open the active guide", () => {
 		render(<HelpHome />);
 
@@ -178,6 +190,18 @@ describe("Help Center local search", () => {
 		expect(navigateMock).toHaveBeenCalledWith({
 			href: "/bantuan/studio/revisi-desain",
 		});
+	});
+
+	it("closes the result list when the user clicks outside search", () => {
+		render(<HelpHome />);
+
+		const input = searchInput();
+		fireEvent.change(input, { target: { value: "revisi desain" } });
+		expect(screen.getByRole("listbox")).toBeDefined();
+
+		fireEvent.pointerDown(document.body);
+
+		expect(screen.queryByRole("listbox")).toBeNull();
 	});
 
 	it("clears the query and hides results", () => {
