@@ -6,7 +6,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppLayout } from "./app-layout";
 
-const location = vi.hoisted(() => ({ pathname: "/ask/proj-1" }));
+const location = vi.hoisted(() => ({ pathname: "/vibeplan/proj-1/ask" }));
 
 vi.mock("@tanstack/react-router", () => ({
 	useLocation: ({
@@ -18,7 +18,7 @@ vi.mock("@tanstack/react-router", () => ({
 	useNavigate: () => () => {},
 	useMatches: () => [],
 	useRouter: () => ({ navigate: () => {} }),
-	useRouterState: () => ({ location: { pathname: "/ask/proj-1" } }),
+	useRouterState: () => ({ location: { pathname: "/vibeplan/proj-1/ask" } }),
 }));
 
 vi.mock("@/lib/auth-client", () => ({
@@ -33,7 +33,7 @@ let root: Root | null = null;
 let queryClient: QueryClient;
 
 beforeEach(() => {
-	location.pathname = "/ask/proj-1";
+	location.pathname = "/vibeplan/proj-1/ask";
 	(globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 	queryClient = new QueryClient({
 		defaultOptions: { queries: { retry: false } },

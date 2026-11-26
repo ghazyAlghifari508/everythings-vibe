@@ -357,12 +357,20 @@ export function CodebaseExplorerSidebar({
 			</div>
 			<div className="shrink-0 border-t border-graphite px-3 py-2.5">
 				<p className="text-[10px] font-semibold uppercase tracking-wider text-slate">
-					Stack codebase terdeteksi
+					Teknologi proyek
 				</p>
 				{stack.length === 0 ? (
-					<p className="mt-1 text-[11px] italic text-slate">Tidak terdeteksi</p>
+					<p
+						data-testid="codebase-explorer-stack-empty"
+						className="mt-1 text-[11px] text-slate"
+					>
+						Teknologi belum teridentifikasi
+					</p>
 				) : (
-					<div className="mt-1.5 flex flex-wrap gap-1.5">
+					<div
+						data-testid="codebase-explorer-stack-list"
+						className="mt-1.5 flex flex-wrap gap-1.5"
+					>
 						{stack.map((item) => (
 							<span
 								key={item}

@@ -77,7 +77,7 @@ export function AcDetail({
 						Generate PRD terlebih dahulu sebelum membuat Acceptance Criteria.
 					</p>
 					<Link
-						to="/prd/$id"
+						to="/vibeplan/$id/prd"
 						params={{ id: projectId }}
 						className="btn-primary inline-flex items-center gap-2 rounded-md px-4 py-2"
 					>
@@ -138,7 +138,7 @@ export function AcDetail({
 						{/* Topbar */}
 						<div className="flex shrink-0 items-center border-b border-(--color-graphite) bg-obsidian px-4 py-3">
 							<h1 className="truncate font-(--font-inter) text-lg font-[510] text-(--text-primary)">
-								AC - {projectName}
+								Acceptance Criteria
 							</h1>
 						</div>
 

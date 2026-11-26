@@ -1,5 +1,6 @@
 "use client";
 
+import { Delete02Icon, Loading03Icon } from "@hugeicons/core-free-icons";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,7 +11,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-
+import { Icon } from "@/components/ui/icon";
 export interface StudioDeleteProjectDialogProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
@@ -60,19 +61,30 @@ export function StudioDeleteProjectDialog({
 				onOpenChange(next);
 			}}
 		>
-			<DialogContent className="max-w-sm">
-				<DialogHeader>
-					<DialogTitle>Hapus project?</DialogTitle>
-					<DialogDescription>
-						{`Project "${name}" akan dihapus permanen beserta seluruh layar, riwayat revisi, dan asetnya. Tindakan ini tidak dapat dibatalkan.`}
-					</DialogDescription>
+			<DialogContent className="max-w-md" closeAriaLabel="Tutup dialog">
+				<DialogHeader className="gap-3 space-y-0 text-left">
+					<div
+						className="flex h-10 w-10 items-center justify-center rounded-lg border border-graphite/60 bg-charcoal text-crimson"
+						aria-hidden="true"
+					>
+						<Icon icon={Delete02Icon} size={20} />
+					</div>
+					<div className="flex flex-col space-y-2">
+						<DialogTitle className="break-words text-left text-lg font-semibold leading-snug tracking-tight text-snow [overflow-wrap:anywhere]">
+							{`Hapus project "${name}"?`}
+						</DialogTitle>
+						<DialogDescription className="text-left text-sm leading-relaxed text-fog">
+							Semua halaman, riwayat perubahan, dan aset dalam project ini akan
+							dihapus permanen. Project yang dihapus tidak bisa dipulihkan.
+						</DialogDescription>
+					</div>
 				</DialogHeader>
 				{error ? (
 					<p role="alert" className="text-sm text-crimson">
 						{error}
 					</p>
 				) : null}
-				<DialogFooter>
+				<DialogFooter className="gap-2 sm:gap-0">
 					<Button
 						type="button"
 						variant="secondary"
@@ -85,9 +97,22 @@ export function StudioDeleteProjectDialog({
 						type="button"
 						variant="destructive"
 						disabled={deleting}
+						aria-busy={deleting}
 						onClick={() => void confirmDelete()}
 					>
-						{deleting ? "Menghapus..." : "Hapus project"}
+						{deleting ? (
+							<>
+								<Icon
+									icon={Loading03Icon}
+									size={14}
+									className="mr-1.5 animate-spin"
+									aria-hidden="true"
+								/>
+								Menghapus...
+							</>
+						) : (
+							"Hapus project"
+						)}
 					</Button>
 				</DialogFooter>
 			</DialogContent>

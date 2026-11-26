@@ -13,7 +13,8 @@ import {
 import { ScrapeError } from "@/lib/design-errors";
 import type { CreateStudioProjectInput } from "../types/studio-service";
 import { resolveStudioDesignReference } from "./studio-design-reference.server";
-import { generateStudioHtml } from "./studio-frame-generation";
+import { extractDesignSystemTokens } from "./studio-design-tokens";
+import { generateValidatedFrameHtml } from "./studio-frame-generation";
 import { studioGenerationOptionsSchema } from "./studio-generation-options";
 import {
 	buildStudioAssetUrl,
@@ -100,13 +101,19 @@ export async function createStudioProject(
 		designMode,
 		designMd: cleanDesignMd,
 		logoUrl,
+		prdContent: cleanPrdContent,
 	});
 
-	const htmlCode = await generateStudioHtml(
-		userPrompt,
-		undefined,
-		options.designSkillId,
-	);
+	const dsTokens = extractDesignSystemTokens(cleanDesignMd);
+	const htmlCode = await generateValidatedFrameHtml({
+		framePrompt: userPrompt,
+		blueprint: null,
+		viewport: designMode,
+		expectTokens: dsTokens !== null,
+		designSkillId: options.designSkillId,
+		dsTokens,
+		logoUrl,
+	});
 
 	const [project] = await db
 		.insert(studioProjects)

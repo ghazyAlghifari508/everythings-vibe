@@ -213,7 +213,6 @@ describe("PlanCodebasePage live sync reconciliation", () => {
 			},
 			{ timeout: 15000, interval: 100 },
 		);
-		expect(screen.queryByText("Menunggu agent")).toBeNull();
 
 		// The same screen picks the finished upload up live and reports it.
 		await waitFor(

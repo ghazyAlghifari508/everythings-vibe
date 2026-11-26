@@ -109,9 +109,9 @@ export function StudioLandingPage({
 	}, [scope]);
 	const quoteView = useStudioCreditQuote(quoteScope);
 
+	const isSubmittingRef = useRef(false);
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const requestKey = useRef<{ body: string; key: string } | null>(null);
-
 	useEffect(() => {
 		if (search.prompt !== undefined) setPrompt(search.prompt);
 	}, [search.prompt]);
@@ -186,12 +186,13 @@ export function StudioLandingPage({
 		: null;
 
 	async function submit() {
-		if (loading) return;
+		if (loading || isSubmittingRef.current) return;
 		if (!prompt.trim()) {
 			setError("Ceritakan UI yang mau dibuat dulu.");
 			textareaRef.current?.focus();
 			return;
 		}
+		isSubmittingRef.current = true;
 		setLoading(true);
 		setError("");
 		try {
@@ -268,6 +269,7 @@ export function StudioLandingPage({
 		} catch {
 			setError("Jaringan bermasalah. Draf tetap tersimpan, coba lagi.");
 		} finally {
+			isSubmittingRef.current = false;
 			setLoading(false);
 		}
 	}

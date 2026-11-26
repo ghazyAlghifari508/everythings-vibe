@@ -17,9 +17,12 @@ import type { compareRepositoryIdentity } from "./repository-identity";
 import {
 	appendSyncLifecycleEvent,
 	assertSyncTransition,
+	buildCliVersionMetadata,
 	buildHandshakeMetadata,
 	buildRepositoryIdentityMetadata,
 } from "./sync";
+import { getSessionUsability } from "./sync-session";
+import { SyncBindingError } from "./sync-transport";
 
 export interface SyncHandshakeTransactionInput {
 	sessionId: string;
@@ -32,11 +35,23 @@ export interface SyncHandshakeTransactionInput {
 	repositoryName: string | null;
 	repositoryIdentity: string | null;
 	identityComparison: ReturnType<typeof compareRepositoryIdentity>;
+	/**
+	 * Announcement phase: record that the CLI has started this attempt and bind
+	 * its snapshot, WITHOUT advancing the status. `waiting_for_cli -> connected`
+	 * stays the handshake's job — the announcement only makes the window before
+	 * that commit observable instead of leaving the browser to guess.
+	 */
+	announceOnly?: boolean;
+}
+
+export interface SyncHandshakeResult {
+	status: CodebaseSyncStatus;
+	snapshotId?: string;
 }
 
 export async function runSyncHandshakeTransaction(
 	input: SyncHandshakeTransactionInput,
-): Promise<{ status: CodebaseSyncStatus; snapshotId?: string }> {
+): Promise<SyncHandshakeResult> {
 	const {
 		sessionId,
 		codebaseId,
@@ -50,59 +65,93 @@ export async function runSyncHandshakeTransaction(
 		await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${sessionId}))`);
 
 		const [currentSession] = await tx
-			.select({
-				status: codebaseSyncSessions.status,
-				metadata: codebaseSyncSessions.metadata,
-			})
+			.select()
 			.from(codebaseSyncSessions)
-			.where(eq(codebaseSyncSessions.id, sessionId))
+			.where(
+				and(
+					eq(codebaseSyncSessions.id, sessionId),
+					eq(codebaseSyncSessions.userId, userId),
+					eq(codebaseSyncSessions.codebaseId, codebaseId),
+				),
+			)
 			.limit(1);
+		if (!currentSession || !getSessionUsability(currentSession).usable)
+			throw new SyncBindingError();
 
 		// cast boundary: `codebase_sync_sessions.status` is a text column; every
 		// writer stores a `CodebaseSyncStatus`, the transition map below rejects
 		// unreachable moves, and the response schema rejects the rest.
 		let status = (currentSession?.status ??
 			input.sessionStatus) as CodebaseSyncStatus;
-		if (status === "waiting_for_cli") {
-			assertSyncTransition(status, "connected");
-			status = "connected";
+		const announceOnly = input.announceOnly === true;
+		const previousMetadata =
+			currentSession?.metadata ?? input.sessionMetadata ?? null;
+		const at = new Date();
+
+		// Two writers, two different facts:
+		// - announcement records `cli_connecting` (+ the CLI version, so a CLI that
+		//   fails before the handshake can still report that failure) and leaves
+		//   the status alone: only the handshake may commit a connection, because
+		//   only it carries the repository identity the upload is bound to;
+		// - handshake commits `waiting_for_cli -> connected` and records
+		//   `handshakeAt` plus `agent_connected`.
+		// `handshakeAt` is the persisted proof that the CLI actually contacted the
+		// server: it survives a later failure or expiry so the prompt screen can
+		// still tell a handshaked session from one the CLI never reached.
+		let metadata: Record<string, unknown> | null;
+		if (announceOnly) {
+			// Only a still-pre-handshake attempt may gain the connecting phase. A
+			// late announcement (a duplicated request, or a CLI that lost the race
+			// to its own handshake) must not repaint a session the server already
+			// moved on from.
+			metadata =
+				status === "waiting_for_cli"
+					? appendSyncLifecycleEvent({
+							previous: buildCliVersionMetadata({
+								previous: previousMetadata,
+								cliVersion: input.cliVersion,
+							}),
+							kind: "cli_connecting",
+							at,
+						})
+					: null;
+		} else {
+			if (status === "waiting_for_cli") {
+				assertSyncTransition(status, "connected");
+				status = "connected";
+			}
+			const withHandshake = buildHandshakeMetadata({
+				previous: previousMetadata,
+				cliVersion: input.cliVersion,
+				...(repositoryName ? { repositoryName } : {}),
+				handshakeAt: at,
+			});
+			const withIdentity = repositoryIdentity
+				? buildRepositoryIdentityMetadata({
+						previous: withHandshake,
+						repositoryIdentity,
+						matchesStored: identityComparison.matches,
+						at,
+					})
+				: withHandshake;
+			metadata = appendSyncLifecycleEvent({
+				previous: withIdentity,
+				kind: "agent_connected",
+				at,
+			});
 		}
-		// handshakeAt is the persisted proof that the CLI actually contacted the
-		// server for this session. It is written here, inside the handshake
-		// transaction, and survives a later failure or expiry so the prompt screen
-		// can still tell a handshaked session from one the CLI never reached.
-		//
-		// The lifecycle log records the same fact as an ordered event so a browser
-		// that first polls after this transition can still show WHEN the agent
-		// connected instead of only that it did.
-		const handshakeAt = new Date();
-		const withHandshake = buildHandshakeMetadata({
-			previous: currentSession?.metadata ?? input.sessionMetadata ?? null,
-			cliVersion: input.cliVersion,
-			...(repositoryName ? { repositoryName } : {}),
-			handshakeAt,
-		});
-		const withIdentity = repositoryIdentity
-			? buildRepositoryIdentityMetadata({
-					previous: withHandshake,
-					repositoryIdentity,
-					matchesStored: identityComparison.matches,
-					at: handshakeAt,
-				})
-			: withHandshake;
-		const metadata = appendSyncLifecycleEvent({
-			previous: withIdentity,
-			kind: "agent_connected",
-			at: handshakeAt,
-		});
-		await tx
-			.update(codebaseSyncSessions)
-			.set({
-				status,
-				metadata,
-				updatedAt: new Date(),
-			})
-			.where(eq(codebaseSyncSessions.id, sessionId));
+
+		if (metadata) {
+			await tx
+				.update(codebaseSyncSessions)
+				.set({ status, metadata, updatedAt: new Date() })
+				.where(
+					and(
+						eq(codebaseSyncSessions.id, sessionId),
+						eq(codebaseSyncSessions.userId, userId),
+					),
+				);
+		}
 
 		// Auto-name the codebase from the repository folder name, but only while
 		// the stored name is still one the system chose. A name the user picked

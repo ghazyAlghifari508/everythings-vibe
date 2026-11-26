@@ -2,7 +2,10 @@
 
 import { forwardRef, useImperativeHandle, useRef } from "react";
 import type { TaskCard } from "@/features/greenfield/hooks/use-kanban-polling";
-import { groupCardsByFeature } from "@/lib/kanban-utils";
+import {
+	getKanbanColumnEmptyLabel,
+	groupCardsByFeature,
+} from "@/lib/kanban-utils";
 import { FeatureGroup } from "./feature-group";
 
 export interface KanbanColumnHandle {
@@ -58,7 +61,9 @@ export const KanbanColumn = forwardRef<KanbanColumnHandle, KanbanColumnProps>(
 				<div className="flex-1 overflow-y-auto p-3 flex flex-col gap-3 min-h-0 custom-scrollbar select-none">
 					{featuresList.length === 0 ? (
 						<div className="flex flex-1 items-center justify-center py-12">
-							<span className="text-xs text-fog/40">Tidak ada task</span>
+							<span className="text-xs text-fog/40">
+								{getKanbanColumnEmptyLabel(title)}
+							</span>
 						</div>
 					) : (
 						featuresList.map((fName, idx) => (

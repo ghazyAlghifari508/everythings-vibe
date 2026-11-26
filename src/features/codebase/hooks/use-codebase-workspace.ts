@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ChatStreamMessage } from "@/features/codebase/components/chat/codebase-chat-workspace";
 import {
 	type CodebasePipelineStage,
 	type CodebaseRunState,
+	isRunActive,
 	reconcilePipelineStage,
 	resolvePersistedStage,
 	shouldAutoRevealArtifact,
@@ -10,6 +10,7 @@ import {
 import type { ComposerOperationMode } from "@/features/codebase/services/composer-interactions";
 import {
 	emptyArtifactHydration,
+	resolveWorkspaceHistoryView,
 	resolveWorkspaceView,
 	type WorkspaceArtifactHydration,
 } from "@/features/codebase/services/workspace-hydration";
@@ -30,13 +31,37 @@ import { useWorkspacePlan } from "./use-workspace-plan";
 import { useWorkspaceQuestions } from "./use-workspace-questions";
 import { useWorkspaceRevision } from "./use-workspace-revision";
 import { useWorkspaceSource } from "./use-workspace-source";
+import { useWorkspaceTimeline } from "./use-workspace-timeline";
 
 export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 	const { codebase, onboardingFeatureId } = data;
 	const plan = useWorkspacePlan(data);
 	const { effectiveFeatureId, resolvedFeature, planState, onboardingFeature } =
 		plan;
-	const [chatMessages, setChatMessages] = useState<ChatStreamMessage[]>([]);
+	const timeline = useWorkspaceTimeline(codebase.id, effectiveFeatureId);
+	const { refreshTimeline } = timeline;
+	const chatMessages = useMemo(
+		() =>
+			timeline.events.flatMap((event) =>
+				event.type === "user_message" ||
+				event.type === "assistant_message" ||
+				event.type === "revision_requested"
+					? [
+							{
+								id: event.id,
+								role:
+									event.type !== "assistant_message"
+										? ("user" as const)
+										: ("assistant" as const),
+								content: event.content ?? "",
+								stage: event.stage,
+								createdAt: event.createdAt,
+							},
+						]
+					: [],
+			),
+		[timeline.events],
+	);
 	const [run, setRun] = useState<CodebaseRunState | null>(null);
 	const sync = useCodebaseSync({
 		codebaseId: codebase.id,
@@ -57,12 +82,15 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 	const answersReadOnly =
 		Boolean(effectiveFeatureId) &&
 		(artifact.artifactHydration.feature !== "empty" ||
-			(run?.stage === "feature" && run.status === "running"));
+			(run?.stage === "feature" && isRunActive(run)));
 	const questions = useWorkspaceQuestions(
 		effectiveFeatureId,
 		setRun,
 		answersReadOnly,
 	);
+	useEffect(() => {
+		if (run || questions.saveStatus === "saved") void refreshTimeline();
+	}, [run, questions.saveStatus, refreshTimeline]);
 	const [pipelineStage, setPipelineStage] =
 		useState<CodebasePipelineStage>("questions");
 	const [stageBusy, setStageBusy] = useState<CodebasePipelineStage | null>(
@@ -92,11 +120,13 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 	}, [artifact.artifactHydration, hasTasksInDb]);
 	const hasExistingPlan = data.plans.some((entry) => entry.hasArtifacts);
 	const readiness = resolveCodebaseReadiness({
-		snapshotId: sync.status?.snapshotId ?? data.currentSnapshotId,
-		snapshotStatus:
-			sync.status?.status ?? (data.hasStoredSnapshot ? "uploaded" : null),
+		snapshotId: sync.activeWorkspaceSnapshotId,
+		snapshotStatus: sync.activeWorkspaceSnapshotId ? "uploaded" : null,
 		analysis: sync.analysis,
-		analysisAttemptStatus: sync.status?.analysisAttemptStatus ?? null,
+		analysisAttemptStatus:
+			sync.activeWorkspaceSnapshotId === sync.status?.snapshotId
+				? sync.status.analysisAttemptStatus
+				: null,
 		hasExistingPlan,
 		hasStoredSnapshot: data.hasStoredSnapshot,
 	});
@@ -106,21 +136,25 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		(hydration.tasks === "empty" && !hasTasksInDb);
 	const workspaceView = useMemo(
 		() =>
-			resolveWorkspaceView({
-				plan: planState,
-				artifacts: hydration,
-				hasMessages: chatMessages.length > 0,
-				hasQuestions: questions.aiQuestions.length > 0,
-				isSending: sync.isWorking,
-				runStatus: run?.status ?? "idle",
-			}),
+			resolveWorkspaceHistoryView(
+				resolveWorkspaceView({
+					plan: planState,
+					artifacts: hydration,
+					hasMessages: timeline.events.length > 0,
+					hasQuestions: questions.aiQuestions.length > 0,
+					isSending: sync.isWorking,
+					runStatus: run?.status ?? "idle",
+				}),
+				timeline.status,
+			),
 		[
 			planState,
 			hydration,
-			chatMessages.length,
+			timeline.events.length,
 			questions.aiQuestions.length,
 			sync.isWorking,
 			run?.status,
+			timeline.status,
 		],
 	);
 	const persistedStage = resolvePersistedStage({
@@ -139,7 +173,7 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 	const source = useWorkspaceSource({
 		codebaseId: codebase.id,
 		snapshotReady: sync.snapshotReady,
-		polledSnapshotId: sync.status?.snapshotId,
+		polledSnapshotId: sync.activeWorkspaceSnapshotId,
 		analysisOutput,
 		setActiveArtifactId,
 		setCanvasOpen,
@@ -157,12 +191,6 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 	});
 	const [composerMode, setComposerMode] =
 		useState<ComposerOperationMode>("plan");
-	const pushAssistantMessage = useCallback((content: string) => {
-		setChatMessages((current) => [
-			...current,
-			{ id: `assistant-${Date.now()}`, role: "assistant", content },
-		]);
-	}, []);
 	const userTookOverCanvas = useRef(false);
 	const openArtifactPreview = useCallback(
 		(kind: "feature" | "prd" | "ac" | "tasks") => {
@@ -183,7 +211,7 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 	const revision = useWorkspaceRevision({
 		codebaseId: codebase.id,
 		effectiveFeatureId,
-		currentSnapshotId: sync.status?.snapshotId ?? data.currentSnapshotId,
+		currentSnapshotId: sync.activeWorkspaceSnapshotId,
 		stageBusy,
 		featureName: resolvedFeature?.name ?? codebase.name,
 		resolvedFeatureName: resolvedFeature?.name,
@@ -193,7 +221,7 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		refreshFeatureTree: artifact.refreshFeatureTree,
 		onTaskUpdate: artifact.refreshTaskTree,
 		refetchKanban: kanban.refetch,
-		pushAssistantMessage,
+		refreshTimeline,
 		openArtifactPreview,
 		setStageBusy,
 		setStageError,
@@ -215,7 +243,6 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		questions.setAiQuestions([]);
 		questions.setChatAnswers({});
 		questions.setLastFeaturePrompt("");
-		setChatMessages([]);
 		setRun(null);
 		setStageBusy(null);
 		setStageError(null);
@@ -242,7 +269,7 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		setPrdContent: artifact.setPrdContent,
 		setAcContent: artifact.setAcContent,
 		setChatAnswers: questions.setChatAnswers,
-		setChatMessages,
+		persistMessage: timeline.persistMessage,
 		effectiveFeatureId,
 		onboardingFeatureId,
 		artifactCount: presentation.artifacts.length,
@@ -262,9 +289,8 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		aiQuestions: questions.aiQuestions,
 		lastFeaturePrompt: questions.lastFeaturePrompt,
 		featureName: resolvedFeature?.name,
-		codebaseName: codebase.name,
 		refreshFeatureTree: artifact.refreshFeatureTree,
-		pushAssistantMessage,
+		refreshTimeline,
 		openArtifactPreview,
 		setPipelineStage,
 		setStageError,
@@ -291,18 +317,16 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		refetchKanban: kanban.refetch,
 		setStageError,
 		setPipelineStage,
-		pushAssistantMessage,
+		refreshTimeline,
 		openArtifactPreview,
 		pipelineStage: run?.status === "failed" ? run.stage : pipelineStage,
 		handleConfirmGenerate: featureGeneration.handleConfirmGenerate,
 	});
 
-	// onOperationCompleted extracted
 	const onOperationCompleted = useWorkspaceOperationCompletion({
 		activeProjectIdRef: artifact.activeProjectIdRef,
-		resolvedFeatureName: resolvedFeature?.name,
-		codebaseName: codebase.name,
 		setAiQuestions: questions.setAiQuestions,
+		setLastFeaturePrompt: questions.setLastFeaturePrompt,
 		refreshFeatureTree: artifact.refreshFeatureTree,
 		loadPrd: artifact.loadPrd,
 		loadAc: artifact.loadAc,
@@ -310,7 +334,7 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		refetchKanban: kanban.refetch,
 		setPipelineStage,
 		openArtifactPreview,
-		pushAssistantMessage,
+		refreshTimeline,
 	});
 
 	useWorkspaceOperations({
@@ -342,6 +366,9 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		...generation,
 		...revision,
 		chatMessages,
+		timelineEvents: timeline.events,
+		timelineStatus: timeline.status,
+		refreshTimeline,
 		run,
 		canvasOpen,
 		setCanvasOpen,

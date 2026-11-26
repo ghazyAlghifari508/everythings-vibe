@@ -28,6 +28,8 @@ export interface CodebaseSourcePreviewProps {
 	maxBodyHeight?: number;
 	/** Where the full source can be obtained when the preview is clipped. */
 	truncationHint?: string;
+	/** Initial presentation preference to visually collapse trailing blank lines. */
+	initialHideTrailingBlankLines?: boolean;
 }
 
 function formatSize(sizeBytes: number | null): string | null {
@@ -73,16 +75,21 @@ export function CodebaseSourcePreview({
 	maxLines = CODEBASE_FILE_PREVIEW_MAX_LINES,
 	maxBodyHeight,
 	truncationHint = DEFAULT_TRUNCATION_HINT,
+	initialHideTrailingBlankLines = false,
 }: CodebaseSourcePreviewProps) {
 	const [mode, setMode] = useState<SourceViewMode>("original");
 	const [pendingMode, setPendingMode] = useState<SourceViewMode | null>(null);
 	const [activePath, setActivePath] = useState(path);
+	const [hideTrailingBlank, setHideTrailingBlank] = useState(
+		initialHideTrailingBlankLines,
+	);
 	const [isPending, startTransition] = useTransition();
 
 	if (activePath !== path) {
 		setActivePath(path);
 		setMode("original");
 		setPendingMode(null);
+		setHideTrailingBlank(initialHideTrailingBlankLines);
 	}
 
 	const activeMode = pendingMode ?? mode;
@@ -94,8 +101,9 @@ export function CodebaseSourcePreview({
 				path,
 				mode,
 				maxLines,
+				hideTrailingBlankLines: hideTrailingBlank,
 			}),
-		[content, path, mode, maxLines],
+		[content, path, mode, maxLines, hideTrailingBlank],
 	);
 
 	const handleModeChange = (next: SourceViewMode) => {
@@ -125,33 +133,60 @@ export function CodebaseSourcePreview({
 					<span data-testid="codebase-source-linecount">
 						{view.totalLines.toLocaleString("id-ID")} baris
 					</span>
+					{view.trailingBlankCount > 0 && !view.hiddenTrailingLinesCount ? (
+						<span
+							data-testid="codebase-source-trailing-note"
+							className="text-[10px] text-slate"
+						>
+							({view.trailingBlankCount} kosong di akhir)
+						</span>
+					) : null}
 					{isPending ? (
 						<span className="text-[10px] text-fog animate-pulse">
 							Menyiapkan tampilan...
 						</span>
 					) : null}
 				</p>
-				{view.formattedAvailable ? (
-					<fieldset className="flex rounded-md border border-graphite bg-obsidian p-0.5">
-						<legend className="sr-only">Tampilan isi file</legend>
-						{(["original", "formatted"] as const).map((option) => (
-							<button
-								key={option}
-								type="button"
-								onClick={() => handleModeChange(option)}
-								aria-pressed={activeMode === option}
-								data-testid={`codebase-source-mode-${option}`}
-								className={`min-h-7 rounded px-2 text-[11px] font-medium capitalize transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
-									activeMode === option
-										? "bg-steel/40 text-snow"
-										: "text-fog hover:text-snow"
-								}`}
-							>
-								{option === "original" ? "Asli" : "Terformat"}
-							</button>
-						))}
-					</fieldset>
-				) : null}
+				<div className="flex flex-wrap items-center gap-1.5">
+					{view.trailingBlankCount > 0 ? (
+						<button
+							type="button"
+							onClick={() => setHideTrailingBlank((prev) => !prev)}
+							data-testid="codebase-source-trailing-toggle"
+							aria-pressed={hideTrailingBlank}
+							className={`min-h-7 rounded border border-graphite px-2 text-[11px] font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
+								hideTrailingBlank
+									? "bg-steel/40 text-snow"
+									: "bg-obsidian text-fog hover:text-snow"
+							}`}
+						>
+							{hideTrailingBlank
+								? `Tampilkan ${view.trailingBlankCount} baris kosong akhir`
+								: `Sembunyikan ${view.trailingBlankCount} baris kosong akhir`}
+						</button>
+					) : null}
+					{view.formattedAvailable ? (
+						<fieldset className="flex rounded-md border border-graphite bg-obsidian p-0.5">
+							<legend className="sr-only">Tampilan isi file</legend>
+							{(["original", "formatted"] as const).map((option) => (
+								<button
+									key={option}
+									type="button"
+									onClick={() => handleModeChange(option)}
+									aria-pressed={activeMode === option}
+									data-testid={`codebase-source-mode-${option}`}
+									className={`min-h-7 rounded px-2 text-[11px] font-medium capitalize transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
+										activeMode === option
+											? "bg-steel/40 text-snow"
+											: "text-fog hover:text-snow"
+									}`}
+								>
+									{option === "original" ? "Asli" : "Terformat"}
+								</button>
+							))}
+						</fieldset>
+					) : null}
+				</div>
 			</div>
 			{isClipped ? (
 				<output
@@ -178,7 +213,9 @@ export function CodebaseSourcePreview({
 						className="sticky left-0 z-10 shrink-0 select-none border-r border-graphite bg-obsidian py-2 pl-2 pr-2 text-right text-slate tabular-nums"
 					>
 						{view.rows.map((row) => (
-							<div key={row.lineNumber}>{row.lineNumber}</div>
+							<div key={row.lineNumber} className="h-5 leading-5">
+								{row.lineNumber}
+							</div>
 						))}
 					</div>
 					<div className="codebase-source-code min-w-0 py-2 pr-3">
@@ -189,8 +226,8 @@ export function CodebaseSourcePreview({
 								data-line={row.lineNumber}
 								className={
 									view.softWrap
-										? "whitespace-pre-wrap break-words pl-3"
-										: "whitespace-pre pl-3"
+										? "min-h-5 whitespace-pre-wrap break-words pl-3 leading-5"
+										: "min-h-5 whitespace-pre pl-3 leading-5"
 								}
 							>
 								{renderRowTokens(row.tokens)}
@@ -198,6 +235,20 @@ export function CodebaseSourcePreview({
 						))}
 					</div>
 				</div>
+				{!isClipped && view.rows.length > 0 ? (
+					<div
+						data-testid="codebase-source-eof"
+						className="flex items-center gap-2 border-t border-graphite/40 px-3 py-1.5 text-[11px] font-mono text-slate select-none"
+					>
+						<span>[Akhir file]</span>
+						{view.hiddenTrailingLinesCount > 0 ? (
+							<span className="text-[10px] text-fog">
+								({view.hiddenTrailingLinesCount} baris kosong di akhir
+								disembunyikan)
+							</span>
+						) : null}
+					</div>
+				) : null}
 			</div>
 			{onRetry ? (
 				<button

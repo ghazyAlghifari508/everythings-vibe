@@ -18,6 +18,9 @@ export type GenerationEventListener = (
 const sseChunkSchema = z.object({
 	type: z.string(),
 	error: z.string().optional(),
+	/** Classifies a stream failure so a caller can tell a refused model output
+	 *  (retryable) from an infrastructure failure. */
+	code: z.string().optional(),
 	summaryMessage: z.string().optional(),
 	text: z.string().optional(),
 	content: z.string().optional(),
@@ -36,6 +39,7 @@ export async function drainGenerationSseStream(
 ): Promise<{ ok: boolean; donePayload?: unknown; error?: string }> {
 	if (!body) return { ok: true };
 	let streamError: string | null = null;
+	let streamErrorCode: string | null = null;
 	let donePayload: unknown = null;
 
 	for await (const raw of readSseStream(body)) {
@@ -67,6 +71,7 @@ export async function drainGenerationSseStream(
 		if (parsed.type === "error") {
 			const errMessage = parsed.error || "Generasi AI gagal di tengah jalan.";
 			streamError = errMessage;
+			streamErrorCode = parsed.code ?? null;
 			onEvent?.({
 				type: "error",
 				stage,
@@ -104,7 +109,9 @@ export async function drainGenerationSseStream(
 	}
 
 	if (streamError) {
-		throw new Error(streamError);
+		const error = new Error(streamError) as Error & { code?: string };
+		if (streamErrorCode) error.code = streamErrorCode;
+		throw error;
 	}
 	return { ok: true, donePayload };
 }

@@ -4,7 +4,6 @@ import { usePaymentResume } from "@/features/greenfield/hooks/use-payment-resume
 import {
 	clearSetupPrompt,
 	consumePendingPrdPrompt,
-	getSetupPrompt,
 } from "@/lib/prompt-handoff";
 import { useChatStore } from "@/store";
 
@@ -61,18 +60,9 @@ export function useChatAutoSubmit({
 			return;
 		}
 
-		let pending = consumePendingPrdPrompt();
-		if (!pending) {
-			const setup = getSetupPrompt();
-			if (setup) {
-				pending = { prompt: setup, mode: "auto", createdAt: Date.now() };
-				clearSetupPrompt();
-			} else {
-				return;
-			}
-		} else {
-			clearSetupPrompt();
-		}
+		const pending = consumePendingPrdPrompt(projectId);
+		if (!pending) return;
+		clearSetupPrompt();
 
 		autoSubmitAttemptedRef.current = true;
 		if (projectId) autoSubmittedProjectIds.add(projectId);
@@ -104,9 +94,9 @@ export function useChatAutoSubmit({
 		searchStr,
 		navigate,
 		onResume: () => {
-			setGeneratingPRD(true);
-			const pending = consumePendingPrdPrompt();
+			const pending = consumePendingPrdPrompt(projectId);
 			if (pending) {
+				setGeneratingPRD(true);
 				void onSubmitPrompt(
 					pending.prompt,
 					"generate",

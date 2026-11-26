@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { StudioFrameRow } from "@/db/schema";
 import type { StudioComposerSubmitResult } from "@/features/studio/components/composer/studio-composer";
+import { useStudioPlanningRetry } from "@/features/studio/hooks/use-studio-planning-retry";
 import { useStudioScreenSuggestions } from "@/features/studio/hooks/use-studio-screen-suggestions";
 import { useStudioStatus } from "@/features/studio/hooks/use-studio-status";
 import { useStudioWorkspaceActions } from "@/features/studio/hooks/use-studio-workspace-actions";
@@ -13,6 +14,7 @@ import type {
 	StudioVisibleJob,
 	StudioVisibleProject,
 } from "@/features/studio/types/studio-status";
+import { deriveStudioLifecycle } from "@/features/studio/utils/studio-lifecycle";
 
 const NO_SUGGESTIONS: readonly StudioScreenSuggestion[] = [];
 
@@ -28,6 +30,8 @@ export interface StudioWorkspaceState {
 	duplicating: boolean;
 	renaming: boolean;
 	/** Frames with a retry request in flight; their retry control is disabled. */
+	retryingPlanning: boolean;
+	canRetryPlanning: boolean;
 	retryingFrameIds: string[];
 	/** Per-frame retry rejections, rendered inside that frame only. */
 	frameRetryErrors: Record<string, string>;
@@ -68,6 +72,7 @@ export function useStudioWorkspace(
 		error: syncError,
 		clearError: clearSyncError,
 	} = useStudioStatus(initialData);
+	const lifecycle = deriveStudioLifecycle({ project, frames, activeJob });
 	const [selectedFrameId, setSelectedFrameId] = useState<string | null>(null);
 	const [selectedFrameIds, setSelectedFrameIds] = useState<string[]>([]);
 	const [error, setActionError] = useState("");
@@ -142,6 +147,12 @@ export function useStudioWorkspace(
 		syncProjectStatus,
 		setError,
 	});
+	const planningRetry = useStudioPlanningRetry({
+		projectId: project.id,
+		canRetryPlanning: lifecycle.canRetryPlanning && !syncError,
+		syncProjectStatus,
+		setError,
+	});
 
 	const storedReferenceLabel = useMemo(() => {
 		const reference = project.designReference;
@@ -200,6 +211,8 @@ export function useStudioWorkspace(
 		duplicating: actions.duplicating,
 		renaming: actions.renaming,
 		retryingFrameIds: actions.retryingFrameIds,
+		retryingPlanning: planningRetry.retryingPlanning,
+		canRetryPlanning: lifecycle.canRetryPlanning && !syncError,
 		frameRetryErrors: actions.frameRetryErrors,
 		creditsExhausted: actions.creditsExhausted,
 		setCreditsExhausted: actions.setCreditsExhausted,
@@ -219,7 +232,7 @@ export function useStudioWorkspace(
 		handleComposerSubmit: actions.handleComposerSubmit,
 		handleSkillChange: actions.handleSkillChange,
 		handleRetryFrame: actions.handleRetryFrame,
-		handleRetryPlanning: actions.handleRetryPlanning,
+		handleRetryPlanning: planningRetry.handleRetryPlanning,
 		handleDownloadAllZip: actions.handleDownloadAllZip,
 	};
 }

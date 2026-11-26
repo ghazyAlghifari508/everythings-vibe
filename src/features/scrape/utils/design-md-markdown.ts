@@ -4,13 +4,16 @@
 // cannot support are omitted rather than filled with placeholders, so a reader
 // can trust that every present section is backed by measurement.
 export const DESIGN_MD_SECTIONS = [
+	// What was captured and what the analysis actually achieved comes before any
+	// measurement, so a requested scope can never be read as a successful one.
+	"Overview & Capture Confidence",
 	"Visual Identity",
+	"AI Agent Implementation Guide",
 	"Foundations / Shared Tokens",
 	"Component Specifications",
 	"Responsive Differences",
 	"Theme Differences",
 	"Do's & Don'ts",
-	"AI Agent Implementation Guide",
 	"CSS / Tailwind Reference",
 	"Coverage & Important Limitations",
 ] as const;

@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { classifyAskOptionsOutput } from "@/features/greenfield/services/ask-generation";
 import {
 	type AskQuestion,
-	buildAskOptionsRepairPrompt,
-	classifyAskOptionsOutput,
 	parseAskOptionsJson,
 	validateAskQuestions,
 } from "@/features/greenfield/services/ask-service";
@@ -23,7 +22,18 @@ const validQuestions: AskQuestion[] = [
 		id: "scope",
 		question: "Modul mana yang perlu diubah?",
 		type: "select",
-		options: ["Modul A", "Modul B"],
+		options: [
+			{
+				id: "scope-opt1",
+				label: "Modul A",
+				description: "Hanya alur ini yang ikut berubah.",
+			},
+			{
+				id: "scope-opt2",
+				label: "Modul B",
+				description: "Modul lain harus menyesuaikan pemanggilnya.",
+			},
+		],
 		recommended: 0,
 		recommendationReason: "Analisis menunjukkan modul A memegang alur ini.",
 	},
@@ -32,7 +42,10 @@ const validQuestions: AskQuestion[] = [
 		id: "surfaces",
 		question: "Permukaan UI mana?",
 		type: "multiselect",
-		options: ["A", "B"],
+		options: [
+			{ id: "surfaces-opt1", label: "A" },
+			{ id: "surfaces-opt2", label: "B" },
+		],
 	},
 ];
 
@@ -112,13 +125,19 @@ describe("validateAskQuestions (server payload boundary)", () => {
 			id: "a",
 			question: "Pilih?",
 			type: "select",
-			options: ["X", "Y"],
+			options: [
+				{ id: "a-opt1", label: "X" },
+				{ id: "a-opt2", label: "Y" },
+			],
 		});
 		expect(result?.[1]).toEqual({
 			id: "b",
 			question: "Pilih?",
 			type: "select",
-			options: ["X", "Y"],
+			options: [
+				{ id: "b-opt1", label: "X" },
+				{ id: "b-opt2", label: "Y" },
+			],
 		});
 	});
 
@@ -151,29 +170,5 @@ describe("ask options failure classification (diagnostics only)", () => {
 		expect(
 			classifyAskOptionsOutput(JSON.stringify({ questions: validQuestions })),
 		).toBe("schema");
-	});
-});
-
-describe("bounded repair prompt", () => {
-	it("restates the contract without supplying questions or options", () => {
-		const prompt = buildAskOptionsRepairPrompt({
-			raw: '{"questions": "nope"}',
-			reason: "schema",
-		});
-		expect(prompt).toContain("questions");
-		expect(prompt).toContain("select|text|multiselect");
-		expect(prompt).toContain("Perbaiki dan kirim ulang HANYA JSON valid");
-		// The repair must instruct preservation, never invention.
-		expect(prompt).toContain("jangan menambah atau menghapus pertanyaan");
-	});
-
-	it("bounds the rejected output it hands back", () => {
-		const prompt = buildAskOptionsRepairPrompt({
-			raw: "x".repeat(50_000),
-			reason: "invalid_json",
-			maxRawChars: 100,
-		});
-		expect(prompt).toContain("...(dipotong)");
-		expect(prompt.length).toBeLessThan(1_000);
 	});
 });

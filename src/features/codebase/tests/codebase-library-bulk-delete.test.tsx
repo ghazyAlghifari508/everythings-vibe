@@ -91,7 +91,7 @@ describe("CodebaseLibraryView bulk deletion", () => {
 		expect(useUIStore.getState().toastMessage).toBe("2 repository dihapus.");
 	});
 
-	it("removes the whole history through select-all plus delete", async () => {
+	it("removes every repository on the page through select-all plus delete", async () => {
 		render(
 			<CodebaseLibraryView
 				items={[makeItem("cb-1", "Repo 1"), makeItem("cb-2", "Repo 2")]}
@@ -114,6 +114,36 @@ describe("CodebaseLibraryView bulk deletion", () => {
 		await waitFor(() => {
 			expect(screen.getByText("Belum ada repository terhubung")).toBeDefined();
 		});
+	});
+
+	it("deletes only the page-selected ids and leaves the other pages intact", async () => {
+		const items = Array.from(
+			{ length: CODEBASE_LIBRARY_PAGE_SIZE * 2 },
+			(_, i) => makeItem(`cb-${i + 1}`, `Project ${i + 1}`),
+		);
+		render(<CodebaseLibraryView items={items} />);
+
+		enterSelectionMode();
+		fireEvent.click(
+			screen.getByRole("checkbox", { name: /Pilih semua di halaman ini/i }),
+		);
+		fireEvent.click(screen.getByRole("button", { name: "Hapus Terpilih" }));
+		fireEvent.click(
+			within(screen.getByRole("dialog")).getByRole("button", {
+				name: `Hapus ${CODEBASE_LIBRARY_PAGE_SIZE}`,
+			}),
+		);
+
+		await waitFor(() => {
+			expect(readBulkDeleteCalls()).toEqual([
+				items.slice(0, CODEBASE_LIBRARY_PAGE_SIZE).map((item) => item.id),
+			]);
+		});
+		await waitFor(() => {
+			expect(screen.queryByText("Project 1")).toBeNull();
+		});
+		expect(screen.getByText("Project 11")).toBeDefined();
+		expect(screen.queryByRole("navigation", { name: "Pagination" })).toBeNull();
 	});
 
 	it("clamps pagination after a bulk delete shrinks the page count", async () => {

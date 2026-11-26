@@ -109,26 +109,45 @@ function textOf(html: string): string {
 }
 
 function extractHeadings(body: string): CrawlHeading[] {
-	const matches = [...body.matchAll(/<h([1-6])\b[^>]*>([\s\S]*?)<\/h[1-6]>/gi)];
+	const matches = [
+		...body.matchAll(/<h([1-6])\b([^>]*)>([\s\S]*?)<\/h[1-6]>/gi),
+	];
 	return matches
 		.map((match) => {
 			const level = Number.parseInt(match[1], 10);
-			const text = textOf(match[2]).slice(0, CRAWL_HEADING_MAX_CHARS);
-			return { level, text };
+			const idAttr = match[2]
+				.match(/\bid\s*=\s*["']([^"']+)["']/i)?.[1]
+				?.trim();
+			const text = textOf(match[3]).slice(0, CRAWL_HEADING_MAX_CHARS);
+			const heading: CrawlHeading = idAttr
+				? { id: idAttr, level, text }
+				: { level, text };
+			return heading;
 		})
 		.filter((row) => row.text.length > 0);
 }
 
 function extractSections(body: string): CrawlSection[] {
-	const boundaries: { index: number; level: number; title: string }[] = [];
+	const boundaries: {
+		index: number;
+		level: number;
+		title: string;
+		id?: string;
+	}[] = [];
 	for (const match of body.matchAll(
-		/<h([1-6])\b[^>]*>([\s\S]*?)<\/h[1-6]>/gi,
+		/<h([1-6])\b([^>]*)>([\s\S]*?)<\/h[1-6]>/gi,
 	)) {
-		const title = textOf(match[2]).slice(0, CRAWL_HEADING_MAX_CHARS).trim();
+		const title = textOf(match[3]).slice(0, CRAWL_HEADING_MAX_CHARS).trim();
 		if (!title) continue;
 		const level = Number.parseInt(match[1], 10);
 		const index = match.index ?? 0;
-		boundaries.push({ index, level, title });
+		const idAttr = match[2].match(/\bid\s*=\s*["']([^"']+)["']/i)?.[1]?.trim();
+		boundaries.push({
+			index,
+			level,
+			title,
+			...(idAttr ? { id: idAttr } : {}),
+		});
 	}
 	if (boundaries.length === 0) {
 		const text = textOf(body).slice(0, CRAWL_SECTION_TEXT_MAX_CHARS);
@@ -145,7 +164,12 @@ function extractSections(body: string): CrawlSection[] {
 		);
 		const text = textOf(withoutHeading).slice(0, CRAWL_SECTION_TEXT_MAX_CHARS);
 		if (!text) continue;
-		sections.push({ title: current.title, level: current.level, text });
+		sections.push({
+			...(current.id ? { id: current.id } : {}),
+			title: current.title,
+			level: current.level,
+			text,
+		});
 	}
 	return sections;
 }

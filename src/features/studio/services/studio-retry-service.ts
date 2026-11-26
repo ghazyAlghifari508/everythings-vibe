@@ -13,6 +13,10 @@ import {
 	reserveStudioOperationCharge,
 	serverStudioQuote,
 } from "./studio-credit-adapter.server";
+import {
+	deriveStudioLifecycle,
+	isTemporarySlot,
+} from "../utils/studio-lifecycle";
 import { StudioFrameError } from "./studio-frame-errors";
 
 export interface StudioFrameRetryResult {
@@ -78,6 +82,24 @@ export async function retryStudioFrame(
 			)
 			.limit(1);
 		if (active) return { frame, retry: "already-running" };
+		// Every screen shares one blueprint. When the project still holds only the
+		// provisional planning slots, retrying one slot alone would rebuild it with
+		// no shared navigation contract, and repeating that per slot is the failure
+		// loop this guard exists to stop: the plan is the unit of recovery.
+		const slots = await tx
+			.select({
+				name: studioFrames.name,
+				description: studioFrames.description,
+				htmlCode: studioFrames.htmlCode,
+			})
+			.from(studioFrames)
+			.where(eq(studioFrames.projectId, projectId));
+		if (
+			!project.designBlueprint &&
+			slots.length > 0 &&
+			slots.every(isTemporarySlot)
+		)
+			throw new StudioFrameError("STUDIO_PLANNING_REQUIRED");
 		const [failed] = await tx
 			.select()
 			.from(studioJobs)
@@ -232,6 +254,15 @@ export async function retryStudioPlanning(
 				),
 			);
 		if (active) throw new StudioFrameError("STUDIO_RETRY_RUNNING");
+		const frames = await tx
+			.select()
+			.from(studioFrames)
+			.where(eq(studioFrames.projectId, projectId));
+		if (
+			!deriveStudioLifecycle({ project, frames, activeJob: job })
+				.canRetryPlanning
+		)
+			throw new StudioFrameError("STUDIO_INVALID_INPUT");
 		const [updated] = await tx
 			.update(studioJobs)
 			.set({ ...resetClaim, creditOperationId: null, updatedAt: new Date() })

@@ -60,6 +60,7 @@ import { Route as SettingsFeedbackRouteImport } from './routes/settings/feedback
 import { Route as SettingsNotificationsRouteImport } from './routes/settings/notifications'
 import { Route as SettingsProfileRouteImport } from './routes/settings/profile'
 import { Route as TaskIdRouteImport } from './routes/task/$id'
+import { Route as VibeplanIdRouteRouteImport } from './routes/vibeplan/$id/route'
 import { Route as ApiAcGenerateRouteImport } from './routes/api/ac/generate'
 import { Route as ApiAcSaveRouteImport } from './routes/api/ac/save'
 import { Route as ApiAskOptionsRouteImport } from './routes/api/ask/options'
@@ -92,6 +93,13 @@ import { Route as DesignScrapIndexRouteImport } from './routes/design/scrap.inde
 import { Route as DesignScrapIdRouteImport } from './routes/design/scrap.$id'
 import { Route as DesignScrapHistoryRouteImport } from './routes/design/scrap.history'
 import { Route as PrdShareTokenRouteImport } from './routes/prd/share/$token'
+import { Route as VibeplanIdIndexRouteImport } from './routes/vibeplan/$id/index'
+import { Route as VibeplanIdAcRouteImport } from './routes/vibeplan/$id/ac'
+import { Route as VibeplanIdAskRouteImport } from './routes/vibeplan/$id/ask'
+import { Route as VibeplanIdFiturRouteImport } from './routes/vibeplan/$id/fitur'
+import { Route as VibeplanIdKanbanRouteImport } from './routes/vibeplan/$id/kanban'
+import { Route as VibeplanIdPrdRouteImport } from './routes/vibeplan/$id/prd'
+import { Route as VibeplanIdTaskRouteImport } from './routes/vibeplan/$id/task'
 import { Route as ApiCodebasesCodebaseIdFeaturesRouteImport } from './routes/api/codebases/$codebaseId/features'
 import { Route as ApiCodebasesCodebaseIdSessionRouteImport } from './routes/api/codebases/$codebaseId/session'
 import { Route as ApiCodebasesCodebaseIdStatusRouteImport } from './routes/api/codebases/$codebaseId/status'
@@ -107,6 +115,7 @@ import { Route as ApiSettingsApiKeysAutoRouteImport } from './routes/api/setting
 import { Route as ApiSettingsApiKeysCleanupRouteImport } from './routes/api/settings/api-keys/cleanup'
 import { Route as ApiV1ProjectsIdRouteImport } from './routes/api/v1/projects/$id'
 import { Route as CodebasesKanbanCodebaseIdProjectIdRouteImport } from './routes/codebases/kanban/$codebaseId/$projectId'
+import { Route as ApiCodebasesCodebaseIdFeaturesProjectIdRouteImport } from './routes/api/codebases/$codebaseId/features.$projectId'
 import { Route as ApiV1ProjectsIdAcRouteImport } from './routes/api/v1/projects/$id/ac'
 import { Route as ApiV1ProjectsIdKanbanRouteImport } from './routes/api/v1/projects/$id/kanban'
 import { Route as ApiV1ProjectsIdPrdRouteImport } from './routes/api/v1/projects/$id/prd'
@@ -114,6 +123,7 @@ import { Route as ApiV1ProjectsIdTasksRouteImport } from './routes/api/v1/projec
 import { Route as ApiV1SubtasksIdStatusRouteImport } from './routes/api/v1/subtasks/$id/status'
 import { Route as ApiV1TasksIdStatusRouteImport } from './routes/api/v1/tasks/$id/status'
 import { Route as ApiV1CodebasesIdCodebaseCompleteRouteImport } from './routes/api/v1/codebases/$id/codebase/complete'
+import { Route as ApiV1CodebasesIdCodebaseConnectRouteImport } from './routes/api/v1/codebases/$id/codebase/connect'
 import { Route as ApiV1CodebasesIdCodebaseFailureRouteImport } from './routes/api/v1/codebases/$id/codebase/failure'
 import { Route as ApiV1CodebasesIdCodebaseFilesRouteImport } from './routes/api/v1/codebases/$id/codebase/files'
 import { Route as ApiV1CodebasesIdCodebaseManifestRouteImport } from './routes/api/v1/codebases/$id/codebase/manifest'
@@ -379,6 +389,11 @@ const TaskIdRoute = TaskIdRouteImport.update({
   path: '/task/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const VibeplanIdRouteRoute = VibeplanIdRouteRouteImport.update({
+  id: '/vibeplan/$id',
+  path: '/vibeplan/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAcGenerateRoute = ApiAcGenerateRouteImport.update({
   id: '/api/ac/generate',
   path: '/api/ac/generate',
@@ -540,6 +555,41 @@ const PrdShareTokenRoute = PrdShareTokenRouteImport.update({
   path: '/prd/share/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const VibeplanIdIndexRoute = VibeplanIdIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => VibeplanIdRouteRoute,
+} as any)
+const VibeplanIdAcRoute = VibeplanIdAcRouteImport.update({
+  id: '/ac',
+  path: '/ac',
+  getParentRoute: () => VibeplanIdRouteRoute,
+} as any)
+const VibeplanIdAskRoute = VibeplanIdAskRouteImport.update({
+  id: '/ask',
+  path: '/ask',
+  getParentRoute: () => VibeplanIdRouteRoute,
+} as any)
+const VibeplanIdFiturRoute = VibeplanIdFiturRouteImport.update({
+  id: '/fitur',
+  path: '/fitur',
+  getParentRoute: () => VibeplanIdRouteRoute,
+} as any)
+const VibeplanIdKanbanRoute = VibeplanIdKanbanRouteImport.update({
+  id: '/kanban',
+  path: '/kanban',
+  getParentRoute: () => VibeplanIdRouteRoute,
+} as any)
+const VibeplanIdPrdRoute = VibeplanIdPrdRouteImport.update({
+  id: '/prd',
+  path: '/prd',
+  getParentRoute: () => VibeplanIdRouteRoute,
+} as any)
+const VibeplanIdTaskRoute = VibeplanIdTaskRouteImport.update({
+  id: '/task',
+  path: '/task',
+  getParentRoute: () => VibeplanIdRouteRoute,
+} as any)
 const ApiCodebasesCodebaseIdFeaturesRoute =
   ApiCodebasesCodebaseIdFeaturesRouteImport.update({
     id: '/features',
@@ -622,6 +672,12 @@ const CodebasesKanbanCodebaseIdProjectIdRoute =
     path: '/kanban/$codebaseId/$projectId',
     getParentRoute: () => CodebasesRoute,
   } as any)
+const ApiCodebasesCodebaseIdFeaturesProjectIdRoute =
+  ApiCodebasesCodebaseIdFeaturesProjectIdRouteImport.update({
+    id: '/$projectId',
+    path: '/$projectId',
+    getParentRoute: () => ApiCodebasesCodebaseIdFeaturesRoute,
+  } as any)
 const ApiV1ProjectsIdAcRoute = ApiV1ProjectsIdAcRouteImport.update({
   id: '/ac',
   path: '/ac',
@@ -656,6 +712,12 @@ const ApiV1CodebasesIdCodebaseCompleteRoute =
   ApiV1CodebasesIdCodebaseCompleteRouteImport.update({
     id: '/api/v1/codebases/$id/codebase/complete',
     path: '/api/v1/codebases/$id/codebase/complete',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiV1CodebasesIdCodebaseConnectRoute =
+  ApiV1CodebasesIdCodebaseConnectRouteImport.update({
+    id: '/api/v1/codebases/$id/codebase/connect',
+    path: '/api/v1/codebases/$id/codebase/connect',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiV1CodebasesIdCodebaseFailureRoute =
@@ -728,6 +790,7 @@ export interface FileRoutesByFullPath {
   '/scrape': typeof ScrapeRouteWithChildren
   '/settings': typeof SettingsRouteWithChildren
   '/templates': typeof TemplatesRoute
+  '/vibeplan/$id': typeof VibeplanIdRouteRouteWithChildren
   '/ac/$id': typeof AcIdRoute
   '/admin/credit': typeof AdminCreditRoute
   '/admin/feedback': typeof AdminFeedbackRoute
@@ -794,10 +857,17 @@ export interface FileRoutesByFullPath {
   '/design/scrap/$id': typeof DesignScrapIdRoute
   '/design/scrap/history': typeof DesignScrapHistoryRoute
   '/prd/share/$token': typeof PrdShareTokenRoute
+  '/vibeplan/$id/ac': typeof VibeplanIdAcRoute
+  '/vibeplan/$id/ask': typeof VibeplanIdAskRoute
+  '/vibeplan/$id/fitur': typeof VibeplanIdFiturRoute
+  '/vibeplan/$id/kanban': typeof VibeplanIdKanbanRoute
+  '/vibeplan/$id/prd': typeof VibeplanIdPrdRoute
+  '/vibeplan/$id/task': typeof VibeplanIdTaskRoute
   '/api/codebases/': typeof ApiCodebasesIndexRoute
   '/api/projects/': typeof ApiProjectsIndexRoute
   '/design/scrap/': typeof DesignScrapIndexRoute
-  '/api/codebases/$codebaseId/features': typeof ApiCodebasesCodebaseIdFeaturesRoute
+  '/vibeplan/$id/': typeof VibeplanIdIndexRoute
+  '/api/codebases/$codebaseId/features': typeof ApiCodebasesCodebaseIdFeaturesRouteWithChildren
   '/api/codebases/$codebaseId/session': typeof ApiCodebasesCodebaseIdSessionRoute
   '/api/codebases/$codebaseId/status': typeof ApiCodebasesCodebaseIdStatusRoute
   '/api/codebases/$codebaseId/sync-stream': typeof ApiCodebasesCodebaseIdSyncStreamRoute
@@ -812,6 +882,7 @@ export interface FileRoutesByFullPath {
   '/api/v1/projects/$id': typeof ApiV1ProjectsIdRouteWithChildren
   '/codebases/kanban/$codebaseId/$projectId': typeof CodebasesKanbanCodebaseIdProjectIdRoute
   '/api/settings/api-keys/': typeof ApiSettingsApiKeysIndexRoute
+  '/api/codebases/$codebaseId/features/$projectId': typeof ApiCodebasesCodebaseIdFeaturesProjectIdRoute
   '/api/v1/projects/$id/ac': typeof ApiV1ProjectsIdAcRoute
   '/api/v1/projects/$id/kanban': typeof ApiV1ProjectsIdKanbanRoute
   '/api/v1/projects/$id/prd': typeof ApiV1ProjectsIdPrdRoute
@@ -819,6 +890,7 @@ export interface FileRoutesByFullPath {
   '/api/v1/subtasks/$id/status': typeof ApiV1SubtasksIdStatusRoute
   '/api/v1/tasks/$id/status': typeof ApiV1TasksIdStatusRoute
   '/api/v1/codebases/$id/codebase/complete': typeof ApiV1CodebasesIdCodebaseCompleteRoute
+  '/api/v1/codebases/$id/codebase/connect': typeof ApiV1CodebasesIdCodebaseConnectRoute
   '/api/v1/codebases/$id/codebase/failure': typeof ApiV1CodebasesIdCodebaseFailureRoute
   '/api/v1/codebases/$id/codebase/files': typeof ApiV1CodebasesIdCodebaseFilesRoute
   '/api/v1/codebases/$id/codebase/manifest': typeof ApiV1CodebasesIdCodebaseManifestRoute
@@ -904,10 +976,17 @@ export interface FileRoutesByTo {
   '/design/scrap/$id': typeof DesignScrapIdRoute
   '/design/scrap/history': typeof DesignScrapHistoryRoute
   '/prd/share/$token': typeof PrdShareTokenRoute
+  '/vibeplan/$id/ac': typeof VibeplanIdAcRoute
+  '/vibeplan/$id/ask': typeof VibeplanIdAskRoute
+  '/vibeplan/$id/fitur': typeof VibeplanIdFiturRoute
+  '/vibeplan/$id/kanban': typeof VibeplanIdKanbanRoute
+  '/vibeplan/$id/prd': typeof VibeplanIdPrdRoute
+  '/vibeplan/$id/task': typeof VibeplanIdTaskRoute
   '/api/codebases': typeof ApiCodebasesIndexRoute
   '/api/projects': typeof ApiProjectsIndexRoute
   '/design/scrap': typeof DesignScrapIndexRoute
-  '/api/codebases/$codebaseId/features': typeof ApiCodebasesCodebaseIdFeaturesRoute
+  '/vibeplan/$id': typeof VibeplanIdIndexRoute
+  '/api/codebases/$codebaseId/features': typeof ApiCodebasesCodebaseIdFeaturesRouteWithChildren
   '/api/codebases/$codebaseId/session': typeof ApiCodebasesCodebaseIdSessionRoute
   '/api/codebases/$codebaseId/status': typeof ApiCodebasesCodebaseIdStatusRoute
   '/api/codebases/$codebaseId/sync-stream': typeof ApiCodebasesCodebaseIdSyncStreamRoute
@@ -922,6 +1001,7 @@ export interface FileRoutesByTo {
   '/api/v1/projects/$id': typeof ApiV1ProjectsIdRouteWithChildren
   '/codebases/kanban/$codebaseId/$projectId': typeof CodebasesKanbanCodebaseIdProjectIdRoute
   '/api/settings/api-keys': typeof ApiSettingsApiKeysIndexRoute
+  '/api/codebases/$codebaseId/features/$projectId': typeof ApiCodebasesCodebaseIdFeaturesProjectIdRoute
   '/api/v1/projects/$id/ac': typeof ApiV1ProjectsIdAcRoute
   '/api/v1/projects/$id/kanban': typeof ApiV1ProjectsIdKanbanRoute
   '/api/v1/projects/$id/prd': typeof ApiV1ProjectsIdPrdRoute
@@ -929,6 +1009,7 @@ export interface FileRoutesByTo {
   '/api/v1/subtasks/$id/status': typeof ApiV1SubtasksIdStatusRoute
   '/api/v1/tasks/$id/status': typeof ApiV1TasksIdStatusRoute
   '/api/v1/codebases/$id/codebase/complete': typeof ApiV1CodebasesIdCodebaseCompleteRoute
+  '/api/v1/codebases/$id/codebase/connect': typeof ApiV1CodebasesIdCodebaseConnectRoute
   '/api/v1/codebases/$id/codebase/failure': typeof ApiV1CodebasesIdCodebaseFailureRoute
   '/api/v1/codebases/$id/codebase/files': typeof ApiV1CodebasesIdCodebaseFilesRoute
   '/api/v1/codebases/$id/codebase/manifest': typeof ApiV1CodebasesIdCodebaseManifestRoute
@@ -955,6 +1036,7 @@ export interface FileRoutesById {
   '/scrape': typeof ScrapeRouteWithChildren
   '/settings': typeof SettingsRouteWithChildren
   '/templates': typeof TemplatesRoute
+  '/vibeplan/$id': typeof VibeplanIdRouteRouteWithChildren
   '/ac/$id': typeof AcIdRoute
   '/admin/credit': typeof AdminCreditRoute
   '/admin/feedback': typeof AdminFeedbackRoute
@@ -1021,10 +1103,17 @@ export interface FileRoutesById {
   '/design/scrap/$id': typeof DesignScrapIdRoute
   '/design/scrap/history': typeof DesignScrapHistoryRoute
   '/prd/share/$token': typeof PrdShareTokenRoute
+  '/vibeplan/$id/ac': typeof VibeplanIdAcRoute
+  '/vibeplan/$id/ask': typeof VibeplanIdAskRoute
+  '/vibeplan/$id/fitur': typeof VibeplanIdFiturRoute
+  '/vibeplan/$id/kanban': typeof VibeplanIdKanbanRoute
+  '/vibeplan/$id/prd': typeof VibeplanIdPrdRoute
+  '/vibeplan/$id/task': typeof VibeplanIdTaskRoute
   '/api/codebases/': typeof ApiCodebasesIndexRoute
   '/api/projects/': typeof ApiProjectsIndexRoute
   '/design/scrap/': typeof DesignScrapIndexRoute
-  '/api/codebases/$codebaseId/features': typeof ApiCodebasesCodebaseIdFeaturesRoute
+  '/vibeplan/$id/': typeof VibeplanIdIndexRoute
+  '/api/codebases/$codebaseId/features': typeof ApiCodebasesCodebaseIdFeaturesRouteWithChildren
   '/api/codebases/$codebaseId/session': typeof ApiCodebasesCodebaseIdSessionRoute
   '/api/codebases/$codebaseId/status': typeof ApiCodebasesCodebaseIdStatusRoute
   '/api/codebases/$codebaseId/sync-stream': typeof ApiCodebasesCodebaseIdSyncStreamRoute
@@ -1039,6 +1128,7 @@ export interface FileRoutesById {
   '/api/v1/projects/$id': typeof ApiV1ProjectsIdRouteWithChildren
   '/codebases/kanban/$codebaseId/$projectId': typeof CodebasesKanbanCodebaseIdProjectIdRoute
   '/api/settings/api-keys/': typeof ApiSettingsApiKeysIndexRoute
+  '/api/codebases/$codebaseId/features/$projectId': typeof ApiCodebasesCodebaseIdFeaturesProjectIdRoute
   '/api/v1/projects/$id/ac': typeof ApiV1ProjectsIdAcRoute
   '/api/v1/projects/$id/kanban': typeof ApiV1ProjectsIdKanbanRoute
   '/api/v1/projects/$id/prd': typeof ApiV1ProjectsIdPrdRoute
@@ -1046,6 +1136,7 @@ export interface FileRoutesById {
   '/api/v1/subtasks/$id/status': typeof ApiV1SubtasksIdStatusRoute
   '/api/v1/tasks/$id/status': typeof ApiV1TasksIdStatusRoute
   '/api/v1/codebases/$id/codebase/complete': typeof ApiV1CodebasesIdCodebaseCompleteRoute
+  '/api/v1/codebases/$id/codebase/connect': typeof ApiV1CodebasesIdCodebaseConnectRoute
   '/api/v1/codebases/$id/codebase/failure': typeof ApiV1CodebasesIdCodebaseFailureRoute
   '/api/v1/codebases/$id/codebase/files': typeof ApiV1CodebasesIdCodebaseFilesRoute
   '/api/v1/codebases/$id/codebase/manifest': typeof ApiV1CodebasesIdCodebaseManifestRoute
@@ -1073,6 +1164,7 @@ export interface FileRouteTypes {
     | '/scrape'
     | '/settings'
     | '/templates'
+    | '/vibeplan/$id'
     | '/ac/$id'
     | '/admin/credit'
     | '/admin/feedback'
@@ -1139,9 +1231,16 @@ export interface FileRouteTypes {
     | '/design/scrap/$id'
     | '/design/scrap/history'
     | '/prd/share/$token'
+    | '/vibeplan/$id/ac'
+    | '/vibeplan/$id/ask'
+    | '/vibeplan/$id/fitur'
+    | '/vibeplan/$id/kanban'
+    | '/vibeplan/$id/prd'
+    | '/vibeplan/$id/task'
     | '/api/codebases/'
     | '/api/projects/'
     | '/design/scrap/'
+    | '/vibeplan/$id/'
     | '/api/codebases/$codebaseId/features'
     | '/api/codebases/$codebaseId/session'
     | '/api/codebases/$codebaseId/status'
@@ -1157,6 +1256,7 @@ export interface FileRouteTypes {
     | '/api/v1/projects/$id'
     | '/codebases/kanban/$codebaseId/$projectId'
     | '/api/settings/api-keys/'
+    | '/api/codebases/$codebaseId/features/$projectId'
     | '/api/v1/projects/$id/ac'
     | '/api/v1/projects/$id/kanban'
     | '/api/v1/projects/$id/prd'
@@ -1164,6 +1264,7 @@ export interface FileRouteTypes {
     | '/api/v1/subtasks/$id/status'
     | '/api/v1/tasks/$id/status'
     | '/api/v1/codebases/$id/codebase/complete'
+    | '/api/v1/codebases/$id/codebase/connect'
     | '/api/v1/codebases/$id/codebase/failure'
     | '/api/v1/codebases/$id/codebase/files'
     | '/api/v1/codebases/$id/codebase/manifest'
@@ -1249,9 +1350,16 @@ export interface FileRouteTypes {
     | '/design/scrap/$id'
     | '/design/scrap/history'
     | '/prd/share/$token'
+    | '/vibeplan/$id/ac'
+    | '/vibeplan/$id/ask'
+    | '/vibeplan/$id/fitur'
+    | '/vibeplan/$id/kanban'
+    | '/vibeplan/$id/prd'
+    | '/vibeplan/$id/task'
     | '/api/codebases'
     | '/api/projects'
     | '/design/scrap'
+    | '/vibeplan/$id'
     | '/api/codebases/$codebaseId/features'
     | '/api/codebases/$codebaseId/session'
     | '/api/codebases/$codebaseId/status'
@@ -1267,6 +1375,7 @@ export interface FileRouteTypes {
     | '/api/v1/projects/$id'
     | '/codebases/kanban/$codebaseId/$projectId'
     | '/api/settings/api-keys'
+    | '/api/codebases/$codebaseId/features/$projectId'
     | '/api/v1/projects/$id/ac'
     | '/api/v1/projects/$id/kanban'
     | '/api/v1/projects/$id/prd'
@@ -1274,6 +1383,7 @@ export interface FileRouteTypes {
     | '/api/v1/subtasks/$id/status'
     | '/api/v1/tasks/$id/status'
     | '/api/v1/codebases/$id/codebase/complete'
+    | '/api/v1/codebases/$id/codebase/connect'
     | '/api/v1/codebases/$id/codebase/failure'
     | '/api/v1/codebases/$id/codebase/files'
     | '/api/v1/codebases/$id/codebase/manifest'
@@ -1299,6 +1409,7 @@ export interface FileRouteTypes {
     | '/scrape'
     | '/settings'
     | '/templates'
+    | '/vibeplan/$id'
     | '/ac/$id'
     | '/admin/credit'
     | '/admin/feedback'
@@ -1365,9 +1476,16 @@ export interface FileRouteTypes {
     | '/design/scrap/$id'
     | '/design/scrap/history'
     | '/prd/share/$token'
+    | '/vibeplan/$id/ac'
+    | '/vibeplan/$id/ask'
+    | '/vibeplan/$id/fitur'
+    | '/vibeplan/$id/kanban'
+    | '/vibeplan/$id/prd'
+    | '/vibeplan/$id/task'
     | '/api/codebases/'
     | '/api/projects/'
     | '/design/scrap/'
+    | '/vibeplan/$id/'
     | '/api/codebases/$codebaseId/features'
     | '/api/codebases/$codebaseId/session'
     | '/api/codebases/$codebaseId/status'
@@ -1383,6 +1501,7 @@ export interface FileRouteTypes {
     | '/api/v1/projects/$id'
     | '/codebases/kanban/$codebaseId/$projectId'
     | '/api/settings/api-keys/'
+    | '/api/codebases/$codebaseId/features/$projectId'
     | '/api/v1/projects/$id/ac'
     | '/api/v1/projects/$id/kanban'
     | '/api/v1/projects/$id/prd'
@@ -1390,6 +1509,7 @@ export interface FileRouteTypes {
     | '/api/v1/subtasks/$id/status'
     | '/api/v1/tasks/$id/status'
     | '/api/v1/codebases/$id/codebase/complete'
+    | '/api/v1/codebases/$id/codebase/connect'
     | '/api/v1/codebases/$id/codebase/failure'
     | '/api/v1/codebases/$id/codebase/files'
     | '/api/v1/codebases/$id/codebase/manifest'
@@ -1416,6 +1536,7 @@ export interface RootRouteChildren {
   ScrapeRoute: typeof ScrapeRouteWithChildren
   SettingsRoute: typeof SettingsRouteWithChildren
   TemplatesRoute: typeof TemplatesRoute
+  VibeplanIdRouteRoute: typeof VibeplanIdRouteRouteWithChildren
   AcIdRoute: typeof AcIdRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiFeedbackRoute: typeof ApiFeedbackRoute
@@ -1467,6 +1588,7 @@ export interface RootRouteChildren {
   ApiV1SubtasksIdStatusRoute: typeof ApiV1SubtasksIdStatusRoute
   ApiV1TasksIdStatusRoute: typeof ApiV1TasksIdStatusRoute
   ApiV1CodebasesIdCodebaseCompleteRoute: typeof ApiV1CodebasesIdCodebaseCompleteRoute
+  ApiV1CodebasesIdCodebaseConnectRoute: typeof ApiV1CodebasesIdCodebaseConnectRoute
   ApiV1CodebasesIdCodebaseFailureRoute: typeof ApiV1CodebasesIdCodebaseFailureRoute
   ApiV1CodebasesIdCodebaseFilesRoute: typeof ApiV1CodebasesIdCodebaseFilesRoute
   ApiV1CodebasesIdCodebaseManifestRoute: typeof ApiV1CodebasesIdCodebaseManifestRoute
@@ -1832,6 +1954,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TaskIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/vibeplan/$id': {
+      id: '/vibeplan/$id'
+      path: '/vibeplan/$id'
+      fullPath: '/vibeplan/$id'
+      preLoaderRoute: typeof VibeplanIdRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/ac/generate': {
       id: '/api/ac/generate'
       path: '/api/ac/generate'
@@ -2056,6 +2185,55 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PrdShareTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/vibeplan/$id/': {
+      id: '/vibeplan/$id/'
+      path: '/'
+      fullPath: '/vibeplan/$id/'
+      preLoaderRoute: typeof VibeplanIdIndexRouteImport
+      parentRoute: typeof VibeplanIdRouteRoute
+    }
+    '/vibeplan/$id/ac': {
+      id: '/vibeplan/$id/ac'
+      path: '/ac'
+      fullPath: '/vibeplan/$id/ac'
+      preLoaderRoute: typeof VibeplanIdAcRouteImport
+      parentRoute: typeof VibeplanIdRouteRoute
+    }
+    '/vibeplan/$id/ask': {
+      id: '/vibeplan/$id/ask'
+      path: '/ask'
+      fullPath: '/vibeplan/$id/ask'
+      preLoaderRoute: typeof VibeplanIdAskRouteImport
+      parentRoute: typeof VibeplanIdRouteRoute
+    }
+    '/vibeplan/$id/fitur': {
+      id: '/vibeplan/$id/fitur'
+      path: '/fitur'
+      fullPath: '/vibeplan/$id/fitur'
+      preLoaderRoute: typeof VibeplanIdFiturRouteImport
+      parentRoute: typeof VibeplanIdRouteRoute
+    }
+    '/vibeplan/$id/kanban': {
+      id: '/vibeplan/$id/kanban'
+      path: '/kanban'
+      fullPath: '/vibeplan/$id/kanban'
+      preLoaderRoute: typeof VibeplanIdKanbanRouteImport
+      parentRoute: typeof VibeplanIdRouteRoute
+    }
+    '/vibeplan/$id/prd': {
+      id: '/vibeplan/$id/prd'
+      path: '/prd'
+      fullPath: '/vibeplan/$id/prd'
+      preLoaderRoute: typeof VibeplanIdPrdRouteImport
+      parentRoute: typeof VibeplanIdRouteRoute
+    }
+    '/vibeplan/$id/task': {
+      id: '/vibeplan/$id/task'
+      path: '/task'
+      fullPath: '/vibeplan/$id/task'
+      preLoaderRoute: typeof VibeplanIdTaskRouteImport
+      parentRoute: typeof VibeplanIdRouteRoute
+    }
     '/api/codebases/$codebaseId/features': {
       id: '/api/codebases/$codebaseId/features'
       path: '/features'
@@ -2161,6 +2339,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CodebasesKanbanCodebaseIdProjectIdRouteImport
       parentRoute: typeof CodebasesRoute
     }
+    '/api/codebases/$codebaseId/features/$projectId': {
+      id: '/api/codebases/$codebaseId/features/$projectId'
+      path: '/$projectId'
+      fullPath: '/api/codebases/$codebaseId/features/$projectId'
+      preLoaderRoute: typeof ApiCodebasesCodebaseIdFeaturesProjectIdRouteImport
+      parentRoute: typeof ApiCodebasesCodebaseIdFeaturesRoute
+    }
     '/api/v1/projects/$id/ac': {
       id: '/api/v1/projects/$id/ac'
       path: '/ac'
@@ -2208,6 +2393,13 @@ declare module '@tanstack/react-router' {
       path: '/api/v1/codebases/$id/codebase/complete'
       fullPath: '/api/v1/codebases/$id/codebase/complete'
       preLoaderRoute: typeof ApiV1CodebasesIdCodebaseCompleteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/v1/codebases/$id/codebase/connect': {
+      id: '/api/v1/codebases/$id/codebase/connect'
+      path: '/api/v1/codebases/$id/codebase/connect'
+      fullPath: '/api/v1/codebases/$id/codebase/connect'
+      preLoaderRoute: typeof ApiV1CodebasesIdCodebaseConnectRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/v1/codebases/$id/codebase/failure': {
@@ -2376,6 +2568,30 @@ const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
   SettingsRouteChildren,
 )
 
+interface VibeplanIdRouteRouteChildren {
+  VibeplanIdAcRoute: typeof VibeplanIdAcRoute
+  VibeplanIdAskRoute: typeof VibeplanIdAskRoute
+  VibeplanIdFiturRoute: typeof VibeplanIdFiturRoute
+  VibeplanIdKanbanRoute: typeof VibeplanIdKanbanRoute
+  VibeplanIdPrdRoute: typeof VibeplanIdPrdRoute
+  VibeplanIdTaskRoute: typeof VibeplanIdTaskRoute
+  VibeplanIdIndexRoute: typeof VibeplanIdIndexRoute
+}
+
+const VibeplanIdRouteRouteChildren: VibeplanIdRouteRouteChildren = {
+  VibeplanIdAcRoute: VibeplanIdAcRoute,
+  VibeplanIdAskRoute: VibeplanIdAskRoute,
+  VibeplanIdFiturRoute: VibeplanIdFiturRoute,
+  VibeplanIdKanbanRoute: VibeplanIdKanbanRoute,
+  VibeplanIdPrdRoute: VibeplanIdPrdRoute,
+  VibeplanIdTaskRoute: VibeplanIdTaskRoute,
+  VibeplanIdIndexRoute: VibeplanIdIndexRoute,
+}
+
+const VibeplanIdRouteRouteWithChildren = VibeplanIdRouteRoute._addFileChildren(
+  VibeplanIdRouteRouteChildren,
+)
+
 interface ApiScrapeRouteChildren {
   ApiScrapeAssetRoute: typeof ApiScrapeAssetRoute
   ApiScrapePreviewRoute: typeof ApiScrapePreviewRoute
@@ -2406,8 +2622,23 @@ const DesignScrapRouteWithChildren = DesignScrapRoute._addFileChildren(
   DesignScrapRouteChildren,
 )
 
+interface ApiCodebasesCodebaseIdFeaturesRouteChildren {
+  ApiCodebasesCodebaseIdFeaturesProjectIdRoute: typeof ApiCodebasesCodebaseIdFeaturesProjectIdRoute
+}
+
+const ApiCodebasesCodebaseIdFeaturesRouteChildren: ApiCodebasesCodebaseIdFeaturesRouteChildren =
+  {
+    ApiCodebasesCodebaseIdFeaturesProjectIdRoute:
+      ApiCodebasesCodebaseIdFeaturesProjectIdRoute,
+  }
+
+const ApiCodebasesCodebaseIdFeaturesRouteWithChildren =
+  ApiCodebasesCodebaseIdFeaturesRoute._addFileChildren(
+    ApiCodebasesCodebaseIdFeaturesRouteChildren,
+  )
+
 interface ApiCodebasesCodebaseIdRouteChildren {
-  ApiCodebasesCodebaseIdFeaturesRoute: typeof ApiCodebasesCodebaseIdFeaturesRoute
+  ApiCodebasesCodebaseIdFeaturesRoute: typeof ApiCodebasesCodebaseIdFeaturesRouteWithChildren
   ApiCodebasesCodebaseIdSessionRoute: typeof ApiCodebasesCodebaseIdSessionRoute
   ApiCodebasesCodebaseIdStatusRoute: typeof ApiCodebasesCodebaseIdStatusRoute
   ApiCodebasesCodebaseIdSyncStreamRoute: typeof ApiCodebasesCodebaseIdSyncStreamRoute
@@ -2415,7 +2646,8 @@ interface ApiCodebasesCodebaseIdRouteChildren {
 
 const ApiCodebasesCodebaseIdRouteChildren: ApiCodebasesCodebaseIdRouteChildren =
   {
-    ApiCodebasesCodebaseIdFeaturesRoute: ApiCodebasesCodebaseIdFeaturesRoute,
+    ApiCodebasesCodebaseIdFeaturesRoute:
+      ApiCodebasesCodebaseIdFeaturesRouteWithChildren,
     ApiCodebasesCodebaseIdSessionRoute: ApiCodebasesCodebaseIdSessionRoute,
     ApiCodebasesCodebaseIdStatusRoute: ApiCodebasesCodebaseIdStatusRoute,
     ApiCodebasesCodebaseIdSyncStreamRoute:
@@ -2490,6 +2722,7 @@ const rootRouteChildren: RootRouteChildren = {
   ScrapeRoute: ScrapeRouteWithChildren,
   SettingsRoute: SettingsRouteWithChildren,
   TemplatesRoute: TemplatesRoute,
+  VibeplanIdRouteRoute: VibeplanIdRouteRouteWithChildren,
   AcIdRoute: AcIdRoute,
   ApiChatRoute: ApiChatRoute,
   ApiFeedbackRoute: ApiFeedbackRoute,
@@ -2541,6 +2774,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiV1SubtasksIdStatusRoute: ApiV1SubtasksIdStatusRoute,
   ApiV1TasksIdStatusRoute: ApiV1TasksIdStatusRoute,
   ApiV1CodebasesIdCodebaseCompleteRoute: ApiV1CodebasesIdCodebaseCompleteRoute,
+  ApiV1CodebasesIdCodebaseConnectRoute: ApiV1CodebasesIdCodebaseConnectRoute,
   ApiV1CodebasesIdCodebaseFailureRoute: ApiV1CodebasesIdCodebaseFailureRoute,
   ApiV1CodebasesIdCodebaseFilesRoute: ApiV1CodebasesIdCodebaseFilesRoute,
   ApiV1CodebasesIdCodebaseManifestRoute: ApiV1CodebasesIdCodebaseManifestRoute,

@@ -72,6 +72,11 @@ export const codebaseGenerationOperations = pgTable(
 		updatedAt: timestamp("updated_at", { withTimezone: true })
 			.defaultNow()
 			.notNull(),
+		// Attempt-scoped window of the CURRENT attempt, not of the operation:
+		// `started_at` is stamped when a worker claims the job, `finished_at` when
+		// that attempt settles. Re-queuing an operation clears both, so a retry
+		// never reports the duration of the attempt before it, and a queued
+		// operation (`status = 'queued'`) is guaranteed to have `started_at = null`.
 		startedAt: timestamp("started_at", { withTimezone: true }),
 		finishedAt: timestamp("finished_at", { withTimezone: true }),
 	},

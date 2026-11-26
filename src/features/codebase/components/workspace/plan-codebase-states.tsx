@@ -21,9 +21,12 @@ const CODEBASE_ONBOARDING_LOADING_DETAIL =
 export function CodebaseOnboardingErrorCard({
 	error,
 	onRetry,
+	title = CODEBASE_ONBOARDING_ERROR_TITLE,
 }: {
 	error: string;
 	onRetry: () => void;
+	/** A recovery read that failed says so instead of blaming a create. */
+	title?: string;
 }) {
 	return (
 		<div className="flex min-h-[50vh] flex-1 items-center justify-center py-12">
@@ -32,9 +35,7 @@ export function CodebaseOnboardingErrorCard({
 				className="flex w-full max-w-sm flex-col items-center gap-4 rounded-xl border border-crimson/40 bg-crimson/10 p-8 text-center sm:p-10"
 			>
 				<div className="space-y-1">
-					<p className="text-sm font-medium text-snow">
-						{CODEBASE_ONBOARDING_ERROR_TITLE}
-					</p>
+					<p className="text-sm font-medium text-snow">{title}</p>
 					<p className="text-xs text-fog">{error}</p>
 				</div>
 				<button

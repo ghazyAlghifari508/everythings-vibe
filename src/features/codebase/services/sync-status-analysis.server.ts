@@ -6,7 +6,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { codebaseAnalyses } from "@/db/schema";
-import { selectNewestReadyAnalysis } from "./generation-context";
+import { selectWorkspaceAnalysis } from "./analysis-selection";
 import { sanitizeSyncErrorCode, sanitizeSyncErrorMessage } from "./sync";
 
 /** Stored statuses are writer-controlled; anything else is dropped. */
@@ -45,11 +45,13 @@ export async function readSyncStatusAnalysis(input: {
 	let analysisAttemptCreatedAt: string | undefined;
 	let analysisAttemptUpdatedAt: string | undefined;
 
-	if (input.snapshotId && input.projectId) {
+	const { snapshotId, projectId } = input;
+	if (snapshotId && projectId) {
 		const attempts = await db
 			.select({
 				id: codebaseAnalyses.id,
 				status: codebaseAnalyses.status,
+				output: codebaseAnalyses.output,
 				createdAt: codebaseAnalyses.createdAt,
 				updatedAt: codebaseAnalyses.updatedAt,
 				errorCode: codebaseAnalyses.errorCode,
@@ -58,8 +60,8 @@ export async function readSyncStatusAnalysis(input: {
 			.from(codebaseAnalyses)
 			.where(
 				and(
-					eq(codebaseAnalyses.snapshotId, input.snapshotId),
-					eq(codebaseAnalyses.projectId, input.projectId),
+					eq(codebaseAnalyses.snapshotId, snapshotId),
+					eq(codebaseAnalyses.projectId, projectId),
 				),
 			)
 			.orderBy(desc(codebaseAnalyses.createdAt));
@@ -90,15 +92,26 @@ export async function readSyncStatusAnalysis(input: {
 			errorMessage = sanitizeSyncErrorMessage(latest.errorMessage);
 		}
 
-		const usable = selectNewestReadyAnalysis(
+		// The ready identity is reported from the SAME selection the analysis read
+		// endpoint serves, so status and read can never disagree: a row that the
+		// reader would refuse (unreadable output, or output bound to another
+		// project/snapshot) is never advertised as ready. Without this, the
+		// browser could be told "ready" with an id it can never fetch, leaving the
+		// conclusion permanently disabled with no honest reason to show.
+		const readable = selectWorkspaceAnalysis(
 			attempts.map((attempt) => ({
 				id: attempt.id,
+				projectId,
+				snapshotId,
 				status: attempt.status,
-				createdAt: attempt.createdAt?.toISOString() ?? "",
+				output: attempt.output,
+				createdAt: attempt.createdAt,
+				updatedAt: attempt.updatedAt,
 			})),
-		);
-		if (usable) {
-			analysisId = usable.id;
+			{ projectId, snapshotId },
+		).selected;
+		if (readable) {
+			analysisId = readable.id;
 			analysisStatus = "ready";
 		}
 	}

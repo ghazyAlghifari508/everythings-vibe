@@ -2,6 +2,7 @@
 
 import { Copy01Icon, Tick01Icon } from "@hugeicons/core-free-icons";
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Spinner } from "@/components/ui/spinner";
 import { useCopyFeedback } from "@/features/codebase/hooks/use-copy-feedback";
@@ -15,6 +16,8 @@ import {
 	type LockedPromptState,
 	LockedPromptStateView,
 } from "./locked-prompt-state";
+import { buildPromptRecoveryState } from "./prompt-recovery-state";
+import { ScreenConnectStepItem } from "./screen-connect-step-item";
 
 function resolveExpiryMs(value: string | undefined): number | null {
 	if (!value) return null;
@@ -28,17 +31,32 @@ interface ScreenConnectPromptStepProps {
 	payload: SyncPromptPayload | null;
 	isStarting: boolean;
 	status?: SyncStatusResponse | null;
-	/**
-	 * The server persisted a snapshot, so the CLI already ran. A replacement
-	 * credential would be a second upload for an upload that already succeeded —
-	 * exactly the mixed state the user reported — so the prompt row states the
-	 * transport is done instead of offering a new session.
-	 */
-	transportComplete?: boolean;
 	onRequestNewToken?: () => void;
 	lockedPrompt?: LockedPromptState | null;
 	/** Non-secret rate/saldo disclosure rendered outside the prompt box. */
 	creditNote?: string | null;
+	/**
+	 * The server genuinely failed this attempt. Only its presence is used: a
+	 * recoverable prompt never routes through here, and no raw server message is
+	 * shown, because the failure copy is fixed product wording.
+	 */
+	error?: string | null;
+	/** Step title. The re-sync modal names its own prompt action. */
+	heading?: string;
+	/** Which prompt document to build for the copied credential. */
+	promptMode?: "initial" | "resync";
+	/** Accessible name for the copy affordance. */
+	copyAriaLabel?: string;
+	/** Stable test hook for the scrollable prompt content. */
+	contentTestId?: string;
+	/**
+	 * Replaces the default recovery block (states A/B/E) when the caller owns
+	 * the approved wording for its own flow. The prompt box, copy affordance,
+	 * and one-time-credential rules stay identical.
+	 */
+	recoveryState?: LockedPromptState;
+	/** Vertical line connector extending to next step. */
+	hasConnector?: boolean;
 }
 
 export function ScreenConnectPromptStep({
@@ -46,19 +64,30 @@ export function ScreenConnectPromptStep({
 	payload,
 	isStarting,
 	status,
-	transportComplete = false,
 	onRequestNewToken,
 	lockedPrompt = null,
-	creditNote = null,
+	creditNote: _creditNote = null,
+	error = null,
+	heading = "Salin instruksi untuk AI agent",
+	promptMode = "initial",
+	copyAriaLabel = "Salin prompt untuk AI agent",
+	contentTestId,
+	recoveryState,
+	hasConnector = true,
 }: ScreenConnectPromptStepProps) {
 	const { copied, copyError, copy } = useCopyFeedback();
-	const promptText = payload ? buildAgentPrompt(payload, { projectName }) : "";
+	const promptText = payload
+		? buildAgentPrompt(payload, { projectName, mode: promptMode })
+		: "";
 	const sessionStatus = status?.status ?? null;
-	const expiryMs = resolveExpiryMs(payload?.expiresAt ?? status?.expiresAt);
+	const expiryRaw = payload?.expiresAt ?? status?.expiresAt;
+	const expiryMs = resolveExpiryMs(expiryRaw);
+	const hasExpiry = Boolean(expiryRaw);
 	const expiryState =
-		sessionStatus === "expired" || expiryMs === null || expiryMs <= 0
+		sessionStatus === "expired" ||
+		(hasExpiry && (expiryMs === null || expiryMs <= 0))
 			? "expired"
-			: expiryMs <= CODEBASE_SYNC_EXPIRY_SOON_MS
+			: expiryMs !== null && expiryMs <= CODEBASE_SYNC_EXPIRY_SOON_MS
 				? "soon"
 				: "valid";
 	const [, forceTick] = useState(0);
@@ -72,113 +101,143 @@ export function ScreenConnectPromptStep({
 		await copy(promptText);
 	};
 
-	const showRenewal =
-		expiryState === "expired" || expiryState === "soon" || !payload;
+	// A schema-validated payload is the only proof that this session exists, so
+	// it always wins. A credit read taken before (or after) it landed is stale by
+	// definition and must never replace a live prompt with the lock that caused
+	// the reported "locked prompt stays visible" blocker.
+	//
+	// Sync progress deliberately does NOT participate: starting, connecting,
+	// uploading, and finishing the upload are all states of the same prompt, so
+	// the prompt box keeps the exact credential (and its scroll position and
+	// size) it was handed. Only a credential that the server would now reject —
+	// an expired token, or a terminal session — stops being usable, and that case
+	// routes through the existing renewal state instead of a generic success
+	// message.
+	const promptUsable =
+		payload !== null &&
+		expiryState !== "expired" &&
+		sessionStatus !== "failed" &&
+		sessionStatus !== "expired";
+	// A replacement credential must never be offered while the CLI is genuinely
+	// mid-sync: the token it is using is the one on screen (or was), so minting
+	// another would rotate a credential out from under a live upload. The owner
+	// already clears its own recovery for that state; this is the second line of
+	// defence at the surface the user actually reads.
+	const cliInFlight = [
+		"connected",
+		"scanning",
+		"filtering",
+		"uploading",
+	].includes(sessionStatus ?? "");
+	const activeLock = promptUsable || cliInFlight ? null : lockedPrompt;
 
 	return (
-		<div className="flex items-start gap-3.5">
-			<span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-iron font-mono text-xs text-mist">
-				1
-			</span>
-			<div className="flex min-w-0 flex-1 flex-col gap-2">
-				<div className="flex items-center justify-between gap-3">
-					<div className="text-xs font-semibold text-mist">
-						Salin instruksi untuk AI agent
-					</div>
-					{payload && !lockedPrompt && (
-						<button
-							type="button"
-							onClick={handleCopy}
-							aria-label="Salin prompt untuk AI agent"
-							className="inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-md border border-iron bg-charcoal px-3 py-1 font-sans text-xs font-semibold text-snow transition hover:bg-steel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-						>
-							{copied ? (
-								<>
-									<Icon
-										icon={Tick01Icon}
-										size={13}
-										className="text-emerald-400"
-									/>
-									<span className="text-emerald-400">Tersalin</span>
-								</>
-							) : (
-								<>
-									<Icon icon={Copy01Icon} size={13} />
-									<span>Salin</span>
-								</>
-							)}
-						</button>
-					)}
+		<ScreenConnectStepItem
+			stepNumber={1}
+			hasConnector={hasConnector}
+			connectorTestId="step-connector-1"
+		>
+			<div className="flex min-h-8 items-center justify-between gap-3">
+				<div className="text-xs font-semibold text-mist leading-none">
+					{heading}
 				</div>
-				<div className="relative rounded-lg border border-graphite bg-onyx p-3.5 font-mono text-xs leading-relaxed text-mist sm:p-4">
-					{lockedPrompt ? (
-						<LockedPromptStateView {...lockedPrompt} />
-					) : payload ? (
-						<>
-							<div className="hide-scrollbar max-h-56 select-all overflow-x-auto overflow-y-auto whitespace-pre-wrap text-snow">
-								{promptText}
-							</div>
-							{copyError && (
-								<p className="mt-2 font-sans text-[11px] text-crimson">
-									{copyError}
-								</p>
-							)}
-							{expiryState === "soon" && (
-								<p className="mt-2 font-sans text-[11px] text-amber-400">
-									Sesi segera berakhir. Salin dan jalankan prompt sekarang, atau
-									perbarui sesi.
-								</p>
-							)}
-							{expiryState === "expired" && (
-								<p className="mt-2 font-sans text-[11px] text-crimson">
-									Sesi telah berakhir. Buat sesi baru untuk melanjutkan.
-								</p>
-							)}
-						</>
-					) : transportComplete ? (
-						<div
-							data-testid="prompt-transport-done"
-							className="flex min-h-[190px] flex-col items-center justify-center gap-2 py-6 text-center font-sans"
-						>
-							<Icon icon={Tick01Icon} size={14} className="text-emerald-400" />
-							<p className="max-w-[38ch] text-xs leading-relaxed text-fog">
-								Prompt sudah dijalankan dan source code tersimpan. Tidak ada
-								instruksi baru yang perlu dijalankan.
-							</p>
-						</div>
-					) : isStarting ? (
-						<div className="flex min-h-[190px] items-center justify-center gap-2 py-6 font-sans text-xs text-fog">
-							<Spinner size={14} className="text-blue-400" />
-							<span>Menyiapkan token sesi...</span>
-						</div>
-					) : (
-						<div className="flex min-h-[190px] flex-col items-center justify-center gap-3 py-6 text-center font-sans">
-							<p className="max-w-[38ch] text-xs text-fog">
-								{sessionStatus === "expired" || expiryState === "expired"
-									? "Sesi telah berakhir."
-									: "Token sync hanya berlaku sekali dan tidak disimpan di browser."}
-							</p>
-							{showRenewal && onRequestNewToken && (
-								<button
-									type="button"
-									onClick={onRequestNewToken}
-									disabled={isStarting}
-									className="inline-flex min-h-9 items-center rounded-md border border-iron bg-obsidian px-3.5 font-sans text-[11px] font-medium text-mist transition hover:bg-steel hover:text-snow disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-								>
-									{expiryState === "expired" || !payload
-										? "Buat sesi baru"
-										: expiryState === "soon"
-											? "Perbarui sesi"
-											: "Dapatkan token baru"}
-								</button>
-							)}
-						</div>
-					)}
-				</div>
-				{creditNote && !lockedPrompt && (
-					<p className="text-[11px] leading-relaxed text-fog">{creditNote}</p>
+				{promptUsable && !activeLock && (
+					<Button
+						type="button"
+						onClick={handleCopy}
+						aria-label={copyAriaLabel}
+						variant="secondary"
+						size="sm"
+						className="h-8 shrink-0 gap-1.5 px-3 text-xs font-medium"
+					>
+						{copied ? (
+							<>
+								<Icon
+									icon={Tick01Icon}
+									size={13}
+									className="text-emerald-400"
+								/>
+								<span className="text-emerald-400">Tersalin</span>
+							</>
+						) : (
+							<>
+								<Icon icon={Copy01Icon} size={13} />
+								<span>Salin</span>
+							</>
+						)}
+					</Button>
 				)}
 			</div>
-		</div>
+			<div
+				data-testid="prompt-box"
+				className="relative w-full rounded-lg border border-graphite bg-onyx p-3.5 font-mono text-xs leading-relaxed text-mist sm:p-4"
+			>
+				{activeLock ? (
+					<LockedPromptStateView {...activeLock} />
+				) : promptUsable ? (
+					<>
+						<div
+							data-testid={contentTestId}
+							className="hide-scrollbar max-h-56 select-all overflow-x-auto overflow-y-auto whitespace-pre-wrap break-words text-snow"
+						>
+							{promptText}
+						</div>
+						{copyError && (
+							<p className="mt-2 font-sans text-[11px] text-crimson">
+								{copyError}
+							</p>
+						)}
+						{expiryState === "soon" && (
+							<p className="mt-2 font-sans text-[11px] text-amber-400">
+								Sesi segera berakhir. Salin dan jalankan prompt sekarang, atau
+								perbarui sesi.
+							</p>
+						)}
+					</>
+				) : status?.snapshotId ? (
+					<div
+						data-testid="prompt-unavailable"
+						className="flex flex-col items-start gap-1 font-sans text-xs leading-relaxed"
+					>
+						<p className="font-semibold text-snow">Sinkronisasi selesai.</p>
+						<p className="text-fog">
+							Snapshot repository telah berhasil dibuat.
+						</p>
+					</div>
+				) : cliInFlight ? (
+					<div
+						data-testid="prompt-unavailable"
+						className="flex flex-col items-start gap-1 font-sans text-xs leading-relaxed"
+					>
+						<p className="font-semibold text-snow">
+							Repository sedang disinkronkan.
+						</p>
+						<p className="text-fog">Pantau progresnya di bawah.</p>
+					</div>
+				) : isStarting ? (
+					<div className="flex items-center gap-2 font-sans text-xs text-fog">
+						<Spinner size={14} className="text-blue-400" />
+						<span>
+							{promptMode === "resync"
+								? "Menyiapkan instruksi sync ulang..."
+								: "Menyiapkan instruksi sync..."}
+						</span>
+					</div>
+				) : (
+					<LockedPromptStateView
+						{...(recoveryState ??
+							buildPromptRecoveryState(
+								error
+									? "failed"
+									: sessionStatus === "expired" ||
+											(hasExpiry && expiryState === "expired")
+										? "expired"
+										: "unavailable",
+								onRequestNewToken ?? null,
+							))}
+					/>
+				)}
+			</div>
+		</ScreenConnectStepItem>
 	);
 }

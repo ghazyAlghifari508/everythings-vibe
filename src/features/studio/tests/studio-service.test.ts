@@ -79,14 +79,15 @@ vi.mock("../services/studio-credit-adapter.server", () => ({
 vi.mock("@/lib/services/ai-orchestrator", () => ({
 	selectModels: () => [],
 	tryStreamWithFallback: async () => ({
-		firstChunk: "<html><body><h1>Generated Page</h1></body></html>",
+		firstChunk:
+			'<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><h1>Generated Page</h1></body></html>',
 		generator: (async function* () {})(),
 	}),
 }));
 
 describe("Studio Service", () => {
 	beforeEach(() => {
-		vi.clearAllMocks();
+		vi.resetAllMocks();
 		setupDefaultDb();
 	});
 
@@ -232,7 +233,8 @@ describe("Studio Service", () => {
 				userId: "user-1",
 				title: "Mobile App",
 				designMode: "mobile",
-				designMd: "## Tokens - Colors\n| Canvas | #000000 |",
+				designMd:
+					"## Tokens - Colors\n| Name | Value | Token | Role |\n| --- | --- | --- | --- |\n| Canvas | #000000 | --canvas | canvas background |",
 				logoAssetId: "asset-1",
 				createdAt: new Date(),
 				updatedAt: new Date(),
@@ -275,7 +277,8 @@ describe("Studio Service", () => {
 				title: "Mobile App",
 				prompt: "Buatkan antarmuka mobile e-commerce dengan tabs",
 				designMode: "mobile",
-				designMd: "## Tokens - Colors\n| Canvas | #000000 |",
+				designMd:
+					"## Tokens - Colors\n| Name | Value | Token | Role |\n| --- | --- | --- | --- |\n| Canvas | #000000 | --canvas | canvas background |",
 				logo: {
 					filename: "logo.png",
 					mimeType: "image/png",
@@ -436,6 +439,7 @@ describe("Studio Service", () => {
 				title: "POS App",
 				prompt: "Buatkan aplikasi POS kasir mobile dengan 3 layar",
 				designMode: "mobile",
+				initialPageCount: 3,
 			});
 
 			expect(result.project.id).toBe("proj-10");

@@ -219,6 +219,8 @@ export function CrawlSitemapGraph({
 				>
 					<ZoomControls
 						zoom={zoom}
+						minZoom={minZoom}
+						maxZoom={maxZoom}
 						onZoomIn={handleZoomIn}
 						onZoomOut={handleZoomOut}
 						onReset={fitToView}

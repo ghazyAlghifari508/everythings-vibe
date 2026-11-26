@@ -18,6 +18,7 @@ import {
 import {
 	type FrameReport,
 	PreviewCanvasOverlay,
+	PreviewDegradedNotice,
 } from "./scrape-detail-preview-overlay";
 
 const PREVIEW_WIDTH = 1440;
@@ -267,7 +268,7 @@ export function DesktopPreview({
 	const canvasHeight = Math.max(1, Math.round(frameHeight * scale));
 
 	return (
-		<div className="flex flex-col">
+		<div className="relative flex flex-col">
 			<div ref={wrapRef} className="relative w-full overflow-x-auto bg-white">
 				<div
 					className="min-h-[280px]"
@@ -298,6 +299,9 @@ export function DesktopPreview({
 					<PreviewCanvasOverlay report={report} onRetry={onRetry} />
 				</div>
 			</div>
+			{report === "degraded" ? (
+				<PreviewDegradedNotice onRetry={onRetry} />
+			) : null}
 		</div>
 	);
 }

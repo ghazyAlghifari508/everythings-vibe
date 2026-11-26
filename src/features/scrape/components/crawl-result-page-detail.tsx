@@ -1,8 +1,72 @@
-import type { scrapePages } from "@/db/schema";
+import type { CrawlSection, scrapePages } from "@/db/schema";
 import { cn } from "@/lib/utils";
 import { statusMark, statusText } from "./crawl-page-status";
 
 type Page = typeof scrapePages.$inferSelect;
+
+export interface HeadingKeyItem {
+	id?: string;
+	level?: number | null;
+	text: string;
+}
+
+const headingKeyMap = new WeakMap<HeadingKeyItem, string>();
+const sectionKeyMap = new WeakMap<CrawlSection, string>();
+
+export function getHeadingKey(
+	heading: HeadingKeyItem,
+	seenOccurrences?: Map<string, number>,
+): string {
+	const rawKey = heading.id || `${heading.level ?? "h"}-${heading.text}`;
+	const cached = headingKeyMap.get(heading);
+	if (cached) {
+		seenOccurrences?.set(cached, (seenOccurrences.get(cached) ?? 0) + 1);
+		return cached;
+	}
+	let key = rawKey;
+	if (seenOccurrences) {
+		const count = seenOccurrences.get(rawKey) ?? 0;
+		seenOccurrences.set(rawKey, count + 1);
+		if (count > 0) {
+			key = `${rawKey}-${count}`;
+		}
+	}
+	headingKeyMap.set(heading, key);
+	return key;
+}
+
+export function getSectionKey(
+	section: CrawlSection,
+	seenOccurrences?: Map<string, number>,
+): string {
+	const rawKey =
+		section.id || `${section.title ?? "section"}-${section.text.slice(0, 48)}`;
+	const cached = sectionKeyMap.get(section);
+	if (cached) {
+		seenOccurrences?.set(cached, (seenOccurrences.get(cached) ?? 0) + 1);
+		return cached;
+	}
+	let key = rawKey;
+	if (seenOccurrences) {
+		const count = seenOccurrences.get(rawKey) ?? 0;
+		seenOccurrences.set(rawKey, count + 1);
+		if (count > 0) {
+			key = `${rawKey}-${count}`;
+		}
+	}
+	sectionKeyMap.set(section, key);
+	return key;
+}
+
+export function getItemKey(
+	item: string,
+	seenOccurrences?: Map<string, number>,
+): string {
+	if (!seenOccurrences) return item;
+	const count = seenOccurrences.get(item) ?? 0;
+	seenOccurrences.set(item, count + 1);
+	return count === 0 ? item : `${item}-${count}`;
+}
 
 export function PageDetail({ page }: { page: Page }) {
 	const content = page.content;
@@ -16,7 +80,9 @@ export function PageDetail({ page }: { page: Page }) {
 	const showSplit = Boolean(
 		content && (content.internalLinks || content.externalLinks),
 	);
-
+	const headingOccurrences = new Map<string, number>();
+	const sectionOccurrences = new Map<string, number>();
+	const imageOccurrences = new Map<string, number>();
 	return (
 		<div className="min-w-0">
 			<div className="mt-4 flex flex-wrap items-center gap-2">
@@ -81,7 +147,7 @@ export function PageDetail({ page }: { page: Page }) {
 							<ul className="mt-2 space-y-1.5">
 								{headingLevels.map((heading) => (
 									<li
-										key={`${heading.level}-${heading.text}`}
+										key={getHeadingKey(heading, headingOccurrences)}
 										className="flex gap-2 text-sm"
 									>
 										<span className="w-8 shrink-0 text-xs text-fog tabular-nums">
@@ -104,7 +170,7 @@ export function PageDetail({ page }: { page: Page }) {
 							<div className="mt-2 space-y-2">
 								{sections.map((section, position) => (
 									<details
-										key={`${section.title}-${section.text.slice(0, 48)}`}
+										key={getSectionKey(section, sectionOccurrences)}
 										open={position === 0}
 										className="rounded-lg border border-graphite"
 									>
@@ -170,7 +236,10 @@ export function PageDetail({ page }: { page: Page }) {
 								</summary>
 								<ul className="space-y-2 px-3 pb-3">
 									{content.images.slice(0, 20).map((image) => (
-										<li key={image} className="break-all text-xs text-fog">
+										<li
+											key={getItemKey(image, imageOccurrences)}
+											className="break-all text-xs text-fog"
+										>
 											{image}
 										</li>
 									))}
@@ -202,10 +271,11 @@ export function PageDetail({ page }: { page: Page }) {
 function LinkList({ links }: { links: string[] }) {
 	if (links.length === 0)
 		return <p className="px-3 pb-3 text-sm text-fog">Tidak ada.</p>;
+	const linkOccurrences = new Map<string, number>();
 	return (
 		<ul className="space-y-2 px-3 pb-3">
 			{links.slice(0, 20).map((link) => (
-				<li key={link}>
+				<li key={getItemKey(link, linkOccurrences)}>
 					<a
 						href={link}
 						target="_blank"

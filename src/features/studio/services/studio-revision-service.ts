@@ -14,7 +14,8 @@ import {
 	serverStudioQuote,
 	settleStudioOperationCharge,
 } from "./studio-credit-adapter.server";
-import { generateStudioHtml } from "./studio-frame-generation";
+import { extractDesignSystemTokens } from "./studio-design-tokens";
+import { generateValidatedFrameHtml } from "./studio-frame-generation";
 import { getStudioProject } from "./studio-project-query";
 import {
 	validateStudioDesignMode,
@@ -75,17 +76,18 @@ export async function reviseStudioProject(
 			logoUrl: detail.logoUrl,
 			prdContent: detail.prdContent,
 		});
-
-		const htmlCode = await generateStudioHtml(
-			userPrompt,
-			undefined,
-			detail.designSkillId,
-			undefined,
-			undefined,
-			{ stage: "revision", focus: [checked.prompt] },
-		);
+		const dsTokens = extractDesignSystemTokens(detail.designMd);
+		const htmlCode = await generateValidatedFrameHtml({
+			framePrompt: userPrompt,
+			stage: "revision",
+			blueprint: null,
+			viewport: designMode,
+			expectTokens: dsTokens !== null,
+			designSkillId: detail.designSkillId,
+			dsTokens,
+			logoUrl: detail.logoUrl,
+		});
 		const nextVersion = (detail.latest?.version ?? 0) + 1;
-
 		const revision = await db.transaction(async (tx) => {
 			const [created] = await tx
 				.insert(studioRevisions)

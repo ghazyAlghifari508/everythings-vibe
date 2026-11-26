@@ -28,6 +28,7 @@ export interface InitialFrameContext {
 
 export interface ValidatedFrameInput {
 	framePrompt: string;
+	stage?: "frame" | "revision";
 	activeScreen?: string;
 	blueprint: StudioDesignBlueprint | null;
 	viewport: StudioDesignMode;

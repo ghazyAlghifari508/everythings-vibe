@@ -2,6 +2,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CodebaseLibraryDeleteDialog } from "@/features/codebase/components/planning/codebase-library-delete-dialog";
+import { CodebasePlanDeleteDialog } from "@/features/codebase/components/planning/codebase-plan-delete-dialog";
 import { ProjectActionsMenu } from "@/features/codebase/components/planning/project-actions-menu";
 import type { CodebaseLibraryItem } from "@/features/codebase/services/library";
 
@@ -153,5 +154,59 @@ describe("Destructive dialog consistency (FIX 06)", () => {
 		// Click delete
 		fireEvent.click(deleteBtn);
 		expect(onDelete).toHaveBeenCalledWith(sampleItem);
+	});
+
+	it("renders CodebasePlanDeleteDialog with feature-scoped copy and working actions", () => {
+		const onCancel = vi.fn();
+		const onConfirm = vi.fn();
+
+		render(
+			<CodebasePlanDeleteDialog
+				planName="Filter Artikel"
+				deleting={false}
+				onCancel={onCancel}
+				onConfirm={onConfirm}
+			/>,
+		);
+
+		expect(screen.getByRole("dialog")).toBeDefined();
+		expect(screen.getByText("Hapus fitur?")).toBeDefined();
+		// The copy names the feature and its scope, never the repository.
+		expect(screen.getByText(/Filter Artikel/)).toBeDefined();
+		expect(
+			screen.getByText(/Repository dan fitur lain tidak terpengaruh/),
+		).toBeDefined();
+
+		const cancelBtn = screen.getByRole("button", { name: "Batal" });
+		const deleteBtn = screen.getByRole("button", { name: "Hapus fitur" });
+		expect(cancelBtn).toBeDefined();
+		expect(deleteBtn).toBeDefined();
+		expect(screen.queryByLabelText("Close")).toBeNull();
+
+		// Cancel closes without confirming.
+		fireEvent.click(cancelBtn);
+		expect(onCancel).toHaveBeenCalledTimes(1);
+		expect(onConfirm).not.toHaveBeenCalled();
+
+		// Confirm deletes.
+		fireEvent.click(deleteBtn);
+		expect(onConfirm).toHaveBeenCalledTimes(1);
+	});
+
+	it("renders CodebasePlanDeleteDialog as nothing when no plan is targeted", () => {
+		const onCancel = vi.fn();
+		const onConfirm = vi.fn();
+
+		const { container } = render(
+			<CodebasePlanDeleteDialog
+				planName={null}
+				deleting={false}
+				onCancel={onCancel}
+				onConfirm={onConfirm}
+			/>,
+		);
+
+		expect(container.querySelector("[role='dialog']")).toBeNull();
+		expect(screen.queryByRole("button", { name: "Hapus fitur" })).toBeNull();
 	});
 });

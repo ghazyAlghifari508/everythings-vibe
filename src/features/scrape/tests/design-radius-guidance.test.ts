@@ -214,7 +214,13 @@ describe("radius guidance boundaries", () => {
 			normalizeRadii(combined),
 		);
 		expect(result.dos).toHaveLength(1);
-		expect(result.dos[0]?.evidence).toContain("capture 1");
+		// The rule no longer embeds its capture: the renderer attributes it to the
+		// captures that measured it, so the same rule in four captures stays one
+		// instruction. The conflicting capture must still not leak into it.
+		expect(result.dos[0]?.rule).not.toMatch(/capture/i);
+		expect(result.dos[0]?.evidence).not.toMatch(/capture/i);
+		expect(result.dos[0]?.rule).not.toContain("16px");
+		expect(result.dos[0]?.rule).not.toContain("24px");
 		expect(
 			result.limitations.some(
 				(note) => note.includes("16px") && note.includes("24px"),

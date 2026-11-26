@@ -27,6 +27,7 @@ export function WorkspaceScreenResolver({
 	taskTree,
 	featureTree,
 	snapshotId,
+	planningSnapshotId,
 	impactAreas,
 }: {
 	sourcePreview: SourcePreviewState;
@@ -46,6 +47,7 @@ export function WorkspaceScreenResolver({
 	taskTree: TaskTree | null;
 	featureTree: ProjectFeatureTree | null;
 	snapshotId: string | null | undefined;
+	planningSnapshotId?: string | null | undefined;
 	impactAreas: string[] | undefined;
 }) {
 	if (sourcePreview.kind !== "idle") {
@@ -162,6 +164,20 @@ export function WorkspaceScreenResolver({
 					</p>
 				) : null}
 			</div>
+			{planningSnapshotId && snapshotId && planningSnapshotId !== snapshotId ? (
+				<div
+					data-testid="codebase-plan-snapshot-mismatch"
+					className="rounded-lg border border-amber/30 bg-amber/10 p-3 text-xs text-amber"
+				>
+					<p className="font-semibold text-amber">
+						Repository sudah disinkronkan ulang
+					</p>
+					<p className="mt-1 leading-5 text-amber/90">
+						Repository sudah disinkronkan ulang setelah planning ini dibuat.
+						Planning lama tetap tersimpan — tinjau apakah masih sesuai.
+					</p>
+				</div>
+			) : null}
 			{impactAreas && impactAreas.length > 0 ? (
 				<div className="rounded-lg border border-graphite bg-charcoal p-3">
 					<p className="font-mono text-[11px] uppercase tracking-wider text-slate">

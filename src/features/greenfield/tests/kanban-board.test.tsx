@@ -226,7 +226,7 @@ describe("KanbanBoard", () => {
 		const c = renderBoard();
 
 		await vi.waitFor(() => {
-			expect(c.textContent).toContain("Test Kanban App");
+			expect(c.textContent).toContain("Setup Better Auth OAuth");
 		});
 
 		// Initially closed
@@ -251,7 +251,7 @@ describe("KanbanBoard", () => {
 		const c = renderBoard();
 
 		await vi.waitFor(() => {
-			expect(c.textContent).toContain("Test Kanban App");
+			expect(c.textContent).toContain("Setup Better Auth OAuth");
 		});
 
 		const chatLink = c.querySelector('a[to="/plan/new"]');

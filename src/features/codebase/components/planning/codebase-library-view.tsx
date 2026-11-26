@@ -64,10 +64,19 @@ export function CodebaseLibraryView({
 	const pageIds = paged.map((item) => item.id);
 	const selectionActive = selection.count > 0;
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: reset to the first page whenever the query changes; the dependency is the trigger, not a read
-	useEffect(() => {
+	// Existing Codebase keeps the selection page-scoped: an id stays selected
+	// only while the rows that produced it are on screen, so a later delete can
+	// never target repositories the user can no longer see.
+	function changeQuery(next: string) {
+		setQuery(next);
 		setPage(1);
-	}, [query]);
+		selection.clear();
+	}
+
+	function changePage(next: number) {
+		setPage(next);
+		selection.clear();
+	}
 
 	useEffect(() => {
 		if (page > totalPages) setPage(totalPages);
@@ -209,7 +218,7 @@ export function CodebaseLibraryView({
 						type="text"
 						placeholder="Cari project..."
 						value={query}
-						onChange={(e) => setQuery(e.target.value)}
+						onChange={(e) => changeQuery(e.target.value)}
 						aria-label="Cari project tersimpan"
 						className="w-full rounded-lg border border-graphite bg-charcoal py-2.5 pl-10 pr-4 text-sm text-snow placeholder:text-fog/60 focus:border-fog/40 focus:outline-none"
 					/>
@@ -218,38 +227,12 @@ export function CodebaseLibraryView({
 
 			{selectionActive && paged.length > 0 && (
 				<HistorySelectAll
+					mode="binary"
 					noun="repository"
 					pageIds={pageIds}
 					selectedIds={selection.ids}
-					total={filtered.length}
-					filteredScopeActive={selection.scope === "filtered"}
-					preparing={false}
 					onTogglePage={(selected) =>
 						selection.setPageSelection(pageIds, selected)
-					}
-					onSelectAllFiltered={() =>
-						selection.applyFiltered({
-							ids: filtered.map((r) => r.id),
-							total: filtered.length,
-							truncated: false,
-						})
-					}
-				/>
-			)}
-
-			{(selectionActive || selection.notice !== null) && (
-				<HistorySelectionBar
-					noun="repository"
-					count={selection.count}
-					filteredTotal={selection.filteredTotal}
-					truncated={selection.truncated}
-					notice={selection.notice}
-					deleting={deleting}
-					cancelLabel="Batalkan Pilihan"
-					deleteLabel="Hapus Terpilih"
-					onClear={selection.clear}
-					onDelete={() =>
-						setDeleteRequest({ kind: "bulk", count: selection.count })
 					}
 				/>
 			)}
@@ -276,12 +259,27 @@ export function CodebaseLibraryView({
 				</ul>
 			)}
 
+			{(selectionActive || selection.notice !== null) && (
+				<HistorySelectionBar
+					noun="repository"
+					count={selection.count}
+					notice={selection.notice}
+					deleting={deleting}
+					cancelLabel="Batalkan Pilihan"
+					deleteLabel="Hapus Terpilih"
+					onClear={selection.clear}
+					onDelete={() =>
+						setDeleteRequest({ kind: "bulk", count: selection.count })
+					}
+				/>
+			)}
+
 			{filtered.length > 0 && (
 				<LibraryPagination
 					clampedPage={clampedPage}
 					totalPages={totalPages}
 					totalItems={filtered.length}
-					onPageChange={setPage}
+					onPageChange={changePage}
 				/>
 			)}
 

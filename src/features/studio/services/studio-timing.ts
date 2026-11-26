@@ -15,6 +15,9 @@ export function studioJobTiming(
 		issueCodes?: string[];
 		issueStages?: string[];
 		issueCount?: number;
+		hardCount?: number;
+		repairableCount?: number;
+		advisoryCount?: number;
 		sourceContentNodes?: number;
 		assembledContentNodes?: number;
 		correctionRequired?: boolean;
@@ -32,11 +35,16 @@ export function studioJobTiming(
 		outputTokens?: number;
 		textTokens?: number;
 		reasoningTokens?: number;
-		maxTokens?: number;
-		tokenLimitExceeded?: boolean;
+		finishReason?: string;
+		rawFinishReason?: string;
+		requestedMaxTokens?: number;
+		effectiveMaxTokens?: number | null;
+		accountingAboveRequested?: boolean | null;
+		ceilingReached?: boolean;
+		documentChars?: number;
+		repairCount?: number;
 		providerRetries?: number;
 		providerFallbacks?: number;
-		finishReason?: string;
 		cachedTokens?: number;
 		referenceChars?: number;
 		prdChars?: number;
@@ -64,13 +72,14 @@ export function studioJobTiming(
 			finishReason: context.finishReason,
 		});
 	}
+	const { detail: _privateDetail, ...safeContext } = context;
 	console.info(
 		JSON.stringify({
 			scope: "studio",
 			stage,
 			timestamp: new Date().toISOString(),
 			durationMs: Date.now() - startedAt,
-			...context,
+			...safeContext,
 		}),
 	);
 }

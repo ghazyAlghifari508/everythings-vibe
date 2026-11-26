@@ -9,6 +9,17 @@ export {
 	type PageHeadingProps,
 	type PageHeadingVariant,
 } from "./page-heading";
+export {
+	generatePaginationPages,
+	Pagination,
+	PaginationContent,
+	PaginationEllipsis,
+	PaginationItem,
+	PaginationLink,
+	type PaginationLinkProps,
+	PaginationNext,
+	PaginationPrevious,
+} from "./pagination";
 export { Spinner, type SpinnerProps } from "./spinner";
 export { StatusBadge, type StatusBadgeProps } from "./status-badge";
 export {

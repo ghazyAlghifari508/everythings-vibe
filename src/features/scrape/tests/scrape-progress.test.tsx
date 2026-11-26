@@ -162,6 +162,22 @@ describe("connected vertical stepper", () => {
 			container.querySelectorAll("[data-active-stage-spinner]"),
 		).toHaveLength(0);
 	});
+
+	it("adds vertical spacing between header and stepper for design progress card", () => {
+		const { container } = render(
+			<ScrapeProgress mode="design" status="queued" />,
+		);
+		const stepper = container.querySelector("[data-stepper]");
+		expect(stepper?.classList.contains("mt-5")).toBe(true);
+	});
+
+	it("does not add extra spacing to other modes", () => {
+		const { container } = render(
+			<ScrapeProgress mode="crawl" status="queued" />,
+		);
+		const stepper = container.querySelector("[data-stepper]");
+		expect(stepper?.classList.contains("mt-5")).toBe(false);
+	});
 });
 
 describe("honest stages per mode", () => {

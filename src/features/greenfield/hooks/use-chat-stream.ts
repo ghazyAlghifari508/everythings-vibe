@@ -15,6 +15,7 @@ import {
 	handleStreamPostCompletion,
 } from "@/features/greenfield/components/chat/chat-stream-handlers";
 import { executeChatStreamRequest } from "@/features/greenfield/components/chat/chat-stream-runner";
+import { useGenerationNavigationGuard } from "@/features/greenfield/hooks/use-generation-navigation-guard";
 import { useChatStore, useUIStore } from "@/store";
 import { useChatResumeModal } from "./use-chat-resume-modal";
 import { useChatSectionProgress } from "./use-chat-section-progress";
@@ -73,6 +74,8 @@ export function useChatStream({
 		markAllSectionsCompleted,
 	} = useChatSectionProgress(currentPrdContent, isGeneratingPRD);
 
+	useGenerationNavigationGuard(isStreaming);
+
 	const buffer = useChatStreamBuffer({
 		chatMode: activeChatMode,
 		currentPrdContent,
@@ -102,13 +105,9 @@ export function useChatStream({
 	}, [projectId]);
 
 	const handleCancel = useCallback(() => {
+		// Retain ownership until the aborted request has finished its cleanup.
 		abortControllerRef.current?.abort();
-		abortControllerRef.current = null;
-		setStreaming(false);
-		setGeneratingPRD(false);
-		setStreamingPRDContent("");
-		isSubmittingRef.current = false;
-	}, [setStreaming, setGeneratingPRD, setStreamingPRDContent]);
+	}, []);
 
 	const streamApiCall = useCallback(
 		async (

@@ -181,7 +181,7 @@ describe("CodebaseLibraryView selection mode", () => {
 		expect(screen.queryByText(/repository dipilih/i)).toBeNull();
 	});
 
-	it("selects the current page with an indeterminate checkbox", () => {
+	it("keeps the page checkbox empty while only some rows are selected", () => {
 		render(
 			<CodebaseLibraryView
 				items={[makeItem("cb-1", "Repo 1"), makeItem("cb-2", "Repo 2")]}
@@ -193,64 +193,74 @@ describe("CodebaseLibraryView selection mode", () => {
 		const pageCheckbox = screen.getByRole("checkbox", {
 			name: /Pilih semua/i,
 		}) as HTMLInputElement;
-		expect(pageCheckbox.indeterminate).toBe(true);
 		expect(pageCheckbox.checked).toBe(false);
+		expect(pageCheckbox.indeterminate).toBe(false);
+		expect(pageCheckbox.getAttribute("aria-checked")).toBe("false");
+		expect(screen.getByText("Pilih semua di halaman ini")).toBeDefined();
 
 		fireEvent.click(pageCheckbox);
 		expect(screen.getByText("2 repository dipilih")).toBeDefined();
-		expect(pageCheckbox.indeterminate).toBe(false);
 		expect(pageCheckbox.checked).toBe(true);
+		expect(pageCheckbox.indeterminate).toBe(false);
+		expect(pageCheckbox.getAttribute("aria-checked")).toBe("true");
+		expect(
+			screen.getByText("Semua repository di halaman ini dipilih"),
+		).toBeDefined();
 	});
 
-	it("keeps selection across pagination", () => {
-		render(
-			<CodebaseLibraryView
-				items={makeProjects(CODEBASE_LIBRARY_PAGE_SIZE + 5)}
-			/>,
-		);
-
-		enterSelectionMode();
-		fireEvent.click(screen.getByRole("button", { name: /Selanjutnya/i }));
-		expect(screen.getByText("Halaman 2 dari 2")).toBeDefined();
-		expect(screen.getByText("1 repository dipilih")).toBeDefined();
-
-		fireEvent.click(
-			screen.getByRole("checkbox", {
-				name: new RegExp(
-					`^Pilih repository Project ${CODEBASE_LIBRARY_PAGE_SIZE + 1}$`,
-					"i",
-				),
-			}),
-		);
-		expect(screen.getByText("2 repository dipilih")).toBeDefined();
-	});
-
-	it("extends the selection to every filtered repository and resets on filter change", () => {
-		const items = makeProjects(CODEBASE_LIBRARY_PAGE_SIZE + 5);
+	it("selects the current page only and drops the selection when the page changes", () => {
+		const items = makeProjects(CODEBASE_LIBRARY_PAGE_SIZE * 2);
 		render(<CodebaseLibraryView items={items} />);
 
 		enterSelectionMode();
 		fireEvent.click(
 			screen.getByRole("checkbox", { name: /Pilih semua di halaman ini/i }),
 		);
-		fireEvent.click(
-			screen.getByRole("button", {
-				name: new RegExp(
-					`Pilih semua ${items.length} repository sesuai filter`,
-					"i",
-				),
-			}),
-		);
+
 		expect(
-			screen.getByText(`${items.length} repository dipilih`),
+			screen.getByText(`${CODEBASE_LIBRARY_PAGE_SIZE} repository dipilih`),
 		).toBeDefined();
+		expect(screen.queryByRole("button", { name: /sesuai filter/i })).toBeNull();
+
+		fireEvent.click(screen.getByRole("button", { name: /Selanjutnya/i }));
+		expect(screen.getByText("Halaman 2 dari 2")).toBeDefined();
+		expect(screen.queryByText(/repository dipilih/i)).toBeNull();
+		expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
+	});
+
+	it("renders the selection bar between the repository list and pagination", () => {
+		render(
+			<CodebaseLibraryView
+				items={makeProjects(CODEBASE_LIBRARY_PAGE_SIZE + 1)}
+			/>,
+		);
+
+		enterSelectionMode();
+
+		const list = screen.getByTestId("codebase-library-list");
+		const bar = screen.getByText("1 repository dipilih");
+		const pagination = screen.getByRole("navigation", { name: "Pagination" });
+
+		expect(
+			list.compareDocumentPosition(bar) & Node.DOCUMENT_POSITION_FOLLOWING,
+		).toBeTruthy();
+		expect(
+			bar.compareDocumentPosition(pagination) &
+				Node.DOCUMENT_POSITION_FOLLOWING,
+		).toBeTruthy();
+	});
+
+	it("clears the selection when the search changes", () => {
+		render(<CodebaseLibraryView items={makeProjects(3)} />);
+
+		enterSelectionMode();
+		expect(screen.getByText("1 repository dipilih")).toBeDefined();
 
 		fireEvent.change(screen.getByPlaceholderText(/Cari project/i), {
 			target: { value: "Project 1" },
 		});
-		expect(
-			screen.getByText(/Filter berubah, pilihan dibersihkan/i),
-		).toBeDefined();
+
+		expect(screen.queryByText(/repository dipilih/i)).toBeNull();
 		expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
 	});
 });

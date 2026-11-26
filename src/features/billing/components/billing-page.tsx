@@ -20,6 +20,7 @@ import type {
 	ProductTrialState,
 } from "../services/billing-settings.functions";
 import type { ProductChargingState } from "../services/charging-state.functions";
+import { ADAPTIVE_CREDIT_PRICING } from "../types/billing-constants";
 import { getPaymentStatusInfo } from "../utils/payment-status";
 import { CreditMeter } from "./credit-meter";
 import { CreditUsageSection } from "./credit-usage";
@@ -174,6 +175,16 @@ export function BillingPage({
 							exempt={exempt}
 							paused={paused}
 						/>
+						<p className="mt-2 text-xs text-(--text-secondary)">
+							Analisis awal gratis sekali per akun. Analisis berikutnya memakai
+							hingga{" "}
+							{
+								ADAPTIVE_CREDIT_PRICING.operations.codebase_analysis
+									.maximumCredits
+							}{" "}
+							kredit sesuai ukuran repository. Sesi sync gratis; hanya analisis
+							berhasil yang ditagih.
+						</p>
 						{!paused &&
 							available <= 0 &&
 							isPaidPlan &&

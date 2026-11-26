@@ -2,6 +2,7 @@ import { getRequestHeaders } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { httpStatusForErrorCode, ScrapeError } from "@/lib/design-errors";
 import { requireUser } from "@/lib/session";
+import { readStudioFrameDocument } from "./studio-frame-document";
 import {
 	STUDIO_FRAME_ERRORS,
 	studioFrameErrorReport,
@@ -11,18 +12,18 @@ import { enqueueStudioOperation } from "./studio-operation-enqueue";
 import { retryStudioFrame, retryStudioPlanning } from "./studio-retry-service";
 
 function studioErrorResponse(error: unknown): Response {
-	if (error instanceof ScrapeError && error.code === "PRODUCT_PLAN_REQUIRED")
-		return Response.json(
-			{ error: error.message, code: error.code },
-			{ status: httpStatusForErrorCode(error.code) },
-		);
-	// Public copy and HTTP status come from the taxonomy; the raw message stays
-	// in this server-side diagnostic line.
+if (error instanceof ScrapeError && error.code === "PRODUCT_PLAN_REQUIRED")
+	return Response.json(
+		{ error: error.message, code: error.code },
+		{ status: httpStatusForErrorCode(error.code) },
+	);
+// Public copy and HTTP status come from the taxonomy; the raw message stays
+// in this server-side diagnostic line.
 	const report = studioFrameErrorReport(error);
 	console.error("[studio.frame]", {
 		code: report.code,
 		status: report.status,
-		diagnostic: report.diagnostic,
+		category: report.category,
 	});
 	return Response.json(
 		{ error: report.message, code: report.code },
@@ -55,6 +56,21 @@ export async function GET({
 		// A user-initiated visual retry must bypass the cached render so a
 		// capture that could not be decoded is genuinely re-rendered.
 		const attempt = Number(url.searchParams.get("attempt") ?? "0");
+		// The ZIP export asks for the frame's final standalone document. It is
+		// built by the same transformation the canvas capture renders, so an
+		// exported screen and its preview cannot disagree.
+		if (url.searchParams.get("document") === "1") {
+			const frameDocument = await readStudioFrameDocument(
+				projectId,
+				frameId,
+				user.id,
+			);
+			status = 200;
+			return Response.json(
+				{ html: frameDocument.html, viewport: frameDocument.viewport },
+				{ headers: { "Cache-Control": "private, no-store" } },
+			);
+		}
 		const visual = await getStudioFrameVisual(projectId, frameId, user.id, {
 			forceRecapture: Number.isFinite(attempt) && attempt > 0,
 		});

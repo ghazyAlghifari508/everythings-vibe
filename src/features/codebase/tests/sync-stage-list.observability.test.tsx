@@ -49,9 +49,12 @@ function status(
 	};
 }
 
-function render(statusValue: SyncStatusResponse | null) {
+function render(
+	statusValue: SyncStatusResponse | null,
+	props: Partial<React.ComponentProps<typeof SyncStageList>> = {},
+) {
 	act(() => {
-		root?.render(<SyncStageList status={statusValue} />);
+		root?.render(<SyncStageList status={statusValue} {...props} />);
 	});
 }
 
@@ -143,12 +146,90 @@ describe("SyncStageList fast-sync reporting", () => {
 				analysisStatus: "ready",
 				analysisAttemptStatus: "failed",
 			}),
+			{ isAnalysisReady: true },
 		);
 		const analysis = container.querySelector(
 			"[data-testid='sync-stage-analysis']",
 		);
 		expect(analysis?.getAttribute("data-stage-state")).toBe("done");
 		expect(analysis?.textContent).toContain("Analisis selesai");
+	});
+
+	it("reads a server-ready analysis as preparing until this client holds its output", () => {
+		// Status naming a ready row is not the same fact as the browser holding a
+		// usable output: the row must not claim success next to a closed
+		// conclusion, and it must never report the newer failed retry instead.
+		render(
+			status({
+				status: "uploaded",
+				snapshotId: "snap_ui",
+				fileCount: 4,
+				analysisStatus: "ready",
+				analysisAttemptStatus: "failed",
+			}),
+		);
+		const analysis = container.querySelector(
+			"[data-testid='sync-stage-analysis']",
+		);
+		expect(analysis?.getAttribute("data-stage-state")).toBe("waiting");
+		expect(analysis?.textContent).toContain("Menyiapkan kesimpulan...");
+		expect(analysis?.textContent).not.toContain("Analisis belum berhasil");
+	});
+
+	it("repaints a persisted standby session as idle instead of starting motion", () => {
+		// Refresh and stream reconnect both replay the current persisted state. A
+		// waiting session must stay waiting — no spinner, no timer — rather than
+		// appearing to begin a connection the server never observed.
+		render(status());
+		expect(states()).toEqual(["waiting", "waiting", "waiting"]);
+		expect(container.querySelectorAll('[data-testid="spinner"]')).toHaveLength(
+			0,
+		);
+		expect(container.querySelector("[role='timer']")).toBeNull();
+		render(status({ updatedAt: "2026-02-01T10:05:00.000Z" }));
+		expect(states()).toEqual(["waiting", "waiting", "waiting"]);
+		expect(container.querySelectorAll('[data-testid="spinner"]')).toHaveLength(
+			0,
+		);
+	});
+
+	it("keeps a persisted upload running after a repaint", () => {
+		const uploading = status({
+			status: "uploading",
+			snapshotId: "snap_ui",
+			fileCount: 12,
+			lifecycle: [
+				{ kind: "agent_connected", at: "2026-02-01T10:00:00.000Z" },
+				{ kind: "upload_started", at: "2026-02-01T10:00:20.000Z" },
+			],
+		});
+		render(uploading);
+		expect(states()).toEqual(["done", "done", "active"]);
+		// The replayed frame is the same persisted attempt: completed rows stay
+		// completed and the active row is still the one genuinely in flight.
+		render(uploading);
+		expect(states()).toEqual(["done", "done", "active"]);
+	});
+
+	it("does not reset completed stages when the finished state is re-delivered", () => {
+		const finished = status({
+			status: "uploaded",
+			snapshotId: "snap_ui",
+			fileCount: 12,
+			lifecycle: [
+				{ kind: "agent_connected", at: "2026-02-01T10:00:00.000Z" },
+				{
+					kind: "snapshot_persisted",
+					at: "2026-02-01T10:00:20.000Z",
+					count: 12,
+				},
+			],
+		});
+		render(finished);
+		expect(states()).toEqual(["done", "done", "done"]);
+		render(finished);
+		expect(states()).toEqual(["done", "done", "done"]);
+		expect(container.querySelectorAll(".animate-spin")).toHaveLength(0);
 	});
 
 	it("withholds the list entirely while the server has not answered", () => {

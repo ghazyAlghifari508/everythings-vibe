@@ -103,6 +103,14 @@ export function validateDesignMd(markdown: string): DesignMdIssue[] {
 		}
 	}
 
+	// The document must state what the analysis actually achieved, so a requested
+	// depth can never be read as a completed AI synthesis.
+	if (!/^\*\*Analysis status:\*\*/m.test(markdown))
+		issues.push({
+			code: "missing-analysis-status",
+			detail: "The document does not state its analysis status.",
+		});
+
 	const versionMatch = markdown.match(/^Document model version (\d+)\./m);
 	if (!versionMatch)
 		issues.push({

@@ -214,6 +214,8 @@ export const WhiteboardCanvas = memo(function WhiteboardCanvas({
 
 					<ZoomControls
 						zoom={zoom}
+						minZoom={minZoom}
+						maxZoom={maxZoom}
 						onZoomIn={zoomIn}
 						onZoomOut={zoomOut}
 						onReset={resetZoom}

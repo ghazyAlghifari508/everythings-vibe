@@ -14,6 +14,7 @@ export type StudioFrameErrorCode =
 	| "STUDIO_STORAGE_FAILED"
 	| "STUDIO_PREVIEW_FAILED"
 	| "STUDIO_RETRY_RUNNING"
+	| "STUDIO_PLANNING_REQUIRED"
 	| "STUDIO_DUPLICATE_SCREEN"
 	| "STUDIO_SCREEN_LIMIT"
 	| "STUDIO_NOT_FOUND"
@@ -83,6 +84,11 @@ export const STUDIO_FRAME_ERRORS: Record<
 		status: 409,
 		message: "Halaman ini sedang dibuat ulang.",
 	},
+	STUDIO_PLANNING_REQUIRED: {
+		status: 409,
+		message:
+			"Perencanaan layar belum selesai. Jalankan ulang perencanaan, lalu coba halaman ini lagi.",
+	},
 	STUDIO_DUPLICATE_SCREEN: {
 		status: 409,
 		message:
@@ -114,6 +120,7 @@ export type StudioFrameFailureCategory =
 	| "render-capture"
 	| "job-timeout"
 	| "lease-loss"
+	| "planning-required"
 	| "resource-missing"
 	| "cancelled"
 	| "unknown";
@@ -121,6 +128,7 @@ export type StudioFrameFailureCategory =
 export type StudioFrameRecoveryAction =
 	| "retry-generation"
 	| "retry-visual"
+	| "retry-planning"
 	| "wait-for-recovery"
 	| "none";
 
@@ -142,6 +150,7 @@ const FAILURE_CATEGORY_BY_CODE: Record<
 	STUDIO_INVALID_INPUT: "unknown",
 	STUDIO_STORAGE_FAILED: "unknown",
 	STUDIO_RETRY_RUNNING: "unknown",
+	STUDIO_PLANNING_REQUIRED: "planning-required",
 	STUDIO_DUPLICATE_SCREEN: "unknown",
 	STUDIO_SCREEN_LIMIT: "unknown",
 	STUDIO_UNAUTHORIZED: "unknown",
@@ -157,6 +166,7 @@ const RECOVERY_BY_CATEGORY: Record<
 	"render-capture": "retry-visual",
 	"job-timeout": "retry-generation",
 	"lease-loss": "wait-for-recovery",
+	"planning-required": "retry-planning",
 	"resource-missing": "none",
 	cancelled: "retry-generation",
 	unknown: "retry-generation",

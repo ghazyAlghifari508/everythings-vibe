@@ -25,5 +25,5 @@ export const Route = createFileRoute("/plan/codebase")({
 // navigation intent to the feature container.
 function PlanCodebaseRoute() {
 	const { intent } = Route.useSearch();
-	return <PlanCodebasePage intent={intent} />;
+	return <PlanCodebasePage key={intent ?? "recover"} intent={intent} />;
 }

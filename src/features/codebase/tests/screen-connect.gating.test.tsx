@@ -119,29 +119,56 @@ describe("Step 1 instruction copy", () => {
 });
 
 describe("Step 1 live sync status", () => {
-	it("shows the waiting agent as the active stage as soon as a session exists", () => {
+	it("keeps the waiting agent idle as soon as a session exists but no CLI ran", () => {
 		renderConnect({ status: status() });
 		expect(container.textContent).toContain("Pantau progres");
 		expect(container.textContent).toContain(
 			"Jalankan prompt dari root repository untuk mulai menyinkronkan codebase.",
 		);
-		// The first row is a real, current state of this attempt: the session exists
-		// and nothing has contacted the server yet.
-		expect(allStageStates()).toEqual(["active", "waiting", "waiting"]);
-		expect(container.textContent).toContain("Menunggu agent terhubung...");
+		// The session exists and the prompt is on screen, but nothing has contacted
+		// the server yet: the user has not run the prompt. Waiting for a human action
+		// is not system activity, so every row stays a neutral idle indicator.
+		expect(allStageStates()).toEqual(["waiting", "waiting", "waiting"]);
+		expect(container.textContent).toContain("Menunggu agent");
 		expect(container.textContent).toContain("Menyiapkan source code");
 		expect(container.textContent).toContain("Mengunggah repository");
+		// No spinner and no elapsed timer may exist before real server-observed work.
+		expect(container.querySelectorAll('[data-testid="spinner"]')).toHaveLength(
+			0,
+		);
+		expect(container.querySelector("[role='timer']")).toBeNull();
 		// Nothing is claimed as done before the handshake is persisted.
 		expect(container.textContent).not.toContain("Agent terhubung");
 		expect(allStageStates()).not.toContain("done");
 		expect(container.textContent).not.toContain("Sync ID");
-		expect(container.textContent).not.toContain("Menghubungkan server...");
 	});
 
 	it("never claims a linked agent or a finished sync before the server says so", () => {
 		renderConnect({ status: status() });
 		expect(container.textContent).not.toContain("Agent terhubung");
 		expect(container.textContent).not.toContain("Sinkronisasi selesai");
+	});
+
+	it("does not start any progress when the prompt is copied", async () => {
+		const writeText = vi.fn(async () => {});
+		vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
+		renderConnect({ status: status() });
+		const before = allStageStates();
+		const copy = container.querySelector(
+			'button[aria-label="Salin prompt untuk AI agent"]',
+		) as HTMLButtonElement | null;
+		expect(copy).not.toBeNull();
+		await act(async () => {
+			copy?.click();
+		});
+		expect(writeText).toHaveBeenCalledOnce();
+		// Copying is browser-local feedback, not evidence that the CLI ran: the
+		// stage list must not move and no spinner may appear.
+		expect(allStageStates()).toEqual(before);
+		expect(allStageStates()).toEqual(["waiting", "waiting", "waiting"]);
+		expect(container.querySelectorAll('[data-testid="spinner"]')).toHaveLength(
+			0,
+		);
 	});
 
 	it("shows source preparation as the active stage once the agent is linked", () => {
@@ -202,10 +229,15 @@ describe("Step 1 live sync status", () => {
 		expect(container.textContent).not.toContain("Mengunggah repository...");
 	});
 
-	it("says it is connecting instead of claiming a stage the server never reported", () => {
+	it("stays passively waiting while the first status read is still in flight", () => {
 		renderConnect({ status: null });
-		expect(container.textContent).toContain("Menghubungkan server...");
-		expect(container.textContent).not.toContain("Menunggu agent");
+		// Polling is internal monitoring, not connection activity: the line reads as
+		// the passive wait it is, without a spinner.
+		expect(container.textContent).toContain("Menunggu agent");
+		expect(container.querySelectorAll('[data-testid="spinner"]')).toHaveLength(
+			0,
+		);
+		expect(container.textContent).not.toContain("Menghubungkan server...");
 		expect(container.querySelectorAll("[data-stage-state]")).toHaveLength(0);
 	});
 
@@ -285,6 +317,25 @@ describe("Step 1 live sync status", () => {
 				analysisStatus: "ready",
 			}),
 			canContinueToSummary: false,
+		});
+		// Ready on the server but not yet reconciled into a usable output: the
+		// row must not claim success next to a disabled action.
+		const reconcilingRow = container.querySelector(
+			'[data-testid="sync-stage-analysis"]',
+		);
+		expect(reconcilingRow).not.toBeNull();
+		expect(reconcilingRow?.getAttribute("data-stage-state")).toBe("waiting");
+		expect(reconcilingRow?.textContent).toContain("Menyiapkan kesimpulan...");
+		expect(reconcilingRow?.textContent).not.toContain("Analisis selesai");
+
+		renderConnect({
+			status: status({
+				status: "uploaded",
+				snapshotId: "snap_1",
+				analysisStatus: "ready",
+			}),
+			canContinueToSummary: false,
+			isLegacyAnalysisMissingSuggestions: true,
 		});
 		const legacyRow = container.querySelector(
 			'[data-testid="sync-stage-analysis"]',
@@ -574,7 +625,9 @@ describe("Step 1 recovery affordances", () => {
 			onRequestNewToken,
 		});
 		const button = [...container.querySelectorAll("button")].find((b) =>
-			/Buat sesi baru|Dapatkan token baru/i.test(b.textContent ?? ""),
+			/Buat prompt baru|Buat sesi baru|Dapatkan token baru|Buat instruksi baru/i.test(
+				b.textContent ?? "",
+			),
 		);
 		expect(button).toBeDefined();
 		act(() => {
@@ -602,10 +655,19 @@ describe("Step 1 recovery affordances", () => {
 			onRetryAnalysis,
 		});
 		const renewal = [...container.querySelectorAll("button")].find((b) =>
-			/Buat sesi baru|Dapatkan token baru/i.test(b.textContent ?? ""),
+			/Buat prompt baru|Buat sesi baru|Dapatkan token baru/i.test(
+				b.textContent ?? "",
+			),
 		);
 		expect(renewal).toBeUndefined();
-		expect(container.textContent).toContain("Prompt sudah dijalankan");
+		// FIX 01: the prompt box never carries a progress sentence — step 3 owns
+		// the outcome. Without a credential it states prompt availability only.
+		expect(container.textContent).not.toContain(
+			"Source code berhasil diterima.",
+		);
+		expect(
+			container.querySelector('[data-testid="prompt-unavailable"]'),
+		).not.toBeNull();
 		expect(onRequestNewToken).not.toHaveBeenCalled();
 		// The absent one-time token must not block analysis recovery: the failed
 		// attempt is still retryable against the snapshot that already uploaded.

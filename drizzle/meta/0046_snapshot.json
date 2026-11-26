@@ -1,6 +1,6 @@
 {
-  "id": "ff0b8102-84db-4f51-ada1-0520734ef75d",
-  "prevId": "a0aaad4c-7b4f-4657-be13-262d0ce7da4c",
+  "id": "cb4100f6-23b9-4511-8be5-2770736c0c5f",
+  "prevId": "cdb5ad14-054a-4d9a-ac7d-a6c2cd72daef",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1163,44 +1163,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "resource_type": {
-          "name": "resource_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
         "project_id": {
           "name": "project_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "studio_project_id": {
-          "name": "studio_project_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "studio_job_id": {
-          "name": "studio_job_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "scrape_id": {
-          "name": "scrape_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "product": {
-          "name": "product",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "funding_source": {
-          "name": "funding_source",
           "type": "text",
           "primaryKey": false,
           "notNull": true
@@ -1208,12 +1172,6 @@
         "subscription_id": {
           "name": "subscription_id",
           "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "subscription_epoch": {
-          "name": "subscription_epoch",
-          "type": "integer",
           "primaryKey": false,
           "notNull": false
         },
@@ -1472,54 +1430,6 @@
           "method": "btree",
           "with": {}
         },
-        "credit_operations_studio_project_id_idx": {
-          "name": "credit_operations_studio_project_id_idx",
-          "columns": [
-            {
-              "expression": "studio_project_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "studio_project_id IS NOT NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "credit_operations_studio_job_id_idx": {
-          "name": "credit_operations_studio_job_id_idx",
-          "columns": [
-            {
-              "expression": "studio_job_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "studio_job_id IS NOT NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "credit_operations_scrape_id_idx": {
-          "name": "credit_operations_scrape_id_idx",
-          "columns": [
-            {
-              "expression": "scrape_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "scrape_id IS NOT NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "credit_operations_active_initial_allowance_unique": {
           "name": "credit_operations_active_initial_allowance_unique",
           "columns": [
@@ -1592,53 +1502,6 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "credit_operations_user_studio_project_fk": {
-          "name": "credit_operations_user_studio_project_fk",
-          "tableFrom": "credit_operations",
-          "tableTo": "studio_projects",
-          "columnsFrom": [
-            "studio_project_id",
-            "user_id"
-          ],
-          "columnsTo": [
-            "id",
-            "user_id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "credit_operations_user_studio_job_fk": {
-          "name": "credit_operations_user_studio_job_fk",
-          "tableFrom": "credit_operations",
-          "tableTo": "studio_jobs",
-          "columnsFrom": [
-            "studio_job_id",
-            "studio_project_id",
-            "user_id"
-          ],
-          "columnsTo": [
-            "id",
-            "project_id",
-            "user_id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "credit_operations_user_scrape_fk": {
-          "name": "credit_operations_user_scrape_fk",
-          "tableFrom": "credit_operations",
-          "tableTo": "scrapes",
-          "columnsFrom": [
-            "scrape_id",
-            "user_id"
-          ],
-          "columnsTo": [
-            "id",
-            "user_id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
         "credit_operations_user_subscription_fk": {
           "name": "credit_operations_user_subscription_fk",
           "tableFrom": "credit_operations",
@@ -1671,14 +1534,6 @@
         "credit_operations_credit_bounds_check": {
           "name": "credit_operations_credit_bounds_check",
           "value": "estimated_credits >= 0 AND reserved_credits >= 0 AND maximum_credits >= 0 AND estimated_credits <= maximum_credits AND reserved_credits <= maximum_credits AND (final_charge IS NULL OR (final_charge >= 0 AND final_charge <= maximum_credits))"
-        },
-        "credit_operations_resource_check": {
-          "name": "credit_operations_resource_check",
-          "value": "CASE resource_type WHEN 'plan_project' THEN product IN ('vibeplan_greenfield', 'vibeplan_codebase', 'legacy_unknown') AND kind NOT LIKE 'studio.%' AND kind NOT LIKE 'scrape.%' AND project_id IS NOT NULL AND studio_project_id IS NULL AND studio_job_id IS NULL AND scrape_id IS NULL WHEN 'studio_project' THEN product = 'studio' AND kind LIKE 'studio.%' AND project_id IS NULL AND studio_project_id IS NOT NULL AND scrape_id IS NULL WHEN 'scrape' THEN product = 'scrape' AND kind LIKE 'scrape.%' AND project_id IS NULL AND studio_project_id IS NULL AND studio_job_id IS NULL AND scrape_id IS NOT NULL ELSE false END"
-        },
-        "credit_operations_funding_source_check": {
-          "name": "credit_operations_funding_source_check",
-          "value": "funding_source IN ('subscription_balance', 'initial_analysis_allowance', 'exempt', 'trial', 'legacy_unknown') AND (funding_source = 'exempt') = is_exempt AND (funding_source = 'initial_analysis_allowance') = (initial_analysis_allowance AND NOT is_exempt) AND (funding_source <> 'subscription_balance' OR subscription_id IS NOT NULL) AND (funding_source <> 'trial' OR (reserved_credits = 0 AND COALESCE(final_charge, 0) = 0))"
         }
       },
       "isRLSEnabled": false
@@ -1965,13 +1820,6 @@
         },
         "credits_reserved": {
           "name": "credits_reserved",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "allocation_epoch": {
-          "name": "allocation_epoch",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -3012,6 +2860,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "onboarding_request_hash": {
+          "name": "onboarding_request_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -3483,6 +3337,112 @@
           "tableTo": "projects",
           "columnsFrom": [
             "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.codebase_sync_requests": {
+      "name": "codebase_sync_requests",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "codebase_id": {
+          "name": "codebase_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "session_id": {
+          "name": "session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "codebase_sync_requests_owner_idx": {
+          "name": "codebase_sync_requests_owner_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "codebase_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "codebase_sync_requests_user_id_users_id_fk": {
+          "name": "codebase_sync_requests_user_id_users_id_fk",
+          "tableFrom": "codebase_sync_requests",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "codebase_sync_requests_codebase_id_codebases_id_fk": {
+          "name": "codebase_sync_requests_codebase_id_codebases_id_fk",
+          "tableFrom": "codebase_sync_requests",
+          "tableTo": "codebases",
+          "columnsFrom": [
+            "codebase_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "codebase_sync_requests_session_id_codebase_sync_sessions_id_fk": {
+          "name": "codebase_sync_requests_session_id_codebase_sync_sessions_id_fk",
+          "tableFrom": "codebase_sync_requests",
+          "tableTo": "codebase_sync_sessions",
+          "columnsFrom": [
+            "session_id"
           ],
           "columnsTo": [
             "id"
@@ -5284,16 +5244,7 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "scrapes_user_id_id_unique": {
-          "name": "scrapes_user_id_id_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "id",
-            "user_id"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -5765,17 +5716,7 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "studio_jobs_id_project_id_user_id_unique": {
-          "name": "studio_jobs_id_project_id_user_id_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "id",
-            "project_id",
-            "user_id"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -5932,16 +5873,7 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "studio_projects_user_id_id_unique": {
-          "name": "studio_projects_user_id_id_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "id",
-            "user_id"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -6025,267 +5957,6 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.shadow_usage_records": {
-      "name": "shadow_usage_records",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "product_family": {
-          "name": "product_family",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "operation_kind": {
-          "name": "operation_kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "logical_job_id": {
-          "name": "logical_job_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "attempt_id": {
-          "name": "attempt_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "attempt_index": {
-          "name": "attempt_index",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "retry_count": {
-          "name": "retry_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "started_at": {
-          "name": "started_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "finished_at": {
-          "name": "finished_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "duration_ms": {
-          "name": "duration_ms",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "outcome": {
-          "name": "outcome",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'unknown'"
-        },
-        "requested_units": {
-          "name": "requested_units",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "completed_units": {
-          "name": "completed_units",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "resource_limits": {
-          "name": "resource_limits",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::jsonb"
-        },
-        "metrics": {
-          "name": "metrics",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "provider_usage": {
-          "name": "provider_usage",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "cost": {
-          "name": "cost",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "price_source": {
-          "name": "price_source",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "pricing_version": {
-          "name": "pricing_version",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "dedupe_key": {
-          "name": "dedupe_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "recorded_at": {
-          "name": "recorded_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {
-        "shadow_usage_records_user_dedupe_unique": {
-          "name": "shadow_usage_records_user_dedupe_unique",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "dedupe_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "shadow_usage_records_group_recorded_idx": {
-          "name": "shadow_usage_records_group_recorded_idx",
-          "columns": [
-            {
-              "expression": "product_family",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "operation_kind",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "recorded_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "shadow_usage_records_user_recorded_idx": {
-          "name": "shadow_usage_records_user_recorded_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "recorded_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "shadow_usage_records_expires_at_idx": {
-          "name": "shadow_usage_records_expires_at_idx",
-          "columns": [
-            {
-              "expression": "expires_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "shadow_usage_records_user_id_users_id_fk": {
-          "name": "shadow_usage_records_user_id_users_id_fk",
-          "tableFrom": "shadow_usage_records",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "shadow_usage_records_bounds_check": {
-          "name": "shadow_usage_records_bounds_check",
-          "value": "attempt_index >= 0 AND retry_count >= 0 AND completed_units >= 0 AND (duration_ms IS NULL OR duration_ms >= 0)"
-        }
-      },
       "isRLSEnabled": false
     }
   },

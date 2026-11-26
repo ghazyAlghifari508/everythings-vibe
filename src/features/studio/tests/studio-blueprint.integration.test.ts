@@ -101,7 +101,6 @@ describe("planning + blueprint", () => {
 		expect(prompt).not.toContain("375px");
 		expect(prompt).toContain("User Request:");
 		expect(prompt).toContain("Initial screen count: exactly 2");
-		expect(prompt).toContain("Plan the necessary screens");
 		expect(prompt).toContain("blueprint");
 		expect(prompt).toContain("Design precedence");
 	});

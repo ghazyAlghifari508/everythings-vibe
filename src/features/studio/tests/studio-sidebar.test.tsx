@@ -139,7 +139,13 @@ describe("StudioSidebar", () => {
 		const searchInput = screen.getByLabelText("Cari project studio");
 		fireEvent.change(searchInput, { target: { value: "xyznotfound" } });
 
-		expect(screen.getByText(/Tidak ada project yang cocok/i)).toBeDefined();
+		expect(screen.getByText("Tidak ada proyek yang cocok.")).toBeDefined();
+
+		const clearButton = screen.getByRole("button", {
+			name: "Hapus pencarian",
+		});
+		fireEvent.click(clearButton);
+		expect(screen.getByText("Dashboard SIMRS Pasien Rawat Inap")).toBeDefined();
 	});
 
 	it("displays empty state when history is empty", () => {
@@ -151,7 +157,10 @@ describe("StudioSidebar", () => {
 			/>,
 		);
 
-		expect(screen.getByText("Belum ada project studio.")).toBeDefined();
+		expect(screen.getByText("Belum ada proyek")).toBeDefined();
+		expect(
+			screen.getByText("Desain yang kamu buat akan muncul di sini."),
+		).toBeDefined();
 	});
 
 	it("calls onSelectProject when clicking a project item", () => {
@@ -219,7 +228,7 @@ describe("StudioSidebar", () => {
 
 		const dialog = await screen.findByRole("dialog");
 		expect(dialog).toBeDefined();
-		expect(screen.getByText(/tidak dapat dibatalkan/i)).toBeDefined();
+		expect(screen.getByText(/tidak bisa dipulihkan/i)).toBeDefined();
 		expect(dialog.textContent).toContain("Dashboard SIMRS Pasien Rawat Inap");
 		expect(onDeleteProject).not.toHaveBeenCalled();
 

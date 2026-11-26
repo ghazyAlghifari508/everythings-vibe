@@ -26,11 +26,13 @@ const ASK_LANGUAGE_KEY = "prdfy:ask-language";
 const SETUP_PROMPT_MAX_AGE_MS = 5 * 60 * 1000;
 
 interface SetupPromptPayload {
+	projectId?: string;
 	prompt: string;
 	createdAt: number;
 }
 
 interface PendingPrdPrompt {
+	projectId?: string;
 	prompt: string;
 	mode: PendingPrdPromptMode;
 	createdAt: number;
@@ -38,10 +40,11 @@ interface PendingPrdPrompt {
 	displayMessage?: string;
 }
 
-export function saveSetupPrompt(prompt: string) {
+export function saveSetupPrompt(prompt: string, projectId?: string) {
 	const payload: SetupPromptPayload = {
 		prompt,
 		createdAt: Date.now(),
+		projectId,
 	};
 	getStorage()?.setItem(SETUP_PROMPT_KEY, JSON.stringify(payload));
 }
@@ -50,7 +53,7 @@ export function saveSetupPrompt(prompt: string) {
  * Read-only access to the setup prompt (does NOT consume it).
  * Returns empty string if missing or expired.
  */
-export function getSetupPrompt(): string {
+export function getSetupPrompt(projectId?: string): string {
 	const storage = getStorage();
 	const raw = storage?.getItem(SETUP_PROMPT_KEY);
 	if (!raw) return "";
@@ -58,6 +61,7 @@ export function getSetupPrompt(): string {
 	try {
 		const parsed = JSON.parse(raw) as Partial<SetupPromptPayload>;
 		if (!parsed.prompt || typeof parsed.prompt !== "string") return "";
+		if (projectId && parsed.projectId !== projectId) return "";
 
 		// Reject expired prompts — and any prompt whose timestamp is not
 		// plausible (non-finite or future), which would otherwise bypass
@@ -87,18 +91,22 @@ export function savePendingPrdPrompt(
 	prompt: string,
 	mode: PendingPrdPromptMode,
 	displayMessage?: string,
+	projectId?: string,
 ) {
 	const payload: PendingPrdPrompt = {
 		prompt,
 		mode,
 		createdAt: Date.now(),
 		displayMessage,
+		projectId,
 	};
 
 	getStorage()?.setItem(PRD_PROMPT_KEY, JSON.stringify(payload));
 }
 
-export function getPendingPrdPrompt(): PendingPrdPrompt | null {
+export function getPendingPrdPrompt(
+	projectId?: string,
+): PendingPrdPrompt | null {
 	const storage = getStorage();
 	const raw = storage?.getItem(PRD_PROMPT_KEY);
 	if (!storage || !raw) return null;
@@ -106,6 +114,7 @@ export function getPendingPrdPrompt(): PendingPrdPrompt | null {
 	try {
 		const parsed = JSON.parse(raw) as Partial<PendingPrdPrompt>;
 		if (!parsed.prompt || typeof parsed.prompt !== "string") return null;
+		if (projectId && parsed.projectId !== projectId) return null;
 		// Tampered sessionStorage could carry any mode string and branch
 		// consumers into the wrong flow — accept only known modes.
 		if (parsed.mode !== "auto" && parsed.mode !== "chat") return null;
@@ -113,6 +122,8 @@ export function getPendingPrdPrompt(): PendingPrdPrompt | null {
 
 		return {
 			prompt: parsed.prompt,
+			projectId:
+				typeof parsed.projectId === "string" ? parsed.projectId : undefined,
 			mode: parsed.mode,
 			createdAt: parsed.createdAt,
 			displayMessage:
@@ -129,8 +140,10 @@ export function clearPendingPrdPrompt(): void {
 	getStorage()?.removeItem(PRD_PROMPT_KEY);
 }
 
-export function consumePendingPrdPrompt(): PendingPrdPrompt | null {
-	const pending = getPendingPrdPrompt();
+export function consumePendingPrdPrompt(
+	projectId?: string,
+): PendingPrdPrompt | null {
+	const pending = getPendingPrdPrompt(projectId);
 	if (pending) {
 		clearPendingPrdPrompt();
 	}

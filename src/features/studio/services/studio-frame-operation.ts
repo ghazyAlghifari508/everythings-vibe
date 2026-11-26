@@ -18,7 +18,6 @@ import {
 	extendStudioBlueprintWithScreen,
 	type StudioScreenClassification,
 } from "./studio-blueprint-navigation";
-import { assembleCanonicalShell } from "./studio-canonical-shell";
 import { STUDIO_ADD_FRAME_PLACEHOLDER_NAME } from "./studio-composer-intent";
 import { extractDesignSystemTokens } from "./studio-design-tokens";
 import { generateValidatedFrameHtml } from "./studio-frame-generation";
@@ -192,6 +191,7 @@ export async function runStudioFrameOperation(
 	const dsTokens = extractDesignSystemTokens(project.designMd);
 	const htmlCode = await generateValidatedFrameHtml({
 		framePrompt: `${prompt}\n\nUSER CHANGE INSTRUCTION: ${changeInstruction}\nPreserve unaffected content, layout and identity. Modify only the requested screen.`,
+		stage: job.jobType === "add" ? "frame" : "revision",
 		activeScreen: name,
 		blueprint: activeBlueprint,
 		viewport: validateStudioDesignMode(frame.viewport),
@@ -228,42 +228,6 @@ export async function runStudioFrameOperation(
 					updatedAt: new Date(),
 				})
 				.where(eq(studioProjects.id, project.id));
-
-			if (screenRoleClassification?.role === "primary") {
-				for (const existingFrame of frames) {
-					if (
-						existingFrame.id !== frame.id &&
-						existingFrame.status === "ready" &&
-						existingFrame.htmlCode &&
-						(existingFrame.htmlCode.includes("data-studio-shell") ||
-							existingFrame.htmlCode.includes("data-studio-navigation"))
-					) {
-						try {
-							const updatedHtml = assembleCanonicalShell(
-								existingFrame.htmlCode,
-								activeBlueprint,
-								existingFrame.name,
-								dsTokens,
-								logoUrl,
-							);
-							await tx
-								.update(studioFrames)
-								.set({
-									htmlCode: updatedHtml,
-									updatedAt: new Date(),
-								})
-								.where(
-									and(
-										eq(studioFrames.id, existingFrame.id),
-										eq(studioFrames.projectId, project.id),
-									),
-								);
-						} catch {
-							// ponytail: keep existing static HTML if canonical reassembly encounters unexpected markup.
-						}
-					}
-				}
-			}
 		}
 		const [latest] = await tx
 			.select()

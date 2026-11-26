@@ -65,23 +65,29 @@ export async function saveAskHandoffAction(input: {
 					{ status: 409 },
 				);
 			}
-			// Concurrency guard: reject older writes when expectedUpdatedAt is behind
+			// Concurrency guard: reject older writes when expectedUpdatedAt is behind.
+			// The server answers with its own current version so the caller can adopt
+			// it and retry the same write instead of forcing a manual reload — the
+			// handoff row is legitimately rewritten by background generation, which is
+			// not a conflicting concurrent editor.
 			if (parsed.data.expectedUpdatedAt) {
 				const [existingHandoff] = await tx
 					.select({ updatedAt: codebaseAskHandoffs.updatedAt })
 					.from(codebaseAskHandoffs)
 					.where(eq(codebaseAskHandoffs.projectId, projectId))
 					.limit(1);
+				const currentUpdatedAt = existingHandoff?.updatedAt ?? null;
 				if (
-					existingHandoff?.updatedAt &&
-					existingHandoff.updatedAt.getTime() >
+					currentUpdatedAt &&
+					currentUpdatedAt.getTime() >
 						new Date(parsed.data.expectedUpdatedAt).getTime()
 				) {
 					return Response.json(
 						{
 							error:
-								"Jawaban telah diperbarui di sesi lain. Muat ulang untuk menyinkronkan.",
-							code: "HANDOFF_LOCKED",
+								"Jawaban telah diperbarui di sesi lain. Jawaban akan disinkronkan ulang.",
+							code: "HANDOFF_STALE",
+							updatedAt: currentUpdatedAt.toISOString(),
 						},
 						{ status: 409 },
 					);

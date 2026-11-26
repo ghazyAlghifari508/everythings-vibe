@@ -47,6 +47,8 @@ export const codebases = pgTable(
 		// sync. Never derived from the folder name, and never used to merge two
 		// codebases automatically — a mismatch is reported, not acted on.
 		repositoryIdentity: text("repository_identity"),
+		// Immutable create-input fingerprint; bounded to one hash per repository.
+		onboardingRequestHash: text("onboarding_request_hash"),
 		createdAt: timestamp("created_at").defaultNow(),
 		updatedAt: timestamp("updated_at").defaultNow(),
 	},

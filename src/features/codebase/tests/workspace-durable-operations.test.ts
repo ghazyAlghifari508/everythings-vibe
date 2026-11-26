@@ -15,6 +15,7 @@ afterEach(() => {
 
 function createMockRunState() {
 	let current: CodebaseRunState | null = null;
+	const history: (CodebaseRunState | null)[] = [];
 	const setRun = vi.fn((updater: unknown) => {
 		current =
 			typeof updater === "function"
@@ -24,11 +25,15 @@ function createMockRunState() {
 						) => CodebaseRunState | null
 					)(current)
 				: (updater as CodebaseRunState | null);
+		history.push(current);
 	});
 	return {
 		setRun,
 		get current() {
 			return current;
+		},
+		get history() {
+			return history;
 		},
 	};
 }
@@ -238,5 +243,70 @@ describe("Durable Operations - Mount & Refresh Hydration", () => {
 			expect.stringContaining("belum tersimpan"),
 		);
 		expect(runState.current?.status).toBe("failed");
+	});
+
+	it("6. Remount on a QUEUED operation waits, then anchors the new attempt's own clock", async () => {
+		const createdAt = new Date(5_000).toISOString();
+		const queuedOp = mockOp("questions", "queued", {
+			attempt: 1,
+			createdAt,
+			startedAt: null,
+			finishedAt: null,
+		});
+		const runningOp = {
+			...queuedOp,
+			status: "running" as const,
+			attempt: 2,
+			startedAt: new Date(9_000).toISOString(),
+		};
+		const completedOp = {
+			...runningOp,
+			status: "completed" as const,
+			finishedAt: new Date(12_000).toISOString(),
+			result: { questions: [] },
+		};
+
+		let poll = 0;
+		const fetchMock = vi.fn(async () => {
+			poll++;
+			// Mount hydration sees the queued operation; the poller then observes the
+			// claim (attempt 2) and finally that attempt's settled result.
+			if (poll === 1)
+				return Response.json({ operations: { questions: queuedOp } });
+			return Response.json({
+				operation: poll === 2 ? runningOp : completedOp,
+			});
+		});
+		vi.stubGlobal("fetch", fetchMock);
+
+		const runState = createMockRunState();
+
+		renderHook(() =>
+			useWorkspaceOperations({
+				effectiveFeatureId: "proj-1",
+				activeProjectIdRef: { current: "proj-1" },
+				setRun: runState.setRun,
+				setStageBusy: vi.fn(),
+				setStageError: vi.fn(),
+				onOperationCompleted: vi.fn(async () => true),
+			}),
+		);
+
+		await act(async () => {
+			await new Promise((r) => setTimeout(r, 120));
+		});
+
+		// The queued state is shown without inheriting any duration.
+		const queuedState = runState.history.find(
+			(run) => run?.status === "queued",
+		);
+		expect(queuedState?.startedAt).toBeNull();
+		expect(queuedState?.operationId).toBe("op-questions-1");
+
+		// The attempt that really ran owns the final clock: 12s - 9s, not 12s - 5s.
+		expect(runState.current?.status).toBe("done");
+		expect(runState.current?.attempt).toBe(2);
+		expect(runState.current?.startedAt).toBe(9_000);
+		expect(runState.current?.finishedAt).toBe(12_000);
 	});
 });

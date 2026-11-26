@@ -3,11 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CodebaseStarterSuggestion } from "@/features/codebase/services/analysis";
-import {
-	CODEBASE_STAGE_ACTIVITY,
-	settleRun,
-	startRun,
-} from "@/features/codebase/services/chat-flow";
+import { settleRun, startRun } from "@/features/codebase/services/chat-flow";
 import {
 	type AdaptiveQuestion,
 	CodebaseChatWorkspace,
@@ -166,8 +162,8 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 		const titleEl = container.querySelector(
 			"[data-testid='codebase-chat-title']",
 		);
-		expect(titleEl?.textContent).toBe("Workspace: everythings-vibe");
-		expect(text).toContain("Planning workspace");
+		expect(titleEl?.textContent).toBe("everythings-vibe");
+		expect(text).toContain("Workspace perencanaan");
 
 		// 6. Pristine composition contains PromptBar
 		expect(
@@ -193,7 +189,7 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 		);
 	});
 
-	it("resolves provisional codebase name to neutral Workspace: Perencanaan codebase", () => {
+	it("resolves provisional codebase name to neutral Perencanaan codebase", () => {
 		renderWorkspace({
 			codebaseName: "Repository Lokal",
 			featureName: "Repository Lokal",
@@ -202,7 +198,7 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 		const titleEl = container.querySelector(
 			"[data-testid='codebase-chat-title']",
 		);
-		expect(titleEl?.textContent).toBe("Workspace: Perencanaan codebase");
+		expect(titleEl?.textContent).toBe("Perencanaan codebase");
 		expect(container.textContent).not.toContain("Repository Lokal");
 	});
 
@@ -218,7 +214,7 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 		const titleEl = container.querySelector(
 			"[data-testid='codebase-chat-title']",
 		);
-		expect(titleEl?.textContent).toBe("Workspace: Perencanaan codebase");
+		expect(titleEl?.textContent).toBe("Perencanaan codebase");
 		expect(titleEl?.textContent).not.toContain("Sistem Checkout Billing");
 	});
 
@@ -614,9 +610,13 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 			container.querySelector("[data-testid='codebase-questions-loading']"),
 		).toBeNull();
 		expect(container.querySelectorAll(".animate-pulse")).toHaveLength(0);
-		// The real activity line for this stage, plus a real elapsed timer.
-		expect(thinking?.textContent).toContain("Menyusun pertanyaan klarifikasi");
-		expect(thinking?.textContent).toContain(CODEBASE_STAGE_ACTIVITY.questions);
+		// Exactly one status line and one real elapsed timer.
+		expect(thinking?.textContent).toContain(
+			"Menyusun pertanyaan klarifikasi...",
+		);
+		expect(thinking?.querySelectorAll("[data-orb]")).toHaveLength(1);
+		// No transport log is exposed to the user.
+		expect(thinking?.textContent).not.toContain("Permintaan diterima server");
 		const timer = thinking?.querySelector("[role='timer']");
 		expect(timer).not.toBeNull();
 		expect(timer?.textContent).toMatch(/^\d+\.\d+s$/);
@@ -664,7 +664,7 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 		const thinking = container.querySelector(
 			"[data-testid='codebase-run-thinking']",
 		);
-		expect(thinking?.textContent).toContain("PRD selesai");
+		expect(thinking?.textContent).toContain("PRD siap");
 		expect(thinking?.textContent).toContain("18.4s");
 	});
 
@@ -986,15 +986,24 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 		expect(container.querySelector("canvas")).toBeNull();
 	});
 
-	it("shows the kanban badge only when live progress exists", () => {
+	it("shows the task progress button only when live progress exists and triggers onOpenTaskProgress on click", () => {
+		const onOpenTaskProgress = vi.fn();
 		renderWorkspace({
 			kanbanProgress: { done: 2, total: 5, pct: 40 },
+			onOpenTaskProgress,
 		});
 
 		const badge = container.querySelector(
 			"[data-testid='codebase-kanban-badge']",
-		);
-		expect(badge?.textContent).toContain("Kanban Live: 2/5 Selesai (40%)");
+		) as HTMLButtonElement | null;
+		expect(badge).not.toBeNull();
+		expect(badge?.tagName.toLowerCase()).toBe("button");
+		expect(badge?.textContent).toContain("Progress task · 2/5 selesai");
+
+		act(() => {
+			badge?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+		expect(onOpenTaskProgress).toHaveBeenCalledTimes(1);
 	});
 
 	it("renders user messages in the stream", () => {
@@ -1042,7 +1051,7 @@ describe("CodebaseChatWorkspace one-by-one questions", () => {
 			"[data-testid='adaptive-question-q1']",
 		);
 		const submit = [...(card?.querySelectorAll("button") ?? [])].find((b) =>
-			/Kirim Jawaban/.test(b.textContent ?? ""),
+			/Berikutnya/.test(b.textContent ?? ""),
 		);
 		expect(submit?.disabled).toBe(true);
 
@@ -1141,7 +1150,7 @@ describe("CodebaseChatWorkspace one-by-one questions", () => {
 			}
 		});
 		const submit = [...(card?.querySelectorAll("button") ?? [])].find((b) =>
-			/Kirim Jawaban/.test(b.textContent ?? ""),
+			/Berikutnya/.test(b.textContent ?? ""),
 		);
 		act(() => {
 			submit?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -1166,12 +1175,12 @@ describe("CodebaseChatWorkspace one-by-one questions", () => {
 			customRadio?.click();
 		});
 		const submit = [...(card?.querySelectorAll("button") ?? [])].find((b) =>
-			/Kirim Jawaban/.test(b.textContent ?? ""),
+			/Berikutnya/.test(b.textContent ?? ""),
 		);
 		expect(submit?.disabled).toBe(true);
 	});
 
-	it("advances to the next question after answering and supports Lainnya", () => {
+	it("opens on the first unanswered question and keeps a single card on screen", () => {
 		const onSubmitAnswer = vi.fn();
 		renderWorkspace({
 			questions: sampleQuestions,
@@ -1179,13 +1188,14 @@ describe("CodebaseChatWorkspace one-by-one questions", () => {
 			onSubmitAnswer,
 		});
 
-		const q1 = container.querySelector("[data-testid='adaptive-question-q1']");
-		expect(q1?.textContent).toContain("Jawaban: Database relasional");
+		// The answered question is not re-rendered as a summary row beside the
+		// active one: the wizard shows exactly one card, on the first unanswered.
 		expect(
-			container.querySelector("[data-testid='adaptive-question-q2']"),
-		).not.toBeNull();
-
+			container.querySelectorAll("[data-testid^='adaptive-question-']"),
+		).toHaveLength(1);
 		const q2 = container.querySelector("[data-testid='adaptive-question-q2']");
+		expect(q2).not.toBeNull();
+
 		const customRadio = q2?.querySelector<HTMLInputElement>(
 			"input[type='radio'][value$='-custom']",
 		);
@@ -1206,21 +1216,34 @@ describe("CodebaseChatWorkspace one-by-one questions", () => {
 			}
 		});
 
-		const submit = [...(q2?.querySelectorAll("button") ?? [])].find((b) =>
-			/Kirim Jawaban/.test(b.textContent ?? ""),
+		const submit = q2?.querySelector<HTMLButtonElement>(
+			"[data-testid='codebase-questions-complete']",
 		);
 		act(() => {
 			submit?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 		});
+		// q2 is the last question, so its forward control is the specification
+		// action: it still stores the answer before it hands over to generation.
 		expect(onSubmitAnswer).toHaveBeenCalledWith("q2", "Banner kilat");
 	});
 
-	it("shows the recommendation reason tied to a select option", () => {
+	it("shows the recommendation reason on the recommended option itself", () => {
 		renderWorkspace({ questions: sampleQuestions, answers: {} });
-		const reason = container.querySelector(
-			"[data-testid='adaptive-question-reason-q1']",
+		// No separate explanation panel exists; the reason is the recommended
+		// option's own supporting line when the stored option predates descriptions.
+		expect(
+			container.querySelector("[data-testid='adaptive-question-reason-q1']"),
+		).toBeNull();
+		const recommended = container.querySelector<HTMLInputElement>(
+			"input[value='q1-opt1']",
 		);
-		expect(reason?.textContent).toContain(
+		const describedIds =
+			recommended?.getAttribute("aria-describedby")?.split(/\s+/) ?? [];
+		const described = describedIds
+			.map((id) => container.querySelector(`[id="${id}"]`)?.textContent)
+			.join(" ")
+			.trim();
+		expect(described).toContain(
 			"Repo memakai penyimpanan lokal untuk preferensi.",
 		);
 	});
@@ -1250,7 +1273,7 @@ describe("CodebaseChatWorkspace one-by-one questions", () => {
 		expect(options[1]?.checked).toBe(true);
 
 		const submit = [...(card?.querySelectorAll("button") ?? [])].find((b) =>
-			/Kirim Jawaban/.test(b.textContent ?? ""),
+			/Berikutnya/.test(b.textContent ?? ""),
 		);
 		act(() => {
 			submit?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -1299,7 +1322,7 @@ describe("CodebaseChatWorkspace one-by-one questions", () => {
 			}
 		});
 		const submit = [...(card?.querySelectorAll("button") ?? [])].find((b) =>
-			/Kirim Jawaban/.test(b.textContent ?? ""),
+			/Berikutnya/.test(b.textContent ?? ""),
 		);
 		act(() => {
 			submit?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -1324,19 +1347,30 @@ describe("CodebaseChatWorkspace one-by-one questions", () => {
 		expect(card?.textContent).not.toContain("Lainnya");
 	});
 
-	it("locks earlier questions so a submitted answer cannot be changed", () => {
+	it("steps back to an earlier question with its stored answer still editable", () => {
 		renderWorkspace({
 			questions: sampleQuestions,
 			answers: { q1: "Database relasional" },
 		});
-		const q1 = container.querySelector("[data-testid='adaptive-question-q1']");
 		const q2 = container.querySelector("[data-testid='adaptive-question-q2']");
-		expect(q1?.querySelector("input[type='radio']")).toBeNull();
-		const q2Radios = q2?.querySelectorAll<HTMLInputElement>(
-			"input[type='radio']",
+		const previous = [...(q2?.querySelectorAll("button") ?? [])].find((b) =>
+			/Sebelumnya/.test(b.textContent ?? ""),
 		);
-		expect(q2Radios?.length).toBeGreaterThan(0);
-		expect([...(q2Radios ?? [])].every((input) => !input.disabled)).toBe(true);
+		expect(previous).toBeDefined();
+
+		act(() => {
+			previous?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+
+		const q1 = container.querySelector("[data-testid='adaptive-question-q1']");
+		expect(q1).not.toBeNull();
+		const saved = q1?.querySelector<HTMLInputElement>(
+			"input[type='radio'][value='q1-opt1']",
+		);
+		expect(saved?.checked).toBe(true);
+		// Reached through wizard navigation, so it is editable rather than a
+		// locked summary of the answer.
+		expect(saved?.disabled).toBe(false);
 	});
 
 	it("shows the progress counter on the active question card", () => {
@@ -1348,7 +1382,7 @@ describe("CodebaseChatWorkspace one-by-one questions", () => {
 		expect(q2?.textContent).toContain("2 dari 2");
 	});
 
-	it("allows editing a previously answered question via the Ubah button", () => {
+	it("edits an earlier answer through Sebelumnya and stores the change", () => {
 		const onSubmitAnswer = vi.fn();
 		renderWorkspace({
 			questions: sampleQuestions,
@@ -1356,22 +1390,17 @@ describe("CodebaseChatWorkspace one-by-one questions", () => {
 			onSubmitAnswer,
 		});
 
-		const q1 = container.querySelector("[data-testid='adaptive-question-q1']");
-		const ubahBtn = [...(q1?.querySelectorAll("button") ?? [])].find((b) =>
-			/Ubah/.test(b.textContent ?? ""),
-		);
-		expect(ubahBtn).toBeDefined();
-
-		// Click Ubah
+		const previous = [
+			...(container.querySelectorAll(
+				"[data-testid^='adaptive-question-'] button",
+			) ?? []),
+		].find((b) => /Sebelumnya/.test(b.textContent ?? ""));
 		act(() => {
-			ubahBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+			previous?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 		});
 
-		// Now q1 is in editing mode with radio buttons revealed
-		const q1Updated = container.querySelector(
-			"[data-testid='adaptive-question-q1']",
-		);
-		const radio2 = q1Updated?.querySelector<HTMLInputElement>(
+		const q1 = container.querySelector("[data-testid='adaptive-question-q1']");
+		const radio2 = q1?.querySelector<HTMLInputElement>(
 			"input[type='radio'][value='q1-opt2']",
 		);
 		expect(radio2).not.toBeNull();
@@ -1380,8 +1409,8 @@ describe("CodebaseChatWorkspace one-by-one questions", () => {
 			radio2?.click();
 		});
 
-		const submit = [...(q1Updated?.querySelectorAll("button") ?? [])].find(
-			(b) => /Kirim Jawaban|Konfirmasi/.test(b.textContent ?? ""),
+		const submit = [...(q1?.querySelectorAll("button") ?? [])].find((b) =>
+			/Berikutnya/.test(b.textContent ?? ""),
 		);
 		act(() => {
 			submit?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -1390,36 +1419,38 @@ describe("CodebaseChatWorkspace one-by-one questions", () => {
 		expect(onSubmitAnswer).toHaveBeenCalledWith("q1", "Penyimpanan lokal");
 	});
 
-	it("allows cancelling an edit without changing the answer", () => {
+	it("leaves an earlier answer untouched when the user only passes through", () => {
+		const onSubmitAnswer = vi.fn();
 		renderWorkspace({
 			questions: sampleQuestions,
 			answers: { q1: "Database relasional" },
+			onSubmitAnswer,
+		});
+
+		const previous = [...(container.querySelectorAll("button") ?? [])].find(
+			(b) => /Sebelumnya/.test(b.textContent ?? ""),
+		);
+		act(() => {
+			previous?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 		});
 
 		const q1 = container.querySelector("[data-testid='adaptive-question-q1']");
-		const ubahBtn = [...(q1?.querySelectorAll("button") ?? [])].find((b) =>
-			/Ubah/.test(b.textContent ?? ""),
+		const submit = [...(q1?.querySelectorAll("button") ?? [])].find((b) =>
+			/Berikutnya/.test(b.textContent ?? ""),
 		);
-
 		act(() => {
-			ubahBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+			submit?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 		});
 
-		const batalBtn = [...(container.querySelectorAll("button") ?? [])].find(
-			(b) => /Batal/.test(b.textContent ?? ""),
-		);
-		expect(batalBtn).toBeDefined();
-
-		act(() => {
-			batalBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-		});
-
-		// Restores to compact completed line
-		const q1Restored = container.querySelector(
-			"[data-testid='adaptive-question-q1']",
-		);
-		expect(q1Restored?.querySelector("input[type='radio']")).toBeNull();
-		expect(q1Restored?.textContent).toContain("Jawaban: Database relasional");
+		// Passing through re-stores the very same answer and returns to the step
+		// the wizard was on: nothing is silently rewritten.
+		expect(onSubmitAnswer).toHaveBeenCalledWith("q1", "Database relasional");
+		expect(
+			container.querySelector("[data-testid='adaptive-question-q2']"),
+		).not.toBeNull();
+		expect(
+			container.querySelector("[data-testid='adaptive-question-q1']"),
+		).toBeNull();
 	});
 });
 
@@ -1439,15 +1470,12 @@ describe("CodebaseChatWorkspace confirmation and spec errors", () => {
 			"[data-testid='codebase-questions-complete']",
 		);
 		expect(complete).not.toBeNull();
-		// The single CTA carries the handoff; no restated stage label or
-		// explanatory paragraph.
+		// The single CTA carries the handoff, inside the question card; no restated
+		// stage label and no second block below the questions.
 		expect(complete?.textContent).toBe("Buat Spesifikasi Fitur");
 
-		const cta = [...(complete?.querySelectorAll("button") ?? [])].find((b) =>
-			/Buat Spesifikasi Fitur/.test(b.textContent ?? ""),
-		);
 		act(() => {
-			cta?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+			complete?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 		});
 		expect(onConfirmGenerate).toHaveBeenCalledTimes(1);
 	});
@@ -1696,12 +1724,6 @@ describe("CodebaseChatWorkspace pipeline stages", () => {
 
 		const cta = container.querySelector("[data-testid='codebase-stage-prd']");
 		expect(cta).not.toBeNull();
-		// Settled outcome plus the next request, in one conversational block.
-		expect(cta?.textContent).toContain("Spesifikasi fitur siap");
-		expect(cta?.textContent).toContain("Berikutnya: PRD");
-		expect(cta?.textContent).toContain(
-			"Menyusun PRD 8 seksi dari spesifikasi fitur dan konteks repository.",
-		);
 		// The finished artifact is the same FileCard used in the chat stream.
 		expect(
 			cta?.querySelector("[data-testid='codebase-file-card']"),
@@ -1732,8 +1754,6 @@ describe("CodebaseChatWorkspace pipeline stages", () => {
 
 		const cta = container.querySelector("[data-testid='codebase-stage-ac']");
 		expect(cta).not.toBeNull();
-		expect(cta?.textContent).toContain("PRD selesai");
-		expect(cta?.textContent).toContain("Berikutnya: Acceptance Criteria");
 		const button = [...(cta?.querySelectorAll("button") ?? [])].find((b) =>
 			/Menyusun AC/.test(b.textContent ?? ""),
 		);
@@ -1746,9 +1766,6 @@ describe("CodebaseChatWorkspace pipeline stages", () => {
 
 		const cta = container.querySelector("[data-testid='codebase-stage-task']");
 		expect(cta).not.toBeNull();
-		expect(cta?.textContent).toContain("Acceptance Criteria selesai");
-		expect(cta?.textContent).toContain("Berikutnya: Task dan Kanban");
-
 		const button = [...(cta?.querySelectorAll("button") ?? [])].find((b) =>
 			/Buat Task/.test(b.textContent ?? ""),
 		);
@@ -1869,7 +1886,7 @@ describe("CodebaseChatWorkspace pipeline stages", () => {
 		expect(card?.textContent).not.toContain("export rules");
 		expect(card?.textContent).toContain("docs/vibeplan/");
 		expect(card?.textContent).toContain("Project ID: proj-123");
-		expect(card?.textContent).toContain("polling");
+		expect(card?.textContent).not.toContain("polling");
 	});
 
 	it("offers no handoff before tasks exist", () => {

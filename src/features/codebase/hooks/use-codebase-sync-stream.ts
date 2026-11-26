@@ -5,6 +5,7 @@ import {
 	type SyncStatusResponse,
 	syncStatusResponseSchema,
 } from "@/features/codebase/services/sync";
+import { syncProgressEventId } from "@/features/codebase/services/sync-progress-event";
 import { CODEBASE_SYNC_STREAM_MAX_RECONNECT_ATTEMPTS } from "@/features/codebase/types/codebase-constants";
 
 /**
@@ -97,6 +98,13 @@ export function useCodebaseSyncStream({
 		let failures = 0;
 		let hasReceivedFrame = false;
 		let hasBeenLive = false;
+		// Event identity for this attempt. The server tags every frame with the
+		// newest persisted timestamp, which only moves forward; a frame older than
+		// the last accepted one is out of order (a race across a reconnect) and is
+		// dropped instead of rewinding the screen. Frames without an id fall back
+		// to the same derivation, so the guard never depends on transport detail.
+		let lastEventId: number | null = null;
+		let lastPayload: string | null = null;
 
 		// A new attempt is a reset, not a migration.
 		setStatus(null);
@@ -126,7 +134,33 @@ export function useCodebaseSyncStream({
 				if (!parsed.success) return;
 				// Late frame from a previous attempt: drop it instead of repainting.
 				const expected = pinnedSessionRef.current;
-				if (expected && parsed.data.sessionId !== expected) return;
+				if (
+					parsed.data.projectId !== codebaseId ||
+					(expected && parsed.data.sessionId !== expected)
+				)
+					return;
+				// Event identity, in priority order: the transport id the server wrote,
+				// then the payload's own newest persisted timestamp. A strictly older
+				// frame is a delayed delivery, not a new state.
+				const rawEventId = (event as MessageEvent<string>).lastEventId;
+				const incomingEventId =
+					rawEventId && rawEventId.length > 0
+						? Number(rawEventId)
+						: Number(syncProgressEventId(parsed.data));
+				if (
+					Number.isFinite(incomingEventId) &&
+					lastEventId !== null &&
+					incomingEventId < lastEventId
+				)
+					return;
+				if (Number.isFinite(incomingEventId)) lastEventId = incomingEventId;
+				// An identical payload is a duplicate delivery of the state already
+				// painted; skipping it keeps one render per real transition. A changed
+				// payload with the same id (upload counts move without a session
+				// timestamp) is still a real update and must not be lost.
+				const serialized = JSON.stringify(parsed.data);
+				if (serialized === lastPayload) return;
+				lastPayload = serialized;
 				failures = 0;
 				hasReceivedFrame = true;
 				hasBeenLive = true;

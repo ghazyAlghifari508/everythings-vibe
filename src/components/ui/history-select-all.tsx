@@ -5,43 +5,52 @@ import { Icon } from "@/components/ui/icon";
 /**
  * Page-level "select all" affordance shared by History surfaces.
  *
- * The checkbox covers the rows rendered on the current page and shows the
- * indeterminate state when only some of them are ticked. Extending the
- * selection to every filtered row is a separate, explicit action so the two
- * scopes can never be confused.
+ * The checkbox covers the rows rendered on the current page. `mode="binary"`
+ * keeps only two visual states (empty until every row on the page is ticked),
+ * while `mode="indeterminate"` keeps the mixed state for surfaces that use it.
+ * Extending the selection to every filtered row is a separate, explicit action
+ * passed in by the surfaces that offer it.
  */
+export type HistorySelectAllMode = "binary" | "indeterminate";
+
 export function HistorySelectAll({
+	mode = "indeterminate",
 	noun,
 	pageIds,
 	selectedIds,
-	total,
-	filteredScopeActive,
-	preparing,
+	total = 0,
+	filteredScopeActive = false,
+	preparing = false,
 	onTogglePage,
 	onSelectAllFiltered,
 }: {
+	mode?: HistorySelectAllMode;
 	noun: string;
 	pageIds: readonly string[];
 	selectedIds: ReadonlySet<string>;
-	total: number;
-	filteredScopeActive: boolean;
-	preparing: boolean;
+	total?: number;
+	filteredScopeActive?: boolean;
+	preparing?: boolean;
 	onTogglePage: (selected: boolean) => void;
-	onSelectAllFiltered: () => void;
+	onSelectAllFiltered?: () => void;
 }) {
 	const checkboxRef = useRef<HTMLInputElement>(null);
 	const selectedOnPage = pageIds.filter((id) => selectedIds.has(id)).length;
 	const isAllSelected = pageIds.length > 0 && selectedOnPage === pageIds.length;
 	const isPartiallySelected =
 		pageIds.length > 0 && selectedOnPage > 0 && selectedOnPage < pageIds.length;
+	const mixed = mode === "indeterminate" && isPartiallySelected;
 	const scopeAvailable =
-		isAllSelected && !filteredScopeActive && total > selectedIds.size;
+		onSelectAllFiltered !== undefined &&
+		isAllSelected &&
+		!filteredScopeActive &&
+		total > selectedIds.size;
 
 	useEffect(() => {
 		if (checkboxRef.current) {
-			checkboxRef.current.indeterminate = isPartiallySelected;
+			checkboxRef.current.indeterminate = mixed;
 		}
-	}, [isPartiallySelected]);
+	}, [mixed]);
 
 	const labelText = isAllSelected
 		? `Semua ${noun} di halaman ini dipilih`
@@ -58,7 +67,7 @@ export function HistorySelectAll({
 					ref={checkboxRef}
 					type="checkbox"
 					checked={isAllSelected}
-					aria-checked={isPartiallySelected ? "mixed" : isAllSelected}
+					aria-checked={mixed ? "mixed" : isAllSelected}
 					aria-label="Pilih semua di halaman ini"
 					onChange={handleCheckboxChange}
 					className="size-4 shrink-0 accent-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
@@ -66,7 +75,7 @@ export function HistorySelectAll({
 				<span>{labelText}</span>
 			</label>
 
-			{scopeAvailable ? (
+			{scopeAvailable && onSelectAllFiltered ? (
 				<button
 					type="button"
 					onClick={onSelectAllFiltered}

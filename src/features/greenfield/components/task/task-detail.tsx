@@ -94,7 +94,7 @@ export function TaskDetail({
 						Generate Acceptance Criteria terlebih dahulu.
 					</p>
 					<Link
-						to="/ac/$id"
+						to="/vibeplan/$id/ac"
 						params={{ id: projectId }}
 						className="btn-primary inline-flex items-center gap-2 rounded-md px-4 py-2"
 					>
@@ -127,7 +127,7 @@ export function TaskDetail({
 	const generatingTitle = thinkingText
 		? thinkingTitleText(thinkingText)
 		: IDLE_GENERATING_TITLE;
-	const displayTitle = isGenerating ? generatingTitle : projectName;
+	const displayTitle = isGenerating ? generatingTitle : "Task Breakdown";
 
 	return (
 		<>
@@ -151,7 +151,7 @@ export function TaskDetail({
 					</h1>
 					<div className="flex items-center gap-3">
 						<Link
-							to="/kanban/$id"
+							to="/vibeplan/$id/kanban"
 							params={{ id: projectId }}
 							className="btn-primary px-3 py-1.5 rounded-md text-xs font-[510]"
 						>

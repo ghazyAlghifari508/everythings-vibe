@@ -134,6 +134,9 @@ describe("sync stage vocabulary", () => {
 	it("never leaks a backend enum or transport term into user-facing copy", () => {
 		const cases: SyncStatusResponse[] = [
 			status(),
+			status({
+				lifecycle: [{ kind: "cli_connecting", at: "2026-02-01T10:00:00.000Z" }],
+			}),
 			status({ status: "connected" }),
 			status({ status: "scanning" }),
 			status({ status: "filtering" }),
@@ -152,21 +155,129 @@ describe("sync stage vocabulary", () => {
 });
 
 describe("waiting_for_cli", () => {
-	it("shows the agent wait as the active stage before the CLI reports in", () => {
+	it("renders the agent wait as passive idle, not as an active connection", () => {
 		const view = resolveSyncStageView(status());
-		// Standby is a real, current state of this attempt, so the first row is an
-		// active waiting indicator and the later `Agent terhubung` checkmark is a
-		// visible transition instead of a row that already looked done.
-		expect(states(view)).toEqual(["active", "waiting", "waiting"]);
-		expect(stage(view, 0).title).toBe("Menunggu agent terhubung...");
+		// The session exists and the prompt is on screen, but nothing has contacted
+		// the server yet. Waiting for the user is not system activity, so no row may
+		// spin: the spinner only becomes legitimate once real work is persisted.
+		expect(states(view)).toEqual(["waiting", "waiting", "waiting"]);
+		expect(stage(view, 0).title).toBe("Menunggu agent");
+		expect(stage(view, 0).detail).toBe(
+			"Jalankan prompt di AI coding agent untuk memulai sinkronisasi.",
+		);
+		expect(stage(view, 0).state).not.toBe("active");
 		expect(stage(view, 0).state).not.toBe("done");
-		expect(stage(view, 0).completedAt).toBeUndefined();
 		expect(view.hasStatus).toBe(true);
 		expect(view.hasStarted).toBe(false);
 		expect(view.syncComplete).toBe(false);
 		expect(view.canRetry).toBe(false);
 		expect(userFacingCopy(view)).toContain("Menyiapkan source code");
 		expect(userFacingCopy(view)).toContain("Mengunggah repository");
+	});
+
+	it("offers no elapsed timer and no count while nothing is running", () => {
+		const view = resolveSyncStageView(status());
+		for (const row of view.stages) {
+			// A stage with no server-recorded start cannot measure anything, and the
+			// row primitives render a timer only from `startedAt`.
+			expect(row.startedAt).toBeUndefined();
+			expect(row.completedAt).toBeUndefined();
+			expect(row.meta).toBeUndefined();
+		}
+	});
+
+	it("cannot advance a stage by being read again", () => {
+		// Polling is internal monitoring, not connection activity: repeated reads of
+		// the same persisted status must produce the same idle view.
+		const first = resolveSyncStageView(status());
+		const later = resolveSyncStageView(status());
+		expect(states(later)).toEqual(states(first));
+		expect(states(later)).toEqual(["waiting", "waiting", "waiting"]);
+	});
+});
+
+describe("connecting phase", () => {
+	it("starts the agent row only from a real CLI announcement", () => {
+		const view = resolveSyncStageView(
+			status({
+				lifecycle: [{ kind: "cli_connecting", at: "2026-02-01T10:00:00.000Z" }],
+			}),
+		);
+		expect(states(view)).toEqual(["active", "waiting", "waiting"]);
+		expect(stage(view, 0).title).toBe("Menghubungkan agent...");
+		// The elapsed timer measures the real announcement window.
+		expect(stage(view, 0).startedAt).toBe("2026-02-01T10:00:00.000Z");
+		// Real CLI activity has begun, so the attempt is no longer "not started".
+		expect(view.hasStarted).toBe(true);
+		expect(view.syncComplete).toBe(false);
+		// Exactly one stage may be moving: the later rows stay idle.
+		expect(stage(view, 1).state).toBe("waiting");
+		expect(stage(view, 2).state).toBe("waiting");
+		// A refresh or a stream reconnect replays the same persisted snapshot: the
+		// connecting row may not rewind or restart.
+		const replay = resolveSyncStageView(
+			status({
+				lifecycle: [{ kind: "cli_connecting", at: "2026-02-01T10:00:00.000Z" }],
+			}),
+		);
+		expect(states(replay)).toEqual(states(view));
+		expect(stage(replay, 0).startedAt).toBe(stage(view, 0).startedAt);
+	});
+
+	it("hands the agent row over the moment the handshake lands", () => {
+		const view = resolveSyncStageView(
+			status({
+				status: "connected",
+				lifecycle: [
+					{ kind: "cli_connecting", at: "2026-02-01T10:00:00.000Z" },
+					{ kind: "agent_connected", at: "2026-02-01T10:00:02.000Z" },
+				],
+			}),
+		);
+		expect(states(view)).toEqual(["done", "active", "waiting"]);
+		expect(stage(view, 0).title).toBe("Agent terhubung");
+		expect(stage(view, 0).completedAt).toBe("2026-02-01T10:00:02.000Z");
+	});
+
+	it("ignores an announcement that arrived after the handshake", () => {
+		// Out-of-order delivery must never rewind a connected attempt back to a
+		// connecting row.
+		const view = resolveSyncStageView(
+			status({
+				status: "connected",
+				lifecycle: [
+					{ kind: "agent_connected", at: "2026-02-01T10:00:02.000Z" },
+					{ kind: "cli_connecting", at: "2026-02-01T10:00:03.000Z" },
+				],
+			}),
+		);
+		expect(states(view)).toEqual(["done", "active", "waiting"]);
+		expect(stage(view, 0).title).toBe("Agent terhubung");
+	});
+
+	it("never claims connecting on a terminal attempt", () => {
+		const view = resolveSyncStageView(
+			status({
+				status: "failed",
+				lifecycle: [{ kind: "cli_connecting", at: "2026-02-01T10:00:00.000Z" }],
+			}),
+		);
+		expect(view.failed).toBe(true);
+		expect(view.stages).toEqual([]);
+	});
+
+	it("cannot be produced by reading the same status again", () => {
+		const plain = status();
+		expect(states(resolveSyncStageView(plain))).toEqual([
+			"waiting",
+			"waiting",
+			"waiting",
+		]);
+		expect(states(resolveSyncStageView(plain))).toEqual([
+			"waiting",
+			"waiting",
+			"waiting",
+		]);
 	});
 });
 
@@ -190,6 +301,23 @@ describe("connected, scanning and filtering", () => {
 			const view = resolveSyncStageView(status({ status: value }));
 			expect(stage(view, 2).state).not.toBe("active");
 		}
+	});
+
+	it("marks the agent connected only from the persisted handshake evidence", () => {
+		// The checkmark is allowed to appear exactly when the server recorded the
+		// handshake, and it carries that real timestamp with it.
+		const view = resolveSyncStageView(
+			status({
+				status: "connected",
+				lifecycle: [
+					{ kind: "agent_connected", at: "2026-02-01T10:00:00.000Z" },
+				],
+			}),
+		);
+		expect(stage(view, 0).state).toBe("done");
+		expect(stage(view, 0).completedAt).toBe("2026-02-01T10:00:00.000Z");
+		expect(stage(view, 1).state).toBe("active");
+		expect(stage(view, 1).startedAt).toBe("2026-02-01T10:00:00.000Z");
 	});
 });
 
@@ -272,9 +400,9 @@ describe("fast transition", () => {
 		const after = resolveSyncStageView(
 			status({ status: "uploaded", snapshotId: "snap_fast", fileCount: 12 }),
 		);
-		// Before the CLI reports in, only the agent row is active: nothing is claimed
-		// as completed without evidence.
-		expect(states(before)).toEqual(["active", "waiting", "waiting"]);
+		// Before the CLI reports in, nothing is active and nothing is claimed as
+		// completed: the whole list idles.
+		expect(states(before)).toEqual(["waiting", "waiting", "waiting"]);
 		expect(before.hasStarted).toBe(false);
 		expect(states(after)).toEqual(["done", "done", "done"]);
 		expect(stage(after, 0).title).toBe("Agent terhubung");

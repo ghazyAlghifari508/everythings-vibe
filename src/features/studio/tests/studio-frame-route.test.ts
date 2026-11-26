@@ -205,7 +205,7 @@ describe("POST /api/studio/frame", () => {
 				{
 					code: "STUDIO_RETRY_RUNNING",
 					status: 409,
-					diagnostic: expect.stringContaining("private lease detail"),
+					category: expect.any(String),
 				},
 			],
 		]);
@@ -249,7 +249,7 @@ describe("GET /api/studio/frame", () => {
 				{
 					code: "STUDIO_PREVIEW_FAILED",
 					status: 502,
-					diagnostic: "private upstream payload",
+					category: "render-capture",
 				},
 			],
 		]);
@@ -384,7 +384,7 @@ describe("safe frame POST errors", () => {
 		expect(body.error).toEqual(expect.any(String));
 		expect(JSON.stringify(body)).not.toContain("private");
 		expect(log.mock.calls).toEqual([
-			["[studio.frame]", { code, status, diagnostic: expect.any(String) }],
+			["[studio.frame]", { code, status, category: expect.any(String) }],
 		]);
 	});
 });

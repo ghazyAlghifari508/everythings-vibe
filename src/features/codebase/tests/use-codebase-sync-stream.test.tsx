@@ -167,6 +167,99 @@ describe("live sync progress stream", () => {
 		expect(probe.latest?.sessionId).toBe("sess_new");
 	});
 
+	it("ignores a duplicate frame instead of repainting the same state", () => {
+		vi.stubGlobal("EventSource", FakeEventSource);
+		const probe = renderProbe({
+			codebaseId: "cb_stream_hook",
+			sessionId: "sess_stream_hook",
+		});
+		const source = FakeEventSource.instances.at(-1);
+		const frame = statusResponse({
+			status: "uploading",
+			updatedAt: "2026-02-01T10:00:05.000Z",
+			manifestCount: 20,
+			uploadedCount: 4,
+		});
+
+		act(() => {
+			source?.emit("sync", frame);
+		});
+		const painted = probe.latest;
+
+		act(() => {
+			source?.emit("sync", frame);
+		});
+		expect(probe.latest).toBe(painted);
+		expect(probe.connection).toBe("live");
+	});
+
+	it("keeps the newer state when an older frame arrives out of order", () => {
+		vi.stubGlobal("EventSource", FakeEventSource);
+		const probe = renderProbe({
+			codebaseId: "cb_stream_hook",
+			sessionId: "sess_stream_hook",
+		});
+		const source = FakeEventSource.instances.at(-1);
+
+		act(() => {
+			source?.emit(
+				"sync",
+				statusResponse({
+					status: "uploading",
+					updatedAt: "2026-02-01T10:00:10.000Z",
+				}),
+			);
+		});
+		act(() => {
+			source?.emit(
+				"sync",
+				statusResponse({
+					status: "connected",
+					updatedAt: "2026-02-01T10:00:05.000Z",
+				}),
+			);
+		});
+
+		expect(probe.latest?.status).toBe("uploading");
+		expect(probe.latest?.updatedAt).toBe("2026-02-01T10:00:10.000Z");
+	});
+
+	it("accepts real progress that moved without a new session timestamp", () => {
+		// Upload counters advance on chunk rows, not on the session row, so two
+		// frames can share an event id while reporting different real progress.
+		vi.stubGlobal("EventSource", FakeEventSource);
+		const probe = renderProbe({
+			codebaseId: "cb_stream_hook",
+			sessionId: "sess_stream_hook",
+		});
+		const source = FakeEventSource.instances.at(-1);
+
+		act(() => {
+			source?.emit(
+				"sync",
+				statusResponse({
+					status: "uploading",
+					updatedAt: "2026-02-01T10:00:05.000Z",
+					manifestCount: 20,
+					uploadedCount: 4,
+				}),
+			);
+		});
+		act(() => {
+			source?.emit(
+				"sync",
+				statusResponse({
+					status: "uploading",
+					updatedAt: "2026-02-01T10:00:05.000Z",
+					manifestCount: 20,
+					uploadedCount: 9,
+				}),
+			);
+		});
+
+		expect(probe.latest?.uploadedCount).toBe(9);
+	});
+
 	it("resumes after a dropped channel instead of reporting a failure", () => {
 		vi.useFakeTimers();
 		vi.stubGlobal("EventSource", FakeEventSource);

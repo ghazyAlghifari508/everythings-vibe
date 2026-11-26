@@ -93,6 +93,36 @@ Timeouts and shutdowns emit the same shape with `leaseRefreshResult: "skipped"`.
 Only identifiers, counters, and error codes are recorded; provider messages,
 prompts, and connection strings are never included.
 
+## Planning status and manual recovery
+
+`deriveStudioLifecycle` derives the canvas from the persisted job. Missing HTML
+or a null blueprint alone is not failure: queued, planning and generating jobs
+remain nonterminal. Planning recovery requires a failed initial job, no blueprint,
+and either no frames or only provisional slots. A completed/partial job keeps
+valid results visible; missing terminal data offers a status reload, not a whole
+plan retry or an endless shimmer.
+
+Project detail reads use one read-only repeatable-read transaction, so project,
+frames, revisions and job cannot straddle a planning commit. Client polling
+rejects older project/job snapshots, missing older frame sets and cancelled
+requests. Reconnect and loader replacement retain newer persisted results.
+
+Planning retry retains the existing project-row lock and failed-status write
+predicate. It resets the original job only after checking all active project
+jobs and the same planning eligibility selector. Existing blueprint/planned
+frames/HTML reject a whole-plan retry. Frame retries remain frame-local. The
+client holds a synchronous in-flight guard until status synchronization settles,
+disables the pending control, ignores responses after project changes, and
+resynchronizes `STUDIO_RETRY_RUNNING` without presenting another AI failure.
+
+Targeted regression suites: `studio-planning-lifecycle.test.ts`,
+`studio-planning-retry.integration.test.ts`,
+`studio-planning-retry-client.test.tsx`, `studio-status.test.ts`,
+`studio-canvas.test.tsx`, and the existing pipeline durability, design-reference
+recovery, planning and concurrency integration suites. These use no browser QA
+or paid provider calls. Worker lease rules, credit rules, schema and HTTP payload
+contracts are unchanged.
+
 ## Verification
 
 ```sh

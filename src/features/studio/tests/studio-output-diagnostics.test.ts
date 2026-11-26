@@ -129,7 +129,7 @@ describe("classifyStudioStreamCompletion", () => {
 });
 
 describe("structured output diagnostics", () => {
-	it("bounds semantic quality correction without rejecting a still-usable screen", async () => {
+	it("preserves usable output without advisory regeneration", async () => {
 		const response = {
 			html: "<html><body><main><div data-skeleton></div><p>Sample content</p></main></body></html>",
 			finishReason: "stop",
@@ -145,7 +145,7 @@ describe("structured output diagnostics", () => {
 			dsTokens: null,
 			logoUrl: null,
 		});
-		expect(mocked).toHaveBeenCalledTimes(2);
+		expect(mocked).toHaveBeenCalledTimes(1);
 		expect(html).toContain("Sample content");
 	});
 	it("avoids a correction request when an image supplies the button label", async () => {
@@ -269,8 +269,10 @@ describe("incomplete provider output", () => {
 						stage: "frame-output",
 						code: "COMPLETED",
 						outputTokens: 29000,
-						maxTokens: 12000,
-						tokenLimitExceeded: true,
+						requestedMaxTokens: 12000,
+						effectiveMaxTokens: null,
+						accountingAboveRequested: true,
+						ceilingReached: false,
 					}),
 				]),
 			);

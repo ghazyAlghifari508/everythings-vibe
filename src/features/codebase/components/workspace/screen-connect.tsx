@@ -1,7 +1,6 @@
 "use client";
 
 import type { AnalysisResponse } from "@/features/codebase/services/analysis";
-import { resolveCodebaseDisplayName } from "@/features/codebase/services/naming";
 import {
 	resolveSyncStageView,
 	type SyncPromptPayload,
@@ -17,7 +16,7 @@ interface ScreenConnectProps {
 	projectName: string;
 	payload: SyncPromptPayload | null;
 	isStarting?: boolean;
-	/** Replaces the prompt with one centered state; never hides a real token. */
+	/** Replaces the prompt row with one state; never hides a real token. */
 	lockedPrompt?: LockedPromptState | null;
 	/** Non-secret rate/saldo disclosure; omitted for exempt accounts. */
 	creditNote?: string | null;
@@ -32,6 +31,7 @@ interface ScreenConnectProps {
 	status: SyncStatusResponse | null;
 	/** Reconciliation error from the owning loop. */
 	statusError?: string | null;
+	promptError?: string | null;
 	/** Update-channel notice; a dropped stream is not a failed sync. */
 	streamNotice?: string | null;
 	/** Mints a fresh one-time sync credential for a new attempt. */
@@ -71,6 +71,7 @@ export function ScreenConnect({
 	creditNote = null,
 	status,
 	statusError = null,
+	promptError = null,
 	streamNotice = null,
 	onRequestNewToken,
 	onRetrySync,
@@ -85,10 +86,6 @@ export function ScreenConnect({
 	isLegacyAnalysisMissingSuggestions = false,
 	onRefreshLegacySuggestions,
 }: ScreenConnectProps) {
-	// A provisional creation name is storage-only: the eyebrow shows neutral
-	// copy until the CLI handshake reports the real repository folder name.
-	const displayName =
-		resolveCodebaseDisplayName(projectName) ?? "Repository belum terdeteksi";
 	const stageView = resolveSyncStageView(status);
 	const canAdvance =
 		canContinueToSummary && !isStarting && Boolean(onContinueToSummary);
@@ -98,29 +95,27 @@ export function ScreenConnect({
 		<div className="w-full animate-enter">
 			<div className="mx-auto w-full max-w-2xl overflow-hidden rounded-xl border border-iron bg-obsidian">
 				<div className="border-b border-graphite p-5 sm:p-6">
-					{/* The server owns this name once the CLI has handshaken, so the
-					eyebrow drops the creation placeholder and shows the detected
-					repository folder. */}
-					<div className="mb-2 font-mono text-[11px] uppercase tracking-widest text-fog">
-						Project / {displayName}
-					</div>
+					{/* No repository identity here: a provisional creation name is
+					storage-only, and the real folder name is shown in History and the
+					workspace once the CLI has handshaken. */}
 					<h2 className="font-inter text-lg font-[600] text-snow sm:text-xl">
 						Sync codebase dengan everythings-vibe
 					</h2>
 					<p className="mt-1.5 text-xs leading-relaxed text-fog sm:text-sm">
-						Salin prompt ini dan paste ke Claude Code, Cursor, Windsurf, atau AI
-						agent lain dari root repository kamu.
+						{
+							"Salin instruksi berikut, lalu jalankan melalui AI coding agent di root repository kamu."
+						}
 					</p>
 				</div>
 
-				<div className="flex flex-col gap-6 p-5 sm:p-6">
+				<div className="flex flex-col p-5 sm:p-6">
 					<ScreenConnectPromptStep
 						key={payload?.sessionId ?? "no-session"}
 						projectName={projectName}
 						payload={payload}
 						isStarting={isStarting}
+						error={promptError}
 						status={status}
-						transportComplete={stageView.syncComplete}
 						onRequestNewToken={onRequestNewToken}
 						lockedPrompt={lockedPrompt}
 						creditNote={creditNote}
@@ -135,6 +130,7 @@ export function ScreenConnect({
 						statusError={statusError}
 						streamNotice={streamNotice}
 						isStarting={isStarting}
+						hasSession={payload !== null}
 						onRetrySync={onRetrySync}
 						canContinueToSummary={canContinueToSummary}
 						analysis={analysis}

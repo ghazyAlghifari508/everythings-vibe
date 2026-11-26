@@ -27,6 +27,7 @@ vi.mock("@tanstack/react-router", () => ({
 
 const SYNC_PAYLOAD = {
 	projectId: "cb-onboard-1",
+	sessionId: "sess-onboard-1",
 	apiBaseUrl: "http://localhost:3000",
 	syncToken: "onboard-token-1",
 	syncCommand:
@@ -284,7 +285,6 @@ describe("PlanCodebasePage onboarding analysis", () => {
 			},
 			{ timeout: 10000, interval: 100 },
 		);
-		expect(screen.queryByText("Menunggu agent")).toBeNull();
 		const cta = screen.getByTestId(
 			"sync-continue-to-summary",
 		) as HTMLButtonElement;
@@ -504,7 +504,12 @@ describe("PlanCodebasePage onboarding analysis", () => {
 						status: 200,
 						json: async () => ({
 							...uploadedStatus(),
-							analysisStatus: analysisPostCount >= 2 ? "ready" : "failed",
+							analysisStatus:
+								analysisPostCount >= 2
+									? "ready"
+									: analysisPostCount === 1
+										? "failed"
+										: undefined,
 							analysisId: analysisPostCount >= 2 ? "ana-onboard-1" : null,
 						}),
 					};

@@ -25,11 +25,13 @@ import { Logo } from "@/components/ui/logo";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { TopUpModal } from "@/features/billing/components/top-up-modal";
 import { useUserPlan } from "@/features/billing/hooks/use-user-plan";
+import { clearSyncPromptVault } from "@/features/codebase/services/sync-prompt-vault";
+import { routeToStep } from "@/features/greenfield/utils/flow-step";
 import { authClient } from "@/lib/auth-client";
 import { historyFilterSchema } from "@/lib/history";
 import { isAdmin } from "@/lib/session";
 import { useUIStore } from "@/store";
-import { CodebaseStepNav, FlowStepNav, routeToStep } from "./flow-step-nav";
+import { CodebaseStepNav, FlowStepNav } from "./flow-step-nav";
 import { NavbarFlowActions } from "./navbar-flow-actions";
 import { NavbarNavLinks } from "./navbar-nav-links";
 
@@ -65,66 +67,33 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 	const routeStep = routeToStep(pathname);
 	const projectNavData = useMatches({
 		select: (matches) => {
-			for (let i = matches.length - 1; i >= 0; i--) {
-				const data = matches[i].loaderData as
-					| {
-							projectName?: string;
-							step?: string | null;
-							taskStatus?: string | null;
-							acStatus?: string | null;
-							featuresStatus?: string | null;
-							latestAcContent?: string | null;
-							hasAc?: boolean;
-					  }
-					| undefined;
-				if (
-					data &&
-					(typeof data.projectName === "string" ||
-						typeof data.step === "string" ||
-						typeof data.taskStatus === "string" ||
-						typeof data.acStatus === "string" ||
-						typeof data.featuresStatus === "string" ||
-						typeof data.latestAcContent === "string" ||
-						typeof data.hasAc === "boolean" ||
-						data.step === null)
-				) {
-					return {
-						projectName: data.projectName ?? null,
-						step: data.step ?? null,
-						taskStatus: data.taskStatus ?? null,
-						acStatus: data.acStatus ?? null,
-						featuresStatus: data.featuresStatus ?? null,
-						hasAc: Boolean(
-							data.latestAcContent ||
-								data.hasAc ||
-								data.acStatus === "completed",
-						),
-					};
-				}
-			}
-			return null;
+			const parent = matches.find((match) => match.routeId === "/vibeplan/$id");
+			if (parent?.routeId !== "/vibeplan/$id" || !parent.loaderData)
+				return null;
+			const data = parent.loaderData;
+			return { ...data, step: data.progress };
 		},
 	});
 	const { data: planData } = useUserPlan();
 	const isFree = (planData?.plan ?? "free") === "free";
-	const isFlowStepRoute =
-		pathname.startsWith("/ask/") ||
-		pathname.startsWith("/fitur/") ||
-		pathname.startsWith("/prd/") ||
-		pathname.startsWith("/ac/") ||
-		pathname.startsWith("/task/") ||
-		pathname.startsWith("/kanban/");
+	const isFlowStepRoute = pathname.startsWith("/vibeplan/");
 	const isCodebaseSyncRoute = pathname === "/plan/codebase";
 	const codebasePlanStep = useUIStore((s) => s.codebasePlanStep);
 	const setCodebasePlanStep = useUIStore((s) => s.setCodebasePlanStep);
 	const showToast = useUIStore((s) => s.showToast);
-	const projectId = pathname.split("/")[2];
+	const projectId = useMatches({
+		select: (matches) =>
+			matches.find((match) => match.routeId === "/vibeplan/$id")?.params.id,
+	});
 
 	const handleLogout = async () => {
 		try {
 			await authClient.signOut();
 			// The router survives logout, so its user-scoped cache must not reach the next session.
 			queryClient.clear();
+			// A one-time sync prompt may still be retained in app memory; the next
+			// account in this tab must never inherit it.
+			clearSyncPromptVault();
 			navigate({ to: "/login" });
 			router.invalidate();
 		} catch (err) {
@@ -189,6 +158,7 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 						<FlowStepNav
 							step={projectNavData?.step}
 							taskStatus={projectNavData?.taskStatus}
+							availability={projectNavData ?? undefined}
 						/>
 					</div>
 				) : null}
@@ -202,6 +172,7 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 						<FlowStepNav
 							step={projectNavData?.step}
 							taskStatus={projectNavData?.taskStatus}
+							availability={projectNavData ?? undefined}
 						/>
 					) : (
 						<div className="flex items-center gap-1">
@@ -232,6 +203,7 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 						<NavbarFlowActions
 							pathname={pathname}
 							project={projectNavData}
+							projectId={projectId}
 							isFree={isFree}
 						/>
 					)}

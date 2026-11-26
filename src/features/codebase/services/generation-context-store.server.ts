@@ -1,3 +1,4 @@
+import type { db } from "@/db";
 import {
 	CODEBASE_GENERATION_MAX_ANSWER_CHARS,
 	CODEBASE_GENERATION_MAX_PATHS,
@@ -10,6 +11,7 @@ import {
 } from "./generation-context-build";
 import {
 	type AskHandoff,
+	askHandoffSchema,
 	askHandoffStateSchema,
 	parseStoredHandoffAnswers,
 	sanitizeAskHandoff,
@@ -265,10 +267,14 @@ export async function linkGenerationContext(
 export async function saveAskHandoff(
 	userId: string,
 	input: AskHandoff,
-	executor?: Pick<typeof import("@/db").db, "insert">,
+	executor?: Pick<typeof db, "insert" | "select">,
 ): Promise<void> {
-	const clean = sanitizeAskHandoff(input);
-	const database = executor ?? (await import("@/db")).db;
+	const clean = sanitizeAskHandoff(askHandoffSchema.parse(input));
+	if (!executor) {
+		const { db } = await import("@/db");
+		return db.transaction((tx) => saveAskHandoff(userId, clean, tx));
+	}
+	const database = executor;
 	const { codebaseAskHandoffs } = await import("@/db/schema");
 	await database
 		.insert(codebaseAskHandoffs)
@@ -294,6 +300,10 @@ export async function saveAskHandoff(
 				updatedAt: new Date(),
 			},
 		});
+	const { persistAskWorkspaceEvents } = await import(
+		"./workspace-timeline-store.server"
+	);
+	await persistAskWorkspaceEvents(database, userId, clean);
 }
 
 /** Read the authoritative Ask handoff. Returns null when absent or owned by

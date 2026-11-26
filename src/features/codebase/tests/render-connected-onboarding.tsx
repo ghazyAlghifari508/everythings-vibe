@@ -41,13 +41,14 @@ export async function renderConnectedOnboarding(options?: {
 		if (screen.queryByRole("alert")) return;
 		if (
 			screen.queryByRole("button", {
-				name: /Buat sesi baru|Dapatkan token baru|Perbarui sesi/,
+				name: /Buat prompt baru|Buat sesi baru|Dapatkan token baru|Perbarui sesi/,
 			})
 		)
 			return;
-		// A recovered attempt that already uploaded has no credential to restore,
-		// so its prompt row settles into the transport-done state instead.
-		if (document.querySelector('[data-testid="prompt-transport-done"]')) return;
+		// A recovered attempt whose credential this browser no longer holds (for
+		// example one that already uploaded) states that fact instead of offering a
+		// replacement or a success message.
+		if (document.querySelector('[data-testid="prompt-unavailable"]')) return;
 		if (document.querySelector('[data-testid="codebase-sync-summary"]')) return;
 		throw new Error("Onboarding is not ready");
 	});

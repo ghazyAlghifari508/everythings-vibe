@@ -59,6 +59,8 @@ export function StudioCanvasToolPalette({
 
 interface StudioCanvasZoomCornerProps {
 	zoom: number;
+	minZoom?: number;
+	maxZoom?: number;
 	onZoomIn: () => void;
 	onZoomOut: () => void;
 	onFit: () => void;
@@ -72,6 +74,8 @@ interface StudioCanvasZoomCornerProps {
  */
 export function StudioCanvasZoomCorner({
 	zoom,
+	minZoom,
+	maxZoom,
 	onZoomIn,
 	onZoomOut,
 	onFit,
@@ -83,6 +87,8 @@ export function StudioCanvasZoomCorner({
 		>
 			<ZoomControls
 				zoom={zoom}
+				minZoom={minZoom}
+				maxZoom={maxZoom}
 				onZoomIn={onZoomIn}
 				onZoomOut={onZoomOut}
 				onReset={onFit}
@@ -99,12 +105,12 @@ export function StudioCanvasZoomCorner({
  */
 function StudioCanvasPlanningStatus({ label }: { label: string }) {
 	return (
-		<p
+		<output
 			className="pointer-events-none absolute left-3 z-20 max-w-md rounded-full border border-graphite bg-obsidian px-3 py-1 text-xs text-fog"
 			style={{ bottom: canvasZoomRowBottomCss() }}
 		>
 			{label}
-		</p>
+		</output>
 	);
 }
 
@@ -114,9 +120,8 @@ interface StudioCanvasQueueReadoutProps {
 }
 
 /**
- * The job readout: names a stalled queue so an empty or late canvas is never
- * mistaken for steady work. Silent while a worker holds a live lease, and while
- * frames already carry their own shimmer.
+ * The job readout distinguishes queued/planning even when provisional slots
+ * already exist. Generating frames carry their own shimmer.
  */
 export function StudioCanvasQueueReadout({
 	activeJob,
@@ -124,24 +129,24 @@ export function StudioCanvasQueueReadout({
 }: StudioCanvasQueueReadoutProps) {
 	const queueHealth = resolveStudioQueueHealth(activeJob);
 	if (queueHealth) return <StudioCanvasPlanningStatus label={queueHealth} />;
-	if (
-		hasFrames ||
-		(activeJob.status !== "queued" && activeJob.status !== "planning")
-	)
+	if (activeJob.status === "generating" && hasFrames) return null;
+	if (!["queued", "planning", "generating"].includes(activeJob.status))
 		return null;
 	return (
 		<StudioCanvasPlanningStatus
 			label={
 				activeJob.status === "queued"
 					? "Menunggu antrean generate"
-					: "Menyusun rencana layar"
+					: activeJob.status === "planning"
+						? "Menyusun struktur halaman..."
+						: "Menghasilkan halaman..."
 			}
 		/>
 	);
 }
 
 interface StudioCanvasPlanningFailureProps {
-	error?: string | null;
+	retryingPlanning?: boolean;
 	onRetryPlanning?: () => void;
 }
 
@@ -150,7 +155,7 @@ interface StudioCanvasPlanningFailureProps {
  * the canvas surface itself.
  */
 export function StudioCanvasPlanningFailure({
-	error,
+	retryingPlanning = false,
 	onRetryPlanning,
 }: StudioCanvasPlanningFailureProps) {
 	return (
@@ -158,14 +163,19 @@ export function StudioCanvasPlanningFailure({
 			<div className="flex items-center gap-2">
 				<Icon icon={AlertCircleIcon} size={16} className="text-crimson" />
 				<p className="text-sm font-semibold text-snow">
-					Perencanaan layar gagal
+					Rencana halaman belum berhasil dibuat.
 				</p>
 			</div>
 			<p className="text-xs leading-5 text-fog">
-				{error || "AI tidak dapat menyusun rencana layar untuk topik ini."}
+				Proses perencanaan terhenti. Periksa koneksi atau coba proses ini
+				kembali.
 			</p>
 			{onRetryPlanning && (
-				<StudioFrameRetryButton label="Coba lagi" onRetry={onRetryPlanning} />
+				<StudioFrameRetryButton
+					label="Coba lagi"
+					onRetry={onRetryPlanning}
+					pending={retryingPlanning}
+				/>
 			)}
 		</div>
 	);

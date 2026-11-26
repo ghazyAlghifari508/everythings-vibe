@@ -86,6 +86,13 @@ describe("Studio frame error classification", () => {
 			"retry-generation",
 		],
 		[
+			"planning never produced a shared blueprint",
+			new StudioFrameError("STUDIO_PLANNING_REQUIRED"),
+			"STUDIO_PLANNING_REQUIRED",
+			"planning-required",
+			"retry-planning",
+		],
+		[
 			"user cancellation maps to the cancelled category",
 			new StudioLeaseLostError("JOB_CANCELLED"),
 			"STUDIO_CANCELLED",

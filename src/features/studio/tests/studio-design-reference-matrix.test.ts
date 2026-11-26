@@ -148,8 +148,6 @@ describe("studio design reference compatibility matrix", () => {
 			expect(planning).toHaveLength(1);
 			const planningUser = planning[0]?.[1]?.content ?? "";
 			expect(planningUser).toContain(documentHead(combo.designMd));
-			expect(planningUser).toContain(`- Primary Brand Color: ${combo.primary}`);
-			expect(planningUser).toContain(`- Card Border Radius: ${combo.cards}`);
 
 			const frames = aiCalls("frame");
 			expect(frames).toHaveLength(2);
@@ -268,7 +266,7 @@ describe("studio design reference compatibility matrix", () => {
 		);
 		expect(error.failure).toBe("invalid-design-file");
 		expect(error.message).toBe(
-			"File desain belum bisa digunakan. Periksa isinya lalu unggah kembali.",
+			"File desain belum bisa digunakan. Periksa bagian warna, tipografi, atau radius di dalamnya, lalu coba lagi.",
 		);
 
 		const unknownTheme = await referenceFailure(

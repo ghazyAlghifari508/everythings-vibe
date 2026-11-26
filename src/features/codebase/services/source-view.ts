@@ -28,6 +28,10 @@ import {
 	shouldSoftWrapLanguage,
 	supportsFormattedView,
 } from "./source-view-format";
+import {
+	type SplitSourceResult,
+	splitSourceLines,
+} from "./source-view-highlight";
 
 export type SourceViewMode = "original" | "formatted";
 
@@ -55,6 +59,9 @@ export interface SourceView {
 	/** Unmodified file content, always the value a copy action must use. */
 	originalContent: string;
 	language: string | null;
+	hasTrailingNewline: boolean;
+	trailingBlankCount: number;
+	hiddenTrailingLinesCount: number;
 }
 
 export {
@@ -64,7 +71,9 @@ export {
 	getCachedFormattedMarkup,
 	getCachedHighlightedRows,
 	shouldSoftWrapLanguage,
+	splitSourceLines,
 	supportsFormattedView,
+	type SplitSourceResult,
 };
 
 export interface BuildSourceViewInput {
@@ -72,6 +81,7 @@ export interface BuildSourceViewInput {
 	path: string;
 	mode: SourceViewMode;
 	maxLines: number;
+	hideTrailingBlankLines?: boolean;
 }
 
 /** Build every row the viewer needs for one file in one chosen view. */
@@ -93,11 +103,25 @@ export function buildSourceViewRows(input: BuildSourceViewInput): SourceView {
 	const text = formatted ?? input.content;
 	const highlighted = getCachedHighlightedRows(text, language, input.maxLines);
 
+	let rowTexts = highlighted.text;
+	let rowTokens = highlighted.tokens;
+
+	const hideTrailing =
+		Boolean(input.hideTrailingBlankLines) && highlighted.trailingBlankCount > 0;
+	if (hideTrailing) {
+		const keepCount = Math.max(
+			0,
+			rowTexts.length - highlighted.trailingBlankCount,
+		);
+		rowTexts = rowTexts.slice(0, keepCount);
+		rowTokens = rowTokens.slice(0, keepCount);
+	}
+
 	return {
-		rows: highlighted.text.map((rowText, index) => ({
+		rows: rowTexts.map((rowText, index) => ({
 			lineNumber: index + 1,
 			text: rowText,
-			tokens: highlighted.tokens[index] ?? [],
+			tokens: rowTokens[index] ?? [],
 		})),
 		mode,
 		formattedAvailable,
@@ -106,5 +130,8 @@ export function buildSourceViewRows(input: BuildSourceViewInput): SourceView {
 		totalLines: highlighted.totalLines,
 		originalContent: input.content,
 		language,
+		hasTrailingNewline: highlighted.hasTrailingNewline,
+		trailingBlankCount: highlighted.trailingBlankCount,
+		hiddenTrailingLinesCount: hideTrailing ? highlighted.trailingBlankCount : 0,
 	};
 }

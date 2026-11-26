@@ -135,6 +135,14 @@ describe("isValidHistoryUrl", () => {
 		expect(isValidHistoryUrl(`/ask/${id}`, id)).toBe(true);
 		expect(isValidHistoryUrl(`/fitur/${id}`, id)).toBe(true);
 		expect(isValidHistoryUrl(`/kanban/${id}`, id)).toBe(true);
+		expect(isValidHistoryUrl(`/vibeplan/${id}`, id)).toBe(true);
+		for (const view of ["ask", "fitur", "prd", "ac", "task", "kanban"]) {
+			expect(isValidHistoryUrl(`/vibeplan/${id}/${view}`, id)).toBe(true);
+			expect(isValidHistoryUrl(`/vibeplan/foreign/${view}`, id)).toBe(false);
+			expect(
+				isValidHistoryUrl(`https://evil.test/vibeplan/${id}/${view}`, id),
+			).toBe(false);
+		}
 		expect(isValidHistoryUrl(`/codebase/${id}`, id)).toBe(false);
 	});
 
@@ -164,27 +172,27 @@ describe("parseHistoryHref", () => {
 
 	it("splits every project-internal route into a typed target", () => {
 		expect(parseHistoryHref(`/ask/${id}`)).toEqual({
-			to: "/ask/$id",
+			to: "/vibeplan/$id/ask",
 			params: { id },
 		});
 		expect(parseHistoryHref(`/fitur/${id}`)).toEqual({
-			to: "/fitur/$id",
+			to: "/vibeplan/$id/fitur",
 			params: { id },
 		});
 		expect(parseHistoryHref(`/prd/${id}`)).toEqual({
-			to: "/prd/$id",
+			to: "/vibeplan/$id/prd",
 			params: { id },
 		});
 		expect(parseHistoryHref(`/ac/${id}`)).toEqual({
-			to: "/ac/$id",
+			to: "/vibeplan/$id/ac",
 			params: { id },
 		});
 		expect(parseHistoryHref(`/task/${id}`)).toEqual({
-			to: "/task/$id",
+			to: "/vibeplan/$id/task",
 			params: { id },
 		});
 		expect(parseHistoryHref(`/kanban/${id}`)).toEqual({
-			to: "/kanban/$id",
+			to: "/vibeplan/$id/kanban",
 			params: { id },
 		});
 	});
@@ -209,6 +217,9 @@ describe("parseHistoryHref", () => {
 	it("is total over every URL isValidHistoryUrl accepts", () => {
 		for (const url of [
 			"/codebases",
+			`/vibeplan/${id}`,
+			`/vibeplan/${id}/ask`,
+			`/vibeplan/${id}/kanban`,
 			`/ask/${id}`,
 			`/fitur/${id}`,
 			`/prd/${id}`,
@@ -228,12 +239,12 @@ describe("resolveHistoryUrl", () => {
 	it("prefers a valid lastUrl for this project", () => {
 		expect(
 			resolveHistoryUrl({ id, step: "prd", lastUrl: `/kanban/${id}` }),
-		).toBe(`/kanban/${id}`);
+		).toBe(`/vibeplan/${id}/kanban`);
 	});
 
-	it("falls back to stepToRoute when lastUrl is null", () => {
+	it("uses verified workspace entry when lastUrl is null", () => {
 		expect(resolveHistoryUrl({ id, step: "ac", lastUrl: null })).toBe(
-			`/ac/${id}`,
+			`/vibeplan/${id}`,
 		);
 	});
 
@@ -244,15 +255,15 @@ describe("resolveHistoryUrl", () => {
 				step: "task",
 				lastUrl: "/ac/00000000-0000-0000-0000-000000000000",
 			}),
-		).toBe(`/task/${id}`);
+		).toBe(`/vibeplan/${id}`);
 	});
 
 	it("falls back when lastUrl is non-project or malformed", () => {
 		expect(resolveHistoryUrl({ id, step: "prd", lastUrl: "/history" })).toBe(
-			`/prd/${id}`,
+			`/vibeplan/${id}`,
 		);
 		expect(
 			resolveHistoryUrl({ id, step: "prd", lastUrl: "javascript:alert(1)" }),
-		).toBe(`/prd/${id}`);
+		).toBe(`/vibeplan/${id}`);
 	});
 });

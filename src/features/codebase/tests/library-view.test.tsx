@@ -298,7 +298,7 @@ describe("CodebaseLibraryView", () => {
 		expect(screen.getByText("Perlu analisis")).toBeDefined();
 	});
 
-	it("maps readiness to the four public status labels", () => {
+	it("maps readiness to the public status labels without displaying redundant normal status", () => {
 		render(
 			<CodebaseLibraryView
 				items={[
@@ -328,7 +328,7 @@ describe("CodebaseLibraryView", () => {
 				]}
 			/>,
 		);
-		expect(screen.getByText("Siap")).toBeDefined();
+		expect(screen.queryByText("Siap")).toBeNull();
 		expect(screen.getByText("Menganalisis")).toBeDefined();
 		expect(screen.getByText("Perlu analisis")).toBeDefined();
 		expect(screen.getByText("Sinkronisasi belum selesai")).toBeDefined();
@@ -428,7 +428,7 @@ describe("CodebaseLibraryView primary actions", () => {
 			/>,
 		);
 		const card = screen.getByText("<sample run>").closest("a");
-		expect(card?.getAttribute("href")).toBe("/plan/codebase");
+		expect(card?.getAttribute("href")).toBe("/plan/codebase?intent=resume");
 		expect(screen.getByText("Lihat Progres")).toBeDefined();
 		fireEvent.click(card as Element);
 		expect(readPlanCodebasePointer()).toEqual({
@@ -453,7 +453,7 @@ describe("CodebaseLibraryView primary actions", () => {
 			/>,
 		);
 		const card = screen.getByText("<sample fail>").closest("a");
-		expect(card?.getAttribute("href")).toBe("/plan/codebase");
+		expect(card?.getAttribute("href")).toBe("/plan/codebase?intent=resume");
 		expect(screen.getByText("Coba Analisis Lagi")).toBeDefined();
 		fireEvent.click(card as Element);
 		// A recovery resume points at the canonical codebase id, and clears a
@@ -549,7 +549,7 @@ describe("CodebaseLibraryView primary actions", () => {
 				]}
 			/>,
 		);
-		expect(screen.getByText("Siap")).toBeDefined();
+		expect(screen.queryByText("Siap")).toBeNull();
 		expect(screen.getByText("Buka Workspace")).toBeDefined();
 		expect(screen.queryByText("Menganalisis")).toBeNull();
 	});

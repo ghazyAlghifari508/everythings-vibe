@@ -136,6 +136,6 @@ describe("StudioLandingPage Layout Geometry", () => {
 		expect(sidebar).not.toBeNull();
 		expect(sidebar?.className).toContain("w-72");
 		expect(sidebar?.className).toContain("lg:w-80");
-		expect(screen.getByText("Belum ada project studio.")).toBeDefined();
+		expect(screen.getByText("Belum ada proyek")).toBeDefined();
 	});
 });

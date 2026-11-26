@@ -31,6 +31,8 @@ interface HighlightedCacheEntry {
 	tokens: SourceToken[][];
 	text: string[];
 	totalLines: number;
+	hasTrailingNewline: boolean;
+	trailingBlankCount: number;
 }
 const HIGHLIGHT_CACHE_MAX = 100;
 const highlightCache = new Map<string, HighlightedCacheEntry>();

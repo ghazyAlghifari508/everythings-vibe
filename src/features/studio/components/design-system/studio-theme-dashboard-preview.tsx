@@ -4,8 +4,11 @@ interface StudioThemeDashboardPreviewProps {
 	tokens: StudioThemeTokens;
 }
 
-// Unified miniature dashboard silhouette: identical geometry and content hierarchy across all presets.
-// Only semantic tokens (colors, font, border radius) vary between themes.
+/**
+ * Unified abstract UI silhouette: identical geometry and content hierarchy across all presets.
+ * Only semantic tokens (colors, font, border radius) vary between themes.
+ * Eliminates fake dashboard copy, micro-text, and simulated metrics.
+ */
 export function StudioThemeDashboardPreview({
 	tokens,
 }: StudioThemeDashboardPreviewProps) {
@@ -24,7 +27,7 @@ export function StudioThemeDashboardPreview({
 			}}
 			aria-hidden="true"
 		>
-			{/* Top Header: [S] Dashboard ... Search [U] */}
+			{/* Top Header silhouette: [■] [=========] ... [===] [○] */}
 			<div
 				className="flex h-6 sm:h-7 items-center justify-between border-b px-2 shrink-0"
 				style={{
@@ -33,60 +36,48 @@ export function StudioThemeDashboardPreview({
 				}}
 			>
 				<div className="flex items-center gap-1.5">
+					{/* Logo block [■] */}
 					<span
-						className="size-3 sm:size-3.5 flex items-center justify-center font-bold text-[6px] sm:text-[7px]"
+						className="size-3 sm:size-3.5 shrink-0 block"
 						style={{
 							backgroundColor: tokens.primary,
-							color: tokens.primaryForeground,
 							borderRadius: miniRadius,
 						}}
-					>
-						S
-					</span>
+					/>
+					{/* Header bar silhouette [=========] */}
 					<span
-						className="text-[8px] sm:text-[9px] font-semibold tracking-tight"
-						style={{ color: tokens.ink }}
-					>
-						Dashboard
-					</span>
+						className="h-2 w-16 sm:w-20 block opacity-85"
+						style={{
+							backgroundColor: tokens.ink,
+							borderRadius: miniRadius,
+						}}
+					/>
 				</div>
 
 				<div className="flex items-center gap-1.5">
-					<div
-						className="flex h-3.5 sm:h-4 items-center gap-1 px-1.5 border"
+					{/* Search/input silhouette */}
+					<span
+						className="h-3 sm:h-3.5 w-12 sm:w-16 border block"
 						style={{
 							backgroundColor: tokens.inputBg,
 							borderColor: tokens.border,
 							borderRadius: miniRadius,
 						}}
-					>
-						<span
-							className="size-1 rounded-full"
-							style={{ backgroundColor: tokens.muted }}
-						/>
-						<span
-							className="text-[6px] sm:text-[7px]"
-							style={{ color: tokens.muted }}
-						>
-							Search
-						</span>
-					</div>
+					/>
+					{/* Avatar silhouette [○] */}
 					<span
-						className="size-3.5 sm:size-4 rounded-full border flex items-center justify-center font-medium text-[6px]"
+						className="size-3.5 sm:size-4 rounded-full border shrink-0 block"
 						style={{
 							backgroundColor: tokens.secondary,
 							borderColor: tokens.border,
-							color: tokens.secondaryForeground,
 						}}
-					>
-						U
-					</span>
+					/>
 				</div>
 			</div>
 
-			{/* Main body: Sidebar + Dashboard Content */}
+			{/* Main body: Sidebar + Content Region */}
 			<div className="flex flex-1 min-h-0 overflow-hidden">
-				{/* Sidebar (NAV) */}
+				{/* Sidebar silhouette */}
 				<div
 					className="w-14 sm:w-16 border-r flex flex-col justify-between p-1.5 shrink-0"
 					style={{
@@ -94,10 +85,11 @@ export function StudioThemeDashboardPreview({
 						borderColor: tokens.border,
 					}}
 				>
+					{/* Navigation items silhouette */}
 					<div className="flex flex-col gap-1">
-						{/* Active Nav item */}
+						{/* Active item */}
 						<div
-							className="flex items-center gap-1 px-1 py-0.5 border"
+							className="flex items-center gap-1 px-1 py-1 border"
 							style={{
 								backgroundColor: tokens.active,
 								borderColor: tokens.border,
@@ -105,67 +97,73 @@ export function StudioThemeDashboardPreview({
 							}}
 						>
 							<span
-								className="size-1 rounded-full"
+								className="size-1 rounded-full shrink-0"
 								style={{ backgroundColor: tokens.primary }}
 							/>
 							<span
-								className="text-[6px] sm:text-[7px] font-semibold truncate"
-								style={{ color: tokens.primary }}
-							>
-								Overview
-							</span>
+								className="h-1.5 w-7 sm:w-8 block"
+								style={{
+									backgroundColor: tokens.primary,
+									borderRadius: miniRadius,
+								}}
+							/>
 						</div>
-						{/* Secondary Nav items */}
+						{/* Inactive item 1 */}
 						<div className="flex items-center gap-1 px-1 py-0.5">
 							<span
-								className="size-1 rounded-full opacity-60"
+								className="size-1 rounded-full shrink-0 opacity-40"
 								style={{ backgroundColor: tokens.muted }}
 							/>
 							<span
-								className="text-[6px] sm:text-[7px] truncate"
-								style={{ color: tokens.muted }}
-							>
-								Reports
-							</span>
+								className="h-1.5 w-8 sm:w-9 block opacity-40"
+								style={{
+									backgroundColor: tokens.muted,
+									borderRadius: miniRadius,
+								}}
+							/>
 						</div>
+						{/* Inactive item 2 */}
 						<div className="flex items-center gap-1 px-1 py-0.5">
 							<span
-								className="size-1 rounded-full opacity-60"
+								className="size-1 rounded-full shrink-0 opacity-40"
 								style={{ backgroundColor: tokens.muted }}
 							/>
 							<span
-								className="text-[6px] sm:text-[7px] truncate"
-								style={{ color: tokens.muted }}
-							>
-								Activity
-							</span>
+								className="h-1.5 w-6 sm:w-7 block opacity-40"
+								style={{
+									backgroundColor: tokens.muted,
+									borderRadius: miniRadius,
+								}}
+							/>
 						</div>
 					</div>
 
 					{/* Bottom sidebar item */}
 					<div className="flex items-center gap-1 px-1 py-0.5">
 						<span
-							className="size-1 rounded-full opacity-50"
+							className="size-1 rounded-full shrink-0 opacity-30"
 							style={{ backgroundColor: tokens.muted }}
 						/>
 						<span
-							className="text-[5.5px] truncate"
-							style={{ color: tokens.muted }}
-						>
-							Settings
-						</span>
+							className="h-1.5 w-5 sm:w-6 block opacity-30"
+							style={{
+								backgroundColor: tokens.muted,
+								borderRadius: miniRadius,
+							}}
+						/>
 					</div>
 				</div>
 
-				{/* Content area */}
+				{/* Content region */}
 				<div
-					className="flex flex-1 flex-col justify-between p-1.5 sm:p-2 overflow-hidden gap-1"
+					className="flex flex-1 flex-col justify-between p-1.5 sm:p-2 overflow-hidden gap-1.5"
 					style={{ backgroundColor: tokens.canvas }}
 				>
-					{/* Metric 1 & Metric 2 */}
+					{/* Top row: 2 panel silhouettes */}
 					<div className="grid grid-cols-2 gap-1.5 shrink-0">
+						{/* Panel 1 */}
 						<div
-							className="flex flex-col justify-between p-1 border"
+							className="flex flex-col justify-between p-1.5 border"
 							style={{
 								backgroundColor: tokens.surface,
 								borderColor: tokens.border,
@@ -173,32 +171,33 @@ export function StudioThemeDashboardPreview({
 							}}
 						>
 							<span
-								className="text-[6px] font-medium leading-none"
-								style={{ color: tokens.muted }}
-							>
-								Revenue
-							</span>
-							<div className="flex items-baseline justify-between mt-0.5">
+								className="h-1.5 w-10 block opacity-50"
+								style={{
+									backgroundColor: tokens.muted,
+									borderRadius: miniRadius,
+								}}
+							/>
+							<div className="flex items-center justify-between mt-1">
 								<span
-									className="text-[7.5px] sm:text-[8px] font-bold leading-none"
-									style={{ color: tokens.ink }}
-								>
-									$24.8k
-								</span>
+									className="h-2.5 sm:h-3 w-12 sm:w-14 block"
+									style={{
+										backgroundColor: tokens.ink,
+										borderRadius: miniRadius,
+									}}
+								/>
 								<span
-									className="text-[5px] px-0.5 rounded-xs font-semibold leading-none"
+									className="h-2 w-5 sm:w-6 block"
 									style={{
 										backgroundColor: tokens.active,
-										color: tokens.primary,
+										borderRadius: miniRadius,
 									}}
-								>
-									+12%
-								</span>
+								/>
 							</div>
 						</div>
 
+						{/* Panel 2 */}
 						<div
-							className="flex flex-col justify-between p-1 border"
+							className="flex flex-col justify-between p-1.5 border"
 							style={{
 								backgroundColor: tokens.surface,
 								borderColor: tokens.border,
@@ -206,49 +205,50 @@ export function StudioThemeDashboardPreview({
 							}}
 						>
 							<span
-								className="text-[6px] font-medium leading-none"
-								style={{ color: tokens.muted }}
-							>
-								Active Users
-							</span>
-							<div className="flex items-baseline justify-between mt-0.5">
+								className="h-1.5 w-9 block opacity-50"
+								style={{
+									backgroundColor: tokens.muted,
+									borderRadius: miniRadius,
+								}}
+							/>
+							<div className="flex items-center justify-between mt-1">
 								<span
-									className="text-[7.5px] sm:text-[8px] font-bold leading-none"
-									style={{ color: tokens.ink }}
-								>
-									1,429
-								</span>
+									className="h-2.5 sm:h-3 w-10 sm:w-12 block"
+									style={{
+										backgroundColor: tokens.ink,
+										borderRadius: miniRadius,
+									}}
+								/>
 								<span
-									className="text-[5px] px-0.5 rounded-xs font-semibold leading-none"
+									className="h-2 w-4 sm:w-5 block"
 									style={{
 										backgroundColor: tokens.secondary,
-										color: tokens.secondaryForeground,
+										borderRadius: miniRadius,
 									}}
-								>
-									+5%
-								</span>
+								/>
 							</div>
 						</div>
 					</div>
 
-					{/* Chart Container */}
+					{/* Middle row: Chart / graphic placeholder panel */}
 					<div
-						className="flex flex-col p-1 border min-h-0 flex-1 justify-between"
+						className="flex flex-col p-1.5 border min-h-0 flex-1 justify-between"
 						style={{
 							backgroundColor: tokens.surface,
 							borderColor: tokens.border,
 							borderRadius: scaledRadius,
 						}}
 					>
-						<div className="flex items-center justify-between pb-0.5">
+						<div className="flex items-center justify-between pb-1">
 							<span
-								className="text-[5.5px] sm:text-[6px] font-medium"
-								style={{ color: tokens.muted }}
-							>
-								Growth Trend
-							</span>
+								className="h-1.5 w-14 sm:w-16 block opacity-60"
+								style={{
+									backgroundColor: tokens.muted,
+									borderRadius: miniRadius,
+								}}
+							/>
 							<span
-								className="size-1 rounded-full"
+								className="size-1 rounded-full shrink-0"
 								style={{ backgroundColor: tokens.primary }}
 							/>
 						</div>
@@ -257,8 +257,9 @@ export function StudioThemeDashboardPreview({
 								viewBox="0 0 100 24"
 								className="w-full h-full overflow-visible"
 								preserveAspectRatio="none"
+								aria-hidden="true"
 							>
-								<title>Visual metric trend</title>
+								<title>Placeholder grafik siluet</title>
 								<path
 									d="M0,20 L12,15 L25,18 L38,10 L52,13 L66,6 L80,9 L92,3 L100,2 L100,24 L0,24 Z"
 									fill={tokens.primary}
@@ -276,75 +277,61 @@ export function StudioThemeDashboardPreview({
 						</div>
 					</div>
 
-					{/* Recent Activity Table */}
+					{/* Bottom row: Abstract data rows */}
 					<div
-						className="flex flex-col p-1 border shrink-0"
+						className="flex flex-col p-1.5 border shrink-0 gap-1"
 						style={{
 							backgroundColor: tokens.surface,
 							borderColor: tokens.border,
 							borderRadius: scaledRadius,
 						}}
 					>
-						<div
-							className="flex items-center justify-between pb-0.5 border-b"
-							style={{ borderColor: tokens.border }}
-						>
-							<span
-								className="text-[5.5px] sm:text-[6px] font-semibold"
-								style={{ color: tokens.ink }}
-							>
-								Recent Activity
-							</span>
-							<span className="text-[5px]" style={{ color: tokens.muted }}>
-								Status
-							</span>
-						</div>
-
-						{/* Row 1 */}
-						<div
-							className="flex items-center justify-between py-0.5 border-b"
-							style={{ borderColor: tokens.border }}
-						>
-							<div className="flex items-center gap-1">
+						{/* Data row 1 */}
+						<div className="flex items-center justify-between gap-1.5">
+							<div className="flex items-center gap-1.5 flex-1 min-w-0">
 								<span
-									className="size-1 rounded-full"
+									className="size-1 rounded-full shrink-0"
 									style={{ backgroundColor: tokens.primary }}
 								/>
 								<span
-									className="text-[5.5px] truncate"
-									style={{ color: tokens.ink }}
-								>
-									Batch #428 synced
-								</span>
+									className="h-1.5 flex-1 max-w-24 block opacity-75"
+									style={{
+										backgroundColor: tokens.ink,
+										borderRadius: miniRadius,
+									}}
+								/>
 							</div>
 							<span
-								className="text-[5px] px-1 font-semibold rounded-xs"
+								className="h-1.5 w-6 sm:w-8 block"
 								style={{
 									backgroundColor: tokens.active,
-									color: tokens.primary,
+									borderRadius: miniRadius,
 								}}
-							>
-								Done
-							</span>
+							/>
 						</div>
 
-						{/* Row 2 */}
-						<div className="flex items-center justify-between pt-0.5">
-							<div className="flex items-center gap-1">
+						{/* Data row 2 */}
+						<div className="flex items-center justify-between gap-1.5">
+							<div className="flex items-center gap-1.5 flex-1 min-w-0">
 								<span
-									className="size-1 rounded-full opacity-60"
+									className="size-1 rounded-full shrink-0 opacity-40"
 									style={{ backgroundColor: tokens.muted }}
 								/>
 								<span
-									className="text-[5.5px] truncate"
-									style={{ color: tokens.muted }}
-								>
-									API webhook ping
-								</span>
+									className="h-1.5 flex-1 max-w-20 block opacity-40"
+									style={{
+										backgroundColor: tokens.muted,
+										borderRadius: miniRadius,
+									}}
+								/>
 							</div>
-							<span className="text-[5px]" style={{ color: tokens.muted }}>
-								1m ago
-							</span>
+							<span
+								className="h-1.5 w-4 sm:w-5 block opacity-40"
+								style={{
+									backgroundColor: tokens.muted,
+									borderRadius: miniRadius,
+								}}
+							/>
 						</div>
 					</div>
 				</div>

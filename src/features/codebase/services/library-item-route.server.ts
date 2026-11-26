@@ -15,6 +15,12 @@ import {
 	CODEBASE_NAME_MIN_ERROR,
 	codebaseRenameSchema,
 } from "./library";
+import {
+	authFailureResponse,
+	logRouteFailure,
+	logTransientFailure,
+	transientDependencyResponse,
+} from "./route-failure";
 
 export function decideCodebaseDeletion(input: {
 	featureCount: number;
@@ -48,8 +54,8 @@ export async function handleCodebaseRename({
 	let user: { id: string };
 	try {
 		user = await requireUser(request.headers);
-	} catch {
-		return Response.json({ error: "Unauthorized" }, { status: 401 });
+	} catch (error) {
+		return authFailureResponse(error);
 	}
 
 	const { codebaseId } = params;
@@ -104,10 +110,12 @@ export async function handleCodebaseRename({
 			name: renamed.name,
 		});
 	} catch (error) {
-		console.error(
-			`[codebases/rename] failed for codebase ${codebaseId} (user ${user.id}):`,
-			error,
-		);
+		const unavailable = transientDependencyResponse(error);
+		if (unavailable) {
+			logTransientFailure("codebases/rename", error);
+			return unavailable;
+		}
+		logRouteFailure(`codebases/rename ${codebaseId}`, error);
 		return Response.json(
 			{
 				error: "Gagal mengganti nama project.",
@@ -224,8 +232,8 @@ export async function handleCodebaseDelete({
 	let user: { id: string };
 	try {
 		user = await requireUser(request.headers);
-	} catch {
-		return Response.json({ error: "Unauthorized" }, { status: 401 });
+	} catch (error) {
+		return authFailureResponse(error);
 	}
 
 	const { codebaseId } = params;
@@ -268,10 +276,12 @@ export async function handleCodebaseDelete({
 
 		return Response.json({ success: true, deleted: true });
 	} catch (error) {
-		console.error(
-			`[codebases/delete] failed for codebase ${codebaseId} (user ${user.id}):`,
-			error,
-		);
+		const unavailable = transientDependencyResponse(error);
+		if (unavailable) {
+			logTransientFailure("codebases/delete", error);
+			return unavailable;
+		}
+		logRouteFailure(`codebases/delete ${codebaseId}`, error);
 		return Response.json(
 			{
 				error: "Gagal menghapus codebase.",

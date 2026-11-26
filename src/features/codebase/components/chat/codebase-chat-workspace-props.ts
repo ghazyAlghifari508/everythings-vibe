@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { AnswersPersistenceState } from "@/features/codebase/hooks/use-workspace-handoff-persistence";
 import type { CodebaseStarterSuggestion } from "@/features/codebase/services/analysis";
 import type {
 	AdaptiveQuestion,
@@ -12,6 +13,7 @@ import type {
 import type { CodebaseComposerMode } from "@/features/codebase/services/revision-intent";
 import type { WorkspaceView } from "@/features/codebase/services/workspace-hydration";
 import type { ComposerReferenceBinding } from "@/features/codebase/types/revision";
+import type { WorkspaceEvent } from "../../types/workspace-timeline";
 import type { CodebaseArtifactRef } from "../explorer/codebase-file-card";
 import type { RevisionHistoryEntry } from "../revision/codebase-revision-history";
 import type { RevisionProposalView } from "../revision/codebase-revision-review-dialog";
@@ -37,7 +39,11 @@ export interface CodebaseChatWorkspaceProps {
 	repositoryFiles?: ReadonlyArray<{ path: string } | string>;
 	fileCount?: number;
 	kanbanProgress?: { done: number; total: number; pct: number } | null;
+	onOpenTaskProgress?: () => void;
 	messages: ChatStreamMessage[];
+	timelineEvents?: WorkspaceEvent[];
+	timelineStatus?: "pending" | "ready" | "failed";
+	onRetryTimeline?: () => void;
 	questions: AdaptiveQuestion[];
 	answers: Record<string, string>;
 	/**
@@ -61,6 +67,12 @@ export interface CodebaseChatWorkspaceProps {
 	 */
 	tasksUnresolved?: boolean;
 	answersReadOnly?: boolean;
+	/**
+	 * Persistence state of the clarification answers. The wizard's final
+	 * specification action waits for a successful save, and a failed save is
+	 * retried from the row it renders instead of being retried silently.
+	 */
+	answersPersistence?: AnswersPersistenceState;
 	composerAvailable?: boolean;
 	codebaseName?: string;
 	starterSuggestions?: CodebaseStarterSuggestion[];
@@ -75,7 +87,6 @@ export interface CodebaseChatWorkspaceProps {
 	isConfirming?: boolean;
 	specError?: string | null;
 	onOpenArtifact?: (artifact: CodebaseArtifactRef) => void;
-	onDownloadArtifact?: (artifact: CodebaseArtifactRef) => void;
 	onSubmitAnswer?: (questionId: string, answer: string) => void;
 	onSendMessage?:
 		| ((message: string) => void)
@@ -98,7 +109,6 @@ export interface CodebaseChatWorkspaceProps {
 	 */
 	planningSnapshotId?: string | null;
 	currentSnapshotId?: string | null;
-	onReviewPlan?: () => void;
 	onConfirmGenerate?: () => void;
 	onRetryQuestions?: () => void;
 	onRetryGenerate?: () => void;

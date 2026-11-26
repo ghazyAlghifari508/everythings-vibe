@@ -125,6 +125,17 @@ export function radiusAliasLabel(
 	return token.pill ? `${base} pill` : base;
 }
 
+// A radius measured on a single element is a scoped observation, not a
+// component-class decision, so it stays in the evidence table until repetition
+// or proven pill geometry supports a global alias.
+const RADIUS_SHARED_SUPPORT = 2;
+
+function radiusHasSharedSupport(
+	token: DesignTokenModel["radii"][number],
+): boolean {
+	return token.pill === true || token.frequency >= RADIUS_SHARED_SUPPORT;
+}
+
 // Only tokens that pass validation reach the stylesheet, and generated
 // implementation aliases are labelled as generated rather than presented as
 // the website's own variables.
@@ -145,7 +156,10 @@ export function tokenEntries(model: DesignTokenModel): TokenEntry[] {
 	};
 	const roleCounts = new Map<string, number>();
 	for (const color of model.colors) {
-		if (!isValidCssColor(color.value)) continue;
+		// The user-agent text colour is what the browser painted, not what the
+		// page decided; it stays in the evidence table instead of becoming a
+		// global token an agent would treat as a design decision.
+		if (!isValidCssColor(color.value) || color.userAgentDefault) continue;
 		const isUnclassified =
 			color.roleClass === "unknown" || color.confidence === "unknown";
 		if (!isUnclassified) {
@@ -155,7 +169,8 @@ export function tokenEntries(model: DesignTokenModel): TokenEntry[] {
 	add(
 		"color",
 		model.colors.map((color) => {
-			if (!isValidCssColor(color.value)) return { name: null, value: "" };
+			if (!isValidCssColor(color.value) || color.userAgentDefault)
+				return { name: null, value: "" };
 			const isUnclassified =
 				color.roleClass === "unknown" || color.confidence === "unknown";
 			if (isUnclassified) {
@@ -208,13 +223,20 @@ export function tokenEntries(model: DesignTokenModel): TokenEntry[] {
 	add(
 		"spacing",
 		// Container widths are not spacing steps: they live under the Tailwind v4
-		// container scale instead of the spacing namespace.
+		// container scale instead of the spacing namespace. A max-width that the
+		// capture could not establish as a container stays measurement evidence.
 		model.spacing.map((token) => ({
 			name:
+				token.property === "max-width" ||
 				token.purpose === "Container max-width" ||
 				!isValidCssLength(token.value)
 					? null
-					: tokenName("--spacing", token.purpose),
+					: tokenName(
+							"--spacing",
+							// The namespace already says spacing, so "Navigation spacing"
+							// must not become `--spacing-navigation-spacing`.
+							token.purpose.replace(/\s*spacing$/i, ""),
+						),
 			value: token.value,
 		})),
 	);
@@ -233,9 +255,10 @@ export function tokenEntries(model: DesignTokenModel): TokenEntry[] {
 	add(
 		"radius",
 		model.radii.map((token) => ({
-			name: isValidCssRadius(token.value)
-				? tokenName("--radius", radiusAliasLabel(token))
-				: null,
+			name:
+				isValidCssRadius(token.value) && radiusHasSharedSupport(token)
+					? tokenName("--radius", radiusAliasLabel(token))
+					: null,
 			value: token.value,
 		})),
 	);

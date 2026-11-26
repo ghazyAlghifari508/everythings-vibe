@@ -316,4 +316,67 @@ describe("StudioLaunchComposer", () => {
 		fireEvent.keyDown(textarea, { key: "Enter" });
 		expect(onSubmit).not.toHaveBeenCalled();
 	});
+
+	it("submits on clicking the submit button when enabled", () => {
+		const { onSubmit } = renderComposer({ prompt: "Aplikasi POS kasir" });
+		const submitBtn = screen.getByRole("button", { name: "Kirim prompt" });
+		expect(submitBtn).toHaveProperty("disabled", false);
+		fireEvent.click(submitBtn);
+		expect(onSubmit).toHaveBeenCalledTimes(1);
+	});
+
+	it("renders circular spinner with accessible busy state during loading and restores idle state on retry", () => {
+		const onSubmit = vi.fn();
+		const { rerender } = render(
+			<StudioLaunchComposer
+				prompt="Desain sistem keuangan"
+				onPromptChange={vi.fn()}
+				config={baseConfig}
+				onConfigChange={vi.fn()}
+				reference={null}
+				onOpenDesignPicker={vi.fn()}
+				loading={true}
+				error=""
+				onSubmit={onSubmit}
+				textareaRef={{ current: null }}
+			/>,
+		);
+
+		const submitBtn = screen.getByRole("button", { name: "Kirim prompt" });
+		expect(submitBtn).toHaveProperty("disabled", true);
+		expect(submitBtn.getAttribute("aria-busy")).toBe("true");
+
+		const spinner = submitBtn.querySelector('[data-testid="spinner"]');
+		expect(spinner).not.toBeNull();
+		expect(spinner?.getAttribute("class")).toContain(
+			"motion-safe:animate-spin",
+		);
+
+		fireEvent.click(submitBtn);
+		const textarea = screen.getByRole("textbox");
+		fireEvent.keyDown(textarea, { key: "Enter" });
+		expect(onSubmit).not.toHaveBeenCalled();
+
+		rerender(
+			<StudioLaunchComposer
+				prompt="Desain sistem keuangan"
+				onPromptChange={vi.fn()}
+				config={baseConfig}
+				onConfigChange={vi.fn()}
+				reference={null}
+				onOpenDesignPicker={vi.fn()}
+				loading={false}
+				error="Studio gagal generate. Coba lagi."
+				onSubmit={onSubmit}
+				textareaRef={{ current: null }}
+			/>,
+		);
+
+		expect(submitBtn.querySelector('[data-testid="spinner"]')).toBeNull();
+		expect(submitBtn.getAttribute("aria-busy")).toBeNull();
+		expect(submitBtn).toHaveProperty("disabled", false);
+		expect(screen.getByRole("alert").textContent).toContain(
+			"Studio gagal generate. Coba lagi.",
+		);
+	});
 });

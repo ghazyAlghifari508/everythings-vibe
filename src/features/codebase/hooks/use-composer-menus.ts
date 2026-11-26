@@ -10,6 +10,8 @@ import {
 	canSwitchToPlanMode,
 	consumeTriggerToken,
 	extractProjectIdFromArtifactId,
+	formatArtifactChipLabel,
+	inferArtifactTargetKind,
 	normalizeRepositoryFileList,
 	parseDirectSlashCommand,
 	reconcileSelectedReferences,
@@ -22,7 +24,10 @@ import {
 	normalizeComposerMode,
 } from "@/features/codebase/services/revision-intent";
 import type { CodebaseArtifactRef } from "../components/explorer/codebase-file-card";
-import type { ComposerReferenceBinding } from "../types/revision";
+import type {
+	ComposerArtifactReference,
+	ComposerReferenceBinding,
+} from "../types/revision";
 import { useComposerKeyboard } from "./use-composer-keyboard";
 
 export function useComposerMenus(input: {
@@ -159,11 +164,8 @@ export function useComposerMenus(input: {
 	const kb = useComposerKeyboard({
 		draft,
 		artifacts,
-		normalizedRepoFiles,
 		featureName,
 		resolvedProjectId,
-		codebaseId,
-		currentSnapshotId,
 		onSelectMentionCandidate: useCallback(
 			(
 				candidate: ComposerMentionCandidate,
@@ -180,22 +182,18 @@ export function useComposerMenus(input: {
 				}
 				const nextBinding = toReferenceBinding(candidate);
 				setSelectedReferences((current) => {
-					const filtered = current.filter((item) => {
-						if (item.kind === "artifact" && nextBinding.kind === "artifact")
-							return item.targetKind !== nextBinding.targetKind;
-						if (item.kind === "file" && nextBinding.kind === "file")
-							return item.path !== nextBinding.path;
-						return true;
-					});
+					const filtered = current.filter(
+						(item) =>
+							item.kind !== "artifact" ||
+							item.targetKind !== nextBinding.targetKind,
+					);
 					const updated = [...filtered, nextBinding];
 					onReferencesChange?.(updated);
 					return updated;
 				});
-				if (candidate.kind === "artifact") {
-					setInternalTarget(candidate.targetKind);
-					setExplicitTargetSelected(true);
-					onChangeRevisionTarget?.(candidate.targetKind);
-				}
+				setInternalTarget(candidate.targetKind);
+				setExplicitTargetSelected(true);
+				onChangeRevisionTarget?.(candidate.targetKind);
 				focusComposer();
 			},
 			[onChangeRevisionTarget, onReferencesChange, focusComposer, setDraft],
@@ -290,6 +288,106 @@ export function useComposerMenus(input: {
 		(hasStaleReferences ||
 			(activeMode === "revise" && effectiveTarget.artifact === null));
 
+	const handleStartRevision = useCallback(
+		(targetInput?: RevisionTargetKind | CodebaseArtifactRef) => {
+			let resolvedArtifact: CodebaseArtifactRef | null = null;
+			let resolvedKind: RevisionTargetKind | null = null;
+
+			if (
+				targetInput &&
+				typeof targetInput === "object" &&
+				"id" in targetInput
+			) {
+				resolvedArtifact = targetInput;
+				resolvedKind = inferArtifactTargetKind(targetInput);
+			} else if (typeof targetInput === "string") {
+				resolvedKind = targetInput;
+				resolvedArtifact =
+					artifacts.find((a) => inferArtifactTargetKind(a) === targetInput) ??
+					null;
+			}
+
+			if (!resolvedKind || !resolvedArtifact) {
+				const taskArt = artifacts.find(
+					(a) => inferArtifactTargetKind(a) === "tasks",
+				);
+				const acArt = artifacts.find(
+					(a) => inferArtifactTargetKind(a) === "ac",
+				);
+				const prdArt = artifacts.find(
+					(a) => inferArtifactTargetKind(a) === "prd",
+				);
+				const featArt = artifacts.find(
+					(a) => inferArtifactTargetKind(a) === "feature",
+				);
+
+				if (taskArt) {
+					resolvedArtifact = taskArt;
+					resolvedKind = "tasks";
+				} else if (acArt) {
+					resolvedArtifact = acArt;
+					resolvedKind = "ac";
+				} else if (prdArt) {
+					resolvedArtifact = prdArt;
+					resolvedKind = "prd";
+				} else if (featArt) {
+					resolvedArtifact = featArt;
+					resolvedKind = "feature";
+				}
+			}
+
+			if (!resolvedKind || !resolvedArtifact) {
+				return;
+			}
+
+			setIsCompletedRevisionOpen(true);
+			setActiveMode("revise");
+			setLockedNotice(null);
+			onComposerModeChange?.("revise");
+
+			setInternalTarget(resolvedKind);
+			setExplicitTargetSelected(true);
+			onChangeRevisionTarget?.(resolvedKind);
+
+			const nextBinding: ComposerArtifactReference = {
+				kind: "artifact",
+				id: resolvedArtifact.id,
+				projectId: extractProjectIdFromArtifactId(
+					resolvedArtifact.id,
+					resolvedProjectId,
+				),
+				targetKind: resolvedKind,
+				label: formatArtifactChipLabel(
+					resolvedArtifact,
+					resolvedKind,
+					featureName,
+				),
+				fileName: resolvedArtifact.fileName,
+			};
+
+			setSelectedReferences((current) => {
+				const filtered = current.filter(
+					(item) =>
+						item.kind !== "artifact" ||
+						item.targetKind !== nextBinding.targetKind,
+				);
+				const updated = [...filtered, nextBinding];
+				onReferencesChange?.(updated);
+				return updated;
+			});
+
+			focusComposer();
+		},
+		[
+			artifacts,
+			featureName,
+			focusComposer,
+			onChangeRevisionTarget,
+			onComposerModeChange,
+			onReferencesChange,
+			resolvedProjectId,
+		],
+	);
 	return {
 		activeMode,
 		canSwitchToPlan,
@@ -316,8 +414,9 @@ export function useComposerMenus(input: {
 		isMentionPopoverOpen: kb.isMentionPopoverOpen,
 		mentionSearch: kb.effectiveMentionQuery,
 		setMentionSearch: kb.setMentionSearch,
-		mentionDocuments: kb.mentionCandidates.documents,
-		mentionFiles: kb.mentionCandidates.files,
+		mentionDocuments: kb.filteredMentionDocuments,
+		mentionHasDocuments: kb.hasMentionDocuments,
+		mentionSearchAutoFocus: kb.isMentionButtonOpen,
 		mentionActiveIndex: kb.mentionActiveIndex,
 		isSlashPopoverOpen: kb.isSlashPopoverOpen,
 		slashCommands: kb.filteredSlashCommands,
@@ -331,15 +430,19 @@ export function useComposerMenus(input: {
 		handleChangeRevisionTarget,
 		handleToggleMention: () => {
 			kb.setIsMentionButtonOpen((prev) => !prev);
+			kb.setMentionSearch("");
 			kb.setMentionActiveIndex(0);
 		},
 		handleCloseMention: () => {
 			kb.setIsMentionButtonOpen(false);
+			kb.setMentionSearch("");
 			kb.setDismissedMentionToken(kb.inlineMentionTokenKey);
 		},
 		handleSelectMentionCandidate: kb.handleSelectMention,
 		handleRemoveReference,
 		handleSelectSlashCommand: kb.handleSelectSlash,
 		handleComposerKeyDown: kb.handleComposerKeyDown,
+		handleMentionSearchKeyDown: kb.handleMentionSearchKeyDown,
+		handleStartRevision,
 	};
 }

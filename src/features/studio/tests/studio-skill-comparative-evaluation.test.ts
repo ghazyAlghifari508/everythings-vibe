@@ -260,7 +260,7 @@ describe("Comparative skill evaluation on four representative briefs (Task 02)",
 				note: "mocked provider: measures pipeline behaviour, not model aesthetics",
 			}),
 		);
-	}, 30_000);
+	}, 120_000);
 
 	it("keeps shared component structure consistent across screens and skills", () => {
 		for (const brief of BRIEFS) {

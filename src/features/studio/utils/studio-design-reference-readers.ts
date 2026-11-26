@@ -1,21 +1,11 @@
-import { extractDesignSystemTokens } from "@/features/studio/services/studio-design-tokens";
-import { validateStudioDesignMd } from "@/features/studio/services/studio-prompt-validation";
+import type { CanonicalDesignSystem } from "@/features/studio/services/studio-design-tokens";
+import { inspectStudioDesignMd } from "@/features/studio/services/studio-prompt-validation";
 import type { AttachedLogo } from "@/features/studio/types/studio";
 import { STUDIO_LOGO_MAX_BYTES } from "@/features/studio/types/studio-constants";
 import { formatStudioBytes } from "@/features/studio/utils/format-studio-bytes";
 
 /** Counts the design tokens a custom DESIGN.md actually declares. */
-function countDeclaredTokens(tokens: {
-	colors: {
-		primary?: string | null;
-		canvas?: string | null;
-		ink?: string | null;
-		surface?: string | null;
-		muted?: string | null;
-		border?: string | null;
-		accents: Record<string, string>;
-	};
-}): number {
+function countDeclaredTokens(tokens: CanonicalDesignSystem): number {
 	return (
 		[
 			tokens.colors.primary,
@@ -64,28 +54,13 @@ export async function readStudioDesignMdFile(
 	} catch {
 		return { error: "Gagal membaca file. Coba lagi." };
 	}
-	const checked = validateStudioDesignMd(text);
-	if (!checked.ok || !checked.designMd) {
-		return {
-			error: !checked.ok
-				? checked.error
-				: "File tidak berisi desain yang valid.",
-		};
-	}
-	const tokens = extractDesignSystemTokens(checked.designMd);
-	if (
-		!tokens ||
-		(!tokens.typography.fontFamily && countDeclaredTokens(tokens) === 0)
-	) {
-		return {
-			error: "File tidak memuat token desain yang dikenali (warna atau font).",
-		};
-	}
+	const inspected = inspectStudioDesignMd(text);
+	if (!inspected.ok) return { error: inspected.error };
 	return {
-		designMd: checked.designMd,
+		designMd: inspected.designMd,
 		filename: file.name,
-		colorCount: countDeclaredTokens(tokens),
-		fontFamily: tokens.typography.fontFamily ?? null,
+		colorCount: countDeclaredTokens(inspected.tokens),
+		fontFamily: inspected.tokens.typography.fontFamily ?? null,
 	};
 }
 

@@ -58,6 +58,7 @@ export const CODEBASE_GENERATION_MAX_CONSTRAINTS = 10;
 
 export const CODEBASE_ASK_HANDOFF_MAX_PROMPT_CHARS = 8_000;
 export const CODEBASE_ASK_HANDOFF_MAX_ANSWERS = 60;
-export const CODEBASE_ASK_HANDOFF_MAX_STATE_CHARS = 20_000;
-export const CODEBASE_ASK_HANDOFF_MAX_OPTIONS = 8;
+// Covers a full generated set, including JSON escaping, without dropping questions.
+export const CODEBASE_ASK_HANDOFF_MAX_STATE_CHARS = 1_000_000;
+export const CODEBASE_ASK_HANDOFF_MAX_OPTIONS = 12;
 export const CODEBASE_ASK_HANDOFF_SAVE_TIMEOUT_MS = 8_000;

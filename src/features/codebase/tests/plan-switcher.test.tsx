@@ -143,3 +143,104 @@ describe("CodebasePlanSwitcher menu", () => {
 		expect(onSelectPlan).not.toHaveBeenCalled();
 	});
 });
+
+describe("CodebasePlanSwitcher search", () => {
+	function typeQuery(value: string) {
+		const input = document.body.querySelector<HTMLInputElement>(
+			"[data-testid='codebase-plan-search']",
+		);
+		act(() => {
+			input?.dispatchEvent(new Event("input", { bubbles: true }));
+			if (input) {
+				const setter = Object.getOwnPropertyDescriptor(
+					window.HTMLInputElement.prototype,
+					"value",
+				)?.set;
+				setter?.call(input, value);
+				input.dispatchEvent(new Event("input", { bubbles: true }));
+			}
+		});
+	}
+
+	it("filters the list to plans matching the query", () => {
+		renderSwitcher();
+		openMenu();
+		typeQuery("Filter");
+		const ready = document.body.querySelector(
+			"[data-testid='codebase-plan-option-plan-ready']",
+		);
+		const draft = document.body.querySelector(
+			"[data-testid='codebase-plan-option-plan-draft']",
+		);
+		expect(ready).not.toBeNull();
+		expect(draft).toBeNull();
+	});
+
+	it("shows a no-results message when nothing matches", () => {
+		renderSwitcher();
+		openMenu();
+		typeQuery("tidak-ada-fitur-ini");
+		const empty = document.body.querySelector(
+			"[data-testid='codebase-plan-empty']",
+		);
+		expect(empty?.textContent).toContain("Tidak ada fitur yang cocok");
+		expect(
+			document.body.querySelector(
+				"[data-testid='codebase-plan-option-plan-ready']",
+			),
+		).toBeNull();
+	});
+
+	it("keeps the create-new action reachable while searching", () => {
+		renderSwitcher();
+		openMenu();
+		typeQuery("Filter");
+		expect(
+			document.body.querySelector("[data-testid='codebase-plan-create-new']"),
+		).not.toBeNull();
+	});
+});
+
+describe("CodebasePlanSwitcher large list", () => {
+	it("renders every plan inside the bounded scroll region", () => {
+		const many: ActivePlanCandidate[] = Array.from({ length: 30 }, (_, i) => ({
+			...draftPlan,
+			id: `plan-${i}`,
+			name: `Fitur ${i}`,
+		}));
+		renderSwitcher({ plans: many, activePlanId: null, activePlanName: null });
+		openMenu();
+		const list = document.body.querySelector(
+			"[data-testid='codebase-plan-list']",
+		);
+		// The scroll region hosts all 30 plans; max-h + overflow-y keeps it
+		// bounded rather than pushing the create action off-screen.
+		expect(
+			list?.querySelectorAll("[data-testid^='codebase-plan-option-']"),
+		).toHaveLength(30);
+		const create = document.body.querySelector(
+			"[data-testid='codebase-plan-create-new']",
+		);
+		expect(create).not.toBeNull();
+	});
+});
+
+describe("describePlanMeta task progress", () => {
+	it("leads with task progress when the plan carries tasks", () => {
+		renderSwitcher({
+			plans: [
+				{
+					...readyPlan,
+					taskTotal: 12,
+					taskCompleted: 4,
+				},
+			],
+		});
+		openMenu();
+		const option = document.body.querySelector(
+			"[data-testid='codebase-plan-option-plan-ready']",
+		);
+		expect(option?.textContent).toContain("12 task");
+		expect(option?.textContent).toContain("4 selesai");
+	});
+});

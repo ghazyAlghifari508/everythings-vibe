@@ -5,22 +5,59 @@ import {
 	CODEBASE_STARTER_PROMPT_MAX_CHARS,
 	CODEBASE_STARTER_TITLE_MAX_CHARS,
 } from "@/features/codebase/types/codebase-constants";
-import { analysisCreditConsentSchema } from "./analysis-credit-policy";
 import { codebaseAnalysisStatusSchema } from "./sync";
 
 // === Codebase analysis (validated advisory output) ===
 // The analysis is advisory: uncertain detections must stay labeled as
 // uncertainty/verification items and must never be presented as fact.
 
+export const codebaseFindingClaimTypeSchema = z.enum([
+	"verified",
+	"inference",
+	"uncertain",
+]);
+
+export type CodebaseFindingClaimType = z.infer<
+	typeof codebaseFindingClaimTypeSchema
+>;
+
 export const codebaseAnalysisFindingSchema = z.object({
 	title: z.string().min(1),
 	detail: z.string().min(1),
 	uncertainty: z.string().min(1).optional(),
+	claimType: codebaseFindingClaimTypeSchema.optional(),
+	evidencePaths: z.array(z.string().min(1)).optional(),
 	relevantPaths: z.array(z.string().min(1)).optional(),
+	implication: z.string().min(1).optional(),
+	impact: z.string().min(1).optional(),
 });
 
 export type CodebaseAnalysisFinding = z.infer<
 	typeof codebaseAnalysisFindingSchema
+>;
+
+export function getFindingEvidencePaths(
+	finding: Pick<CodebaseAnalysisFinding, "evidencePaths" | "relevantPaths">,
+): string[] {
+	if (finding.evidencePaths && finding.evidencePaths.length > 0) {
+		return finding.evidencePaths;
+	}
+	return finding.relevantPaths ?? [];
+}
+
+export function getFindingImplication(
+	finding: Pick<CodebaseAnalysisFinding, "implication" | "impact">,
+): string | undefined {
+	return finding.implication ?? finding.impact;
+}
+
+export const codebaseApplicationModuleSchema = z.object({
+	name: z.string().min(1),
+	description: z.string().min(1),
+});
+
+export type CodebaseApplicationModule = z.infer<
+	typeof codebaseApplicationModuleSchema
 >;
 
 export const CODEBASE_STARTER_IDS = [
@@ -80,6 +117,7 @@ const codebaseAnalysisBaseSchema = z.object({
 		.optional(),
 	relevantFiles: z.array(z.string().min(1)).optional(),
 	impactAreas: z.array(z.string().min(1)).optional(),
+	applicationModules: z.array(codebaseApplicationModuleSchema).optional(),
 	limitations: z.array(z.string().min(1)).optional(),
 	findings: z.array(codebaseAnalysisFindingSchema).optional(),
 });
@@ -109,7 +147,6 @@ export const ANALYSIS_VALIDATION_MESSAGE =
 export const analysisRequestSchema = z.object({
 	snapshotId: z.string().min(1).optional(),
 	preflight: z.boolean().optional(),
-	creditConsent: analysisCreditConsentSchema.optional(),
 });
 
 export type AnalysisRequest = z.infer<typeof analysisRequestSchema>;

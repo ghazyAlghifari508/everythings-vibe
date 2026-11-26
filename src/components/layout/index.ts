@@ -1,6 +1,8 @@
+export type { FlowStep } from "@/features/greenfield/utils/flow-step";
+export { routeToStep } from "@/features/greenfield/utils/flow-step";
 export { AppLayout } from "./app-layout";
-export type { CodebasePlanStep, FlowStep } from "./flow-step-nav";
-export { CodebaseStepNav, FlowStepNav, routeToStep } from "./flow-step-nav";
+export type { CodebasePlanStep } from "./flow-step-nav";
+export { CodebaseStepNav, FlowStepNav } from "./flow-step-nav";
 export { GridBackground } from "./grid-background";
 export { HeroContent } from "./hero";
 export { Navbar } from "./navbar";

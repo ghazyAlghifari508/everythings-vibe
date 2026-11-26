@@ -4,6 +4,7 @@ import {
 	handleCodebaseCreate,
 	handleCodebaseList,
 } from "@/features/codebase/services/library-route.server";
+import { guardCodebaseHandler } from "@/features/codebase/services/route-failure";
 
 // Browser codebase library boundary (list + create + bulk delete).
 //
@@ -15,16 +16,26 @@ import {
 // Auth (`requireUser`), tenant isolation, name provenance, the atomic
 // codebase + sync-session transaction, and the documented error contract live
 // in `src/features/codebase/services/library-route.server.ts`.
+//
+// `guardCodebaseHandler` is the last line of defense: a dependency outage must
+// answer a classified 503 instead of escaping into TanStack Start's opaque
+// unhandled 500.
 
 export const Route = createFileRoute("/api/codebases/")({
 	server: {
 		handlers: {
 			GET: ({ request }: { request: Request }) =>
-				handleCodebaseList({ request }),
+				guardCodebaseHandler("codebases/list", () =>
+					handleCodebaseList({ request }),
+				),
 			POST: ({ request }: { request: Request }) =>
-				handleCodebaseCreate({ request }),
+				guardCodebaseHandler("codebases/create", () =>
+					handleCodebaseCreate({ request }),
+				),
 			DELETE: ({ request }: { request: Request }) =>
-				handleCodebaseBulkDelete({ request }),
+				guardCodebaseHandler("codebases/bulk-delete", () =>
+					handleCodebaseBulkDelete({ request }),
+				),
 		},
 	},
 });

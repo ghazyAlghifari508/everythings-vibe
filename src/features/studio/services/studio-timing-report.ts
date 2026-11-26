@@ -18,8 +18,9 @@ const eventSchema = z.object({
 	outputTokens: z.number().nonnegative().optional(),
 	textTokens: z.number().nonnegative().optional(),
 	reasoningTokens: z.number().nonnegative().optional(),
-	maxTokens: z.number().nonnegative().optional(),
-	tokenLimitExceeded: z.boolean().optional(),
+	accountingAboveRequested: z.boolean().nullable().optional(),
+	ceilingReached: z.boolean().optional(),
+	correctionRequired: z.boolean().optional(),
 	providerRetries: z.number().nonnegative().optional(),
 	providerFallbacks: z.number().nonnegative().optional(),
 });
@@ -31,13 +32,14 @@ function frameMeasurementKey(event: { jobId?: string; frameId?: string }) {
 function summarize(values: number[]) {
 	const sorted = [...values].sort((a, b) => a - b);
 	const mean = sorted.reduce((sum, value) => sum + value, 0) / sorted.length;
-	// ponytail: three observations is a minimal sample floor for descriptive p50/p95 reporting; larger cohorts are preferred when available.
+	// Small cohorts retain per-event measurements rather than misleading tails.
 	return {
 		count: sorted.length,
 		mean,
-		p50: sorted.length >= 3 ? sorted[Math.ceil(sorted.length * 0.5) - 1] : null,
+		p50:
+			sorted.length >= 20 ? sorted[Math.ceil(sorted.length * 0.5) - 1] : null,
 		p95:
-			sorted.length >= 3 ? sorted[Math.ceil(sorted.length * 0.95) - 1] : null,
+			sorted.length >= 20 ? sorted[Math.ceil(sorted.length * 0.95) - 1] : null,
 	};
 }
 
@@ -113,6 +115,13 @@ export function summarizeStudioTimings(log: string) {
 			validated.add(frameKey);
 			if ((event.attempt ?? 1) > 1) corrected.add(frameKey);
 		}
+		if (
+			event.frameId &&
+			(event.stage === "correction" || event.correctionRequired)
+		) {
+			validated.add(frameKey);
+			corrected.add(frameKey);
+		}
 		if (event.stage.endsWith("-output")) {
 			if (event.outputTokens !== undefined) tokens.push(event.outputTokens);
 			if (event.inputTokens !== undefined) inputTokens.push(event.inputTokens);
@@ -174,9 +183,11 @@ export function summarizeStudioTimings(log: string) {
 			: null,
 		providerRetries,
 		providerFallbacks,
-		tokenLimitExceededCount: events.filter(
-			(event) => event.tokenLimitExceeded === true,
+		accountingAboveRequestedCount: events.filter(
+			(event) => event.accountingAboveRequested === true,
 		).length,
+		ceilingReachedCount: events.filter((event) => event.ceilingReached === true)
+			.length,
 		gatewayInternalFallbacks: null,
 	};
 }

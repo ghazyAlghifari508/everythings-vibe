@@ -136,3 +136,42 @@ export function WorkspaceConnectionScreen({
 		</main>
 	);
 }
+
+export function WorkspaceConnectionScreenWrapper({
+	name,
+	ws,
+}: {
+	name: string;
+	ws: {
+		error: string | null;
+		status: ConnectionState["status"];
+		payload: ConnectionState["payload"];
+		isStarting: boolean;
+		triggerAnalysis: ConnectionState["triggerAnalysis"];
+		startSession: ConnectionState["startSession"];
+		readStatus: ConnectionState["readStatus"];
+		readiness?: CodebaseReadiness;
+		analysis?: AnalysisResponse | null;
+		isWorking?: boolean;
+		activeWorkspaceSnapshotId?: string | null;
+		manifestFileCount?: number | null;
+	};
+}) {
+	return (
+		<WorkspaceConnectionScreen
+			name={name}
+			error={ws.error}
+			status={ws.status}
+			payload={ws.payload}
+			isStarting={ws.isStarting}
+			triggerAnalysis={ws.triggerAnalysis}
+			startSession={ws.startSession}
+			readStatus={ws.readStatus}
+			readiness={ws.readiness}
+			analysis={ws.analysis}
+			isWorking={ws.isWorking}
+			activeWorkspaceSnapshotId={ws.activeWorkspaceSnapshotId}
+			manifestFileCount={ws.manifestFileCount ?? undefined}
+		/>
+	);
+}

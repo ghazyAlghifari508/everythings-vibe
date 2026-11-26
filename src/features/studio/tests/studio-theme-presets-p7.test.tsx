@@ -153,7 +153,7 @@ describe("TASK 07 — Nine Themes, Standardized Previews, and Fullscreen Picker"
 		expect(jadeBtn.getAttribute("aria-pressed")).toBe("true");
 
 		// Click apply
-		fireEvent.click(screen.getByRole("button", { name: "Gunakan Tema" }));
+		fireEvent.click(screen.getByRole("button", { name: "Terapkan Tema" }));
 		expect(onSelectTheme).toHaveBeenCalledWith("jade");
 		expect(onOpenChange).toHaveBeenCalledWith(false);
 	});
@@ -303,8 +303,8 @@ describe("TASK 07 — Nine Themes, Standardized Previews, and Fullscreen Picker"
 		expect(grid?.className).toContain("lg:grid-cols-3");
 	});
 
-	// 13. No duplicate preview implementations remain
-	it("13. No duplicate preview components remain; all presets use the unified dashboard preview", () => {
+	// 13. Unified abstract UI silhouette across all presets
+	it("13. All presets use the unified abstract UI silhouette without fake dashboard copy", () => {
 		const onSelect = vi.fn();
 		render(
 			<StudioDesignThemePanel activeThemeId={null} onToggleTheme={onSelect} />,
@@ -314,15 +314,25 @@ describe("TASK 07 — Nine Themes, Standardized Previews, and Fullscreen Picker"
 		const buttons = screen.getAllByRole("button");
 		expect(buttons).toHaveLength(9);
 
-		// Every button contains the miniature preview with [S] and Dashboard
-		for (const button of buttons) {
-			const sDot = button.querySelector("span");
-			expect(sDot).not.toBeNull();
-			expect(button.textContent).toContain("Dashboard");
-			expect(button.textContent).toContain("Overview");
-			expect(button.textContent).toContain("Revenue");
-			expect(button.textContent).toContain("Active Users");
-			expect(button.textContent).toContain("Recent Activity");
+		// Every button contains the abstract silhouette preview and theme metadata
+		for (const [index, button] of buttons.entries()) {
+			const preset = STUDIO_DESIGN_PRESETS[index];
+			const preview = button.querySelector('[aria-hidden="true"]');
+			expect(preview).not.toBeNull();
+			expect(preview?.querySelector("svg")).not.toBeNull();
+
+			// Metadata is preserved under the preview
+			expect(button.textContent).toContain(preset.name);
+			expect(button.textContent).toContain(preset.font);
+
+			// Abstract silhouette contains no fake dashboard copy or micro-text
+			expect(button.textContent).not.toContain("Dashboard");
+			expect(button.textContent).not.toContain("Overview");
+			expect(button.textContent).not.toContain("Revenue");
+			expect(button.textContent).not.toContain("Active Users");
+			expect(button.textContent).not.toContain("Recent Activity");
+			expect(button.textContent).not.toContain("Reports");
+			expect(button.textContent).not.toContain("Search");
 		}
 	});
 });

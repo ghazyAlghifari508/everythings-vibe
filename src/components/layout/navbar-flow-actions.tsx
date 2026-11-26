@@ -6,24 +6,26 @@ import {
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState, useTransition } from "react";
 import { Icon } from "@/components/ui/icon";
-import {
-	getPendingPrdPrompt,
-	getSetupPrompt,
-	savePendingPrdPrompt,
-} from "@/lib/prompt-handoff";
-import { useChatStore, useUIStore } from "@/store";
+import { loadAsk } from "@/features/greenfield/services/ask-loader.functions";
 import {
 	getFlowStepCta,
 	routeToStep,
 	stepToRouteTarget,
-} from "./flow-step-nav";
+} from "@/features/greenfield/utils/flow-step";
+import {
+	getPendingPrdPrompt,
+	savePendingPrdPrompt,
+} from "@/lib/prompt-handoff";
+import { useChatStore, useUIStore } from "@/store";
 
 export function NavbarFlowActions({
 	pathname,
 	project,
+	projectId,
 	isFree,
 }: {
 	pathname: string;
+	projectId?: string;
 	project: {
 		projectName: string | null;
 		step: string | null;
@@ -37,7 +39,6 @@ export function NavbarFlowActions({
 	const [, startTransition] = useTransition();
 	const [isStepLoading, setIsStepLoading] = useState(false);
 	const routeStep = routeToStep(pathname);
-	const projectId = pathname.split("/")[2];
 	const flowCta = getFlowStepCta(routeStep, project?.step);
 	const isGeneratingPRD = useChatStore((s) => s.isGeneratingPRD);
 	const hasStreamingPRDContent = useChatStore((s) => !!s.streamingPRDContent);
@@ -103,20 +104,35 @@ export function NavbarFlowActions({
 							? "Daftar fitur masih disusun. Tunggu hingga selesai."
 							: "Lanjut ke PRD"
 					}
-					onClick={() => {
+					onClick={async () => {
 						if (isGeneratingFeatures || isStepLoading) return;
-						if (!getPendingPrdPrompt()) {
-							const setup = getSetupPrompt();
-							if (setup)
-								savePendingPrdPrompt(
-									setup,
-									"auto",
-									project?.projectName ?? undefined,
-								);
+						setIsStepLoading(true);
+						try {
+							if (!getPendingPrdPrompt(projectId)) {
+								const data = await loadAsk({ data: projectId });
+								const prompt = data.savedHandoff?.compiledPrompt;
+								if (prompt && !data.hasPrd)
+									savePendingPrdPrompt(
+										prompt,
+										"auto",
+										data.projectName,
+										projectId,
+									);
+							}
+							await navigate({
+								to: "/vibeplan/$id/prd",
+								params: { id: projectId },
+							});
+						} catch (error) {
+							showToast(
+								error instanceof Error
+									? error.message
+									: "Gagal memuat konteks PRD.",
+								"error",
+							);
+						} finally {
+							setIsStepLoading(false);
 						}
-						startTransition(() => {
-							navigate({ to: "/prd/$id", params: { id: projectId } });
-						});
 					}}
 					className="btn-primary flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-[510] transition-all hover:brightness-105 active:scale-[0.98] disabled:opacity-40 disabled:bg-graphite/40 disabled:text-fog/50"
 				>
@@ -199,7 +215,10 @@ export function NavbarFlowActions({
 						type="button"
 						onClick={() =>
 							startTransition(() => {
-								navigate({ to: "/task/$id", params: { id: projectId } });
+								navigate({
+									to: "/vibeplan/$id/task",
+									params: { id: projectId },
+								});
 							})
 						}
 						className="btn-primary flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-[510] transition-all hover:brightness-105 active:scale-[0.98]"

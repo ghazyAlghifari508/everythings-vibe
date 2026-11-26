@@ -4,67 +4,13 @@ import {
 	type ScopedDeclaration,
 	scopedStylesheet,
 } from "./design-md-css-scopes";
-import { codeFence, escapeCell, heading } from "./design-md-markdown";
-import type { RenderDesignMdOptions } from "./design-md-render";
+import { codeFence, heading } from "./design-md-markdown";
 
-// The AI agent guide and the two generated stylesheet outputs (AI Agent
-// Implementation Guide, CSS / Tailwind Reference).
-
-export function renderAgentPromptGuide(
-	lines: string[],
-	model: DesignTokenModel,
-	options: RenderDesignMdOptions,
-): void {
-	// Only a colour that was actually measured as an action fill can describe an
-	// action. A brand-named colour used for body text proves brand association,
-	// not an action hierarchy.
-	const primaryActionColor = model.colors.find(
-		(color) => color.role === "Primary action",
-	);
-	const actionFillColor = model.colors.find(
-		(color) => color.role === "Action accent",
-	);
-	const textColor =
-		model.colors.find((color) => color.role === "Base text") ??
-		model.colors.find((color) => color.role === "Text");
-	const surfaceColor = model.surfaces[0];
-	lines.push("", heading(2, "AI Agent Implementation Guide"));
-	lines.push("", "**Quick reference**");
-	lines.push(
-		`- text: ${textColor ? `\`${textColor.value}\`` : "not measured"}`,
-		`- surface: ${surfaceColor ? `\`${surfaceColor.value}\`` : "not measured"}`,
-		`- action fill: ${
-			actionFillColor ? `\`${actionFillColor.value}\`` : "not measured"
-		}`,
-		`- primary action: ${
-			primaryActionColor ? `\`${primaryActionColor.value}\`` : "not measured"
-		}`,
-		`- base spacing unit: ${Number.isFinite(model.baseUnitPx) ? `${model.baseUnitPx}px` : "not measured"}`,
-	);
-
-	lines.push(
-		"",
-		"**Operational Guidelines**",
-		"1. **Understand the product first:** decide what the application must do before styling it.",
-		"2. **Treat this document as a style reference:** it describes visual language, not features or content.",
-		"3. **Map styles to existing components:** reuse the application's own component classes instead of inventing equivalents.",
-		"4. **Preserve hierarchy and semantic roles:** keep the measured role of each colour and type step; never promote an inferred role to a measurement.",
-		"5. **Apply only proven responsive differences:** use the values recorded for desktop and mobile, and treat the endpoint widths as observations, not breakpoints.",
-		"6. **Invent no unseen variants:** hover, focus, disabled and intermediate breakpoints were not captured unless stated.",
-		"7. **Copy no proprietary assets:** do not reuse the source site's text, logos, images or brand assets as product content.",
-		"8. **Build the product, not a design showcase:** no palette galleries, token inspectors or design-documentation pages unless the user asks for them.",
-		"9. **Report what this document cannot establish:** treat an uncovered requirement as a new product decision and say it is unknown.",
-	);
-
-	if (options.implementationGuidance?.length) {
-		lines.push("", "**Additional Guidance**");
-		for (const note of options.implementationGuidance)
-			lines.push(`- ${escapeCell(note)}`);
-	}
-}
+// The two generated stylesheet outputs. The implementation brief is rendered
+// separately, before the measurement tables, so neither output repeats it.
 
 const CSS_INTRO =
-	"Generated from validated measurements. These are implementation aliases derived from the capture, not declarations copied from the website's own stylesheet.";
+	"Generated from validated measurements. These are implementation aliases derived from the capture, not declarations copied from the website's own stylesheet. A role name comes from a usage the capture proved; a `measured` name marks a value whose role the capture could not establish, and browser-default colours are listed as evidence only.";
 
 function renderCssSection(lines: string[], sheet: string | null): void {
 	if (!sheet) return;
@@ -96,10 +42,8 @@ function tailwindNote(scoped: boolean): string[] {
 export function renderCodeSections(
 	lines: string[],
 	model: DesignTokenModel,
-	options: RenderDesignMdOptions,
 ): void {
 	const codeReference = model.settings?.codeReference ?? "both";
-	renderAgentPromptGuide(lines, model, options);
 	const declarations = buildTokenDeclarations(model);
 	const blocks = propertyBlocks([
 		["Colors", declarations.color],
@@ -127,10 +71,8 @@ export function renderScopedCodeSections(
 	lines: string[],
 	base: DesignTokenModel,
 	scopes: ScopedDeclaration[],
-	options: RenderDesignMdOptions,
 ): void {
 	const codeReference = base.settings?.codeReference ?? "both";
-	renderAgentPromptGuide(lines, base, options);
 	const cssSheet =
 		codeReference !== "tailwind-v4"
 			? scopedStylesheet(base, scopes, "root")
