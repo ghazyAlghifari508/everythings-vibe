@@ -182,7 +182,7 @@ resolve it.
 
 ### Schema and migration
 
-Additive migration `drizzle/0046_studio_operation_dependencies.sql`
+The merged migration `drizzle/0049_studio_after_main.sql` applies this additive schema change after the main-branch migrations, with a data backfill and worker-safety handling:
 (no destructive statement; all columns nullable except `studio_frames.revision`,
 which defaults to `0`):
 
@@ -257,7 +257,8 @@ sequenceDiagram
 
 ### Impacted files
 
-- Schema/migration: `src/db/schema/studio.ts`, `drizzle/0046_*.sql`,
+- Schema/migration: `src/db/schema/studio.ts`,
+  `drizzle/0049_studio_after_main.sql`,
   `src/features/studio/types/studio-status.ts`.
 - Shared constant: `STUDIO_JOB_MAX_ATTEMPTS` moved to
   `types/studio-constants.ts` (re-exported from `services/studio-job-lease.ts`)

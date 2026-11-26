@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { guardCodebaseHandler } from "@/features/codebase/services/route-failure";
 import {
 	handleCodebaseSessionCreate,
 	handleCodebaseSessionRead,
@@ -18,6 +19,9 @@ export const CODEBASE_SESSION_ROUTE_PATH = "/api/codebases/$codebaseId/session";
 // minting/hashing, the advisory-lock session transaction, and the documented
 // error contract live in
 // `src/features/codebase/services/sync-session-route.server.ts`.
+//
+// `guardCodebaseHandler` classifies whatever escapes the handler: a transient
+// database outage answers 503, never an unhandled 500.
 
 export const Route = createFileRoute("/api/codebases/$codebaseId/session")({
 	server: {
@@ -28,21 +32,30 @@ export const Route = createFileRoute("/api/codebases/$codebaseId/session")({
 			}: {
 				request: Request;
 				params: { codebaseId: string };
-			}) => handleCodebaseSessionRead({ request, params }),
+			}) =>
+				guardCodebaseHandler("codebases/session/read", () =>
+					handleCodebaseSessionRead({ request, params }),
+				),
 			POST: ({
 				request,
 				params,
 			}: {
 				request: Request;
 				params: { codebaseId: string };
-			}) => handleCodebaseSessionCreate({ request, params }),
+			}) =>
+				guardCodebaseHandler("codebases/session/create", () =>
+					handleCodebaseSessionCreate({ request, params }),
+				),
 			DELETE: ({
 				request,
 				params,
 			}: {
 				request: Request;
 				params: { codebaseId: string };
-			}) => handleCodebaseSessionRevoke({ request, params }),
+			}) =>
+				guardCodebaseHandler("codebases/session/revoke", () =>
+					handleCodebaseSessionRevoke({ request, params }),
+				),
 		},
 	},
 });

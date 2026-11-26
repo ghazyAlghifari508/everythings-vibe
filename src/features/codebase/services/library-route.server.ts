@@ -22,6 +22,12 @@ import {
 	parseCodebaseBulkDelete,
 } from "./library";
 import { deleteOwnedCodebases } from "./library-delete.server";
+import {
+	authFailureResponse,
+	logRouteFailure,
+	logTransientFailure,
+	transientDependencyResponse,
+} from "./route-failure";
 import { buildSyncCommand, type SyncPromptPayload } from "./sync";
 import { hashSyncToken } from "./sync.server";
 import {
@@ -71,8 +77,8 @@ export async function handleCodebaseList({
 	let user: { id: string };
 	try {
 		user = await requireUser(request.headers);
-	} catch {
-		return Response.json({ error: "Unauthorized" }, { status: 401 });
+	} catch (error) {
+		return authFailureResponse(error);
 	}
 
 	if (new URL(request.url).searchParams.get("preflight") === "analysis") {
@@ -151,8 +157,8 @@ export async function handleCodebaseBulkDelete({
 	let user: { id: string };
 	try {
 		user = await requireUser(request.headers);
-	} catch {
-		return Response.json({ error: "Unauthorized" }, { status: 401 });
+	} catch (error) {
+		return authFailureResponse(error);
 	}
 
 	const body: unknown = await request.json().catch(() => null);
@@ -182,7 +188,12 @@ export async function handleCodebaseBulkDelete({
 				{ status: 400 },
 			);
 		}
-		console.error(`[codebases/bulk-delete] failed for user ${user.id}:`, error);
+		const unavailable = transientDependencyResponse(error);
+		if (unavailable) {
+			logTransientFailure("codebases/bulk-delete", error);
+			return unavailable;
+		}
+		logRouteFailure("codebases/bulk-delete", error);
 		return Response.json(
 			{
 				error: "Gagal menghapus repository.",
@@ -203,8 +214,8 @@ export async function handleCodebaseCreate({
 	let user: { id: string };
 	try {
 		user = await requireUser(request.headers);
-	} catch {
-		return Response.json({ error: "Unauthorized" }, { status: 401 });
+	} catch (error) {
+		return authFailureResponse(error);
 	}
 	const startedAt = Date.now();
 	const body: unknown = await request.json().catch(() => null);
@@ -301,11 +312,16 @@ export async function handleCodebaseCreate({
 			};
 		});
 	} catch (error) {
-		diagnose("failed", "CODEBASE_CREATE_FAILED");
-		console.error(
-			"[codebases/create] persistence failed",
-			error instanceof Error ? error.name : "UnknownError",
+		const unavailable = transientDependencyResponse(error);
+		diagnose(
+			"failed",
+			unavailable ? "SERVICE_UNAVAILABLE" : "CODEBASE_CREATE_FAILED",
 		);
+		if (unavailable) {
+			logTransientFailure("codebases/create", error);
+			return unavailable;
+		}
+		logRouteFailure("codebases/create", error);
 		return Response.json(
 			{
 				error: "Gagal membuat codebase",

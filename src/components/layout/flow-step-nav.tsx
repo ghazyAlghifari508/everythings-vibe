@@ -3,35 +3,23 @@
 import { Tick01Icon } from "@hugeicons/core-free-icons";
 import { useLocation } from "@tanstack/react-router";
 import { Icon } from "@/components/ui/icon";
+import { type FlowStep, stepRank } from "@/features/greenfield/utils/flow-step";
 import {
-	type FlowStep,
-	routeToStep,
-	stepRank,
-} from "@/features/greenfield/utils/flow-step";
+	type WorkspaceAvailability,
+	workspaceView,
+} from "@/features/greenfield/utils/workspace-routing";
 import { cn } from "@/lib/utils";
-import { useChatStore } from "@/store";
-
-// ponytail: pure step<->route logic lives in the greenfield feature so server
-// code + tests can use it without next/navigation. Re-export keeps existing
-// `import { routeToStep } from "./flow-step-nav"` call sites working.
-export {
-	type FlowStep,
-	getFlowStepCta,
-	routeToStep,
-	type StepRouteTarget,
-	stepToRoute,
-	stepToRouteTarget,
-} from "@/features/greenfield/utils/flow-step";
 
 export type StepId = FlowStep;
 
-const STEPS: Array<{ id: FlowStep; label: string }> = [
-	{ id: "question", label: "Question" },
+const STEPS = [
+	{ id: "ask", label: "Ask" },
 	{ id: "fitur", label: "Fitur" },
 	{ id: "prd", label: "PRD" },
 	{ id: "ac", label: "AC" },
 	{ id: "task", label: "Task" },
-];
+	{ id: "kanban", label: "Kanban" },
+] as const;
 
 /**
  * Pure visual status indicator showing project progress.
@@ -40,16 +28,25 @@ const STEPS: Array<{ id: FlowStep; label: string }> = [
 export function FlowStepNav(props?: {
 	step?: FlowStep | string | null;
 	taskStatus?: string | null;
+	availability?: WorkspaceAvailability;
 }) {
 	const pathname = useLocation({ select: (l) => l.pathname });
-	const isKanbanRoute = (pathname ?? "").startsWith("/kanban");
-	const isTaskGenerated = useChatStore((s) => s.isTaskGenerated);
-	const currentRouteStep = routeToStep(pathname ?? "");
-	const routeRank = stepRank(currentRouteStep);
-	const dbRank = stepRank(props?.step);
-
-	const isTaskDone =
-		isKanbanRoute || isTaskGenerated || props?.taskStatus === "completed";
+	const view = workspaceView(pathname);
+	const dbRank = stepRank(props?.step ?? "question");
+	const completed = {
+		ask: Boolean(
+			props?.availability?.hasHandoff ||
+				props?.availability?.hasFeatures ||
+				props?.availability?.hasPrd ||
+				props?.availability?.hasAc ||
+				props?.availability?.hasTasks,
+		),
+		fitur: Boolean(props?.availability?.hasFeatures),
+		prd: Boolean(props?.availability?.hasPrd),
+		ac: Boolean(props?.availability?.hasAc),
+		task: Boolean(props?.availability?.hasTasks),
+		kanban: false,
+	};
 
 	return (
 		<ol
@@ -57,19 +54,11 @@ export function FlowStepNav(props?: {
 			className="flex items-center gap-1.5 md:gap-2 select-none"
 		>
 			{STEPS.map((s, idx) => {
-				const isCurrentRoute = s.id === currentRouteStep;
-
-				const isCompleted =
-					s.id === "task"
-						? isTaskDone
-						: !isCurrentRoute &&
-							(routeRank > idx || (props?.step ? dbRank > idx : false));
-
-				const isActive = isCurrentRoute && !isCompleted;
+				const isCurrentRoute = s.id === view;
+				const isCompleted = completed[s.id];
+				const isActive = isCurrentRoute;
 				const isLocked = !isCompleted && !isActive;
-
-				const connectorActive =
-					idx <= routeRank || (props?.step ? idx <= dbRank : false);
+				const connectorActive = idx <= dbRank;
 
 				return (
 					<li

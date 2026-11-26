@@ -6,10 +6,9 @@ import type { RevisionTargetKind } from "./revision-base-version.server";
 
 export {
 	buildMentionCandidates,
-	type ComposerArtifactMentionCandidate,
-	type ComposerFileMentionCandidate,
 	type ComposerMentionCandidate,
 	extractProjectIdFromArtifactId,
+	filterMentionCandidates,
 	formatArtifactChipLabel,
 	inferArtifactTargetKind,
 	normalizeRepositoryFileList,

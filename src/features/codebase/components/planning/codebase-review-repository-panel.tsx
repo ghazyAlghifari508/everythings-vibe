@@ -26,24 +26,26 @@ interface CodebaseReviewRepositoryPanelProps {
 	analysis: CodebaseAnalysis;
 	fileCount?: number;
 	excludedCount?: number;
+	onSelectFile?: (path: string) => void;
 }
 
 export function CodebaseReviewRepositoryPanel({
 	analysis,
 	fileCount,
 	excludedCount,
+	onSelectFile,
 }: CodebaseReviewRepositoryPanelProps) {
 	return (
 		<>
-			{/* Panel 2: Repository map */}
+			{/* Panel 2: Struktur repository */}
 			<div className="rounded-xl border border-graphite bg-charcoal overflow-hidden flex flex-col shadow-sm">
 				<div className="flex items-center justify-between border-b border-graphite p-4 sm:p-5">
 					<h3 className="font-inter text-sm font-[600] text-snow">
-						Repository map
+						Struktur repository
 					</h3>
 					<span className="font-mono text-[11px] text-fog">
-						{fileCount === undefined ? "—" : fileCount} files indexed (
-						{excludedCount === undefined ? "—" : excludedCount} excluded)
+						{fileCount === undefined ? "—" : fileCount} file terindeks (
+						{excludedCount === undefined ? "—" : excludedCount} dikecualikan)
 					</span>
 				</div>
 				<div className="p-4 sm:p-5 flex-1 flex flex-col gap-4 text-xs">
@@ -51,11 +53,8 @@ export function CodebaseReviewRepositoryPanel({
 						<div className="rounded-lg border border-graphite/60 bg-onyx/50 divide-y divide-graphite/40 overflow-hidden max-h-64 overflow-y-auto">
 							{analysis.moduleMap.map((entry) => {
 								const parsed = splitPath(entry.path);
-								return (
-									<div
-										key={entry.path}
-										className="group flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between px-3 py-2 text-xs transition-colors hover:bg-steel/10 dark:hover:bg-steel/20"
-									>
+								const rowContent = (
+									<>
 										<div className="flex items-center gap-2 min-w-0 sm:max-w-[52%]">
 											{parsed.isFile ? (
 												<Icon
@@ -92,6 +91,23 @@ export function CodebaseReviewRepositoryPanel({
 										>
 											{entry.summary}
 										</span>
+									</>
+								);
+								return onSelectFile && parsed.isFile ? (
+									<button
+										type="button"
+										key={entry.path}
+										onClick={() => onSelectFile(entry.path)}
+										className="w-full text-left group flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between px-3 py-2 text-xs transition-colors hover:bg-steel/10 dark:hover:bg-steel/20 cursor-pointer"
+									>
+										{rowContent}
+									</button>
+								) : (
+									<div
+										key={entry.path}
+										className="group flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between px-3 py-2 text-xs transition-colors hover:bg-steel/10 dark:hover:bg-steel/20"
+									>
+										{rowContent}
 									</div>
 								);
 							})}
@@ -103,16 +119,13 @@ export function CodebaseReviewRepositoryPanel({
 					{analysis.relevantFiles && analysis.relevantFiles.length > 0 && (
 						<div className="mt-auto border-t border-graphite/60 pt-3 flex flex-col gap-2">
 							<span className="font-mono text-[10px] uppercase text-slate tracking-wider">
-								FILE RELEVAN ({analysis.relevantFiles.length})
+								File relevan ({analysis.relevantFiles.length})
 							</span>
 							<div className="rounded-lg border border-graphite/40 bg-onyx/30 divide-y divide-graphite/30 max-h-40 overflow-y-auto">
 								{analysis.relevantFiles.map((file) => {
 									const parsed = splitPath(file);
-									return (
-										<div
-											key={file}
-											className="flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-steel/10 dark:hover:bg-steel/20 transition-colors"
-										>
+									const fileContent = (
+										<>
 											<Icon
 												icon={FileCodeIcon}
 												size={13}
@@ -132,6 +145,23 @@ export function CodebaseReviewRepositoryPanel({
 													{parsed.name}
 												</strong>
 											</span>
+										</>
+									);
+									return onSelectFile ? (
+										<button
+											type="button"
+											key={file}
+											onClick={() => onSelectFile(file)}
+											className="w-full text-left flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-steel/10 dark:hover:bg-steel/20 transition-colors cursor-pointer"
+										>
+											{fileContent}
+										</button>
+									) : (
+										<div
+											key={file}
+											className="flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-steel/10 dark:hover:bg-steel/20 transition-colors"
+										>
+											{fileContent}
 										</div>
 									);
 								})}

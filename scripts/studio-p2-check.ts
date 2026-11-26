@@ -21,7 +21,10 @@ try {
 		const definition = key.definition.replaceAll("REFERENCES public.", `REFERENCES "${schema}".`).replace(/REFERENCES (?!")([a-z_]+)\(/g, `REFERENCES "${schema}".$1(`);
 		await client.query(`alter table "${schema}"."${key.tablename}" add constraint "${key.name}" ${definition}`);
 	}
-	const migration = await readFile("drizzle/0046_studio_operation_dependencies.sql", "utf8");
+	const migration = (await readFile("drizzle/0049_studio_after_main.sql", "utf8"))
+		.replaceAll('"public".', `"${schema}".`)
+		.replaceAll("'public.", `'"${schema}".`)
+		.replaceAll("'public'", `'${schema}'`);
 	await client.query(migration);
 	url.searchParams.set("options", `-csearch_path=${schema}`);
 	const command = process.argv.slice(2);

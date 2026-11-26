@@ -5,13 +5,15 @@
 // correct here — server handlers only, no client component. Never import this
 // module from client code.
 import { and, desc, eq, gt, isNull, notInArray } from "drizzle-orm";
-import { z } from "zod";
 import { db } from "@/db";
 import { codebaseSyncSessions, codebases } from "@/db/schema";
+import { ADAPTIVE_CREDIT_PRICING } from "@/features/billing/types/billing-constants";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { requireUser } from "@/lib/session";
 import { checkPreSyncCredit } from "./analysis-credit-preflight.server";
+import { serializeAnalysisError } from "./analysis-diagnostics";
 import { resolvePlan } from "./analysis-route-scope.server";
+import { authFailureResponse } from "./route-failure";
 import {
 	buildSyncCommand,
 	CODEBASE_SYNC_RATE_LIMIT_ACTION,
@@ -20,6 +22,8 @@ import {
 	type SyncPromptPayload,
 	toSessionMetadata,
 } from "./sync";
+import { prepareResyncSession } from "./sync-resync-prepare.server";
+import { codebaseSessionRequestSchema } from "./sync-session-contract";
 import {
 	NO_SYNC_SESSION_FOR_RECOVERY,
 	type PreparedSyncSession,
@@ -47,8 +51,8 @@ export async function handleCodebaseSessionRead({
 	let user: { id: string };
 	try {
 		user = await requireUser(request.headers);
-	} catch {
-		return Response.json({ error: "Unauthorized" }, { status: 401 });
+	} catch (error) {
+		return authFailureResponse(error);
 	}
 	const { codebaseId } = params;
 
@@ -140,8 +144,8 @@ export async function handleCodebaseSessionCreate({
 	let user: { id: string };
 	try {
 		user = await requireUser(request.headers);
-	} catch {
-		return Response.json({ error: "Unauthorized" }, { status: 401 });
+	} catch (error) {
+		return authFailureResponse(error);
 	}
 	const { codebaseId } = params;
 
@@ -166,18 +170,14 @@ export async function handleCodebaseSessionCreate({
 
 	const body: unknown = await request.json().catch(() => null);
 	const preflight = await checkPreSyncCredit(user.id);
-	if (preflight.response) return preflight.response;
-	const parsed = z
-		.object({
-			action: z.enum(["retry", "recover"]).optional(),
-			sessionId: z.string().min(1).optional(),
-		})
-		.safeParse(body ?? {});
+	const parsed = codebaseSessionRequestSchema.safeParse(body ?? {});
 	if (!parsed.success)
 		return Response.json(
 			{ error: "Permintaan sesi tidak valid." },
 			{ status: 400 },
 		);
+	if (preflight.response && parsed.data.action !== "resync")
+		return preflight.response;
 	const startedAt = Date.now();
 	const diagnose = (
 		result: string,
@@ -189,7 +189,12 @@ export async function handleCodebaseSessionCreate({
 			userId: user.id,
 			codebaseId,
 			syncSessionId,
-			operation: parsed.data.action === "retry" ? "replaced" : "recovered",
+			operation:
+				parsed.data.action === "retry"
+					? "replaced"
+					: parsed.data.action === "resync"
+						? "resync"
+						: "recovered",
 			result,
 			durationMs: Date.now() - startedAt,
 			safeErrorCode,
@@ -197,15 +202,32 @@ export async function handleCodebaseSessionCreate({
 	let result: PreparedSyncSession;
 	try {
 		result = await db.transaction((tx) =>
-			prepareSyncSession(
-				tx,
-				user.id,
-				codebaseId,
-				parsed.data.action === "retry" ? parsed.data.sessionId : undefined,
-				parsed.data.action === "recover",
-			),
+			parsed.data.action === "resync" && parsed.data.requestId
+				? prepareResyncSession(
+						tx,
+						user.id,
+						codebaseId,
+						parsed.data.requestId,
+						!preflight.response ||
+							preflight.status.availableCredits >=
+								ADAPTIVE_CREDIT_PRICING.operations.codebase_analysis
+									.baseCredits,
+					)
+				: prepareSyncSession(
+						tx,
+						user.id,
+						codebaseId,
+						parsed.data.action === "retry" ? parsed.data.sessionId : undefined,
+						parsed.data.action === "recover",
+					),
 		);
 	} catch (error) {
+		if (
+			error instanceof Error &&
+			error.message === "SYNC_CREDIT_REQUIRED" &&
+			preflight.response
+		)
+			return preflight.response;
 		if (
 			error instanceof Error &&
 			error.message === NO_SYNC_SESSION_FOR_RECOVERY
@@ -224,16 +246,33 @@ export async function handleCodebaseSessionCreate({
 			"CODEBASE_SESSION_REPLACEMENT_FAILED",
 			parsed.data.sessionId ?? null,
 		);
-		console.error(
-			"[codebase/session] preparation failed",
-			error instanceof Error ? error.name : "UnknownError",
-		);
+		console.error("[codebase/session] preparation failed", {
+			...serializeAnalysisError(error),
+			userId: user.id,
+			codebaseId,
+			action: parsed.data.action ?? "initial",
+			requestId: parsed.data.requestId ?? null,
+			sessionId: parsed.data.sessionId ?? null,
+		});
 		return Response.json(
 			{
 				error: "Sesi sync gagal dibuat. Coba lagi.",
 				code: "CODEBASE_SESSION_REPLACEMENT_FAILED",
 			},
-			{ status: 503 },
+			{ status: 503, headers: { "Cache-Control": "no-store" } },
+		);
+	}
+	if (parsed.data.action === "resync" && !result.token) {
+		return Response.json(
+			{
+				...toSessionMetadata({ ...result.session, projectId: codebaseId }),
+				codebaseId,
+				requestId: parsed.data.requestId,
+				code: ["ready", "failed", "expired"].includes(result.session.status)
+					? "SYNC_ATTEMPT_FINISHED"
+					: "SYNC_SESSION_RESTORED",
+			},
+			{ headers: { "Cache-Control": "no-store" } },
 		);
 	}
 	if (!result.token) {
@@ -260,7 +299,7 @@ export async function handleCodebaseSessionCreate({
 		return Response.json(
 			{
 				code,
-				sessionId: result.session.id,
+				...toSessionMetadata({ ...result.session, projectId: codebaseId }),
 				// Safe, non-technical descriptions only. The UI models these as
 				// recoverable states (or live progress), never as failures; the raw
 				// credential is never described or returned.
@@ -282,6 +321,9 @@ export async function handleCodebaseSessionCreate({
 
 	const payload: SyncPromptPayload = {
 		projectId: codebaseId,
+		codebaseId,
+		requestId: parsed.data.requestId,
+		status: result.token ? "waiting_for_cli" : undefined,
 		sessionId: inserted.id,
 		apiBaseUrl: new URL(request.url).origin,
 		syncToken: result.token,
@@ -305,8 +347,8 @@ export async function handleCodebaseSessionRevoke({
 	let user: { id: string };
 	try {
 		user = await requireUser(request.headers);
-	} catch {
-		return Response.json({ error: "Unauthorized" }, { status: 401 });
+	} catch (error) {
+		return authFailureResponse(error);
 	}
 	const { codebaseId } = params;
 

@@ -1,37 +1,60 @@
 "use client";
 
+import { ArrowLeft01Icon, ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
 import type { AdaptiveQuestionSelection } from "@/features/codebase/hooks/use-adaptive-question-selection";
 import type { AdaptiveQuestion } from "@/features/codebase/services/chat-flow";
 import { CodebaseAdaptiveQuestionAnswerInput } from "./codebase-adaptive-question-answer-input";
 import { CodebaseAdaptiveQuestionOptions } from "./codebase-adaptive-question-options";
 import { CodebaseAdaptiveQuestionProgress } from "./codebase-adaptive-question-progress";
-import { CodebaseAdaptiveQuestionRecommendation } from "./codebase-adaptive-question-recommendation";
+
+/** Navigation the wizard hands to the one card it renders. */
+export interface AdaptiveQuestionNav {
+	/** Absent on the first question. */
+	onPrevious?: () => void;
+	/** Absent when this step has no forward action to offer. */
+	onNext?: () => void;
+	/** Label of the forward control. */
+	nextLabel: string;
+	/**
+	 * Wizard gate on top of the card's own answer validity: the final action
+	 * stays disabled until every answer is valid and persisted, and the retry
+	 * of a failed save owns the way forward again.
+	 */
+	nextDisabled?: boolean;
+	/** The forward control is the final "Buat Spesifikasi Fitur" action. */
+	isFinal?: boolean;
+}
 
 interface CodebaseAdaptiveQuestionActiveProps {
 	question: AdaptiveQuestion;
 	index: number;
 	totalQuestions?: number;
+	/** The current wizard step that accepts input; false while reviewing. */
 	active: boolean;
-	isEditing: boolean;
 	selection: AdaptiveQuestionSelection;
-	onCancelEdit?: () => void;
+	nav: AdaptiveQuestionNav;
 }
 
+/**
+ * The single question card: progress, title, the control group, and the
+ * wizard footer. `Berikutnya` stores the current answer before it moves on and
+ * the last step's control is the final specification action, so no separate
+ * CTA block is ever stacked below the card.
+ */
 export function CodebaseAdaptiveQuestionActive({
 	question,
 	index,
 	totalQuestions,
 	active,
-	isEditing,
 	selection,
-	onCancelEdit,
+	nav,
 }: CodebaseAdaptiveQuestionActiveProps) {
 	const {
 		groupName,
 		customId,
 		inputId,
-		reasonId,
 		titleId,
 		isMulti,
 		isText,
@@ -42,8 +65,19 @@ export function CodebaseAdaptiveQuestionActive({
 		customText,
 		setCustomText,
 		handleOptionChange,
+		handleMultiChange,
 		handleSubmit,
 	} = selection;
+
+	// The forward control requires a valid answer while the step is editable, and
+	// always honours the wizard's own gate: unanswered siblings, an unsaved
+	// handoff, or a generation already running.
+	const forwardDisabled = nav.nextDisabled === true || (active && !canSubmit);
+
+	const handleForward = () => {
+		if (active) handleSubmit();
+		nav.onNext?.();
+	};
 
 	return (
 		<div
@@ -55,22 +89,24 @@ export function CodebaseAdaptiveQuestionActive({
 				totalQuestions={totalQuestions}
 			/>
 
+			{/* The heading is the card's focal point: metadata stays small and the
+			    question itself carries the largest text on the surface. */}
 			<p
 				id={titleId}
-				className="text-sm sm:text-[15px] font-semibold text-snow leading-snug mb-3.5"
+				className="text-pretty text-[15px] font-semibold leading-snug text-snow sm:text-base"
 			>
 				{question.title}
 			</p>
 
 			{isText ? (
-				<div className="mt-2">
+				<div className="mt-3">
 					<CodebaseAdaptiveQuestionAnswerInput
 						id={inputId}
 						label={question.title}
-						disabled={!active && !isEditing}
+						disabled={!active}
 						value={customText}
 						placeholder={question.customPlaceholder ?? "Tulis jawabanmu..."}
-						className="text-xs h-11 bg-steel/60 text-snow border-graphite"
+						className="h-11 border-graphite bg-steel/60 text-xs text-snow"
 						onChange={setCustomText}
 						onSubmit={handleSubmit}
 					/>
@@ -80,51 +116,55 @@ export function CodebaseAdaptiveQuestionActive({
 					isMulti={isMulti}
 					labelledBy={titleId}
 					options={question.options}
-					selectedIds={isMulti ? multiOptionIds : selectedOptionId}
-					disabled={!active && !isEditing}
+					selectedMultiIds={multiOptionIds}
+					selectedId={selectedOptionId}
+					disabled={!active}
 					groupName={groupName}
 					customId={customId}
 					customChosen={customChosen}
 					customText={customText}
 					customInputId={inputId}
 					customPlaceholder={question.customPlaceholder}
-					recommendationReasonId={
-						question.recommendedOptionId && question.recommendationReason
-							? reasonId
-							: undefined
-					}
+					recommendedOptionId={question.recommendedOptionId}
+					recommendationReason={question.recommendationReason}
 					onSelect={handleOptionChange}
+					onSelectMany={handleMultiChange}
 					onCustomTextChange={setCustomText}
 					onCustomSubmit={handleSubmit}
 				/>
 			)}
 
-			<CodebaseAdaptiveQuestionRecommendation
-				question={question}
-				reasonId={reasonId}
-			/>
-
-			{active || isEditing ? (
-				<div className="mt-4 flex items-center justify-end gap-2 pt-3 border-t border-graphite/40">
-					{isEditing && onCancelEdit ? (
+			{nav.onPrevious || nav.onNext ? (
+				<div className="mt-4 flex items-center justify-between gap-2 border-t border-graphite/40 pt-3">
+					{nav.onPrevious ? (
 						<Button
 							type="button"
 							variant="ghost"
 							size="sm"
-							onClick={onCancelEdit}
-							className="text-xs text-fog hover:text-snow"
+							onClick={nav.onPrevious}
+							className="gap-1.5 text-xs text-fog hover:text-snow"
 						>
-							Batal
+							<Icon icon={ArrowLeft01Icon} size={12} aria-hidden="true" />
+							Sebelumnya
+						</Button>
+					) : (
+						<span aria-hidden="true" />
+					)}
+					{nav.onNext ? (
+						<Button
+							type="button"
+							size="sm"
+							disabled={forwardDisabled}
+							onClick={handleForward}
+							data-testid={
+								nav.isFinal ? "codebase-questions-complete" : undefined
+							}
+							className="min-h-9 gap-1.5 px-4 text-xs font-semibold"
+						>
+							{nav.nextLabel}
+							<Icon icon={ArrowRight01Icon} size={12} aria-hidden="true" />
 						</Button>
 					) : null}
-					<Button
-						type="button"
-						disabled={!canSubmit}
-						onClick={handleSubmit}
-						className="min-h-9 rounded-md bg-snow px-4 text-xs font-semibold text-onyx transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-					>
-						Konfirmasi <span className="sr-only">Kirim Jawaban</span>
-					</Button>
 				</div>
 			) : null}
 		</div>

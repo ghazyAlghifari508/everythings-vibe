@@ -17,6 +17,13 @@ afterEach(() => {
 	vi.unstubAllGlobals();
 });
 
+// Radix Popper measures its anchor; jsdom ships no ResizeObserver.
+globalThis.ResizeObserver ??= class {
+	observe() {}
+	unobserve() {}
+	disconnect() {}
+} as unknown as typeof ResizeObserver;
+
 const prdArtifact = {
 	id: "prd-proj-1",
 	title: "PRD · Pencarian Artikel",
@@ -142,7 +149,7 @@ describe("Phase 07 Composer Redesign — Plan/Revise Modes & Workflow Separation
 				setPrdContent,
 				setAcContent: vi.fn(),
 				setChatAnswers: vi.fn(),
-				setChatMessages: vi.fn(),
+				persistMessage: vi.fn(async () => {}),
 				effectiveFeatureId: "proj-1",
 				onboardingFeatureId: "anchor",
 				artifactCount: 2,
@@ -189,6 +196,7 @@ describe("Phase 07 Composer Redesign — Plan/Revise Modes & Workflow Separation
 		});
 		expect(runRevision).toHaveBeenCalledWith("Ubah navigasi menjadi modal", {
 			targetKind: "prd",
+			requestId: expect.any(String),
 			optionalReferences: ["src/pages/Content.jsx"],
 			referenceBindings: [
 				{
@@ -233,9 +241,7 @@ describe("Phase 07 Composer Redesign — Plan/Revise Modes & Workflow Separation
 		expect(submitBtn.disabled).toBe(false);
 
 		fireEvent.click(screen.getByTestId("composer-mention-trigger"));
-		fireEvent.click(
-			screen.getByTestId("composer-mention-file-src/pages/Content.jsx"),
-		);
+		fireEvent.click(screen.getByTestId("composer-mention-doc-prd"));
 		expect(composer.value).toBe("Tambahkan indeks pencarian penuh");
 
 		fireEvent.click(screen.getByTestId("composer-mode-trigger"));
@@ -266,7 +272,10 @@ describe("Phase 07 Composer Redesign — Plan/Revise Modes & Workflow Separation
 			/>,
 		);
 		expect(submitBtn.disabled).toBe(true);
-		expect(submitBtn.querySelector("[data-testid='spinner']")).toBeTruthy();
+		// One operation, one animation: the Thinking indicator owns the progress
+		// animation, so the submit control closes without spinning a second time.
+		expect(submitBtn.getAttribute("aria-busy")).toBe("true");
+		expect(submitBtn.querySelector("[data-testid='spinner']")).toBeNull();
 		fireEvent.keyDown(composer, { key: "Enter", code: "Enter" });
 		expect(onSubmitComposer).toHaveBeenCalledTimes(1);
 
@@ -312,12 +321,6 @@ describe("Phase 07 Composer Redesign — Plan/Revise Modes & Workflow Separation
 		);
 
 		expect(screen.queryByRole("textbox")).toBeNull();
-		fireEvent.click(screen.getByTestId("codebase-open-completed-revision"));
-		expect(screen.getByRole("textbox")).toBeTruthy();
-		expect(
-			screen.getByTestId("composer-mode-trigger").getAttribute("data-mode"),
-		).toBe("revise");
-		fireEvent.click(screen.getByTestId("codebase-cancel-completed-revision"));
-		expect(screen.queryByRole("textbox")).toBeNull();
+		expect(screen.queryByTestId("codebase-open-completed-revision")).toBeNull();
 	});
 });

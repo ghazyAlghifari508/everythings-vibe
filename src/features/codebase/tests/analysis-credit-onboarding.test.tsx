@@ -107,8 +107,8 @@ test("sufficient credits land straight on the prompt with no approval step", asy
 	assert.equal(screen.queryByTestId("credit-consent-dialog"), null);
 	assert.equal(screen.queryByRole("checkbox"), null);
 	assert.equal(screen.queryByTestId("locked-prompt-region"), null);
-	// Rate transparency survives as one muted line, not a card or a modal.
-	assert.ok(screen.getByText(/Analisis hingga 12 kredit/));
+	// Credit note removed from prompt area (FIX 05 Section 5)
+	assert.equal(screen.queryByText(/Analisis hingga/), null);
 
 	// A standing authorization means the start request carries no fresh consent.
 	const create = calls.find((call) => call.url === "/api/codebases");
@@ -385,7 +385,7 @@ test("a pending create request shows loading in both the prompt and the progress
 	await waitFor(() => assert.ok(requested));
 	// A real request is in flight: loading is honest here, and the lock is not.
 	// No sync connection can be claimed before the session exists.
-	assert.ok(screen.getByText("Menghubungkan repository..."));
+	assert.ok(screen.getByText("Menyiapkan instruksi sync..."));
 	assert.ok(screen.getByText("Menyiapkan sesi sync..."));
 	assert.equal(screen.queryByText("Menghubungkan server..."), null);
 	assert.equal(screen.queryByText("Belum dimulai"), null);
@@ -394,7 +394,7 @@ test("a pending create request shows loading in both the prompt and the progress
 	releaseCreate();
 	await screen.findByRole("button", { name: "Salin prompt untuk AI agent" });
 	// Success replaces the loading state in the same paint as the prompt.
-	assert.equal(screen.queryByText("Menghubungkan repository..."), null);
+	assert.equal(screen.queryByText("Menyiapkan instruksi sync..."), null);
 	assert.ok(screen.getByText(new RegExp(SYNC_TOKEN)));
 });
 

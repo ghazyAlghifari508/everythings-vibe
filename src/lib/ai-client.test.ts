@@ -11,7 +11,7 @@ vi.mock("ai", () => ({
 
 import { streamText } from "ai";
 import { type StreamOutcome, streamChat } from "./ai-client";
-import { AI_STALL_TIMEOUT_MS } from "./constants";
+import { AI_FIRST_TOKEN_TIMEOUT_MS } from "./constants";
 
 function mockStreamText(
 	parts:
@@ -82,7 +82,7 @@ describe("streamChat", () => {
 		expect(first.value).toBe("AC ");
 	});
 
-	it("identifies no-progress watchdog failures as timeout errors", async () => {
+	it("identifies first-token watchdog failures as timeout errors", async () => {
 		vi.useFakeTimers();
 		try {
 			mockStreamText(
@@ -96,12 +96,12 @@ describe("streamChat", () => {
 					() => ({ timedOut: false as const }),
 					(error: unknown) => ({ timedOut: true as const, error }),
 				);
-			await vi.advanceTimersByTimeAsync(AI_STALL_TIMEOUT_MS);
+			await vi.advanceTimersByTimeAsync(AI_FIRST_TOKEN_TIMEOUT_MS);
 			expect(await result).toMatchObject({
 				timedOut: true,
 				error: {
 					name: "TimeoutError",
-					message: expect.stringContaining("AI tidak merespons"),
+					message: expect.stringContaining("4 menit"),
 				},
 			});
 		} finally {

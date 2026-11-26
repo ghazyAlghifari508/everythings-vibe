@@ -1,6 +1,10 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import type { db } from "@/db";
-import { codebaseSnapshots, codebaseSyncSessions } from "@/db/schema";
+import {
+	codebaseSnapshots,
+	codebaseSyncRequests,
+	codebaseSyncSessions,
+} from "@/db/schema";
 import {
 	CODEBASE_CLI_MIN_VERSION,
 	CODEBASE_SYNC_SESSION_EXPIRY_MS,
@@ -24,6 +28,41 @@ export interface PreparedSyncSession {
 
 /** Recovery never mints; a codebase with no session is answered as 404. */
 export const NO_SYNC_SESSION_FOR_RECOVERY = "NO_SYNC_SESSION_FOR_RECOVERY";
+
+export async function expireUnusedSyncSession(
+	tx: Transaction,
+	session: typeof codebaseSyncSessions.$inferSelect,
+): Promise<typeof codebaseSyncSessions.$inferSelect> {
+	if (
+		session.status !== "waiting_for_cli" ||
+		session.expiresAt.getTime() > Date.now()
+	)
+		return session;
+	await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${session.id}))`);
+	const [expired] = await tx
+		.update(codebaseSyncSessions)
+		.set({ status: "expired", updatedAt: new Date() })
+		.where(
+			and(
+				eq(codebaseSyncSessions.id, session.id),
+				eq(codebaseSyncSessions.userId, session.userId),
+				eq(codebaseSyncSessions.status, "waiting_for_cli"),
+			),
+		)
+		.returning();
+	if (expired) return expired;
+	const [current] = await tx
+		.select()
+		.from(codebaseSyncSessions)
+		.where(
+			and(
+				eq(codebaseSyncSessions.id, session.id),
+				eq(codebaseSyncSessions.userId, session.userId),
+			),
+		)
+		.limit(1);
+	return current ?? session;
+}
 
 export async function prepareSyncSession(
 	tx: Transaction,
@@ -62,6 +101,7 @@ export async function prepareSyncSession(
 			.limit(1);
 	}
 	if (latest) {
+		latest = await expireUnusedSyncSession(tx, latest);
 		if (recoveryOnly) return { session: latest, token: null };
 		const uploaded = ["uploaded", "analyzing", "ready"].includes(latest.status);
 		const cliActive = [
@@ -134,5 +174,17 @@ export async function prepareSyncSession(
 		})
 		.returning();
 	if (!session) throw new Error("Sync session insert returned no row");
+	if (replaceSessionId && latest?.id === replaceSessionId) {
+		await tx
+			.update(codebaseSyncRequests)
+			.set({ sessionId: session.id })
+			.where(
+				and(
+					eq(codebaseSyncRequests.sessionId, replaceSessionId),
+					eq(codebaseSyncRequests.codebaseId, codebaseId),
+					eq(codebaseSyncRequests.userId, userId),
+				),
+			);
+	}
 	return { session, token };
 }

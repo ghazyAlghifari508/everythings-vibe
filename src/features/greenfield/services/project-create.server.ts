@@ -4,6 +4,7 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { codebaseSyncSessions, codebases, projects } from "@/db/schema";
+import { deriveFeatureTitle } from "@/features/codebase/services/feature-naming";
 import { saveAskHandoff } from "@/features/codebase/services/generation-context";
 import {
 	buildSyncCommand,
@@ -66,7 +67,13 @@ export async function handleProjectCreateRequest(
 	// ponytail: sync regex-only name, skip AI call. chat.ts calls
 	// deriveProjectName (with AI) again inside the SSE stream, so the
 	// final name is AI-quality — user never sees the rough one.
-	const projectName = deriveProjectNameSync(message);
+	// An existing-codebase feature is named by its own intent instead: the
+	// product-style tail-word fallback names a fragment ("Demi Kemudahan
+	// Eksplorasi Karya"), and no later rename may replace a feature title.
+	const projectName =
+		projectMode === "greenfield"
+			? deriveProjectNameSync(message)
+			: deriveFeatureTitle(message, language);
 	const platform =
 		body?.platform === "mobile" ||
 		(typeof message === "string" && message.includes("[Platform: Mobile App]"))

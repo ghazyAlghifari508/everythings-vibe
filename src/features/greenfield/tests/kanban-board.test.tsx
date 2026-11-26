@@ -156,25 +156,6 @@ function renderBoard(
 }
 
 describe("KanbanBoard", () => {
-	it("renders header with title and integrated CLI status metadata", async () => {
-		const c = renderBoard();
-
-		await vi.waitFor(() => {
-			expect(c.textContent).toContain("Kanban - Test Kanban App");
-			expect(c.textContent).toContain(
-				"Belum ada update status · Jalankan everythings-vibe CLI untuk update otomatis",
-			);
-		});
-
-		// Header contains both title and status within <header>
-		const header = c.querySelector("header");
-		expect(header).toBeDefined();
-		expect(header?.textContent).toContain("Kanban - Test Kanban App");
-		expect(header?.textContent).toContain(
-			"Belum ada update status · Jalankan everythings-vibe CLI untuk update otomatis",
-		);
-	});
-
 	it("renders repository identity and live project progress with workspace navigation", async () => {
 		const c = renderBoard({
 			navigationContext: {
@@ -226,7 +207,7 @@ describe("KanbanBoard", () => {
 		const c = renderBoard();
 
 		await vi.waitFor(() => {
-			expect(c.textContent).toContain("Test Kanban App");
+			expect(c.textContent).toContain("Setup Better Auth OAuth");
 		});
 
 		// Initially closed
@@ -251,7 +232,7 @@ describe("KanbanBoard", () => {
 		const c = renderBoard();
 
 		await vi.waitFor(() => {
-			expect(c.textContent).toContain("Test Kanban App");
+			expect(c.textContent).toContain("Setup Better Auth OAuth");
 		});
 
 		const chatLink = c.querySelector('a[to="/plan/new"]');

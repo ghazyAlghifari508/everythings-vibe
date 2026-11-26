@@ -68,6 +68,7 @@ export interface PrdChatStreamInput {
 	codebaseSnapshotId?: string;
 	codebaseAnalysisId?: string;
 	codebaseSnapshotInfo?: { fileCount?: number; sourceBytes?: number };
+	projectMode?: string | null;
 	ids: PrdTurnIds;
 }
 
@@ -254,6 +255,7 @@ export function createPrdChatStream(
 					codebaseSnapshotId: input.codebaseSnapshotId,
 					codebaseAnalysisId: input.codebaseAnalysisId,
 					codebaseSnapshotInfo: input.codebaseSnapshotInfo,
+					projectMode: input.projectMode,
 				});
 				if (persisted.stopped) return;
 

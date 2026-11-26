@@ -67,7 +67,7 @@ submit(snapshotted target)
 
 - `refresh()` treats an empty array as a valid result, clears a previous error on success, and uses `AbortSignal` so an in-flight request cannot land after unmount or a newer mutation.
 - After an authoritative `submit()` / `transition()` response the hook no longer issues a follow-up `refresh()` that could overwrite `pending` / `undo` with stale history.
-- The endpoint is unchanged and authorization stays project/user-scoped; migration `drizzle/0048_studio_element_revisions.sql` is present and the local table exists. Storage preview schema still parses legacy `preview` rows strictly. Failures surface in the compact strip and remain recoverable through retry without breaking chat or frame generation.
+- The endpoint is unchanged and authorization stays project/user-scoped; migration `drizzle/0049_studio_after_main.sql` creates the table when needed. Storage preview schema still parses legacy `preview` rows strictly. Failures surface in the compact strip and remain recoverable through retry without breaking chat or frame generation.
 
 ## Renderer consistency
 

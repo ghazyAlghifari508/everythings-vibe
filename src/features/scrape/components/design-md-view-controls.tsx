@@ -3,6 +3,7 @@
 import { ToggleButton, ToggleButtonGroup } from "@heroui/react";
 import {
 	ComputerIcon,
+	InformationCircleIcon,
 	Moon02Icon,
 	SmartPhone01Icon,
 	Sun03Icon,
@@ -10,9 +11,11 @@ import {
 } from "@hugeicons/core-free-icons";
 import type { IconSvgElement } from "@hugeicons/react";
 import { useRef } from "react";
+import { Alert } from "@/components/ui/alert";
 import { Icon } from "@/components/ui/icon";
 import type {
 	DesignThemeKey,
+	DesignThemeNotice,
 	DesignViewportOption,
 } from "../utils/design-view-contexts";
 
@@ -133,6 +136,30 @@ export function DesignMdViewControls({
 					{themeTab("dark", "Dark")}
 				</div>
 			) : null}
+		</div>
+	);
+}
+
+// Availability of the appearance the run asked for, stated directly under the
+// context controls so an unavailable theme is explained where it is chosen
+// instead of only in the document limitations. Several states stay distinct:
+// never requested (nothing shown), verified (nothing shown), requested but not
+// verified, and a result that carries no capture at all.
+export function DesignMdThemeNotice({
+	notice,
+}: {
+	notice?: DesignThemeNotice | null;
+}) {
+	if (!notice) return null;
+	return (
+		<div className="border-b border-graphite px-3 py-2">
+			{/* The status text stays a live region without adding a heading level to
+			    the panel's heading order. */}
+			<Alert variant="subtle" role="status" className="p-3 text-xs">
+				<Icon icon={InformationCircleIcon} size={16} aria-hidden />
+				<span className="block font-semibold text-snow">{notice.title}</span>
+				<span className="mt-0.5 block leading-5 text-fog">{notice.detail}</span>
+			</Alert>
 		</div>
 	);
 }

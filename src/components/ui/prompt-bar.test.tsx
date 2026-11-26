@@ -455,6 +455,27 @@ describe("PromptBar icon submit appearance", () => {
 		expect(submit?.querySelector("[data-testid='spinner']")).not.toBeNull();
 	});
 
+	it("keeps the submit closed without a second spinner when the surface owns the animation", () => {
+		act(() => {
+			root?.render(
+				<PromptBar
+					submitAppearance="icon"
+					value="Kirim ini"
+					isSending
+					showBusyGlyph={false}
+				/>,
+			);
+		});
+
+		const submit = container.querySelector<HTMLButtonElement>(
+			"[data-testid='prompt-bar-submit']",
+		);
+		// The action is still blocked and announced, only the duplicate glyph is gone.
+		expect(submit?.disabled).toBe(true);
+		expect(submit?.getAttribute("aria-busy")).toBe("true");
+		expect(submit?.querySelector("[data-testid='spinner']")).toBeNull();
+	});
+
 	it("respects sendDisabled and external onKeyDown defaultPrevented", () => {
 		const onSend = vi.fn();
 		act(() => {

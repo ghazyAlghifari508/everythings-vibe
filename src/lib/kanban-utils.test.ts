@@ -6,9 +6,11 @@ import {
 	detectAcChanged,
 	extractPhases,
 	filterColumnsByPhase,
+	getKanbanColumnEmptyLabel,
 	getTaskPriorityConfig,
 	groupCardsByFeature,
 	groupCardsByStatus,
+	KANBAN_COLUMN_EMPTY_LABELS,
 	type TaskCard,
 } from "./kanban-utils";
 
@@ -424,6 +426,52 @@ describe("kanban-utils", () => {
 			const unknown = getTaskPriorityConfig("custom_unknown_val");
 			expect(unknown.label).toBe("Penting");
 			expect(unknown.barCount).toBe(2);
+		});
+	});
+
+	describe("getKanbanColumnEmptyLabel", () => {
+		it("provides context-specific empty labels for each column state", () => {
+			expect(getKanbanColumnEmptyLabel("Belum Mulai")).toBe("Belum ada task");
+			expect(getKanbanColumnEmptyLabel("pending")).toBe("Belum ada task");
+			expect(getKanbanColumnEmptyLabel("todo")).toBe("Belum ada task");
+
+			expect(getKanbanColumnEmptyLabel("Dikerjakan")).toBe(
+				"Belum ada task yang dikerjakan",
+			);
+			expect(getKanbanColumnEmptyLabel("in_progress")).toBe(
+				"Belum ada task yang dikerjakan",
+			);
+			expect(getKanbanColumnEmptyLabel("doing")).toBe(
+				"Belum ada task yang dikerjakan",
+			);
+
+			expect(getKanbanColumnEmptyLabel("Selesai")).toBe(
+				"Belum ada task yang selesai",
+			);
+			expect(getKanbanColumnEmptyLabel("completed")).toBe(
+				"Belum ada task yang selesai",
+			);
+			expect(getKanbanColumnEmptyLabel("done")).toBe(
+				"Belum ada task yang selesai",
+			);
+
+			expect(getKanbanColumnEmptyLabel("Gagal")).toBe("Tidak ada task gagal");
+			expect(getKanbanColumnEmptyLabel("failed")).toBe("Tidak ada task gagal");
+		});
+
+		it("falls back to default empty message for unknown column title", () => {
+			expect(getKanbanColumnEmptyLabel("Custom Column")).toBe("Belum ada task");
+		});
+
+		it("exposes the canonical KANBAN_COLUMN_EMPTY_LABELS constant", () => {
+			expect(KANBAN_COLUMN_EMPTY_LABELS["Belum Mulai"]).toBe("Belum ada task");
+			expect(KANBAN_COLUMN_EMPTY_LABELS.Dikerjakan).toBe(
+				"Belum ada task yang dikerjakan",
+			);
+			expect(KANBAN_COLUMN_EMPTY_LABELS.Selesai).toBe(
+				"Belum ada task yang selesai",
+			);
+			expect(KANBAN_COLUMN_EMPTY_LABELS.Gagal).toBe("Tidak ada task gagal");
 		});
 	});
 });

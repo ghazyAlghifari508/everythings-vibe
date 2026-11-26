@@ -153,7 +153,7 @@ export function usePrdDetail({
 			setStreamingPRDContent("");
 		} else if (isDifferentProject) {
 			setStreamingPRDContent("");
-			if (!getPendingPrdPrompt()) {
+			if (!getPendingPrdPrompt(projectId)) {
 				setGeneratingPRD(false);
 			}
 		} else if (!projectId) {

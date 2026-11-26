@@ -13,6 +13,12 @@ import { codebases, subscriptions } from "@/db/schema";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { requireUser } from "@/lib/session";
 import type { Plan } from "@/types/database";
+import {
+	authFailureResponse,
+	clientClosedResponse,
+	logTransientFailure,
+	transientDependencyResponse,
+} from "./route-failure";
 import { CODEBASE_SYNC_STATUS_RATE_LIMIT_ACTION } from "./sync";
 import { readSyncStatusSnapshot } from "./sync-status-snapshot.server";
 
@@ -24,8 +30,8 @@ export async function handleCodebaseSyncStatus(input: {
 	let user: { id: string };
 	try {
 		user = await requireUser(request.headers);
-	} catch {
-		return Response.json({ error: "Unauthorized" }, { status: 401 });
+	} catch (error) {
+		return authFailureResponse(error);
 	}
 	try {
 		const { codebaseId } = params;
@@ -79,8 +85,16 @@ export async function handleCodebaseSyncStatus(input: {
 		if (!result.ok)
 			return Response.json(result.body, { status: result.status });
 		return Response.json(result.snapshot);
-	} catch (e) {
-		console.error("sync status handler failed:", e);
+	} catch (error) {
+		// A cancelled request is not a failure to report: the client is gone, so
+		// there is nobody to answer and nothing to log.
+		if (request.signal.aborted) return clientClosedResponse();
+		const unavailable = transientDependencyResponse(error);
+		if (unavailable) {
+			logTransientFailure("codebases/status", error);
+			return unavailable;
+		}
+		console.error("sync status handler failed:", error);
 		return Response.json(
 			{ error: "Gagal membaca status sync", code: "SYNC_FAILED" },
 			{ status: 500 },

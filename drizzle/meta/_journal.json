@@ -327,22 +327,29 @@
     {
       "idx": 46,
       "version": "7",
-      "when": 1794346397655,
-      "tag": "0046_studio_operation_dependencies",
+      "when": 1794145590124,
+      "tag": "0046_codebase_resync_requests",
       "breakpoints": true
     },
     {
       "idx": 47,
       "version": "7",
-      "when": 1794405183009,
-      "tag": "0047_studio_conversation",
+      "when": 1794416000000,
+      "tag": "0047_codebase_workspace_timeline",
       "breakpoints": true
     },
     {
       "idx": 48,
       "version": "7",
-      "when": 1794415832904,
-      "tag": "0048_studio_element_revisions",
+      "when": 1794416001000,
+      "tag": "0048_feature_plan_archive",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1795708413016,
+      "tag": "0049_studio_after_main",
       "breakpoints": true
     }
   ]

@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { guardCodebaseHandler } from "@/features/codebase/services/route-failure";
 import { handleCodebaseSyncStatus } from "@/features/codebase/services/sync-status.server";
 
 // Browser sync-status polling boundary.
@@ -10,7 +11,9 @@ import { handleCodebaseSyncStatus } from "@/features/codebase/services/sync-stat
 //
 // Auth (`requireUser`), tenant isolation, the polling rate-limit budget, and the
 // documented error contract live in
-// `src/features/codebase/services/sync-status*.server.ts`.
+// `src/features/codebase/services/sync-status*.server.ts`. The handler
+// classifies its own failures (client abort, transient outage, real fault);
+// `guardCodebaseHandler` only covers what would otherwise escape unclassified.
 
 export const Route = createFileRoute("/api/codebases/$codebaseId/status")({
 	server: {
@@ -21,7 +24,10 @@ export const Route = createFileRoute("/api/codebases/$codebaseId/status")({
 			}: {
 				request: Request;
 				params: { codebaseId: string };
-			}) => handleCodebaseSyncStatus({ request, params }),
+			}) =>
+				guardCodebaseHandler("codebases/status", () =>
+					handleCodebaseSyncStatus({ request, params }),
+				),
 		},
 	},
 });

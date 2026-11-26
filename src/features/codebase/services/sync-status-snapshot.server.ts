@@ -28,6 +28,7 @@ import {
 	toIsoOrUndefined,
 } from "./sync-status-analysis.server";
 import { readUploadProgress } from "./sync-upload-progress.server";
+import { readWorkspaceSnapshot } from "./workspace-snapshot.server";
 
 export type SyncStatusSnapshotResult =
 	| { ok: true; snapshot: SyncStatusResponse }
@@ -217,6 +218,7 @@ export async function readSyncStatusSnapshot(input: {
 	// expired.
 	const cliConnectedAt = readCliHandshakeAt(session.metadata);
 
+	const workspaceSnapshot = await readWorkspaceSnapshot(userId, codebaseId);
 	const response: SyncStatusResponse = {
 		projectId: codebaseId,
 		sessionId: session.id,
@@ -228,6 +230,7 @@ export async function readSyncStatusSnapshot(input: {
 		analysisProjectId: analysisProjectId ?? undefined,
 		cliConnectedAt: cliConnectedAt ?? undefined,
 		snapshotId: snapshot?.id ?? null,
+		workspaceSnapshotId: workspaceSnapshot?.id ?? null,
 		snapshotCreatedAt: toIsoOrUndefined(snapshot?.createdAt),
 		fileCount: snapshot?.fileCount ?? undefined,
 		excludedCount: snapshot?.excludedCount ?? undefined,

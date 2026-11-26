@@ -10,12 +10,12 @@ export function decideCodebaseDetailEntry(
 	return codebaseId?.trim() ? "allow" : "deny";
 }
 
-export type CodebaseSessionStartAction = "initial" | "retry";
+export type CodebaseSessionStartAction = "initial" | "retry" | "resync";
 
 export function getCodebaseSessionRequestBody(
 	action: CodebaseSessionStartAction,
-): { action?: "retry" } {
-	return action === "retry" ? { action: "retry" } : {};
+): { action?: "retry" | "resync" } {
+	return action === "initial" ? {} : { action };
 }
 
 export function buildAskHandoffAnswers(

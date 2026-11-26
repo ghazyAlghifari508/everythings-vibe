@@ -41,13 +41,23 @@ FORMAT JSON (output HANYA JSON, tanpa teks lain):
   "language": "Bahasa utama (hilangkan field bila tidak terdeteksi)",
   "packageManager": "Package manager (hilangkan field bila tidak terdeteksi)",
   "dependencies": ["dependensi utama"],
-  "database": "Database yang terdeteksi, atau null",
-  "auth": "Mekanisme auth yang terdeteksi, atau null",
+  "database": "Database yang terdeteksi, atau null bila tidak terdeteksi",
+  "auth": "Mekanisme auth yang terdeteksi, atau null bila tidak terdeteksi",
   "moduleMap": [{ "path": "jalur-modul", "summary": "ringkasan singkat" }],
-  "relevantFiles": ["jalur file yang relevan"],
+  "relevantFiles": ["jalur file yang relevan dari manifest"],
   "impactAreas": ["area yang terdampak fitur baru"],
-  "limitations": ["keterbatasan snapshot/analisis"],
-  "findings": [{ "title": "...", "detail": "...", "uncertainty": "hal yang belum pasti (wajib diisi bila ragu)" }],
+  "applicationModules": [{ "name": "nama bagian atau modul aplikasi", "description": "ringkasan fungsi bagian ini bagi pengguna" }],
+  "limitations": ["keterbatasan snapshot/analisis spesifik"],
+  "findings": [
+    {
+      "title": "judul temuan konkret dan ringkas",
+      "detail": "penjelasan fakta fungsi nyata yang terbukti dari source",
+      "claimType": "verified | inference | uncertain",
+      "evidencePaths": ["jalur/file/aktual/dari/manifest.ts"],
+      "implication": "konsekuensi praktis arsitektural untuk perencanaan fitur ke depan",
+      "uncertainty": "penjelasan spesifik apa yang belum dapat dipastikan (hilangkan jika tidak ada keraguan, jangan mengulang detail)"
+    }
+  ],
   "starterSuggestions": [
     { "id": "feature", "title": "judul tugas konkret dalam Bahasa Indonesia", "description": "ringkasan singkat dalam Bahasa Indonesia", "prompt": "instruksi lengkap dalam Bahasa Indonesia dan siap diedit" },
     { "id": "bugfix", "title": "judul tugas konkret dalam Bahasa Indonesia", "description": "ringkasan singkat dalam Bahasa Indonesia", "prompt": "instruksi lengkap dalam Bahasa Indonesia dan siap diedit" },
@@ -70,8 +80,16 @@ ATURAN:
 11. Untuk kategori feature, usulkan kemampuan yang masuk akal dari bukti tentang fungsi aplikasi. Untuk bugfix, sebutkan kondisi yang benar-benar tampak bermasalah; bila belum ada bukti bug, pilih perbaikan alur konservatif dan jangan menyatakan bug pasti ada. Untuk refactor, pilih modul atau pola yang terlihat dan pertahankan stack/perilaku. Jangan usulkan migrasi stack kecuali findings secara eksplisit membuktikan kebutuhan. Untuk ui, rujuk antarmuka yang benar-benar terlihat dalam source snapshot.
 12. Title, description, dan prompt harus ditulis dalam Bahasa Indonesia. Gunakan istilah baku hanya bila istilah itu benar-benar dikenal pengguna (mis. Kanban, checkout, onboarding); istilah internal repository tidak boleh muncul di title, description, dan prompt. Prompt harus berupa permintaan lengkap dan siap diedit/dikirim, bukan fragmen atau template kosong. Title dan description singkat dan spesifik: title maksimal 80 karakter, description maksimal 180 karakter, prompt maksimal 1500 karakter. Jangan membuat klaim behavior yang tidak dibuktikan snapshot.
 13. relevantPaths hanya boleh berisi jalur yang benar-benar ada dalam manifest. Sertakan jalur saat saran menyentuh modul tertentu, karena jalur ini dipakai tahap perencanaan sebagai konteks teknis; bila tidak dapat membuktikan jalurnya, jangan mengarangnya.
-14. Nama repository adalah metadata identitas, bukan permintaan fitur: jangan menafsirkan atau mempermasalahkan nama tersebut sebagai permintaan user, dan jangan membuat temuan tentang ambiguitasnya. Simpulkan aplikasi HANYA dari manifest dan konteks sumber.`;
-
+14. Nama repository adalah metadata identitas, bukan permintaan fitur: jangan menafsirkan atau mempermasalahkan nama tersebut sebagai permintaan user, dan jangan membuat temuan tentang ambiguitasnya. Simpulkan aplikasi HANYA dari manifest dan konteks sumber.
+15. Bedakan secara tegas antara: (1) fakta yang terbukti dari source, (2) fitur yang terlihat dari struktur dan konten, (3) dugaan yang masuk akal tetapi belum dapat dipastikan (wajib isi field uncertainty), dan (4) batasan karena source yang dianalisis tidak lengkap (masukkan ke limitations).
+16. JANGAN menyimpulkan aplikasi menggunakan database hanya karena memiliki berkas konten statis atau data terstruktur lokal. JANGAN mengklaim autentikasi tersedia bila tidak ada bukti autentikasi. JANGAN menyebut bug sebagai fakta hanya dari ketidakhadiran berkas tertentu. JANGAN mengarang integrasi API eksternal.
+17. Judul temuan (findings.title) harus jelas, ringkas, menggambarkan fungsi atau kondisi nyata, dan tidak terdengar seperti judul laporan AI generik. Detail harus menjelaskan fakta nyata tanpa mengulang judul dan tanpa promosi kosong. Uncertainty harus spesifik menjelaskan apa yang belum dapat dipastikan dan mengapa penting.
+18. EVIDENCE-FIRST: Setiap temuan arsitektur (findings) wajib didasari bukti yang dapat dilacak lewat field evidencePaths berisi jalur berkas yang benar-benar ada dalam manifest snapshot. Jika tidak ada bukti berkas langsung, kosongkan evidencePaths dan jangan mengarang berkas atau nomor baris.
+19. KLASIFIKASI KLAIM (claimType): Beri label claimType pada temuan: "verified" (fakta terbukti langsung dari berkas sumber snapshot dengan evidencePaths), "inference" (kesimpulan logis kuat dari struktur atau konfigurasi), atau "uncertain" (aspek yang belum dapat dipastikan, wajib isi field uncertainty). Jangan melabeli semua interpretasi sebagai fakta pasti.
+20. HINDARI KLAIM NEGATIF ABSOLUT: Jangan membuat pernyataan absolut seperti "Aplikasi tidak menggunakan database" atau "Aplikasi tidak memiliki autentikasi". Gunakan pernyataan sadar-cakupan (scope-aware): "Tidak ditemukan konfigurasi database pada bagian repository yang berhasil dianalisis."
+21. HINDARI DUPLIKASI KETIDAKPASTIAN: Jika fakta temuan adalah "Beberapa aset mengarah ke placeholder", field uncertainty hanya menjelaskan apa yang belum terverifikasi (misalnya "Belum dapat dipastikan apakah aset asli tersedia di lokasi yang tidak termasuk snapshot"), BUKAN mengulang seluruh kalimat temuan sebagai temuan ganda atau menyalin teks yang sama ke limitations.
+22. JANGAN MENYAMAKAN KEBERADAAN DENGAN KUALITAS: Keberadaan file verifikasi SEO atau sitemap tidak membuktikan optimasi SEO sudah baik. Penggunaan suatu framework tidak membuktikan best-practice telah diikuti.
+23. IMPLIKASI FUNGSIONAL: Field "implication" menjelaskan dampak praktis atau konsekuensi arsitektural temuan terhadap perencanaan fitur mendatang (misalnya: perubahan field data lokal harus menjaga kompatibilitas dengan skema konten).`;
 // Manifest entries come from `manifestEntrySchema` (Task 5); this structural
 // subset keeps the prompt builder decoupled from the sync DTO module.
 export interface AnalysisManifestEntry {

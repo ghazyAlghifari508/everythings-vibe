@@ -208,6 +208,7 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 					status={status}
 					failedAt={failedAtStage}
 					stalled={Boolean(stalledMessage)}
+					className={mode === "design" ? "mt-5" : undefined}
 				/>
 
 				{isFailed ? (

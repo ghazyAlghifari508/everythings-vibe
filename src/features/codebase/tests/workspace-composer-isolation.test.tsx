@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
-import { act, renderHook } from "@testing-library/react";
+import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { useWorkspaceComposer } from "../hooks/use-workspace-composer";
 
-function setup() {
+function setup(
+	overrides: Partial<Parameters<typeof useWorkspaceComposer>[0]> = {},
+) {
 	const input = {
 		codebase: { id: "repo", name: "Repository" },
 		snapshotReady: true,
@@ -17,7 +19,7 @@ function setup() {
 		setPrdContent: vi.fn(),
 		setAcContent: vi.fn(),
 		setChatAnswers: vi.fn(),
-		setChatMessages: vi.fn(),
+		persistMessage: vi.fn(async () => {}),
 		effectiveFeatureId: "a",
 		onboardingFeatureId: "anchor",
 		artifactCount: 4,
@@ -28,10 +30,20 @@ function setup() {
 		runRevision: vi.fn(async () => {}),
 		resetFeatureWorkspace: vi.fn(),
 		registerCreatedPlan: vi.fn(),
+		...overrides,
 	};
-	return { input, ...renderHook(() => useWorkspaceComposer(input)) };
+	return {
+		input,
+		...renderHook(
+			({ id }) => useWorkspaceComposer({ ...input, effectiveFeatureId: id }),
+			{ initialProps: { id: input.effectiveFeatureId } },
+		),
+	};
 }
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+	cleanup();
+	vi.unstubAllGlobals();
+});
 it("enters empty creation without a database request", () => {
 	const fetcher = vi.fn();
 	vi.stubGlobal("fetch", fetcher);
@@ -100,4 +112,50 @@ it("reports failed creation without accepting the draft", async () => {
 	expect(input.setError).toHaveBeenCalled();
 	expect(input.setActiveFeature).not.toHaveBeenCalled();
 	expect(input.fetchAiQuestions).not.toHaveBeenCalled();
+});
+
+it("does not launch A after switching to B while A's message is saving", async () => {
+	let finish: (() => void) | undefined;
+	const persistMessage = vi.fn(
+		() =>
+			new Promise<void>((resolve) => {
+				finish = resolve;
+			}),
+	);
+	const { result, rerender, input } = setup({
+		isCreatingNew: false,
+		persistMessage,
+	});
+	let sent: Promise<boolean> | undefined;
+	act(() => {
+		sent = result.current.handleSendMessage("Original plan request");
+	});
+	rerender({ id: "b" });
+	await act(async () => {
+		finish?.();
+		await sent;
+	});
+	expect(input.fetchAiQuestions).not.toHaveBeenCalled();
+	expect(input.runRevision).not.toHaveBeenCalled();
+});
+
+it("preserves retry identity until a message is saved, then accepts repeated content as a new message", async () => {
+	const persistMessage = vi
+		.fn()
+		.mockRejectedValueOnce(new Error("offline"))
+		.mockResolvedValue(undefined);
+	const { result, input } = setup({ isCreatingNew: false, persistMessage });
+	await act(async () => {
+		expect(await result.current.handleSendMessage("Same request")).toBe(false);
+	});
+	expect(input.fetchAiQuestions).not.toHaveBeenCalled();
+	await act(async () => {
+		expect(await result.current.handleSendMessage("Same request")).toBe(true);
+	});
+	await act(async () => {
+		expect(await result.current.handleSendMessage("Same request")).toBe(true);
+	});
+	const calls = persistMessage.mock.calls;
+	expect(calls[0][0].id).toBe(calls[1][0].id);
+	expect(calls[2][0].id).not.toBe(calls[1][0].id);
 });

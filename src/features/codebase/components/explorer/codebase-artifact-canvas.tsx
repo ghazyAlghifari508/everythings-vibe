@@ -11,8 +11,6 @@ import { Icon } from "@/components/ui/icon";
 
 interface CodebaseArtifactCanvasProps {
 	fileName: string;
-	badge: string;
-	hideBadge?: boolean;
 	contentScroll?: boolean;
 	/**
 	 * The active artifact's real content to copy. `null` means no complete
@@ -38,8 +36,6 @@ interface CodebaseArtifactCanvasProps {
 
 export function CodebaseArtifactCanvas({
 	fileName,
-	badge,
-	hideBadge = false,
 	contentScroll = true,
 	copyValue,
 	copyLabel,
@@ -126,11 +122,6 @@ export function CodebaseArtifactCanvas({
 						>
 							{fileName}
 						</span>
-						{!hideBadge ? (
-							<span className="shrink-0 rounded border border-graphite bg-charcoal px-1.5 py-px font-mono text-[10px] font-medium uppercase text-fog">
-								{badge}
-							</span>
-						) : null}
 					</div>
 					<div className="flex shrink-0 items-center gap-1.5">
 						<button

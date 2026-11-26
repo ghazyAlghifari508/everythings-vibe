@@ -56,7 +56,7 @@ export function KanbanHeader({
 							className="text-indigo shrink-0"
 						/>
 						<h1 className="truncate font-inter text-base sm:text-lg font-[600] text-snow">
-							{navigationContext ? projectName : `Kanban - ${projectName}`}
+							{navigationContext ? projectName : "Kanban"}
 						</h1>
 					</div>
 					{navigationContext ? (
@@ -165,7 +165,7 @@ export function KanbanHeader({
 					) : (
 						<>
 							<Link
-								to="/task/$id"
+								to="/vibeplan/$id/task"
 								params={{ id: projectId }}
 								className="btn-primary px-3 py-1.5 rounded-md text-xs font-[510]"
 							>

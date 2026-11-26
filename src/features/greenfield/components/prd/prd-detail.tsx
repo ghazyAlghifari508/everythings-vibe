@@ -2,7 +2,7 @@
 
 import { ArrowRight01Icon, Cancel01Icon } from "@hugeicons/core-free-icons";
 import { useLocation, useNavigate } from "@tanstack/react-router";
-import { useState, useTransition } from "react";
+import { type CSSProperties, useState, useTransition } from "react";
 import { Icon } from "@/components/ui/icon";
 import { CreditExhaustedModal } from "@/features/billing/components/credit-exhausted-modal";
 import { ChatPanel } from "@/features/greenfield/components/chat/chat-panel";
@@ -65,6 +65,10 @@ export function PrdDetail({
 
 	// ── Hooks ──
 	const { rightWidth, onStartDragRight, isDraggingRight } = usePanelResize();
+	const chatStyle: CSSProperties & { "--chat-width": string } = {
+		"--chat-width": `${rightWidth}px`,
+		background: "var(--bg-elevated)",
+	};
 	const navigate = useNavigate();
 	const search = useLocation({ select: (l) => l.search });
 	const [, startTransition] = useTransition();
@@ -92,14 +96,14 @@ export function PrdDetail({
 
 	const handleProjectCreated = (newProjectId: string) => {
 		startTransition(() => {
-			navigate({ to: "/prd/$id", params: { id: newProjectId } });
+			navigate({ to: "/vibeplan/$id/prd", params: { id: newProjectId } });
 		});
 	};
 
 	// ── Render ──
 
 	return (
-		<div className="flex h-dvh flex-col overflow-hidden bg-onyx text-snow">
+		<div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-onyx text-snow">
 			{/* ═══════════ Mobile Tab Toggle (<md) ═══════════ */}
 			<div className="flex shrink-0 border-b border-graphite bg-charcoal md:hidden">
 				<button
@@ -179,103 +183,48 @@ export function PrdDetail({
 					</div>
 				</div>
 
-				{/* ═══════════ Right Panel: Desktop Chat ═══════════ */}
 				<div
 					id="print-hide-chat"
-					style={{
-						width: isChatOpen ? `${rightWidth}px` : "0px",
-						background: "var(--bg-elevated)",
-					}}
+					style={chatStyle}
 					className={cn(
-						"group/right-sidebar relative hidden shrink-0 border-l border-graphite print:hidden xl:block",
-						!isDraggingRight && "transition-all duration-300",
-						!isChatOpen && "overflow-hidden border-none",
+						"flex min-h-0 flex-1 flex-col border-l border-graphite print:hidden md:fixed md:inset-x-0 md:bottom-0 md:z-40 md:h-[60vh] md:rounded-t-xl xl:relative xl:inset-auto xl:z-auto xl:h-auto xl:rounded-none xl:flex-none xl:w-[var(--chat-width)]",
+						activeTab !== "chat" && "hidden md:flex",
+						!isChatOpen &&
+							"md:hidden xl:flex xl:w-0 xl:overflow-hidden xl:border-none",
+						!isDraggingRight && "xl:transition-[width]",
 					)}
 				>
 					{isChatOpen && (
 						<div
 							aria-hidden="true"
-							className="absolute bottom-0 left-[-4px] top-0 z-10 w-2 cursor-col-resize transition-colors hover:bg-indigo/20"
+							className="absolute inset-y-0 -left-1 z-10 hidden w-2 cursor-col-resize xl:block"
 							onMouseDown={onStartDragRight}
 						/>
 					)}
-					<div
-						className="h-full w-full"
-						style={{ display: isChatOpen ? "block" : "none" }}
-					>
-						<ChatPanel
-							projectId={projectId}
-							conversationId={conversationId}
-							onProjectCreated={handleProjectCreated}
-							onPrdRevised={handlePrdRevised}
-							className="w-full"
-							enableAutoSubmit={true}
-							inputDisabled={!projectId && !isGeneratingPRD}
-							isReadOnly={isReadOnly}
-							currentPrdContent={currentContent}
-							userPlan={plan}
-							selectedVersionNum={selectedVersionNum}
-						/>
-					</div>
-				</div>
-
-				{/* ═══════════ Mobile Chat View (<md) & Drawer (md to xl) ═══════════ */}
-				{/* 1. Full panel for Mobile View tab toggle (<md) */}
-				{activeTab === "chat" && (
-					<div className="flex-1 overflow-hidden md:hidden">
-						<ChatPanel
-							projectId={projectId}
-							conversationId={conversationId}
-							onProjectCreated={handleProjectCreated}
-							onPrdRevised={handlePrdRevised}
-							className="h-full w-full border-none"
-							enableAutoSubmit={false}
-							inputDisabled={!projectId && !isGeneratingPRD}
-							isReadOnly={isReadOnly}
-							currentPrdContent={currentContent}
-							userPlan={plan}
-							selectedVersionNum={selectedVersionNum}
-						/>
-					</div>
-				)}
-
-				{/* 2. Slide-over drawer for tablet screens (md to xl) */}
-				<div className="hidden md:block xl:hidden print:hidden">
-					{isChatOpen && (
-						<div
-							role="dialog"
-							aria-modal="true"
-							aria-label="Panel chat revisi"
-							className="fixed bottom-0 left-0 right-0 z-40 h-[60vh] rounded-t-xl bg-charcoal shadow-[var(--shadow-overlay)]"
+					<div className="hidden shrink-0 items-center justify-between border-b border-graphite px-4 py-2 md:flex xl:hidden">
+						<span className="text-sm font-[510]">Chat</span>
+						<button
+							type="button"
+							onClick={toggleChat}
+							aria-label="Tutup chat"
+							className="text-fog hover:text-snow"
 						>
-							<div className="flex items-center justify-between border-b border-graphite px-4 py-2">
-								<span className="text-sm font-[510]">Chat</span>
-								<button
-									type="button"
-									onClick={toggleChat}
-									aria-label="Tutup chat"
-									className="text-fog hover:text-snow"
-								>
-									<Icon icon={Cancel01Icon} size={16} />
-								</button>
-							</div>
-							<div className="h-[calc(60vh-44px)]">
-								<ChatPanel
-									projectId={projectId}
-									conversationId={conversationId}
-									onProjectCreated={handleProjectCreated}
-									onPrdRevised={handlePrdRevised}
-									className="w-full border-none"
-									enableAutoSubmit={false}
-									inputDisabled={!projectId && !isGeneratingPRD}
-									isReadOnly={isReadOnly}
-									currentPrdContent={currentContent}
-									userPlan={plan}
-									selectedVersionNum={selectedVersionNum}
-								/>
-							</div>
-						</div>
-					)}
+							<Icon icon={Cancel01Icon} size={16} />
+						</button>
+					</div>
+					<ChatPanel
+						projectId={projectId}
+						conversationId={conversationId}
+						onProjectCreated={handleProjectCreated}
+						onPrdRevised={handlePrdRevised}
+						className="min-h-0 flex-1 w-full border-none"
+						enableAutoSubmit={true}
+						inputDisabled={!projectId && !isGeneratingPRD}
+						isReadOnly={isReadOnly}
+						currentPrdContent={currentContent}
+						userPlan={plan}
+						selectedVersionNum={selectedVersionNum}
+					/>
 				</div>
 			</div>
 

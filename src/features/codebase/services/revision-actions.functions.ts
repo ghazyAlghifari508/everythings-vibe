@@ -47,7 +47,7 @@ export const submitRevisionProposalAction = createServerFn({ method: "POST" })
 				};
 			}
 
-			const idempotencyKey = `rev_${input.projectId}_${input.targetArtifactVersionId}_${Date.now()}`;
+			const idempotencyKey = input.requestId ?? crypto.randomUUID();
 			const saved = await saveRevisionProposal(user.id, {
 				projectId: input.projectId,
 				codebaseId: input.codebaseId,

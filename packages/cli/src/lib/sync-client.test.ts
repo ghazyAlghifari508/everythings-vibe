@@ -49,6 +49,60 @@ afterEach(() => {
 	vi.restoreAllMocks();
 });
 
+describe("attempt announcement", () => {
+	it("reports the attempt to the connect boundary with Bearer auth and no token leak", async () => {
+		const fetchMock = stubFetch(async () =>
+			jsonResponse(200, {
+				sessionId: "sess-1",
+				attemptId: "att-1",
+				status: "waiting_for_cli",
+				expiresAt: "2026-01-01T00:00:00.000Z",
+			}),
+		);
+		const client = createSyncClient(OPTIONS);
+
+		const res = await client.announceConnect("proj-1");
+
+		expect(res).toMatchObject({ sessionId: "sess-1", attemptId: "att-1" });
+		expect(fetchMock).toHaveBeenCalledOnce();
+		const { url, init } = callUrlAndInit(fetchMock, 0);
+		expect(url).toBe(
+			"http://localhost:3000/api/v1/codebases/proj-1/codebase/connect",
+		);
+		expect((init.headers as Record<string, string>).Authorization).toBe(
+			"Bearer test-sync-token",
+		);
+		expect(JSON.parse(requestBody(init))).toEqual({
+			cliVersion: CODEBASE_CLI_VERSION,
+		});
+		expect(url).not.toContain("test-sync-token");
+		expect(requestBody(init)).not.toContain("test-sync-token");
+	});
+
+	it("resolves null when the server has no connect boundary", async () => {
+		// An older server answers 404. The announcement only makes an existing
+		// window observable, so its absence must never fail the sync.
+		const fetchMock = stubFetch(
+			async () => new Response("not found", { status: 404 }),
+		);
+
+		await expect(
+			createSyncClient(OPTIONS).announceConnect("proj-1"),
+		).resolves.toBeNull();
+		expect(fetchMock).toHaveBeenCalledOnce();
+	});
+
+	it("resolves null on a transport failure instead of throwing", async () => {
+		stubFetch(async () => {
+			throw new Error("network down");
+		});
+
+		await expect(
+			createSyncClient(OPTIONS).announceConnect("proj-1"),
+		).resolves.toBeNull();
+	});
+});
+
 describe("session handshake", () => {
 	it("sends the sync token as Bearer auth without leaking it into URL or body", async () => {
 		const fetchMock = stubFetch(async () =>

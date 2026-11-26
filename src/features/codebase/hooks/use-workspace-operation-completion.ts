@@ -17,9 +17,8 @@ import type { TaskTree } from "@/features/greenfield/services/task-tree";
 
 export interface WorkspaceOperationCompletionOptions {
 	activeProjectIdRef: RefObject<string | null>;
-	resolvedFeatureName?: string;
-	codebaseName: string;
 	setAiQuestions: (questions: AdaptiveQuestion[]) => void;
+	setLastFeaturePrompt?: (prompt: string) => void;
 	refreshFeatureTree: (id: string | null) => Promise<ProjectFeatureTree | null>;
 	loadPrd: () => Promise<string | null>;
 	loadAc: () => Promise<string | null>;
@@ -27,14 +26,13 @@ export interface WorkspaceOperationCompletionOptions {
 	refetchKanban: () => Promise<unknown>;
 	setPipelineStage: Dispatch<SetStateAction<CodebasePipelineStage>>;
 	openArtifactPreview: (kind: "feature" | "prd" | "ac" | "tasks") => void;
-	pushAssistantMessage: (content: string) => void;
+	refreshTimeline: () => Promise<void>;
 }
 
 export function useWorkspaceOperationCompletion({
 	activeProjectIdRef,
-	resolvedFeatureName,
-	codebaseName,
 	setAiQuestions,
+	setLastFeaturePrompt,
 	refreshFeatureTree,
 	loadPrd,
 	loadAc,
@@ -42,7 +40,7 @@ export function useWorkspaceOperationCompletion({
 	refetchKanban,
 	setPipelineStage,
 	openArtifactPreview,
-	pushAssistantMessage,
+	refreshTimeline,
 }: WorkspaceOperationCompletionOptions) {
 	return useCallback(
 		async (
@@ -50,8 +48,12 @@ export function useWorkspaceOperationCompletion({
 			op: DurableGenerationOperation,
 		): Promise<boolean> => {
 			if (activeProjectIdRef.current !== op.projectId) return false;
+			void refreshTimeline();
 
 			if (stage === "questions") {
+				if (typeof op.input?.prompt === "string" && op.input.prompt.trim()) {
+					setLastFeaturePrompt?.(op.input.prompt.trim());
+				}
 				if (op.result?.questions && Array.isArray(op.result.questions)) {
 					const validated = validateAskQuestions(op.result.questions);
 					if (validated && validated.length > 0) {
@@ -67,9 +69,7 @@ export function useWorkspaceOperationCompletion({
 				if (tree && activeProjectIdRef.current === op.projectId) {
 					setPipelineStage("feature");
 					openArtifactPreview("feature");
-					pushAssistantMessage(
-						`Pohon fitur ${resolvedFeatureName ?? codebaseName} berhasil dimuat.`,
-					);
+					void refreshTimeline();
 					return true;
 				}
 				return false;
@@ -80,9 +80,7 @@ export function useWorkspaceOperationCompletion({
 				if (content && activeProjectIdRef.current === op.projectId) {
 					setPipelineStage("prd");
 					openArtifactPreview("prd");
-					pushAssistantMessage(
-						`PRD untuk ${resolvedFeatureName ?? "fitur"} siap.`,
-					);
+					void refreshTimeline();
 					return true;
 				}
 				return false;
@@ -93,9 +91,7 @@ export function useWorkspaceOperationCompletion({
 				if (content && activeProjectIdRef.current === op.projectId) {
 					setPipelineStage("ac");
 					openArtifactPreview("ac");
-					pushAssistantMessage(
-						`Acceptance Criteria untuk ${resolvedFeatureName ?? "fitur"} siap.`,
-					);
+					void refreshTimeline();
 					return true;
 				}
 				return false;
@@ -107,9 +103,7 @@ export function useWorkspaceOperationCompletion({
 				if (tree && activeProjectIdRef.current === op.projectId) {
 					setPipelineStage("handoff");
 					openArtifactPreview("tasks");
-					pushAssistantMessage(
-						`Task untuk ${resolvedFeatureName ?? "fitur"} sudah tersimpan dan papan Kanban aktif.`,
-					);
+					void refreshTimeline();
 					return true;
 				}
 				return false;
@@ -119,8 +113,6 @@ export function useWorkspaceOperationCompletion({
 		},
 		[
 			activeProjectIdRef,
-			resolvedFeatureName,
-			codebaseName,
 			setAiQuestions,
 			refreshFeatureTree,
 			loadPrd,
@@ -129,7 +121,8 @@ export function useWorkspaceOperationCompletion({
 			refetchKanban,
 			setPipelineStage,
 			openArtifactPreview,
-			pushAssistantMessage,
+			refreshTimeline,
+			setLastFeaturePrompt,
 		],
 	);
 }

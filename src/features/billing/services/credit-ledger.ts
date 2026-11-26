@@ -12,6 +12,7 @@ export async function getCreditOperation(input: {
 			id: schema.creditOperations.id,
 			state: schema.creditOperations.state,
 			finalCharge: schema.creditOperations.finalCharge,
+			analysisReference: schema.creditOperations.analysisReference,
 		})
 		.from(schema.creditOperations)
 		.where(

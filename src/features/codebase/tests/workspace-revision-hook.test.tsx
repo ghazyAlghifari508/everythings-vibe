@@ -51,7 +51,7 @@ describe("useWorkspaceRevision", () => {
 		mockGetPending.mockResolvedValue({ proposal: null });
 
 		const loadPrd = vi.fn().mockResolvedValue("Old");
-		const pushAssistantMessage = vi.fn();
+		const refreshTimeline = vi.fn(async () => {});
 		const openArtifactPreview = vi.fn();
 		const setStageBusy = vi.fn();
 		const setStageError = vi.fn();
@@ -67,7 +67,7 @@ describe("useWorkspaceRevision", () => {
 				featureName: "Pencarian",
 				resolvedFeatureName: "Pencarian",
 				loadPrd,
-				pushAssistantMessage,
+				refreshTimeline,
 				openArtifactPreview,
 				setStageBusy,
 				setStageError,
@@ -91,9 +91,6 @@ describe("useWorkspaceRevision", () => {
 
 		// Notice: loadPrd was NOT called to overwrite anything before review!
 		expect(loadPrd).not.toHaveBeenCalled();
-		expect(pushAssistantMessage).toHaveBeenCalledWith(
-			expect.stringContaining("Proposal revisi untuk PRD siap ditinjau"),
-		);
 	});
 
 	it("does not send a revision request when the target has no reviewable version", async () => {
@@ -109,7 +106,7 @@ describe("useWorkspaceRevision", () => {
 				featureName: "Pencarian",
 				resolvedFeatureName: "Pencarian",
 				loadPrd: vi.fn(),
-				pushAssistantMessage: vi.fn(),
+				refreshTimeline: vi.fn(async () => {}),
 				openArtifactPreview: vi.fn(),
 				setStageBusy: vi.fn(),
 				setStageError,
@@ -153,7 +150,7 @@ describe("useWorkspaceRevision", () => {
 				featureName: "Pencarian",
 				resolvedFeatureName: "Pencarian",
 				loadPrd: vi.fn(),
-				pushAssistantMessage: vi.fn(),
+				refreshTimeline: vi.fn(async () => {}),
 				openArtifactPreview: vi.fn(),
 				setStageBusy: vi.fn(),
 				setStageError: vi.fn(),
@@ -170,7 +167,7 @@ describe("useWorkspaceRevision", () => {
 
 	it("supersedes the proposal on request changes and hands the instruction back", async () => {
 		mockReject.mockResolvedValue({ ok: true, status: "rejected" });
-		const pushAssistantMessage = vi.fn();
+		const refreshTimeline = vi.fn(async () => {});
 		const { result } = renderHook(() =>
 			useWorkspaceRevision({
 				codebaseId: "codebase-1",
@@ -181,7 +178,7 @@ describe("useWorkspaceRevision", () => {
 				featureName: "Pencarian",
 				resolvedFeatureName: "Pencarian",
 				loadPrd: vi.fn(),
-				pushAssistantMessage,
+				refreshTimeline,
 				openArtifactPreview: vi.fn(),
 				setStageBusy: vi.fn(),
 				setStageError: vi.fn(),
@@ -217,15 +214,12 @@ describe("useWorkspaceRevision", () => {
 		expect(returned).toBe("Ubah navigasi");
 		expect(result.current.pendingProposal).toBeNull();
 		expect(result.current.isReviewOpen).toBe(false);
-		expect(pushAssistantMessage).toHaveBeenCalledWith(
-			expect.stringContaining("Dokumen aktif belum diubah"),
-		);
 	});
 
 	it("rejects proposal without altering active artifacts", async () => {
 		mockReject.mockResolvedValue({ ok: true, status: "rejected" });
 
-		const pushAssistantMessage = vi.fn();
+		const refreshTimeline = vi.fn(async () => {});
 		const { result } = renderHook(() =>
 			useWorkspaceRevision({
 				codebaseId: "codebase-1",
@@ -236,7 +230,7 @@ describe("useWorkspaceRevision", () => {
 				featureName: "Pencarian",
 				resolvedFeatureName: "Pencarian",
 				loadPrd: vi.fn(),
-				pushAssistantMessage,
+				refreshTimeline,
 				openArtifactPreview: vi.fn(),
 				setStageBusy: vi.fn(),
 				setStageError: vi.fn(),
@@ -269,9 +263,6 @@ describe("useWorkspaceRevision", () => {
 		});
 		expect(result.current.pendingProposal).toBeNull();
 		expect(result.current.isReviewOpen).toBe(false);
-		expect(pushAssistantMessage).toHaveBeenCalledWith(
-			expect.stringContaining("ditolak. Dokumen aktif tidak diubah."),
-		);
 	});
 
 	it("applies proposal, refreshes artifacts, and opens preview", async () => {
@@ -281,7 +272,7 @@ describe("useWorkspaceRevision", () => {
 			appliedVersionId: "v2",
 		});
 		const loadPrd = vi.fn().mockResolvedValue("New v2 content");
-		const pushAssistantMessage = vi.fn();
+		const refreshTimeline = vi.fn(async () => {});
 		const openArtifactPreview = vi.fn();
 
 		const { result } = renderHook(() =>
@@ -294,7 +285,7 @@ describe("useWorkspaceRevision", () => {
 				featureName: "Pencarian",
 				resolvedFeatureName: "Pencarian",
 				loadPrd,
-				pushAssistantMessage,
+				refreshTimeline,
 				openArtifactPreview,
 				setStageBusy: vi.fn(),
 				setStageError: vi.fn(),
@@ -328,8 +319,5 @@ describe("useWorkspaceRevision", () => {
 		expect(result.current.pendingProposal).toBeNull();
 		expect(result.current.isReviewOpen).toBe(false);
 		expect(openArtifactPreview).toHaveBeenCalledWith("prd");
-		expect(pushAssistantMessage).toHaveBeenCalledWith(
-			expect.stringContaining("telah diterapkan sebagai versi baru"),
-		);
 	});
 });

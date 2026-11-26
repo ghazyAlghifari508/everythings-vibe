@@ -71,24 +71,111 @@ function renderReview(
 }
 
 describe("CodebaseReview", () => {
+	it("renders main heading 'Ringkasan repository' and updated description", () => {
+		const c = renderReview();
+		expect(c.textContent).toContain("Ringkasan repository");
+		expect(c.textContent).toContain(
+			"Berikut gambaran aplikasi dan teknologi dari repository yang sudah disinkronkan. Buka workspace untuk mulai merencanakan fitur.",
+		);
+	});
+
+	it("removes redundant labels and badges from the header and impact sections", () => {
+		const c = renderReview();
+		expect(c.textContent).not.toContain(
+			"CODEBASE ANALYSIS · REVIEW BEFORE GENERATE",
+		);
+		expect(c.textContent).not.toContain("Kami menemukan konteks aplikasimu.");
+		expect(c.textContent).not.toContain(
+			"Review ringkasan ini sebelum everythings-vibe membuat pertanyaan.",
+		);
+		expect(c.textContent).not.toContain("Sync selesai");
+		expect(c.textContent).not.toContain("AI generated · review");
+		expect(c.textContent).not.toContain(
+			"Semua temuan di atas tanpa ketidakpastian tercatat.",
+		);
+		expect(c.textContent).not.toContain("Perlu verifikasi");
+	});
+
+	it("does not display raw snapshot ID in primary UI text", () => {
+		const c = renderReview();
+		expect(c.textContent).not.toContain("snap_123");
+		expect(c.textContent).not.toContain("ID: snap_123");
+	});
+
+	it("retains dynamic snapshot metadata internally on DOM attributes and props", () => {
+		const c = renderReview();
+		const nav = c.querySelector('[data-testid="review-nav"]');
+		expect(nav).not.toBeNull();
+		expect(nav?.getAttribute("data-snapshot-id")).toBe("snap_123");
+		expect(nav?.getAttribute("data-snapshot-created-at")).toBe(
+			"2026-09-19T10:00:00.000Z",
+		);
+	});
+
 	it("renders the detected environment without inventing missing values", () => {
 		const c = renderReview();
+		expect(c.textContent).toContain("Teknologi repository");
 		expect(c.textContent).toContain("TanStack Start");
 		expect(c.textContent).toContain("TypeScript");
 		expect(c.textContent).toContain("PostgreSQL");
 		expect(c.textContent).toContain("Better Auth");
 	});
 
-	it("renders the repository map and impact areas", () => {
+	it("renders the repository structure and application sections", () => {
 		const c = renderReview();
+		expect(c.textContent).toContain("Struktur repository");
+		expect(c.textContent).toContain("Bagian aplikasi");
 		expect(c.textContent).toContain("src/routes");
 		expect(c.textContent).toContain("src/db/schema.ts");
 		expect(c.textContent).toContain("src/routes/api");
 	});
 
+	it("does not categorize impact areas by array index or repeat arbitrary categories", () => {
+		const multiAreasAnalysis: CodebaseAnalysis = {
+			...analysis,
+			impactAreas: [
+				"Katalog dan halaman detail proyek",
+				"Sistem navigasi dan tata letak responsif",
+				"Penyajian sertifikat",
+				"Interaksi tema",
+				"Alur kontak",
+			],
+		};
+		const c = renderReview({ analysis: multiAreasAnalysis });
+		expect(c.textContent).not.toContain("Database & State");
+		expect(c.textContent).not.toContain("Application & Logic");
+		expect(c.textContent).not.toContain("Interface & Routing");
+		expect(c.textContent).toContain("Katalog dan halaman detail proyek");
+		expect(c.textContent).toContain("Sistem navigasi dan tata letak responsif");
+		expect(c.textContent).toContain("Penyajian sertifikat");
+		expect(c.textContent).toContain("Interaksi tema");
+		expect(c.textContent).toContain("Alur kontak");
+	});
+
+	it("renders structured applicationModules when present in analysis", () => {
+		const structuredAnalysis: CodebaseAnalysis = {
+			...analysis,
+			applicationModules: [
+				{
+					name: "Halaman proyek",
+					description: "Daftar dan detail karya portofolio",
+				},
+				{
+					name: "Navigasi dan tampilan",
+					description: "Menu, layout, dan tema tampilan",
+				},
+			],
+		};
+		const c = renderReview({ analysis: structuredAnalysis });
+		expect(c.textContent).toContain("Halaman proyek");
+		expect(c.textContent).toContain("Daftar dan detail karya portofolio");
+		expect(c.textContent).toContain("Navigasi dan tampilan");
+		expect(c.textContent).toContain("Menu, layout, dan tema tampilan");
+	});
+
 	it("shows dash for undefined metadata counts instead of false 0", () => {
 		const c = renderReview({ fileCount: undefined, excludedCount: undefined });
-		expect(c.textContent).toContain("— files indexed (— excluded)");
+		expect(c.textContent).toContain("— file terindeks (— dikecualikan)");
 	});
 
 	it("summarizes exclusions by count without file contents", () => {
@@ -97,16 +184,27 @@ describe("CodebaseReview", () => {
 		expect(c.textContent).not.toContain(SECRET_CANARY);
 	});
 
-	it("labels uncertain findings explicitly", () => {
+	it("renders findings and uncertainties under distinct sections without generic warning badges", () => {
 		const c = renderReview();
+		expect(c.textContent).toContain("Temuan arsitektur");
 		expect(c.textContent).toContain("Batas auth");
-		expect(c.textContent).toContain("Jalur refresh token tidak terlihat");
-		expect(c.textContent).toMatch(/perlu verifikasi|tidak pasti/i);
+		expect(c.textContent).toContain("Sesi dibaca dari header Better Auth.");
+		expect(c.textContent).toContain("Hal yang belum dapat dipastikan");
+		expect(c.textContent).toContain(
+			"Jalur refresh token tidak terlihat di snapshot.",
+		);
+		expect(c.textContent).toContain("Tidak ada cakupan tes untuk alur sync");
+		expect(c.textContent).not.toContain("Perlu verifikasi");
 	});
 
-	it("shows the sync snapshot id and timestamp", () => {
-		const c = renderReview();
-		expect(c.textContent).toContain("snap_123");
+	it("does not create false database/auth claims when database and auth are null or absent", () => {
+		const { database: _d, auth: _a, findings: _f, ...withoutDbAuth } = analysis;
+		const c = renderReview({
+			analysis: { ...withoutDbAuth, database: null, auth: null, findings: [] },
+		});
+		expect(c.textContent).not.toContain("PostgreSQL");
+		expect(c.textContent).not.toContain("Better Auth");
+		expect(c.textContent).toMatch(/tidak terdeteksi/i);
 	});
 
 	it("marks unknown detections honestly instead of inventing them", () => {
@@ -174,7 +272,7 @@ describe("CodebaseReview", () => {
 
 	it("renders relevant files with structured explorer items", () => {
 		const c = renderReview();
-		expect(c.textContent).toContain("FILE RELEVAN (1)");
+		expect(c.textContent).toContain("File relevan (1)");
 		expect(c.textContent).toContain("schema.ts");
 	});
 
@@ -251,5 +349,147 @@ describe("CodebaseReview", () => {
 			expect(button.disabled).toBe(true);
 		}
 		expect(c.textContent).not.toContain("%");
+	});
+	it("renders dynamic repository data from analysis without hardcoding", () => {
+		const customAnalysis: CodebaseAnalysis = {
+			projectId: "proj_custom",
+			snapshotId: "snap_custom",
+			summary: "Aplikasi e-commerce berbasis Go dan Vue.",
+			framework: "Vue.js",
+			language: "Go",
+			packageManager: "npm",
+			dependencies: ["gin", "gorm"],
+			database: "MySQL",
+			auth: "JWT",
+			moduleMap: [{ path: "cmd/server", summary: "Server entrypoint" }],
+			relevantFiles: ["cmd/server/main.go"],
+			impactAreas: ["api/orders"],
+			findings: [
+				{
+					title: "Pengelolaan pesanan",
+					detail: "Pesanan disimpan ke database MySQL melalui GORM.",
+				},
+			],
+		};
+		const c = renderReview({ analysis: customAnalysis });
+		expect(c.textContent).toContain("Vue.js");
+		expect(c.textContent).toContain("Go");
+		expect(c.textContent).toContain("MySQL");
+		expect(c.textContent).toContain("JWT");
+		expect(c.textContent).toContain("cmd/server");
+		expect(c.textContent).toContain("main.go");
+		expect(c.textContent).toContain("api/orders");
+		expect(c.textContent).toContain("Pengelolaan pesanan");
+	});
+
+	it("renders evidence disclosure and toggles inspectable file list", () => {
+		const analysisWithEvidence: CodebaseAnalysis = {
+			...analysis,
+			findings: [
+				{
+					title: "Konten dikelola lewat data lokal",
+					detail: "Katalog portofolio dibaca dari berkas JSON terstruktur.",
+					claimType: "verified",
+					evidencePaths: ["src/content/projects.json", "src/content.config.ts"],
+					implication:
+						"Perubahan field proyek harus menjaga kompatibilitas schema.",
+				},
+			],
+		};
+		const c = renderReview({ analysis: analysisWithEvidence });
+		expect(c.textContent).toContain("Konten dikelola lewat data lokal");
+		expect(c.textContent).toContain("Evidence:");
+		expect(c.textContent).toContain("2 berkas relevan");
+		expect(c.textContent).toContain("Impact:");
+		expect(c.textContent).toContain(
+			"Perubahan field proyek harus menjaga kompatibilitas schema.",
+		);
+
+		// Initially, the evidence list is collapsed
+		expect(c.querySelector('[data-testid="finding-evidence-list"]')).toBeNull();
+
+		// Click the disclosure toggle
+		const toggleBtn = [...c.querySelectorAll("button")].find((b) =>
+			/Evidence:.*2 berkas relevan/i.test(b.textContent ?? ""),
+		);
+		expect(toggleBtn).toBeDefined();
+		act(() => {
+			toggleBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+
+		// Evidence list is now expanded and shows the files
+		const list = c.querySelector('[data-testid="finding-evidence-list"]');
+		expect(list).not.toBeNull();
+		expect(list?.textContent).toContain("projects.json");
+		expect(list?.textContent).toContain("content.config.ts");
+	});
+
+	it("routes clicked evidence file to onSelectFile callback", () => {
+		const onSelectFile = vi.fn();
+		const analysisWithEvidence: CodebaseAnalysis = {
+			...analysis,
+			findings: [
+				{
+					title: "Konten dikelola lewat data lokal",
+					detail: "Katalog portofolio dibaca dari berkas JSON.",
+					evidencePaths: ["src/content/projects.json"],
+				},
+			],
+		};
+		const c = renderReview({
+			analysis: analysisWithEvidence,
+			onSelectFile,
+		});
+
+		// Open the disclosure
+		const toggleBtn = [...c.querySelectorAll("button")].find((b) =>
+			/Evidence:.*1 berkas relevan/i.test(b.textContent ?? ""),
+		);
+		act(() => {
+			toggleBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+
+		// Click the "Lihat file" button
+		const fileBtn = [...c.querySelectorAll("button")].find((b) =>
+			/Lihat file/i.test(b.textContent ?? ""),
+		);
+		expect(fileBtn).toBeDefined();
+		act(() => {
+			fileBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+
+		expect(onSelectFile).toHaveBeenCalledWith("src/content/projects.json");
+	});
+
+	it("routes clicked repository panel file to onSelectFile callback", () => {
+		const onSelectFile = vi.fn();
+		const c = renderReview({ onSelectFile });
+
+		// In repository panel, clicking a relevant file should route to onSelectFile
+		const fileBtn = [...c.querySelectorAll("button")].find((b) =>
+			/schema\.ts/i.test(b.textContent ?? ""),
+		);
+		expect(fileBtn).toBeDefined();
+		act(() => {
+			fileBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+
+		expect(onSelectFile).toHaveBeenCalledWith("src/db/schema.ts");
+	});
+
+	it("handles empty optional findings and limitations without crashing UI", () => {
+		const emptyAnalysis: CodebaseAnalysis = {
+			projectId: "proj_empty",
+			snapshotId: "snap_empty",
+			findings: [],
+			limitations: [],
+			applicationModules: [],
+			impactAreas: [],
+		};
+		const c = renderReview({ analysis: emptyAnalysis });
+		expect(c.textContent).toContain("Bagian aplikasi");
+		expect(c.textContent).toContain("Tidak terdeteksi");
+		expect(c.textContent).not.toContain("Temuan arsitektur");
+		expect(c.textContent).not.toContain("Hal yang belum dapat dipastikan");
 	});
 });

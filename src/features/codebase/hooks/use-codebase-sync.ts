@@ -6,21 +6,17 @@ import {
 	shouldDiscardWorkspaceAnalysis,
 } from "@/features/codebase/services/analysis-selection";
 import {
-	type SyncPromptPayload,
 	type SyncStatusResponse,
-	syncPromptPayloadSchema,
 	syncStatusResponseSchema,
 } from "@/features/codebase/services/sync";
 import { shouldFetchWorkspaceAnalysis } from "@/features/codebase/services/workspace-analysis";
-import { CODEBASE_SYNC_POLL_INTERVAL_MS } from "@/features/codebase/types/codebase-constants";
-import type { AnalysisCreditStatus } from "../services/analysis-credit-policy";
-import { requestAnalysisCreditPreflight } from "../services/analysis-credit-requests";
 import {
-	type CodebaseSessionStartAction,
-	getCodebaseSessionRequestBody,
-	resolveWorkspaceSnapshotReady,
-} from "../utils/workspace-contracts";
+	CODEBASE_SYNC_POLL_INTERVAL_MS,
+	CODEBASE_SYNC_REQUEST_TIMEOUT_MS,
+} from "@/features/codebase/types/codebase-constants";
+import { resolveWorkspaceSnapshotReady } from "../utils/workspace-contracts";
 import { useWorkspaceAnalysis } from "./use-workspace-analysis";
+import { useWorkspaceSyncSession } from "./use-workspace-sync-session";
 
 export function useCodebaseSync({
 	codebaseId,
@@ -35,21 +31,65 @@ export function useCodebaseSync({
 	initialAnalysis: AnalysisResponse | null;
 	hasStoredSnapshot: boolean;
 }) {
-	const [payload, setPayload] = useState<SyncPromptPayload | null>(null);
-	const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-	const [isResyncModalOpen, setIsResyncModalOpen] = useState(false);
-	const [status, setStatus] = useState<SyncStatusResponse | null>(null);
+	const [storedStatus, setStatus] = useState<SyncStatusResponse | null>(null);
+	const codebaseStatus =
+		storedStatus?.projectId === codebaseId ? storedStatus : null;
+	const [workspaceSnapshot, setWorkspaceSnapshot] = useState({
+		codebaseId,
+		persistedSnapshotId: currentSnapshotId,
+		snapshotId: currentSnapshotId,
+	});
+	const retainedSnapshotId =
+		workspaceSnapshot.codebaseId === codebaseId &&
+		workspaceSnapshot.persistedSnapshotId === currentSnapshotId
+			? workspaceSnapshot.snapshotId
+			: currentSnapshotId;
 	const [error, setError] = useState<string | null>(null);
-	const [isStarting, setIsStarting] = useState(false);
+	/**
+	 * A failed status read, separate from the shared workspace error. The re-sync
+	 * modal reports this inside its progress step; the banner outside the modal
+	 * reports the shared error, so the same failure never appears twice.
+	 */
+	const [statusError, setStatusError] = useState<string | null>(null);
 	const [isWorking, setIsWorking] = useState(false);
-	const [creditPreflight, setCreditPreflight] =
-		useState<AnalysisCreditStatus | null>(null);
-	const inFlight = useRef(false);
-	const sessionInFlight = useRef(false);
+	const inFlight = useRef<{
+		scope: object;
+		controller: AbortController;
+	} | null>(null);
+	const contextRef = useRef({ codebaseId, projectId });
+	if (
+		contextRef.current.codebaseId !== codebaseId ||
+		contextRef.current.projectId !== projectId
+	)
+		contextRef.current = { codebaseId, projectId };
+	/**
+	 * The exact shared-error string this hook last wrote. A later successful
+	 * read clears only that message, never a composer/analysis error it did not
+	 * own.
+	 */
+	const statusErrorMessageRef = useRef<string | null>(null);
+	const reportStatusError = useCallback((message: string) => {
+		statusErrorMessageRef.current = message;
+		setError(message);
+		setStatusError(message);
+	}, []);
+	const session = useWorkspaceSyncSession({
+		codebaseId,
+		status: codebaseStatus,
+		setStatus,
+		setError,
+	});
+	const { activeSessionId, setActiveSessionId, statusScopeRef, canReadStatus } =
+		session;
+	const status =
+		canReadStatus &&
+		(!activeSessionId || codebaseStatus?.sessionId === activeSessionId)
+			? codebaseStatus
+			: null;
 	const analysisState = useWorkspaceAnalysis({
 		projectId,
 		currentSnapshotId,
-		polledSnapshotId: status?.snapshotId ?? null,
+		polledSnapshotId: retainedSnapshotId,
 		initialAnalysis,
 		setError,
 		setIsWorking,
@@ -57,40 +97,81 @@ export function useCodebaseSync({
 	const {
 		analysis,
 		setAnalysis,
-		analysisAttemptedFor,
+		triggerAnalysis,
 		analysisIdentityRef,
 		readWorkspaceAnalysis,
 	} = analysisState;
 	const readStatus = useCallback(async () => {
-		if (inFlight.current) return;
-		inFlight.current = true;
+		const scope = statusScopeRef.current;
+		if (
+			!canReadStatus ||
+			scope.blocked ||
+			scope.codebaseId !== codebaseId ||
+			scope.sessionId !== activeSessionId
+		)
+			return;
+		if (inFlight.current?.scope === scope) return;
+		inFlight.current?.controller.abort();
+		const context = contextRef.current;
+		const controller = new AbortController();
+		const request = { scope, controller };
+		inFlight.current = request;
+		const timeout = setTimeout(
+			() => controller.abort(),
+			CODEBASE_SYNC_REQUEST_TIMEOUT_MS,
+		);
+		const isCurrent = () =>
+			statusScopeRef.current === scope &&
+			contextRef.current === context &&
+			!controller.signal.aborted;
 		try {
 			const queryParams = new URLSearchParams();
-			const sessionToQuery = activeSessionId ?? status?.sessionId;
+			const sessionToQuery = scope.sessionId;
 			if (sessionToQuery) queryParams.set("sessionId", sessionToQuery);
 			if (projectId) queryParams.set("projectId", projectId);
 			const query = queryParams.toString() ? `?${queryParams}` : "";
 			const response = await fetch(
 				`/api/codebases/${encodeURIComponent(codebaseId)}/status${query}`,
+				{ signal: controller.signal, cache: "no-store" },
 			);
 			const parsed = syncStatusResponseSchema.safeParse(
 				await response.json().catch(() => null),
 			);
+			if (!isCurrent()) return;
 			if (!response.ok || !parsed.success) {
-				setError(
-					response.ok
-						? "Status sync tidak valid. Coba muat ulang."
-						: "Status sync tidak dapat dibaca. Coba lagi.",
-				);
+				const message = response.ok
+					? "Status sync tidak valid. Coba muat ulang."
+					: "Status sync tidak dapat dibaca. Coba lagi.";
+				reportStatusError(message);
 				return;
 			}
+			if (
+				parsed.data.projectId !== codebaseId ||
+				(scope.sessionId && parsed.data.sessionId !== scope.sessionId) ||
+				(parsed.data.analysisProjectId &&
+					projectId &&
+					parsed.data.analysisProjectId !== projectId)
+			)
+				return;
 			const activeSnapshotId = resolveWorkspaceSnapshotIdentity({
-				persistedSnapshotId: currentSnapshotId,
-				polledSnapshotId: parsed.data.snapshotId ?? null,
+				persistedSnapshotId: retainedSnapshotId,
+				polledSnapshotId: parsed.data.workspaceSnapshotId,
 			});
+			if (activeSnapshotId !== retainedSnapshotId)
+				setWorkspaceSnapshot({
+					codebaseId,
+					persistedSnapshotId: currentSnapshotId,
+					snapshotId: activeSnapshotId,
+				});
 			analysisIdentityRef.current = `${projectId ?? ""}:${activeSnapshotId ?? ""}`;
+			const staleStatusError = statusErrorMessageRef.current;
+			if (staleStatusError !== null) {
+				statusErrorMessageRef.current = null;
+				setError((current) => (current === staleStatusError ? null : current));
+				setStatusError(null);
+			}
 			setStatus(parsed.data);
-			if (!activeSessionId && parsed.data.sessionId) {
+			if (!scope.sessionId) {
 				setActiveSessionId(parsed.data.sessionId);
 			}
 			const snapshotId = activeSnapshotId;
@@ -109,7 +190,10 @@ export function useCodebaseSync({
 				shouldFetchWorkspaceAnalysis({
 					projectId,
 					snapshotId,
-					analysisStatus: parsed.data.analysisStatus,
+					analysisStatus:
+						snapshotId === parsed.data.snapshotId
+							? parsed.data.analysisStatus
+							: "ready",
 					analysis: retained,
 				})
 			) {
@@ -117,9 +201,11 @@ export function useCodebaseSync({
 			}
 			// Reading status must never start billable analysis.
 		} catch {
-			setError("Server tidak dapat dihubungi. Coba lagi.");
+			if (isCurrent())
+				reportStatusError("Server tidak dapat dihubungi. Coba lagi.");
 		} finally {
-			inFlight.current = false;
+			clearTimeout(timeout);
+			if (inFlight.current === request) inFlight.current = null;
 		}
 	}, [
 		activeSessionId,
@@ -128,10 +214,14 @@ export function useCodebaseSync({
 		currentSnapshotId,
 		initialAnalysis,
 		projectId,
+		retainedSnapshotId,
 		readWorkspaceAnalysis,
-		status?.sessionId,
+		reportStatusError,
+		statusScopeRef,
+		canReadStatus,
 		analysisIdentityRef,
 		setAnalysis,
+		setActiveSessionId,
 	]);
 	useEffect(() => {
 		void readStatus();
@@ -151,99 +241,50 @@ export function useCodebaseSync({
 		codebaseId,
 		sessionId: activeSessionId,
 		analysisProjectId: projectId,
+		enabled: canReadStatus && Boolean(activeSessionId),
 	});
 	const lastLiveFrameRef = useRef<string | null>(null);
 	const readStatusRef = useRef(readStatus);
 	readStatusRef.current = readStatus;
 	useEffect(() => {
-		if (!liveStatus.status) return;
+		if (
+			!canReadStatus ||
+			!liveStatus.status ||
+			liveStatus.status.projectId !== codebaseId ||
+			liveStatus.status.sessionId !== activeSessionId
+		)
+			return;
 		const fingerprint = JSON.stringify(liveStatus.status);
 		if (lastLiveFrameRef.current === fingerprint) return;
 		lastLiveFrameRef.current = fingerprint;
 		void readStatusRef.current();
-	}, [liveStatus.status]);
-	const startSession = async (
-		action: CodebaseSessionStartAction = "initial",
-	) => {
-		if (sessionInFlight.current) return;
-		sessionInFlight.current = true;
-		setIsStarting(true);
-		setIsResyncModalOpen(true);
-		setError(null);
-		try {
-			const status = await requestAnalysisCreditPreflight().catch(
-				(error: unknown) => {
-					setError(
-						error instanceof Error
-							? error.message
-							: "Kebutuhan kredit belum dapat diperiksa.",
-					);
-					return null;
-				},
-			);
-			if (!status) return;
-			setCreditPreflight(status);
-			if (!status.canStart) {
-				setPayload(null);
-				return;
-			}
-			const response = await fetch(
-				`/api/codebases/${encodeURIComponent(codebaseId)}/session`,
-				{
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({
-						...getCodebaseSessionRequestBody(action),
-						sessionId: activeSessionId,
-					}),
-				},
-			);
-			const parsed = syncPromptPayloadSchema.safeParse(
-				await response.json().catch(() => null),
-			);
-			if (!response.ok || !parsed.success) {
-				setError("Sesi sync gagal dibuat. Coba lagi.");
-				return;
-			}
-			setPayload(parsed.data);
-			if (parsed.data.sessionId) {
-				setActiveSessionId(parsed.data.sessionId);
-			}
-			setStatus(null);
-			setAnalysis(null);
-			analysisAttemptedFor.current = null;
-		} catch (error) {
-			setError(
-				error instanceof Error
-					? error.message
-					: "Server tidak dapat dihubungi.",
-			);
-		} finally {
-			sessionInFlight.current = false;
-			setIsStarting(false);
-		}
-	};
+	}, [liveStatus.status, activeSessionId, codebaseId, canReadStatus]);
+	useEffect(() => {
+		if (
+			status?.status === "uploaded" &&
+			status.snapshotId &&
+			status.snapshotId !== currentSnapshotId &&
+			!status.analysisStatus &&
+			!status.analysisAttemptStatus
+		)
+			void triggerAnalysis(status.snapshotId);
+	}, [status, currentSnapshotId, triggerAnalysis]);
 	const snapshotReady = resolveWorkspaceSnapshotReady({
 		status,
 		hasStoredSnapshot,
 	});
 	return {
 		...analysisState,
-		payload,
-		activeSessionId,
-		isResyncModalOpen,
-		setIsResyncModalOpen,
-		isResyncDrawerOpen: isResyncModalOpen,
-		setIsResyncDrawerOpen: setIsResyncModalOpen,
+		...session,
+		isResyncDrawerOpen: session.isResyncModalOpen,
+		setIsResyncDrawerOpen: session.setIsResyncModalOpen,
 		status,
 		error,
+		statusError,
 		setError,
-		isStarting,
 		isWorking,
 		setIsWorking,
 		readStatus,
-		startSession,
-		creditPreflight,
 		snapshotReady,
 	};
 }

@@ -90,6 +90,12 @@ interface ChunkArg {
 
 function mockClient(overrides: Record<string, unknown> = {}) {
 	const client = {
+		// The announcement is best effort: the default double reports the attempt
+		// back so the pre-handshake failure path has something to report against.
+		announceConnect: vi.fn(async (_projectId: string) => ({
+			...SESSION,
+			status: "waiting_for_cli",
+		})),
 		handshake: vi.fn(async () => ({
 			...SESSION,
 			status: "connected",
@@ -802,5 +808,80 @@ describe("syncCodebase repository identity", () => {
 		expect(res.ok).toBe(true);
 		expect(res.repositoryIdentityMismatch).toBe(true);
 		expect(client.handshakeWithRetry).toHaveBeenCalledOnce();
+	});
+});
+
+describe("attempt announcement", () => {
+	beforeEach(() => {
+		restoreScanRepository();
+	});
+
+	it("announces the attempt before the handshake so a connecting phase is observable", async () => {
+		const client = mockClient();
+		const root = trackRepo(makeRepo({ "src/app.ts": "export const x = 1;\n" }));
+
+		await syncCodebase({
+			projectId: "p1",
+			syncToken: "tok",
+			root,
+			output: "json",
+		});
+
+		expect(client.announceConnect).toHaveBeenCalledWith("p1");
+		expect(client.announceConnect).toHaveBeenCalledOnce();
+		const announcedAt = client.announceConnect.mock.invocationCallOrder[0] ?? 0;
+		const handshakeAt =
+			client.handshakeWithRetry.mock.invocationCallOrder[0] ?? 0;
+		// The server can only record a connecting phase before the handshake
+		// commits `connected`, so the announcement must be sent first.
+		expect(announcedAt).toBeLessThan(handshakeAt);
+	});
+
+	it("reports a failed handshake against the announced attempt", async () => {
+		const client = mockClient({
+			handshakeWithRetry: vi.fn(async () => {
+				throw new Error("handshake refused");
+			}),
+		});
+		const root = trackRepo(makeRepo({ "src/app.ts": "export const x = 1;\n" }));
+
+		const res = await syncCodebase({
+			projectId: "p1",
+			syncToken: "tok",
+			root,
+			output: "json",
+		});
+
+		expect(res.ok).toBe(false);
+		expect(res.errorCode).toBe("SYNC_FAILED");
+		// Reporting the failure is what ends the connecting row on the browser
+		// instead of leaving it until the session expires.
+		expect(client.reportFailureWithRetry).toHaveBeenCalledWith("p1", {
+			sessionId: SESSION.sessionId,
+			attemptId: SESSION.attemptId,
+			errorCode: "SYNC_FAILED",
+		});
+	});
+
+	it("never reports against an attempt the server never bound", async () => {
+		// An older server has no announcement boundary: it answers 404, the client
+		// resolves `null`, and the session keeps whatever it already held.
+		const client = mockClient({
+			announceConnect: vi.fn(async () => null),
+			handshakeWithRetry: vi.fn(async () => {
+				throw new Error("handshake refused");
+			}),
+		});
+		const root = trackRepo(makeRepo({ "src/app.ts": "export const x = 1;\n" }));
+
+		const res = await syncCodebase({
+			projectId: "p1",
+			syncToken: "tok",
+			root,
+			output: "json",
+		});
+
+		expect(res.ok).toBe(false);
+		expect(client.reportFailureWithRetry).not.toHaveBeenCalled();
 	});
 });

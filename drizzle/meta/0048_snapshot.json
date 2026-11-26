@@ -1,6 +1,6 @@
 {
-  "id": "125ffcf3-be58-4bc6-a1d1-caa27864d979",
-  "prevId": "3d1ed878-df20-40bd-b054-8d94d3efb118",
+  "id": "de7c7ab6-9506-43d9-a3fc-0564e65d9751",
+  "prevId": "e37947fa-06be-4269-b809-bb51f3b1a0ab",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -3351,6 +3351,112 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.codebase_sync_requests": {
+      "name": "codebase_sync_requests",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "codebase_id": {
+          "name": "codebase_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "session_id": {
+          "name": "session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "codebase_sync_requests_owner_idx": {
+          "name": "codebase_sync_requests_owner_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "codebase_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "codebase_sync_requests_user_id_users_id_fk": {
+          "name": "codebase_sync_requests_user_id_users_id_fk",
+          "tableFrom": "codebase_sync_requests",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "codebase_sync_requests_codebase_id_codebases_id_fk": {
+          "name": "codebase_sync_requests_codebase_id_codebases_id_fk",
+          "tableFrom": "codebase_sync_requests",
+          "tableTo": "codebases",
+          "columnsFrom": [
+            "codebase_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "codebase_sync_requests_session_id_codebase_sync_sessions_id_fk": {
+          "name": "codebase_sync_requests_session_id_codebase_sync_sessions_id_fk",
+          "tableFrom": "codebase_sync_requests",
+          "tableTo": "codebase_sync_sessions",
+          "columnsFrom": [
+            "session_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.error_reports": {
       "name": "error_reports",
       "schema": "",
@@ -3938,6 +4044,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "workspace_event": {
+          "name": "workspace_event",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -4190,6 +4302,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "archived_at": {
+          "name": "archived_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -4232,6 +4350,27 @@
             },
             {
               "expression": "deleted_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "projects_user_id_archived_at_idx": {
+          "name": "projects_user_id_archived_at_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "archived_at",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -5330,31 +5469,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "origin_job_id": {
-          "name": "origin_job_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "initial_slot": {
-          "name": "initial_slot",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "revision": {
-          "name": "revision",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "last_job_id": {
-          "name": "last_job_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -5418,42 +5532,6 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "studio_frames_origin_idx": {
-          "name": "studio_frames_origin_idx",
-          "columns": [
-            {
-              "expression": "origin_job_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "studio_frames_initial_slot_idx": {
-          "name": "studio_frames_initial_slot_idx",
-          "columns": [
-            {
-              "expression": "origin_job_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "initial_slot",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -5549,60 +5627,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "request_id": {
-          "name": "request_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "request_hash": {
-          "name": "request_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "operation_intent": {
-          "name": "operation_intent",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "operation_index": {
-          "name": "operation_index",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "blueprint_job_id": {
-          "name": "blueprint_job_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "depends_on_job_id": {
-          "name": "depends_on_job_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "base_revision": {
-          "name": "base_revision",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "planning_completed_at": {
-          "name": "planning_completed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "error_code": {
-          "name": "error_code",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "attempts": {
           "name": "attempts",
           "type": "integer",
@@ -5694,54 +5718,6 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "studio_jobs_request_part_idx": {
-          "name": "studio_jobs_request_part_idx",
-          "columns": [
-            {
-              "expression": "project_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "request_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "operation_index",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "studio_jobs_dependency_idx": {
-          "name": "studio_jobs_dependency_idx",
-          "columns": [
-            {
-              "expression": "depends_on_job_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {
@@ -5761,203 +5737,6 @@
         "studio_jobs_user_id_users_id_fk": {
           "name": "studio_jobs_user_id_users_id_fk",
           "tableFrom": "studio_jobs",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.studio_messages": {
-      "name": "studio_messages",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "project_id": {
-          "name": "project_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "operation_id": {
-          "name": "operation_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "job_ids": {
-          "name": "job_ids",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "role": {
-          "name": "role",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "content": {
-          "name": "content",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "order": {
-          "name": "order",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "attachments": {
-          "name": "attachments",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
-        },
-        "progress": {
-          "name": "progress",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "studio_messages_operation_role_idx": {
-          "name": "studio_messages_operation_role_idx",
-          "columns": [
-            {
-              "expression": "project_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "operation_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "role",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "studio_messages_project_order_idx": {
-          "name": "studio_messages_project_order_idx",
-          "columns": [
-            {
-              "expression": "project_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "order",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "studio_messages_owner_idx": {
-          "name": "studio_messages_owner_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "project_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "studio_messages_project_id_studio_projects_id_fk": {
-          "name": "studio_messages_project_id_studio_projects_id_fk",
-          "tableFrom": "studio_messages",
-          "tableTo": "studio_projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "studio_messages_user_id_users_id_fk": {
-          "name": "studio_messages_user_id_users_id_fk",
-          "tableFrom": "studio_messages",
           "tableTo": "users",
           "columnsFrom": [
             "user_id"
@@ -6160,24 +5939,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "frame_id": {
-          "name": "frame_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "frame_revision": {
-          "name": "frame_revision",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "job_id": {
-          "name": "job_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "version": {
           "name": "version",
           "type": "integer",
@@ -6217,243 +5978,6 @@
           "tableTo": "studio_projects",
           "columnsFrom": [
             "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.studio_element_revisions": {
-      "name": "studio_element_revisions",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "project_id": {
-          "name": "project_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "frame_id": {
-          "name": "frame_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "frame_name": {
-          "name": "frame_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "request_id": {
-          "name": "request_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "request_hash": {
-          "name": "request_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "base_revision": {
-          "name": "base_revision",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "base_hash": {
-          "name": "base_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "target": {
-          "name": "target",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "prompt": {
-          "name": "prompt",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "edit": {
-          "name": "edit",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "before_html": {
-          "name": "before_html",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "after_html": {
-          "name": "after_html",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "summary": {
-          "name": "summary",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "''"
-        },
-        "error_code": {
-          "name": "error_code",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "applied_revision": {
-          "name": "applied_revision",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "undo_revision": {
-          "name": "undo_revision",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "studio_element_revisions_request_idx": {
-          "name": "studio_element_revisions_request_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "project_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "request_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "studio_element_revisions_frame_idx": {
-          "name": "studio_element_revisions_frame_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "project_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "frame_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "studio_element_revisions_project_id_studio_projects_id_fk": {
-          "name": "studio_element_revisions_project_id_studio_projects_id_fk",
-          "tableFrom": "studio_element_revisions",
-          "tableTo": "studio_projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "studio_element_revisions_user_id_users_id_fk": {
-          "name": "studio_element_revisions_user_id_users_id_fk",
-          "tableFrom": "studio_element_revisions",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "studio_element_revisions_frame_id_studio_frames_id_fk": {
-          "name": "studio_element_revisions_frame_id_studio_frames_id_fk",
-          "tableFrom": "studio_element_revisions",
-          "tableTo": "studio_frames",
-          "columnsFrom": [
-            "frame_id"
           ],
           "columnsTo": [
             "id"

@@ -4,17 +4,16 @@ import {
 	type SetStateAction,
 	useCallback,
 	useEffect,
+	useRef,
 	useState,
 } from "react";
 import {
 	type CodebasePipelineStage,
 	type CodebaseRunState,
-	recordRunActivity,
 	settleRunIfCurrent,
 	startRun,
 } from "@/features/codebase/services/chat-flow";
 import type { RevisionProposalView } from "../components/revision/codebase-revision-review-dialog";
-import { revisionTargetLabel } from "../components/revision/revision-labels";
 import {
 	applyRevisionAction,
 	getPendingRevisionAction,
@@ -37,7 +36,7 @@ export function useWorkspaceRevision({
 	refreshFeatureTree,
 	onTaskUpdate,
 	refetchKanban,
-	pushAssistantMessage,
+	refreshTimeline,
 	openArtifactPreview,
 	setStageBusy,
 	setStageError,
@@ -55,7 +54,7 @@ export function useWorkspaceRevision({
 	refreshFeatureTree?: (id: string | null) => Promise<unknown>;
 	onTaskUpdate?: (id: string | null) => Promise<unknown>;
 	refetchKanban?: () => Promise<unknown>;
-	pushAssistantMessage: (content: string) => void;
+	refreshTimeline: () => Promise<void>;
 	openArtifactPreview: (kind: "feature" | "prd" | "ac" | "tasks") => void;
 	setStageBusy: Dispatch<SetStateAction<CodebasePipelineStage | null>>;
 	setStageError: Dispatch<SetStateAction<string | null>>;
@@ -67,7 +66,6 @@ export function useWorkspaceRevision({
 	const [isReviewOpen, setIsReviewOpen] = useState(false);
 	const [isApplying, setIsApplying] = useState(false);
 	const [isRejecting, setIsRejecting] = useState(false);
-	const _revisionMode = "revise"; // mode: "revise"
 	const [revisionTarget, setRevisionTarget] = useState<
 		"feature" | "prd" | "ac" | "tasks"
 	>("prd");
@@ -75,6 +73,7 @@ export function useWorkspaceRevision({
 		effectiveFeatureId,
 		activeProjectIdRef,
 	);
+	const restoredProject = useRef<string | null>(null);
 
 	const restorePendingProposal = useCallback(async () => {
 		if (!effectiveFeatureId) return;
@@ -91,21 +90,27 @@ export function useWorkspaceRevision({
 	}, [effectiveFeatureId, activeProjectIdRef]);
 
 	useEffect(() => {
+		if (restoredProject.current === effectiveFeatureId) return;
+		restoredProject.current = effectiveFeatureId;
+		setPendingProposal(null);
+		setIsReviewOpen(false);
+		setIsApplying(false);
+		setIsRejecting(false);
 		void restorePendingProposal();
-	}, [restorePendingProposal]);
+	}, [effectiveFeatureId, restorePendingProposal]);
 
 	const runRevision = useCallback(
 		async (
 			instruction: string,
 			options?: {
 				targetKind?: RevisionTargetKind;
+				requestId?: string;
 				optionalReferences?: readonly string[];
 				referenceBindings?: readonly ComposerReferenceBinding[];
 			},
 		) => {
 			if (!effectiveFeatureId || stageBusy) return;
 			const target = options?.targetKind ?? revisionTarget;
-			const targetLabel = revisionTargetLabel(target);
 			setStageBusy(target === "tasks" ? "task" : target);
 			setStageError(null);
 			const request = startRun(
@@ -121,6 +126,7 @@ export function useWorkspaceRevision({
 					codebaseId: codebaseId ?? null,
 					snapshotId: currentSnapshotId ?? null,
 					targetKind: target,
+					requestId: options?.requestId,
 					instruction,
 					optionalReferences: options?.optionalReferences,
 					referenceBindings: options?.referenceBindings,
@@ -143,21 +149,9 @@ export function useWorkspaceRevision({
 				setPendingProposal(result.proposal);
 				setIsReviewOpen(true);
 				setRun((current) =>
-					settleRunIfCurrent(
-						recordRunActivity(
-							current,
-							"result.persisted",
-							Date.now(),
-							requestId,
-						),
-						requestId,
-						"done",
-						Date.now(),
-					),
+					settleRunIfCurrent(current, requestId, "done", Date.now()),
 				);
-				pushAssistantMessage(
-					`Proposal revisi untuk ${targetLabel} siap ditinjau. ${result.impactNote}`,
-				);
+				void refreshTimeline();
 				void refreshHistory();
 			} catch {
 				if (activeProjectIdRef.current !== effectiveFeatureId) return;
@@ -182,7 +176,7 @@ export function useWorkspaceRevision({
 			setStageBusy,
 			setStageError,
 			setRun,
-			pushAssistantMessage,
+			refreshTimeline,
 			refreshHistory,
 		],
 	);
@@ -190,10 +184,12 @@ export function useWorkspaceRevision({
 	const applyCurrentProposal = useCallback(async () => {
 		if (!pendingProposal || isApplying) return;
 		setIsApplying(true);
+		const projectId = effectiveFeatureId;
 		try {
 			const res = await applyRevisionAction({
 				data: { proposalId: pendingProposal.id },
 			});
+			if (activeProjectIdRef.current !== projectId) return;
 			if (!res.ok) {
 				setStageError(
 					res.code === "STALE_BASE_VERSION"
@@ -212,18 +208,16 @@ export function useWorkspaceRevision({
 			]);
 
 			const content = await loadPrd();
+			if (activeProjectIdRef.current !== projectId) return;
 			if (!content) {
 				setStageError("Dokumen PRD belum dapat dimuat.");
 				return;
 			}
 
 			const targetKind = pendingProposal.targetKind;
-			const targetLabel = revisionTargetLabel(targetKind);
 			setPendingProposal(null);
 			setIsReviewOpen(false);
-			pushAssistantMessage(
-				`Revisi untuk ${targetLabel} telah diterapkan sebagai versi baru. Dokumen versi sebelumnya tetap tersimpan.`,
-			);
+			void refreshTimeline();
 			if (targetKind === "prd") {
 				openArtifactPreview("prd");
 			} else {
@@ -231,9 +225,10 @@ export function useWorkspaceRevision({
 			}
 			void refreshHistory();
 		} catch {
-			setStageError("Server tidak dapat dihubungi saat menerapkan revisi.");
+			if (activeProjectIdRef.current === projectId)
+				setStageError("Server tidak dapat dihubungi saat menerapkan revisi.");
 		} finally {
-			setIsApplying(false);
+			if (activeProjectIdRef.current === projectId) setIsApplying(false);
 		}
 	}, [
 		pendingProposal,
@@ -244,7 +239,8 @@ export function useWorkspaceRevision({
 		onTaskUpdate,
 		refetchKanban,
 		effectiveFeatureId,
-		pushAssistantMessage,
+		activeProjectIdRef,
+		refreshTimeline,
 		openArtifactPreview,
 		setStageError,
 		refreshHistory,
@@ -253,26 +249,28 @@ export function useWorkspaceRevision({
 	const rejectCurrentProposal = useCallback(async () => {
 		if (!pendingProposal || isRejecting) return;
 		setIsRejecting(true);
+		const projectId = effectiveFeatureId;
 		try {
 			await rejectRevisionAction({
 				data: { proposalId: pendingProposal.id },
 			});
-			const targetLabel = revisionTargetLabel(pendingProposal.targetKind);
+			if (activeProjectIdRef.current !== projectId) return;
 			setPendingProposal(null);
 			setIsReviewOpen(false);
-			pushAssistantMessage(
-				`Proposal revisi untuk ${targetLabel} ditolak. Dokumen aktif tidak diubah.`,
-			);
+			void refreshTimeline();
 			void refreshHistory();
 		} catch {
-			setStageError("Gagal menolak proposal.");
+			if (activeProjectIdRef.current === projectId)
+				setStageError("Gagal menolak proposal.");
 		} finally {
-			setIsRejecting(false);
+			if (activeProjectIdRef.current === projectId) setIsRejecting(false);
 		}
 	}, [
 		pendingProposal,
 		isRejecting,
-		pushAssistantMessage,
+		activeProjectIdRef,
+		effectiveFeatureId,
+		refreshTimeline,
 		setStageError,
 		refreshHistory,
 	]);
@@ -286,29 +284,31 @@ export function useWorkspaceRevision({
 	const requestChangesCurrentProposal = useCallback(async () => {
 		if (!pendingProposal || isRejecting) return null;
 		setIsRejecting(true);
+		const projectId = effectiveFeatureId;
 		try {
 			await rejectRevisionAction({
 				data: { proposalId: pendingProposal.id },
 			});
-			const targetLabel = revisionTargetLabel(pendingProposal.targetKind);
+			if (activeProjectIdRef.current !== projectId) return null;
 			const instruction = pendingProposal.instruction;
 			setPendingProposal(null);
 			setIsReviewOpen(false);
-			pushAssistantMessage(
-				`Proposal revisi ${targetLabel} dibatalkan agar bisa diperbaiki. Sunting instruksinya lalu kirim ulang. Dokumen aktif belum diubah.`,
-			);
+			void refreshTimeline();
 			void refreshHistory();
 			return instruction;
 		} catch {
-			setStageError("Gagal membatalkan proposal.");
+			if (activeProjectIdRef.current === projectId)
+				setStageError("Gagal membatalkan proposal.");
 			return null;
 		} finally {
-			setIsRejecting(false);
+			if (activeProjectIdRef.current === projectId) setIsRejecting(false);
 		}
 	}, [
 		pendingProposal,
 		isRejecting,
-		pushAssistantMessage,
+		activeProjectIdRef,
+		effectiveFeatureId,
+		refreshTimeline,
 		setStageError,
 		refreshHistory,
 	]);

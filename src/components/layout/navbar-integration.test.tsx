@@ -13,7 +13,7 @@ import { useUIStore } from "@/store";
 import { Navbar } from "./navbar";
 import { canShowNavbarTopUp } from "./navbar-topup-helper";
 
-let mockPathname = "/prd/test-project-1";
+let mockPathname = "/vibeplan/test-project-1/prd";
 let mockSearch: Record<string, unknown> = {};
 
 vi.mock("@tanstack/react-router", () => ({
@@ -28,8 +28,44 @@ vi.mock("@tanstack/react-router", () => ({
 		select
 			? select({ pathname: mockPathname, search: mockSearch })
 			: { pathname: mockPathname, search: mockSearch },
-	useMatches: () => [],
+	useMatches: ({
+		select,
+	}: {
+		select: (
+			matches: Array<{
+				routeId: string;
+				params: { id: string };
+				loaderData: {
+					projectName: string;
+					progress: string;
+					acStatus: string;
+					taskStatus: string;
+					featuresStatus: string;
+					hasAc: boolean;
+				};
+			}>,
+		) => unknown;
+	}) =>
+		select(
+			mockPathname.startsWith("/vibeplan/")
+				? [
+						{
+							routeId: "/vibeplan/$id",
+							params: { id: "test-project-1" },
+							loaderData: {
+								projectName: "Project",
+								progress: "fitur",
+								acStatus: "pending",
+								taskStatus: "pending",
+								featuresStatus: "completed",
+								hasAc: false,
+							},
+						},
+					]
+				: [],
+		),
 	useNavigate: () => vi.fn(),
+	useParams: () => ({ id: "test-project-1" }),
 	useRouter: () => ({ invalidate: vi.fn() }),
 	Link: ({
 		children,
@@ -118,7 +154,7 @@ function openUserMenu() {
 }
 
 beforeEach(() => {
-	mockPathname = "/prd/test-project-1";
+	mockPathname = "/vibeplan/test-project-1/prd";
 	mockSearch = {};
 	mockPlanData.plan = "free";
 	mockPlanData.topUpEligible = false;
@@ -166,7 +202,7 @@ describe("Navbar TopUp Integration Contract", () => {
 
 describe("Navbar Paywall Integration Contract", () => {
 	it("triggers openPaywallModal('ac') when free user clicks Upgrade on PRD step", () => {
-		mockPathname = "/prd/test-project-1";
+		mockPathname = "/vibeplan/test-project-1/prd";
 		renderNavbar();
 
 		const upgradeButton = screen.getByRole("button", {
@@ -199,7 +235,7 @@ describe("Navbar Paywall Integration Contract", () => {
 });
 describe("Navbar Fitur Generate PRD Contract", () => {
 	it("renders Generate PRD action on the fitur step", () => {
-		mockPathname = "/fitur/test-project-1";
+		mockPathname = "/vibeplan/test-project-1/fitur";
 		renderNavbar();
 		const cta = screen.getByRole("button", { name: /Generate PRD/i });
 		expect(cta).toBeDefined();
@@ -207,28 +243,13 @@ describe("Navbar Fitur Generate PRD Contract", () => {
 	});
 
 	it("shows no Task, Kanban, or document drawer trigger on the fitur step", () => {
-		mockPathname = "/fitur/test-project-1";
+		mockPathname = "/vibeplan/test-project-1/fitur";
 		renderNavbar();
 		expect(screen.queryByRole("button", { name: /Kanban/i })).toBeNull();
 		expect(
 			screen.queryByRole("button", { name: /Menu dokumen proyek/i }),
 		).toBeNull();
 		expect(screen.queryByRole("button", { name: /^Task$/i })).toBeNull();
-	});
-
-	it("wires the fitur CTA through savePendingPrdPrompt into /prd/$id source", async () => {
-		const [shell, actions] = await Promise.all([
-			readFile(`${process.cwd()}/src/components/layout/navbar.tsx`, "utf8"),
-			readFile(
-				`${process.cwd()}/src/components/layout/navbar-flow-actions.tsx`,
-				"utf8",
-			),
-		]);
-		expect(shell).toContain("NavbarFlowActions");
-		const source = actions;
-		expect(source).toContain('routeStep === "fitur"');
-		expect(source).toContain("savePendingPrdPrompt");
-		expect(source).toContain('to: "/prd/$id"');
 	});
 });
 
@@ -318,7 +339,7 @@ describe("Navbar session boundary", () => {
 	});
 
 	it("hides the history trigger on workspace routes even when session exists", () => {
-		mockPathname = "/prd/test-project-1";
+		mockPathname = "/vibeplan/test-project-1/prd";
 		renderNavbar();
 		expect(screen.queryByRole("button", { name: /^Riwayat$/i })).toBeNull();
 	});

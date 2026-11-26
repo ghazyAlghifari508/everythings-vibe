@@ -20,7 +20,7 @@ import {
 import {
 	type AskOptionsCollection,
 	generateValidatedAskQuestions,
-} from "@/features/greenfield/services/ask-service";
+} from "@/features/greenfield/services/ask-generation";
 import { sanitizeModelOutput } from "@/features/greenfield/services/prd-text";
 import { MAX_PROMPT_LENGTH } from "@/lib/constants";
 import { isTruncatedGeneration } from "@/lib/flow-progress";
@@ -273,6 +273,9 @@ export async function handleAskOptionsRequest(
 		const outcome = await generateValidatedAskQuestions({
 			collect: collectOnce,
 			messages,
+			// Existing codebase answers must explain themselves; a heading-only
+			// option is a contract miss the repair pass gets a chance to fix.
+			requireOptionDescriptions: project.projectMode === "existing_codebase",
 			onDiagnostic: (record) => {
 				console.error("[ask/options] output rejected", record);
 			},

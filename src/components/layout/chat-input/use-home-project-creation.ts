@@ -183,6 +183,7 @@ export function useHomeProjectCreation({
 				"projectMode" in body && typeof body.projectMode === "string"
 					? body.projectMode
 					: null;
+			saveSetupPrompt(enrichedPrompt, body.id);
 			clearHomeDraft();
 			const target = decideHomePostCreationTarget({
 				id: body.id,

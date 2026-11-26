@@ -34,7 +34,6 @@ function render(
 		root?.render(
 			<CodebaseArtifactCanvas
 				fileName="PRD-watchlist.md"
-				badge="MARKDOWN"
 				copyValue={"# PRD\n\nIsi dokumen."}
 				onClose={() => {}}
 				{...props}

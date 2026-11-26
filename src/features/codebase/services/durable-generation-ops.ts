@@ -25,6 +25,7 @@ export function toWorkspaceGenerationOperation(
 		status: row.status,
 		attempt: row.attempt,
 		result: row.result,
+		input: (row.input as Record<string, unknown> | null) ?? null,
 		error: row.error,
 		errorCode: row.errorCode,
 		baselineArtifactId: row.baselineArtifactId ?? null,
@@ -108,7 +109,10 @@ export async function claimNextGenerationOperation(
 				attempt: nextAttempt,
 				leaseExpiresAt,
 				heartbeatAt: now,
-				startedAt: row.startedAt ?? now,
+				// Attempt-scoped window: claiming ALWAYS opens a fresh attempt, so the
+				// start of the attempt before it can never leak into this one.
+				startedAt: now,
+				finishedAt: null,
 				updatedAt: now,
 			})
 			.where(eq(codebaseGenerationOperations.id, row.id));

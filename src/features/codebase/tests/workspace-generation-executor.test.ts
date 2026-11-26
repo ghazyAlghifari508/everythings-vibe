@@ -281,6 +281,40 @@ describe("workspace generation executor: stage dispatches", () => {
 		});
 	});
 
+	it("rejects missing questions artifacts even after a successful handler response", async () => {
+		mocks.handleAsk.mockResolvedValueOnce(Response.json({ questions: [] }));
+		mocks.readArtifact.mockResolvedValueOnce(null);
+		await expect(
+			executeWorkspaceGenerationStage(
+				makeTestClaim({
+					stage: "questions",
+					input: { prompt: "Add search" },
+				}),
+			),
+		).rejects.toMatchObject({ code: "ARTIFACT_PERSISTENCE_FAILED" });
+	});
+
+	it("propagates questions persistence failure without accepting an older artifact", async () => {
+		mocks.handleAsk.mockResolvedValueOnce(
+			Response.json(
+				{
+					error: "Handoff save failed",
+					code: "PERSISTENCE_FAILED",
+				},
+				{ status: 500 },
+			),
+		);
+		await expect(
+			executeWorkspaceGenerationStage(
+				makeTestClaim({
+					stage: "questions",
+					input: { prompt: "Add search" },
+				}),
+			),
+		).rejects.toMatchObject({ code: "PERSISTENCE_FAILED" });
+		expect(mocks.readArtifact).not.toHaveBeenCalled();
+	});
+
 	it("throws ARTIFACT_UNCHANGED using trusted backend baselineArtifactId on retry", async () => {
 		mocks.handleFeature.mockResolvedValueOnce(
 			new Response(JSON.stringify({ featureTree: {} }), { status: 200 }),

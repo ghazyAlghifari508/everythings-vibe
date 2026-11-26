@@ -8,7 +8,43 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AdaptiveQuestion } from "@/features/codebase/services/chat-flow";
-import { CodebaseAdaptiveQuestion } from "../components/chat/codebase-adaptive-question";
+import {
+	type AdaptiveQuestionNav,
+	CodebaseAdaptiveQuestion,
+} from "../components/chat/codebase-adaptive-question";
+
+/** Option ids in the order the user actually sees them. */
+function controlValues(): string[] {
+	return screen
+		.getAllByRole("radio")
+		.map((control) => control.getAttribute("value") ?? "");
+}
+
+/** The text an option announces as its description, resolved the way an
+ *  assistive technology resolves it: through `aria-describedby`. */
+function describedText(control: HTMLElement): string {
+	const ids = control.getAttribute("aria-describedby");
+	if (!ids) return "";
+	return ids
+		.split(/\s+/)
+		.map((id) => document.getElementById(id)?.textContent ?? "")
+		.join(" ")
+		.trim();
+}
+
+/** The forward control the wizard hands to the card: `Berikutnya` on a step
+ *  that has a next question, the final action on the last one. */
+function cardNav(
+	overrides: Partial<AdaptiveQuestionNav> = {},
+): AdaptiveQuestionNav {
+	return { onNext: vi.fn(), nextLabel: "Berikutnya", ...overrides };
+}
+
+function forwardButton(): HTMLButtonElement {
+	return screen.getByRole("button", {
+		name: /Berikutnya|Buat Spesifikasi Fitur/,
+	}) as HTMLButtonElement;
+}
 
 describe("CodebaseAdaptiveQuestion Component", () => {
 	afterEach(() => {
@@ -60,9 +96,8 @@ describe("CodebaseAdaptiveQuestion Component", () => {
 		customPlaceholder: "Tuliskan preferensi Anda...",
 	};
 
-	describe("Active Question Card (Progressive Disclosure)", () => {
+	describe("Active Question Card", () => {
 		it("renders progress counter and question title clearly", () => {
-			const onSubmit = vi.fn();
 			render(
 				<CodebaseAdaptiveQuestion
 					question={selectQuestion}
@@ -70,7 +105,8 @@ describe("CodebaseAdaptiveQuestion Component", () => {
 					totalQuestions={4}
 					submitted=""
 					active={true}
-					onSubmit={onSubmit}
+					nav={cardNav()}
+					onSubmit={vi.fn()}
 				/>,
 			);
 
@@ -81,10 +117,13 @@ describe("CodebaseAdaptiveQuestion Component", () => {
 			expect(
 				screen.getByText("Bagaimana filter kategori bekerja?"),
 			).toBeDefined();
+			// The position is a real progress value, not decoration.
+			expect(
+				screen.getByRole("progressbar").getAttribute("aria-valuetext"),
+			).toBe("Pertanyaan 2 dari 4");
 		});
 
-		it("displays the recommendation label and reason grounded in codebase context", () => {
-			const onSubmit = vi.fn();
+		it("explains the recommended option on the option itself, not in a separate panel", () => {
 			render(
 				<CodebaseAdaptiveQuestion
 					question={selectQuestion}
@@ -92,21 +131,91 @@ describe("CodebaseAdaptiveQuestion Component", () => {
 					totalQuestions={4}
 					submitted=""
 					active={true}
-					onSubmit={onSubmit}
+					nav={cardNav()}
+					onSubmit={vi.fn()}
 				/>,
 			);
 
-			const reasonEl = screen.getByTestId(
-				"adaptive-question-reason-filter_type",
-			);
-			expect(reasonEl.textContent).toContain("Satu kategori sekaligus");
-			expect(reasonEl.textContent).toContain(
+			// Legacy stored question: no descriptions, so the recommendation reason
+			// stands in for the recommended option's explanation — announced as that
+			// option's description, never as a separate block under the whole list.
+			const recommended = screen.getByRole("radio", {
+				name: /Satu kategori sekaligus/i,
+			});
+			expect(describedText(recommended)).toContain(
 				"Codebase saat ini menggunakan single filter parameter pada URL.",
 			);
+			// The justification is rendered exactly once — on the recommended option
+			// itself — so no second panel repeats it anywhere on the card.
+			expect(
+				(document.body.textContent ?? "").split(
+					"Codebase saat ini menggunakan single filter parameter pada URL.",
+				).length - 1,
+			).toBe(1);
 		});
 
-		it("keeps submit disabled until a choice is selected, then submits the choice", () => {
+		it("renders a heading and a description for every option that has one", () => {
+			const richQuestion: AdaptiveQuestion = {
+				id: "search_scope",
+				title: "Informasi apa saja yang perlu dicari?",
+				type: "select",
+				options: [
+					{
+						id: "search_scope-opt1",
+						label: "Judul, deskripsi, dan teknologi",
+						description:
+							"Pengunjung bisa menemukan proyek lewat nama, ringkasan, atau teknologi yang dipakai.",
+					},
+					{
+						id: "search_scope-opt2",
+						label: "Judul proyek saja",
+						description: "Pencarian hanya mencocokkan nama proyek.",
+					},
+					{
+						id: "search_scope-opt3",
+						label: "Tentukan sendiri",
+						description: "Cakupan ditentukan pengguna.",
+						recommended: true,
+					},
+				],
+				recommendedOptionId: "search_scope-opt3",
+				recommendationReason: "Metadata internal",
+			};
+			render(
+				<CodebaseAdaptiveQuestion
+					question={richQuestion}
+					index={1}
+					totalQuestions={3}
+					submitted=""
+					active={true}
+					nav={cardNav()}
+					onSubmit={vi.fn()}
+				/>,
+			);
+
+			for (const option of richQuestion.options) {
+				const control = screen.getByRole("radio", {
+					name: new RegExp(option.label, "i"),
+				});
+				// The heading is the control's accessible name; the description is
+				// the text it announces, resolved through the same wiring an
+				// assistive technology uses.
+				expect(describedText(control)).toBe(option.description);
+			}
+			// The option already explains itself, so the internal recommendation
+			// metadata is not repeated on screen.
+			expect(document.body.textContent).not.toContain("Metadata internal");
+			// The recommended option is first and marked, but never auto-selected.
+			expect(controlValues()[0]).toBe("search_scope-opt3");
+			const recommended = screen.getByRole("radio", {
+				name: /Tentukan sendiri/i,
+			});
+			expect((recommended as HTMLInputElement).checked).toBe(false);
+		});
+
+		it("keeps the answer control disabled until a choice is made, then stores it forward", () => {
 			const onSubmit = vi.fn();
+			const onNext = vi.fn();
 			render(
 				<CodebaseAdaptiveQuestion
 					question={selectQuestion}
@@ -114,30 +223,31 @@ describe("CodebaseAdaptiveQuestion Component", () => {
 					totalQuestions={3}
 					submitted=""
 					active={true}
+					nav={cardNav({ onNext })}
 					onSubmit={onSubmit}
 				/>,
 			);
 
-			const submitBtn = screen.getByRole("button", { name: /Konfirmasi/i });
-			expect((submitBtn as HTMLButtonElement).disabled).toBe(true);
-
-			const option1 = screen.getByRole("radio", {
-				name: /Satu kategori sekaligus/i,
-			});
-			act(() => {
-				fireEvent.click(option1);
-			});
-
-			expect((submitBtn as HTMLButtonElement).disabled).toBe(false);
+			expect(forwardButton().disabled).toBe(true);
 
 			act(() => {
-				fireEvent.click(submitBtn);
+				fireEvent.click(
+					screen.getByRole("radio", { name: /Satu kategori sekaligus/i }),
+				);
 			});
 
+			expect(forwardButton().disabled).toBe(false);
+
+			act(() => {
+				fireEvent.click(forwardButton());
+			});
+
+			// Stored before the wizard advances: the step change never races the answer.
 			expect(onSubmit).toHaveBeenCalledWith(
 				"filter_type",
 				"Satu kategori sekaligus",
 			);
+			expect(onNext).toHaveBeenCalledTimes(1);
 		});
 
 		it("supports 'Lainnya' free-text choice in single select", () => {
@@ -149,19 +259,17 @@ describe("CodebaseAdaptiveQuestion Component", () => {
 					totalQuestions={3}
 					submitted=""
 					active={true}
+					nav={cardNav()}
 					onSubmit={onSubmit}
 				/>,
 			);
 
-			const submitBtn = screen.getByRole("button", { name: /Konfirmasi/i });
-			const lainnyaRadio = screen.getByRole("radio", { name: /Lainnya/i });
-
 			act(() => {
-				fireEvent.click(lainnyaRadio);
+				fireEvent.click(screen.getByRole("radio", { name: /Lainnya/i }));
 			});
 
-			// Field is revealed but empty, submit still disabled
-			expect((submitBtn as HTMLButtonElement).disabled).toBe(true);
+			// Field is revealed but empty, the step cannot move on yet
+			expect(forwardButton().disabled).toBe(true);
 
 			const customInput = screen.getByPlaceholderText(
 				"Tulis jawabanmu sendiri...",
@@ -172,10 +280,10 @@ describe("CodebaseAdaptiveQuestion Component", () => {
 				});
 			});
 
-			expect((submitBtn as HTMLButtonElement).disabled).toBe(false);
+			expect(forwardButton().disabled).toBe(false);
 
 			act(() => {
-				fireEvent.click(submitBtn);
+				fireEvent.click(forwardButton());
 			});
 
 			expect(onSubmit).toHaveBeenCalledWith(
@@ -193,6 +301,7 @@ describe("CodebaseAdaptiveQuestion Component", () => {
 					totalQuestions={3}
 					submitted=""
 					active={true}
+					nav={cardNav()}
 					onSubmit={onSubmit}
 				/>,
 			);
@@ -215,7 +324,7 @@ describe("CodebaseAdaptiveQuestion Component", () => {
 			expect(screen.queryByLabelText("Jawaban lain")).toBeNull();
 
 			act(() => {
-				fireEvent.click(screen.getByRole("button", { name: /Konfirmasi/i }));
+				fireEvent.click(forwardButton());
 			});
 			expect(onSubmit).toHaveBeenCalledWith(
 				"filter_type",
@@ -232,6 +341,7 @@ describe("CodebaseAdaptiveQuestion Component", () => {
 					totalQuestions={3}
 					submitted=""
 					active={true}
+					nav={cardNav()}
 					onSubmit={onSubmit}
 				/>,
 			);
@@ -241,8 +351,7 @@ describe("CodebaseAdaptiveQuestion Component", () => {
 				fireEvent.click(screen.getByRole("checkbox", { name: /Lainnya/i }));
 			});
 
-			const submitBtn = screen.getByRole("button", { name: /Konfirmasi/i });
-			expect((submitBtn as HTMLButtonElement).disabled).toBe(true);
+			expect(forwardButton().disabled).toBe(true);
 
 			const customInput = screen.getByLabelText("Jawaban lain");
 			act(() => {
@@ -250,10 +359,10 @@ describe("CodebaseAdaptiveQuestion Component", () => {
 					target: { value: "Penulis tamu" },
 				});
 			});
-			expect((submitBtn as HTMLButtonElement).disabled).toBe(false);
+			expect(forwardButton().disabled).toBe(false);
 
 			act(() => {
-				fireEvent.click(submitBtn);
+				fireEvent.click(forwardButton());
 			});
 			expect(onSubmit).toHaveBeenCalledWith(
 				"export_fields",
@@ -262,89 +371,268 @@ describe("CodebaseAdaptiveQuestion Component", () => {
 		});
 	});
 
-	describe("Answered Question (Compact Completed Line)", () => {
-		it("renders answered question as a compact completed line without radio inputs or green card bloat", () => {
-			const onEdit = vi.fn();
-			const onSubmit = vi.fn();
-			const { container } = render(
+	describe("Recommended option, choice cards, and keyboard access", () => {
+		const orderingQuestion: AdaptiveQuestion = {
+			id: "scope",
+			title: "Informasi apa saja yang perlu dicari?",
+			type: "select",
+			options: [
+				{ id: "scope-opt1", label: "Judul dan deskripsi" },
+				{
+					id: "scope-opt2",
+					label: "Judul proyek saja",
+					description: "Cocok untuk daftar proyek sederhana.",
+				},
+				{
+					id: "scope-opt3",
+					label: "Judul, deskripsi, dan teknologi",
+					description: "Cakupan terluas.",
+					recommended: true,
+				},
+			],
+			recommendedOptionId: "scope-opt3",
+		};
+
+		it("renders the recommended option first and keeps every option id stable", () => {
+			render(
 				<CodebaseAdaptiveQuestion
-					question={selectQuestion}
+					question={orderingQuestion}
 					index={1}
-					totalQuestions={3}
-					submitted="Satu kategori sekaligus"
-					active={false}
-					onSubmit={onSubmit}
-					onEdit={onEdit}
+					totalQuestions={4}
+					submitted=""
+					active={true}
+					nav={cardNav()}
+					onSubmit={vi.fn()}
 				/>,
 			);
 
-			// Completed line text
-			expect(container.textContent).toContain(
-				"Q1 · Bagaimana filter kategori bekerja?",
-			);
-			expect(container.textContent).toContain(
-				"Jawaban: Satu kategori sekaligus",
+			// Recommended first, every other option in its original relative order.
+			// The custom option stays last: it is not part of the recommendation.
+			expect(controlValues()).toEqual([
+				"scope-opt3",
+				"scope-opt1",
+				"scope-opt2",
+				"scope-custom",
+			]);
+		});
+
+		it("marks only the recommended option and never pre-selects it", () => {
+			render(
+				<CodebaseAdaptiveQuestion
+					question={orderingQuestion}
+					index={1}
+					totalQuestions={4}
+					submitted=""
+					active={true}
+					nav={cardNav()}
+					onSubmit={vi.fn()}
+				/>,
 			);
 
-			// No inputs in compact line
-			expect(container.querySelector("input[type='radio']")).toBeNull();
+			expect(screen.getAllByText("Rekomendasi")).toHaveLength(1);
+			const recommended = screen.getByRole("radio", {
+				name: /Judul, deskripsi, dan teknologi/i,
+			});
+			expect((recommended as HTMLInputElement).checked).toBe(false);
+			expect(forwardButton().disabled).toBe(true);
+		});
 
-			// Has edit trigger
-			const editBtn = screen.getByRole("button", { name: /Ubah/i });
-			expect(editBtn).toBeDefined();
+		it("keeps the stored answer on its own option when the recommended one is shown first", () => {
+			render(
+				<CodebaseAdaptiveQuestion
+					question={orderingQuestion}
+					index={1}
+					totalQuestions={4}
+					submitted="Judul dan deskripsi"
+					active={true}
+					nav={cardNav()}
+					onSubmit={vi.fn()}
+				/>,
+			);
+
+			expect(controlValues()[0]).toBe("scope-opt3");
+			const saved = screen.getByRole("radio", {
+				name: /^Judul dan deskripsi$/i,
+			});
+			expect((saved as HTMLInputElement).checked).toBe(true);
+		});
+
+		it("exposes one tab stop, a labelled group, and native radio grouping", () => {
+			render(
+				<CodebaseAdaptiveQuestion
+					question={orderingQuestion}
+					index={1}
+					totalQuestions={4}
+					submitted=""
+					active={true}
+					nav={cardNav()}
+					onSubmit={vi.fn()}
+				/>,
+			);
+
+			// The group is labelled by the question heading, so a screen reader
+			// announces the question before the options.
+			const group = screen.getByRole("radiogroup");
+			expect(
+				document.getElementById(group.getAttribute("aria-labelledby") ?? "")
+					?.textContent,
+			).toBe(orderingQuestion.title);
+
+			// Native radios sharing one name: the browser and React Aria handle
+			// arrow-key selection, so the card must not invent its own keyboard model.
+			const controls = screen.getAllByRole("radio") as HTMLInputElement[];
+			expect(controls.every((control) => control.type === "radio")).toBe(true);
+			expect(new Set(controls.map((control) => control.name)).size).toBe(1);
+
+			// Choosing an option moves the single tab stop onto it, as a radio group
+			// must: the rest of the group leaves the tab order.
+			act(() => {
+				fireEvent.click(controls[1]);
+			});
+			expect(controls[1].checked).toBe(true);
+			const tabbable = controls.filter(
+				(control) => control.getAttribute("tabindex") === "0",
+			);
+			expect(tabbable).toEqual([controls[1]]);
+		});
+
+		it("reveals the free-text field inside the Lainnya option's own card", () => {
+			render(
+				<CodebaseAdaptiveQuestion
+					question={orderingQuestion}
+					index={1}
+					totalQuestions={4}
+					submitted=""
+					active={true}
+					nav={cardNav()}
+					onSubmit={vi.fn()}
+				/>,
+			);
+
+			const lainnya = screen.getByRole("radio", { name: /Lainnya/i });
+			expect(describedText(lainnya)).toBe(
+				"Tulis jawabanmu sendiri bila tidak ada pilihan yang sesuai.",
+			);
 
 			act(() => {
-				fireEvent.click(editBtn);
+				fireEvent.click(lainnya);
 			});
 
-			expect(onEdit).toHaveBeenCalledWith("filter_type");
+			const input = screen.getByLabelText("Jawaban lain");
+			// Same card as the option it belongs to, not a second one beside the list.
+			expect(lainnya.closest("label")?.parentElement?.contains(input)).toBe(
+				true,
+			);
+			expect(screen.getAllByTestId(/adaptive-question-/)).toHaveLength(1);
+		});
+
+		it("keeps two question cards independent", () => {
+			const onSubmit = vi.fn();
+			const second: AdaptiveQuestion = {
+				id: "surfaces",
+				title: "Permukaan mana yang ikut dicari?",
+				type: "multiselect",
+				options: [
+					{ id: "surfaces-opt1", label: "Artikel" },
+					{ id: "surfaces-opt2", label: "Produk" },
+				],
+			};
+			render(
+				<>
+					<CodebaseAdaptiveQuestion
+						question={orderingQuestion}
+						index={1}
+						totalQuestions={2}
+						submitted=""
+						active={true}
+						nav={cardNav()}
+						onSubmit={onSubmit}
+					/>
+					<CodebaseAdaptiveQuestion
+						question={second}
+						index={2}
+						totalQuestions={2}
+						submitted=""
+						active={true}
+						nav={cardNav()}
+						onSubmit={onSubmit}
+					/>
+				</>,
+			);
+
+			act(() => {
+				fireEvent.click(screen.getByRole("checkbox", { name: /Artikel/i }));
+			});
+
+			// The other question's draft is untouched by a choice made elsewhere.
+			expect(
+				screen
+					.getAllByRole("radio")
+					.some((control) => (control as HTMLInputElement).checked),
+			).toBe(false);
+
+			act(() => {
+				fireEvent.click(
+					screen.getAllByRole("button", { name: /Berikutnya/ })[1],
+				);
+			});
+			expect(onSubmit).toHaveBeenCalledWith("surfaces", "Artikel");
 		});
 	});
 
-	describe("Editing Mode", () => {
-		it("pre-fills previous answer in edit mode and allows updating or cancelling", () => {
-			const onCancelEdit = vi.fn();
+	describe("Review mode", () => {
+		it("locks the controls, keeps navigation, and never stores an answer", () => {
 			const onSubmit = vi.fn();
+			const onPrevious = vi.fn();
+			const onNext = vi.fn();
+			render(
+				<CodebaseAdaptiveQuestion
+					question={selectQuestion}
+					index={2}
+					totalQuestions={3}
+					submitted="Satu kategori sekaligus"
+					active={false}
+					nav={cardNav({ onPrevious, onNext, nextLabel: "Berikutnya" })}
+					onSubmit={onSubmit}
+				/>,
+			);
+
+			// The stored answer is shown on its own option, and it cannot be changed.
+			const saved = screen.getByRole("radio", {
+				name: /Satu kategori sekaligus/i,
+			});
+			expect((saved as HTMLInputElement).checked).toBe(true);
+			expect((saved as HTMLInputElement).disabled).toBe(true);
+
+			// Reviewing is allowed: the wizard still walks the questions.
+			expect(forwardButton().disabled).toBe(false);
+			act(() => {
+				fireEvent.click(forwardButton());
+			});
+			expect(onNext).toHaveBeenCalledTimes(1);
+			expect(onSubmit).not.toHaveBeenCalled();
+
+			act(() => {
+				fireEvent.click(screen.getByRole("button", { name: /Sebelumnya/ }));
+			});
+			expect(onPrevious).toHaveBeenCalledTimes(1);
+		});
+
+		it("omits the footer when a single question has nowhere to go", () => {
 			render(
 				<CodebaseAdaptiveQuestion
 					question={selectQuestion}
 					index={1}
-					totalQuestions={3}
+					totalQuestions={1}
 					submitted="Satu kategori sekaligus"
-					active={true}
-					isEditing={true}
-					onSubmit={onSubmit}
-					onCancelEdit={onCancelEdit}
+					active={false}
+					nav={{ nextLabel: "Buat Spesifikasi Fitur" }}
+					onSubmit={vi.fn()}
 				/>,
 			);
 
-			// Radio inputs are present
-			const opt1 = screen.getByRole("radio", {
-				name: /Satu kategori sekaligus/i,
-			});
-			expect((opt1 as HTMLInputElement).checked).toBe(true);
-
-			// Switch to option 2
-			const opt2 = screen.getByRole("radio", {
-				name: /Beberapa kategori bersamaan/i,
-			});
-			act(() => {
-				fireEvent.click(opt2);
-			});
-
-			// Has Cancel button
-			const cancelBtn = screen.getByRole("button", { name: /Batal/i });
-			expect(cancelBtn).toBeDefined();
-
-			const submitBtn = screen.getByRole("button", { name: /Konfirmasi/i });
-			act(() => {
-				fireEvent.click(submitBtn);
-			});
-
-			expect(onSubmit).toHaveBeenCalledWith(
-				"filter_type",
-				"Beberapa kategori bersamaan",
-			);
+			expect(screen.queryByRole("button", { name: /Berikutnya/ })).toBeNull();
+			expect(screen.queryByRole("button", { name: /Sebelumnya/ })).toBeNull();
 		});
 	});
 
@@ -358,21 +646,18 @@ describe("CodebaseAdaptiveQuestion Component", () => {
 					totalQuestions={3}
 					submitted=""
 					active={true}
+					nav={cardNav()}
 					onSubmit={onSubmit}
 				/>,
 			);
 
-			const chk1 = screen.getByRole("checkbox", { name: /Judul/i });
-			const chk2 = screen.getByRole("checkbox", { name: /Tanggal/i });
-
 			act(() => {
-				fireEvent.click(chk1);
-				fireEvent.click(chk2);
+				fireEvent.click(screen.getByRole("checkbox", { name: /Judul/i }));
+				fireEvent.click(screen.getByRole("checkbox", { name: /Tanggal/i }));
 			});
 
-			const submitBtn = screen.getByRole("button", { name: /Konfirmasi/i });
 			act(() => {
-				fireEvent.click(submitBtn);
+				fireEvent.click(forwardButton());
 			});
 
 			expect(onSubmit).toHaveBeenCalledWith("export_fields", "Judul, Tanggal");
@@ -387,6 +672,7 @@ describe("CodebaseAdaptiveQuestion Component", () => {
 					totalQuestions={1}
 					submitted=""
 					active={true}
+					nav={cardNav()}
 					onSubmit={onSubmit}
 				/>,
 			);
@@ -415,6 +701,7 @@ describe("CodebaseAdaptiveQuestion Component", () => {
 					totalQuestions={3}
 					submitted=""
 					active={true}
+					nav={cardNav()}
 					onSubmit={onSubmit}
 				/>,
 			);

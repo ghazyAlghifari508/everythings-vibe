@@ -155,6 +155,37 @@ describe("findUnknownSurfaces", () => {
 			),
 		).toEqual([]);
 	});
+	it("resolves surfaces when inventory heading includes path in parentheses", () => {
+		expect(
+			findUnknownSurfaces(
+				["Halaman Katalog Proyek"],
+				["Halaman Katalog Proyek (src/pages/projects.astro)"],
+			),
+		).toEqual([]);
+		expect(
+			findUnknownSurfaces(
+				["src/pages/projects.astro"],
+				["Halaman Katalog Proyek (src/pages/projects.astro)"],
+			),
+		).toEqual([]);
+	});
+
+	it("resolves surfaces when the inventory entry carries a file reference and a status marker", () => {
+		// The existing-codebase PRD format appends both, and a task is required to
+		// name the surface only — that exact form must resolve.
+		expect(
+			findUnknownSurfaces(
+				["Halaman Katalog Portofolio Proyek"],
+				["Halaman Katalog Portofolio Proyek (PortfolioPage.tsx) [MODIFIED]"],
+			),
+		).toEqual([]);
+		expect(
+			findUnknownSurfaces(
+				["Halaman Katalog Portofolio Proyek (PortfolioPage.tsx) [MODIFIED]"],
+				["Halaman Katalog Portofolio Proyek (PortfolioPage.tsx) [MODIFIED]"],
+			),
+		).toEqual([]);
+	});
 
 	it("reports surfaces the PRD never defines", () => {
 		expect(

@@ -13,8 +13,9 @@ const DropdownMenuSubTrigger = React.forwardRef<
 	React.ElementRef<typeof DropdownMenuPrimitive.SubTrigger>,
 	React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.SubTrigger> & {
 		inset?: boolean;
+		hideArrow?: boolean;
 	}
->(({ className, inset, children, ...props }, ref) => (
+>(({ className, inset, hideArrow = false, children, ...props }, ref) => (
 	<DropdownMenuPrimitive.SubTrigger
 		ref={ref}
 		className={cn(
@@ -25,7 +26,9 @@ const DropdownMenuSubTrigger = React.forwardRef<
 		{...props}
 	>
 		{children}
-		<Icon icon={ArrowRight01Icon} size={16} className="ml-auto" />
+		{!hideArrow && (
+			<Icon icon={ArrowRight01Icon} size={16} className="ml-auto" />
+		)}
 	</DropdownMenuPrimitive.SubTrigger>
 ));
 DropdownMenuSubTrigger.displayName =

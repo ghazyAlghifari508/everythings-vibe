@@ -45,16 +45,18 @@ NEW → RESUME remounts the machine instead of migrating old state into it.
 | State | Shown | Never shown |
 | --- | --- | --- |
 | A waiting for CLI | `Menunggu agent` with three idle rows (no spinner, no timer) | any running indicator, analysis rows, new-session offer |
+| A′ CLI announced, handshake pending | `Menghubungkan agent...` from the persisted `cli_connecting` event | any spinner without that event |
 | B CLI syncing | `Agent terhubung` → `Mengunggah repository...` | analysis progress, new-session offer |
 | C uploaded, analysis pending | `Sinkronisasi selesai` + `Menganalisis repository...` | new-session offer |
 | D uploaded, analysis failed | `Sinkronisasi selesai` + `Analisis belum berhasil` + `Coba Analisis Lagi` | new-session offer |
 | E token expiring/expired before upload | `Buat prompt baru` (see `codebase-fix02-prompt-recovery.md`) | analysis progress |
 | F ready | `Analisis selesai` + enabled workspace CTA | retry panels |
 
-The prompt row is a single precedence chain: live prompt → transport done → CLI
-active → starting → renewal. A completed snapshot therefore can never render a
-credential or a billing lock, and an active upload can never offer a replacement
-token.
+The prompt row keeps the prompt it was handed: a live credential stays visible
+with its copy action through connecting, upload, and completion (FIX 01 removed
+the "transport done" / "CLI active" replacements). Only a credential the server
+would reject — expired, or a terminal session — leaves the prompt, and it is
+replaced by the renewal state above, never by success copy.
 
 ### 3.1 Progress honesty (waiting is not activity)
 
@@ -64,6 +66,11 @@ Every stage row comes from persisted server status through one mapping
 - `waiting_for_cli` → three idle rows. Waiting for the user is not system
   activity: no spinner, no elapsed timer, and copying the prompt changes nothing
   (the clipboard is browser-local feedback, not evidence the CLI ran).
+- `waiting_for_cli` + a persisted `cli_connecting` event → the agent row turns
+  into `Menghubungkan agent...` with a measured elapsed timer. That event is
+  written only by the CLI's announcement (`POST
+  /api/v1/codebases/:id/codebase/connect`), so polling, a repaint, or a copy
+  click can never produce it.
 - `connected` / `scanning` / `filtering` → the handshake checkmark plus the
   source-preparation row running, because the CLI handshakes before it walks the
   repository.
@@ -72,10 +79,12 @@ Every stage row comes from persisted server status through one mapping
 - `failed` / `expired` → the stage list is withheld (the status does not record
   which step broke) and one recovery card is shown instead.
 
-There is deliberately no `connecting` state. The handshake is the CLI's first
-contact with the server and commits `waiting_for_cli → connected` in a single
-transaction, so a connection-in-progress window is not observable; a fast
-handshake is rendered as already connected instead of a fabricated spinner.
+There is still no `connecting` status enum value. The connecting phase is an
+event, not a status: the handshake commits `waiting_for_cli → connected` in one
+transaction, so a persistent intermediate status would be a state a failed
+handshake could strand the session in. A fast handshake is rendered as already
+connected instead of a fabricated spinner, and a CLI that never announces simply
+has no connecting phase.
 
 ## 4. Token lifecycle
 
@@ -85,8 +94,10 @@ handshake is rendered as already connected instead of a fabricated spinner.
 - Recovery is `action: "recover"`: it re-derives the same credential and never
   rotates one an agent may already hold.
 - Uploaded snapshot: recovery returns `409 SYNC_SNAPSHOT_UPLOADED` with the
-  session id instead of minting; the client shows transport-done and continues
-  the analysis lifecycle.
+  session id instead of minting; a browser that still holds the credential keeps
+  showing that prompt, and a browser that does not states that the prompt was
+  only available once instead of showing a success message (FIX 01). The
+  analysis lifecycle continues either way.
 - Expiry no longer rewrites a session that already persisted a snapshot; its own
   snapshot keeps serving status.
 - No raw token is written to `localStorage`; the only browser token copy is the
@@ -164,6 +175,10 @@ Updated because the superseded behaviour changed:
 - `tests/plan-codebase-analysis.test.tsx` — the mock now resolves the failure to
   pending on the retry attempt instead of replaying the old status.
 - `tests/library-view.test.tsx` — History cards navigate to `?intent=resume`.
+
+FIX 01 (`docs/codebase-fix01-sync-handshake-progress.md`) supersedes the
+prompt-row precedence listed above: the transport-done and CLI-active states were
+removed, and the CLI announcement boundary was added. Its file list is there.
 
 ## 8. Verification
 

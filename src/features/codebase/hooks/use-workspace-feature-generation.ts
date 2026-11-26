@@ -9,16 +9,15 @@ import {
 import type { ProjectFeatureTree } from "@/db/schema";
 import {
 	type AdaptiveQuestion,
-	buildFeatureMessage,
 	type CodebasePipelineStage,
 	type CodebaseRunState,
+	observeOperation,
 	operationSettleEpoch,
-	recordOperationActivities,
-	recordRunActivity,
+	queueRun,
 	runConfirmGenerate,
 	serializeAskQuestions,
+	settleRunForOperation,
 	settleRunIfCurrent,
-	startRun,
 } from "@/features/codebase/services/chat-flow";
 import {
 	type DurableGenerationOperation,
@@ -38,9 +37,8 @@ export function useWorkspaceFeatureGeneration({
 	aiQuestions,
 	lastFeaturePrompt,
 	featureName,
-	codebaseName,
 	refreshFeatureTree,
-	pushAssistantMessage,
+	refreshTimeline,
 	openArtifactPreview,
 	setPipelineStage,
 	setStageError,
@@ -53,9 +51,8 @@ export function useWorkspaceFeatureGeneration({
 	aiQuestions: AdaptiveQuestion[];
 	lastFeaturePrompt: string;
 	featureName: string | undefined;
-	codebaseName: string;
 	refreshFeatureTree: (id: string | null) => Promise<ProjectFeatureTree | null>;
-	pushAssistantMessage: (content: string) => void;
+	refreshTimeline: () => Promise<void>;
 	openArtifactPreview: (kind: "feature" | "prd" | "ac" | "tasks") => void;
 	setPipelineStage: Dispatch<SetStateAction<CodebasePipelineStage>>;
 	setStageError: Dispatch<SetStateAction<string | null>>;
@@ -78,12 +75,31 @@ export function useWorkspaceFeatureGeneration({
 			setIsConfirming(true);
 			setSpecError(null);
 			setStageError(null);
-			const request = startRun("feature", Date.now());
+			const request = queueRun("feature");
 			setRun(request);
 			const requestId = request.requestId;
 			let observedOperation: DurableGenerationOperation | null = null;
 			// The operation's own settle time when the server recorded one.
 			const settleAt = () => operationSettleEpoch(observedOperation ?? {});
+			// An observed operation settles through its own attempt identity: a stale
+			// attempt callback can neither finish nor overwrite a newer attempt.
+			const settleRequest = (
+				status: "done" | "failed",
+				finishedAt: number,
+				error?: string,
+			) =>
+				setRun((current) =>
+					observedOperation
+						? settleRunForOperation(
+								current,
+								observedOperation,
+								status,
+								finishedAt,
+								error,
+								requestId,
+							)
+						: settleRunIfCurrent(current, requestId, status, finishedAt, error),
+				);
 			try {
 				const answersList = buildAskHandoffAnswers(chatAnswers, aiQuestions);
 				const outcome = await runConfirmGenerate({
@@ -166,9 +182,9 @@ export function useWorkspaceFeatureGeneration({
 							}
 							let op = submitRes.operation;
 							observedOperation = op;
-							setRun((current) =>
-								recordOperationActivities(current, op, requestId),
-							);
+							// The accepted operation carries its own attempt window: the timer
+							// starts when its attempt starts, never from the submit time.
+							setRun((current) => observeOperation(current, op));
 							if (op.status === "queued" || op.status === "running") {
 								const settled = await pollOperationUntilSettled({
 									projectId: effectiveFeatureId,
@@ -176,23 +192,13 @@ export function useWorkspaceFeatureGeneration({
 									operationId: op.id,
 									onTick: (tick) => {
 										observedOperation = tick;
-										setRun((current) =>
-											recordOperationActivities(current, tick, requestId),
-										);
+										setRun((current) => observeOperation(current, tick));
 									},
 								});
 								if (settled) op = settled;
 								observedOperation = op;
 							}
 							if (op.status === "completed") {
-								setRun((current) =>
-									recordRunActivity(
-										current,
-										"result.persisted",
-										settleAt(),
-										requestId,
-									),
-								);
 								return { status: 200 };
 							}
 							return {
@@ -213,30 +219,14 @@ export function useWorkspaceFeatureGeneration({
 						outcome.error,
 					);
 					setSpecError(message);
-					setRun((current) =>
-						settleRunIfCurrent(
-							current,
-							requestId,
-							"failed",
-							settleAt(),
-							message,
-						),
-					);
+					settleRequest("failed", settleAt(), message);
 					return;
 				}
 				if (outcome.kind === "spec_failed") {
 					const message =
 						outcome.error ?? "Spesifikasi fitur gagal dibuat. Coba lagi.";
 					setSpecError(message);
-					setRun((current) =>
-						settleRunIfCurrent(
-							current,
-							requestId,
-							"failed",
-							settleAt(),
-							message,
-						),
-					);
+					settleRequest("failed", settleAt(), message);
 					return;
 				}
 				if (outcome.kind === "generating") {
@@ -244,53 +234,26 @@ export function useWorkspaceFeatureGeneration({
 					const settled = await pollOperationUntilSettled({
 						projectId: effectiveFeatureId,
 						stage: "feature",
-						maxAttempts: 10,
+						maxAttempts: 60,
 						onTick: (tick) => {
 							observedOperation = tick;
-							setRun((current) =>
-								recordOperationActivities(current, tick, requestId),
-							);
 						},
 					});
 					if (settled?.status === "completed") {
 						const tree = await refreshFeatureTree(effectiveFeatureId);
 						if (tree && activeProjectIdRef.current === effectiveFeatureId) {
 							setPipelineStage("feature");
-							setRun((current) =>
-								settleRunIfCurrent(
-									recordRunActivity(
-										current,
-										"result.persisted",
-										settleAt(),
-										requestId,
-									),
-									requestId,
-									"done",
-									settleAt(),
-								),
-							);
-							const specMessage = buildFeatureMessage(
-								featureName ?? codebaseName,
-								chatAnswers,
-							);
-							pushAssistantMessage(
-								`Pohon fitur ${featureName ?? "fitur"} berhasil disusun dari jawaban Anda: ${specMessage}`,
-							);
+							settleRequest("done", settleAt());
+							void refreshTimeline();
 							openArtifactPreview("feature");
 							return;
 						}
 					}
-					pushAssistantMessage(
-						`Pohon fitur ${featureName ?? "fitur"} sedang disusun. Tunggu sebentar lalu klik Buat Spesifikasi Fitur lagi untuk memuat hasilnya.`,
-					);
-					setRun((current) =>
-						settleRunIfCurrent(
-							current,
-							requestId,
-							"failed",
-							settleAt(),
-							"Generasi masih berjalan di server. Coba muat ulang sebentar lagi.",
-						),
+					void refreshTimeline();
+					settleRequest(
+						"failed",
+						settleAt(),
+						"Generasi masih berjalan di server. Coba muat ulang sebentar lagi.",
 					);
 					return;
 				}
@@ -298,38 +261,12 @@ export function useWorkspaceFeatureGeneration({
 					const message =
 						"Spesifikasi fitur belum tersimpan di server. Coba lagi sebentar lagi.";
 					setSpecError(message);
-					setRun((current) =>
-						settleRunIfCurrent(
-							current,
-							requestId,
-							"failed",
-							settleAt(),
-							message,
-						),
-					);
+					settleRequest("failed", settleAt(), message);
 					return;
 				}
 				setPipelineStage("feature");
-				setRun((current) =>
-					settleRunIfCurrent(
-						recordRunActivity(
-							current,
-							"result.persisted",
-							settleAt(),
-							requestId,
-						),
-						requestId,
-						"done",
-						settleAt(),
-					),
-				);
-				const specMessage = buildFeatureMessage(
-					featureName ?? codebaseName,
-					chatAnswers,
-				);
-				pushAssistantMessage(
-					`Pohon fitur ${featureName ?? "fitur"} berhasil disusun dari jawaban Anda: ${specMessage}`,
-				);
+				settleRequest("done", settleAt());
+				void refreshTimeline();
 				openArtifactPreview("feature");
 			} finally {
 				confirmingInFlight.current = false;
@@ -346,9 +283,8 @@ export function useWorkspaceFeatureGeneration({
 			aiQuestions,
 			lastFeaturePrompt,
 			featureName,
-			codebaseName,
 			refreshFeatureTree,
-			pushAssistantMessage,
+			refreshTimeline,
 			openArtifactPreview,
 			setPipelineStage,
 			setStageError,

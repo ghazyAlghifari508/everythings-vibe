@@ -134,6 +134,9 @@ describe("sync stage vocabulary", () => {
 	it("never leaks a backend enum or transport term into user-facing copy", () => {
 		const cases: SyncStatusResponse[] = [
 			status(),
+			status({
+				lifecycle: [{ kind: "cli_connecting", at: "2026-02-01T10:00:00.000Z" }],
+			}),
 			status({ status: "connected" }),
 			status({ status: "scanning" }),
 			status({ status: "filtering" }),
@@ -190,6 +193,91 @@ describe("waiting_for_cli", () => {
 		const later = resolveSyncStageView(status());
 		expect(states(later)).toEqual(states(first));
 		expect(states(later)).toEqual(["waiting", "waiting", "waiting"]);
+	});
+});
+
+describe("connecting phase", () => {
+	it("starts the agent row only from a real CLI announcement", () => {
+		const view = resolveSyncStageView(
+			status({
+				lifecycle: [{ kind: "cli_connecting", at: "2026-02-01T10:00:00.000Z" }],
+			}),
+		);
+		expect(states(view)).toEqual(["active", "waiting", "waiting"]);
+		expect(stage(view, 0).title).toBe("Menghubungkan agent...");
+		// The elapsed timer measures the real announcement window.
+		expect(stage(view, 0).startedAt).toBe("2026-02-01T10:00:00.000Z");
+		// Real CLI activity has begun, so the attempt is no longer "not started".
+		expect(view.hasStarted).toBe(true);
+		expect(view.syncComplete).toBe(false);
+		// Exactly one stage may be moving: the later rows stay idle.
+		expect(stage(view, 1).state).toBe("waiting");
+		expect(stage(view, 2).state).toBe("waiting");
+		// A refresh or a stream reconnect replays the same persisted snapshot: the
+		// connecting row may not rewind or restart.
+		const replay = resolveSyncStageView(
+			status({
+				lifecycle: [{ kind: "cli_connecting", at: "2026-02-01T10:00:00.000Z" }],
+			}),
+		);
+		expect(states(replay)).toEqual(states(view));
+		expect(stage(replay, 0).startedAt).toBe(stage(view, 0).startedAt);
+	});
+
+	it("hands the agent row over the moment the handshake lands", () => {
+		const view = resolveSyncStageView(
+			status({
+				status: "connected",
+				lifecycle: [
+					{ kind: "cli_connecting", at: "2026-02-01T10:00:00.000Z" },
+					{ kind: "agent_connected", at: "2026-02-01T10:00:02.000Z" },
+				],
+			}),
+		);
+		expect(states(view)).toEqual(["done", "active", "waiting"]);
+		expect(stage(view, 0).title).toBe("Agent terhubung");
+		expect(stage(view, 0).completedAt).toBe("2026-02-01T10:00:02.000Z");
+	});
+
+	it("ignores an announcement that arrived after the handshake", () => {
+		// Out-of-order delivery must never rewind a connected attempt back to a
+		// connecting row.
+		const view = resolveSyncStageView(
+			status({
+				status: "connected",
+				lifecycle: [
+					{ kind: "agent_connected", at: "2026-02-01T10:00:02.000Z" },
+					{ kind: "cli_connecting", at: "2026-02-01T10:00:03.000Z" },
+				],
+			}),
+		);
+		expect(states(view)).toEqual(["done", "active", "waiting"]);
+		expect(stage(view, 0).title).toBe("Agent terhubung");
+	});
+
+	it("never claims connecting on a terminal attempt", () => {
+		const view = resolveSyncStageView(
+			status({
+				status: "failed",
+				lifecycle: [{ kind: "cli_connecting", at: "2026-02-01T10:00:00.000Z" }],
+			}),
+		);
+		expect(view.failed).toBe(true);
+		expect(view.stages).toEqual([]);
+	});
+
+	it("cannot be produced by reading the same status again", () => {
+		const plain = status();
+		expect(states(resolveSyncStageView(plain))).toEqual([
+			"waiting",
+			"waiting",
+			"waiting",
+		]);
+		expect(states(resolveSyncStageView(plain))).toEqual([
+			"waiting",
+			"waiting",
+			"waiting",
+		]);
 	});
 });
 

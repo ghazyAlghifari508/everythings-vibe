@@ -85,14 +85,14 @@ test.describe("project deletion", () => {
 
 		// Direct navigation must not open the deleted project: the route
 		// resolves to its not-found state instead of rendering PRD content.
-		await page.goto(`/prd/${PROJECT_ID}`, { waitUntil: "networkidle" });
-		await expect(page.getByText("PRD tidak ditemukan.")).toBeVisible();
+		await page.goto(`/vibeplan/${PROJECT_ID}/prd`, { waitUntil: "networkidle" });
+		await expect(page.getByText("Proyek tidak ditemukan.")).toBeVisible();
 		await expect(
 			page.locator(`[data-project-id="${PROJECT_ID}"]`),
 		).toHaveCount(0);
 
 		// The only tolerated console noise is the route's own not-found state.
-		// A missing project renders "PRD tidak ditemukan." with a 500 status
+		// A missing project renders "Proyek tidak ditemukan." with a 500 status
 		// (pre-existing behaviour for any unknown project id, unrelated to
 		// deletion), which the browser reports as a failed resource load.
 		const unexpected = errors.filter(

@@ -4,9 +4,111 @@ import {
 	ANALYSIS_VALIDATION_MESSAGE,
 	type AnalysisValidationReason,
 	type CodebaseAnalysis,
+	type CodebaseAnalysisFinding,
 	codebaseAnalysisGenerationSchema,
 	codebaseAnalysisSchema,
 } from "./analysis-schema";
+
+/**
+ * Clean and verify architectural findings against snapshot manifest:
+ * - Exclude untrusted / fabricated file paths so missing evidence does not become a fake citation.
+ * - Deduplicate findings by title.
+ * - Reclassify claimType when evidence is missing or uncertain.
+ * - Eliminate duplicated uncertainty that parrots the finding's title or detail.
+ */
+export function sanitizeAnalysisFindings(
+	findings: readonly CodebaseAnalysisFinding[] | undefined,
+	trustedManifestPaths: ReadonlySet<string>,
+): CodebaseAnalysisFinding[] | undefined {
+	if (!findings || findings.length === 0) return undefined;
+
+	const seenTitles = new Set<string>();
+	const sanitized: CodebaseAnalysisFinding[] = [];
+
+	for (const finding of findings) {
+		const titleKey = finding.title.trim().toLowerCase();
+		if (!titleKey || seenTitles.has(titleKey)) continue;
+		seenTitles.add(titleKey);
+
+		// Filter paths against trusted manifest paths
+		const rawPaths = [
+			...(finding.evidencePaths ?? []),
+			...(finding.relevantPaths ?? []),
+		];
+		const validPaths = Array.from(
+			new Set(rawPaths.filter((path) => trustedManifestPaths.has(path))),
+		);
+
+		let claimType = finding.claimType;
+		if (claimType === "verified" && validPaths.length === 0) {
+			claimType = finding.uncertainty ? "uncertain" : "inference";
+		} else if (!claimType) {
+			if (finding.uncertainty && finding.uncertainty.trim().length > 0) {
+				claimType = "uncertain";
+			} else if (validPaths.length > 0) {
+				claimType = "verified";
+			} else {
+				claimType = "inference";
+			}
+		}
+
+		// Avoid duplicated uncertainty that merely parrots title or detail
+		let uncertainty = finding.uncertainty?.trim();
+		if (uncertainty) {
+			const uLower = uncertainty.toLowerCase();
+			if (
+				uLower === titleKey ||
+				uLower === finding.detail.trim().toLowerCase()
+			) {
+				uncertainty = undefined;
+			}
+		}
+
+		const implication = finding.implication ?? finding.impact;
+
+		sanitized.push({
+			title: finding.title.trim(),
+			detail: finding.detail.trim(),
+			claimType,
+			...(uncertainty ? { uncertainty } : {}),
+			...(validPaths.length > 0
+				? { evidencePaths: validPaths, relevantPaths: validPaths }
+				: {}),
+			...(implication ? { implication } : {}),
+		});
+	}
+
+	return sanitized.length > 0 ? sanitized : undefined;
+}
+
+/**
+ * Deduplicate limitations and filter items that repeat finding uncertainties.
+ */
+export function sanitizeAnalysisLimitations(
+	limitations: readonly string[] | undefined,
+	findings: readonly CodebaseAnalysisFinding[] | undefined,
+): string[] | undefined {
+	if (!limitations || limitations.length === 0) return undefined;
+
+	const seen = new Set<string>();
+	if (findings) {
+		for (const f of findings) {
+			if (f.uncertainty) seen.add(f.uncertainty.trim().toLowerCase());
+			seen.add(f.title.trim().toLowerCase());
+		}
+	}
+
+	const result: string[] = [];
+	for (const item of limitations) {
+		const trimmed = item.trim();
+		const lower = trimmed.toLowerCase();
+		if (!trimmed || seen.has(lower)) continue;
+		seen.add(lower);
+		result.push(trimmed);
+	}
+
+	return result.length > 0 ? result : undefined;
+}
 
 export function parseCodebaseAnalysis(input: unknown): CodebaseAnalysis {
 	return codebaseAnalysisSchema.parse(input);
@@ -66,6 +168,7 @@ const NULLABLE_ADVISORY_KEYS = [
 	"moduleMap",
 	"relevantFiles",
 	"impactAreas",
+	"applicationModules",
 	"limitations",
 	"findings",
 ] as const;
@@ -146,5 +249,28 @@ export function parseAnalysisOutput(
 			issuePaths: leaks.slice(0, MAX_DIAGNOSTIC_ISSUE_PATHS),
 		});
 	}
-	return result.data;
+	const sanitizedRelevantFiles = result.data.relevantFiles
+		? result.data.relevantFiles.filter((p) => trustedManifestPaths.has(p))
+		: undefined;
+	const sanitizedFindings = sanitizeAnalysisFindings(
+		result.data.findings,
+		trustedManifestPaths,
+	);
+	const sanitizedLimitations = sanitizeAnalysisLimitations(
+		result.data.limitations,
+		sanitizedFindings,
+	);
+
+	return {
+		...result.data,
+		...(sanitizedRelevantFiles !== undefined
+			? { relevantFiles: sanitizedRelevantFiles }
+			: {}),
+		...(sanitizedFindings !== undefined
+			? { findings: sanitizedFindings }
+			: { findings: undefined }),
+		...(sanitizedLimitations !== undefined
+			? { limitations: sanitizedLimitations }
+			: { limitations: undefined }),
+	};
 }

@@ -84,16 +84,20 @@ export function useCodebaseSyncStatus({
 	status: SyncStatusResponse | null;
 	error: string | null;
 } {
-	const [status, setStatus] = useState<SyncStatusResponse | null>(
-		initialStatus,
-	);
+	const seed =
+		initialStatus?.projectId === codebaseId &&
+		(sessionId === undefined || initialStatus.sessionId === sessionId) &&
+		(!analysisProjectId ||
+			!initialStatus.analysisProjectId ||
+			initialStatus.analysisProjectId === analysisProjectId)
+			? initialStatus
+			: null;
+	const [status, setStatus] = useState<SyncStatusResponse | null>(seed);
 	const [error, setError] = useState<string | null>(null);
 	// The cadence is chosen from the last status the SERVER reported, never from
 	// a timer or a local guess, so a faster loop can only ever occur while the
 	// server has actually told us an attempt is in flight.
-	const activeRef = useRef(
-		initialStatus ? isSyncStatusInFlight(initialStatus.status) : false,
-	);
+	const activeRef = useRef(seed ? isSyncStatusInFlight(seed.status) : false);
 	const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const inFlightRef = useRef(false);
 	const abortRef = useRef<AbortController | null>(null);
@@ -103,8 +107,13 @@ export function useCodebaseSyncStatus({
 	// first mount it falls back to the recovered seed so the first paint
 	// already reflects persisted server state instead of an empty card.
 	const pinnedSessionRef = useRef<string | null>(
-		sessionId ?? initialStatus?.sessionId ?? null,
+		sessionId ?? seed?.sessionId ?? null,
 	);
+	const pinnedCodebaseRef = useRef(codebaseId);
+	if (pinnedCodebaseRef.current !== codebaseId) {
+		pinnedCodebaseRef.current = codebaseId;
+		pinnedSessionRef.current = sessionId ?? seed?.sessionId ?? null;
+	}
 	// The pinned identity always wins: a session prop change is an explicit new
 	// attempt, so the loop adopts it synchronously inside this render.
 	if (sessionId !== undefined) pinnedSessionRef.current = sessionId;
@@ -114,10 +123,14 @@ export function useCodebaseSyncStatus({
 	// rewind the screen. A session prop change is an explicit new attempt
 	// and always resets through the effect below, whatever the seed holds.
 	useEffect(() => {
-		if (!initialStatus) return;
-		activeRef.current = isSyncStatusInFlight(initialStatus.status);
-		setStatus((current) => (current === null ? initialStatus : current));
-	}, [initialStatus]);
+		if (
+			!seed ||
+			(pinnedSessionRef.current && seed.sessionId !== pinnedSessionRef.current)
+		)
+			return;
+		activeRef.current = isSyncStatusInFlight(seed.status);
+		setStatus((current) => (current === null ? seed : current));
+	}, [seed]);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: the session id is the only trigger; initialStatus is read as the mount seed and must not restart the loop
 	useEffect(() => {
@@ -126,23 +139,19 @@ export function useCodebaseSyncStatus({
 		// so stale progress can never paint as the new attempt's. On the
 		// first mount there is no previous session, so the recovered seed
 		// (when present) is kept as the first paint instead.
-		if (sessionId !== undefined) {
-			setStatus((current) => {
-				if (current !== null && current.sessionId === sessionId) return current;
-				if (
-					current === null &&
-					initialStatus !== null &&
-					initialStatus.sessionId === sessionId
-				)
-					return initialStatus;
-				return null;
-			});
-			activeRef.current =
-				initialStatus !== null && initialStatus.sessionId === sessionId
-					? isSyncStatusInFlight(initialStatus.status)
-					: false;
-			setError(null);
-		}
+		setStatus((current) => {
+			if (
+				current?.projectId === codebaseId &&
+				(sessionId === undefined || current.sessionId === sessionId) &&
+				(!analysisProjectId ||
+					!current.analysisProjectId ||
+					current.analysisProjectId === analysisProjectId)
+			)
+				return current;
+			return seed;
+		});
+		activeRef.current = seed ? isSyncStatusInFlight(seed.status) : false;
+		setError(null);
 		if (!enabled || !codebaseId) return;
 		const seq = seqRef.current;
 		let cancelled = false;
@@ -259,5 +268,13 @@ export function useCodebaseSyncStatus({
 		analysisProjectId,
 	]);
 
-	return { status, error };
+	const visibleStatus =
+		status?.projectId === codebaseId &&
+		(sessionId === undefined || status.sessionId === sessionId) &&
+		(!analysisProjectId ||
+			!status.analysisProjectId ||
+			status.analysisProjectId === analysisProjectId)
+			? status
+			: null;
+	return { status: visibleStatus, error };
 }

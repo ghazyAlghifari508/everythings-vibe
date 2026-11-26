@@ -83,10 +83,202 @@ describe("parseAskOptionsJson bounds", () => {
 				id: "padded",
 				question: "Padded?",
 				type: "select",
-				options: ["X"],
+				options: [{ id: "padded-opt1", label: "X" }],
 			},
 			{ id: "b", question: "Valid?", type: "text" },
 			{ id: "c", question: "Valid?", type: "text" },
+		]);
+	});
+
+	it("accepts the rich option form and keeps heading + description together", () => {
+		expect(
+			parseAskOptionsJson(
+				JSON.stringify({
+					questions: [
+						{
+							id: "search_scope",
+							question: "Informasi apa saja yang perlu dicari?",
+							type: "select",
+							options: [
+								{
+									label: "Judul, deskripsi, dan teknologi",
+									description:
+										"Pengunjung bisa menemukan proyek lewat nama, ringkasan, atau teknologi yang dipakai.",
+								},
+								{
+									label: "Judul proyek saja",
+									description: "Pencarian hanya mencocokkan nama proyek.",
+								},
+							],
+							recommended: 1,
+							recommendationReason: "Analisis menunjukkan pencarian judul.",
+						},
+						{ id: "b", question: "Valid?", type: "text" },
+						{ id: "c", question: "Valid?", type: "text" },
+					],
+				}),
+			),
+		).toEqual([
+			{
+				id: "search_scope",
+				question: "Informasi apa saja yang perlu dicari?",
+				type: "select",
+				options: [
+					{
+						id: "search_scope-opt1",
+						label: "Judul, deskripsi, dan teknologi",
+						description:
+							"Pengunjung bisa menemukan proyek lewat nama, ringkasan, atau teknologi yang dipakai.",
+					},
+					{
+						id: "search_scope-opt2",
+						label: "Judul proyek saja",
+						description: "Pencarian hanya mencocokkan nama proyek.",
+					},
+				],
+				recommended: 1,
+				recommendationReason: "Analisis menunjukkan pencarian judul.",
+			},
+			{ id: "b", question: "Valid?", type: "text" },
+			{ id: "c", question: "Valid?", type: "text" },
+		]);
+	});
+
+	it("accepts a heading-only option so legacy and Greenfield data stay valid", () => {
+		// Whether a description is REQUIRED is decided per mode by the generation
+		// orchestrator (see `describeOptionContractMiss`), not by the shape parser
+		// — otherwise every pre-FIX-01 handoff and the Greenfield prompt would be
+		// rejected on re-read.
+		const result = parseAskOptionsJson(
+			JSON.stringify({
+				questions: [
+					{
+						id: "a",
+						question: "Valid?",
+						type: "select",
+						options: [
+							{ label: "Judul tanpa deskripsi" },
+							{ label: "Opsi lain", description: "Ada deskripsi." },
+						],
+					},
+					{ id: "b", question: "Valid?", type: "text" },
+					{ id: "c", question: "Valid?", type: "text" },
+				],
+			}),
+		);
+		expect(result?.[0].options).toEqual([
+			{ id: "a-opt1", label: "Judul tanpa deskripsi" },
+			{ id: "a-opt2", label: "Opsi lain", description: "Ada deskripsi." },
+		]);
+	});
+
+	it("rejects a description that only repeats the heading", () => {
+		expect(
+			parseAskOptionsJson(
+				JSON.stringify({
+					questions: [
+						{
+							id: "a",
+							question: "Valid?",
+							type: "select",
+							options: [
+								{ label: "Cari judul", description: "cari judul" },
+								{ label: "Opsi lain", description: "Ada deskripsi." },
+							],
+						},
+						{ id: "b", question: "Valid?", type: "text" },
+						{ id: "c", question: "Valid?", type: "text" },
+					],
+				}),
+			),
+		).toBeNull();
+	});
+
+	it("rejects a description beyond the 400-character bound", () => {
+		expect(
+			parseAskOptionsJson(
+				JSON.stringify({
+					questions: [
+						{
+							id: "a",
+							question: "Valid?",
+							type: "select",
+							options: [
+								{ label: "Opsi", description: "x".repeat(401) },
+								{ label: "Opsi lain", description: "Ada deskripsi." },
+							],
+						},
+						{ id: "b", question: "Valid?", type: "text" },
+						{ id: "c", question: "Valid?", type: "text" },
+					],
+				}),
+			),
+		).toBeNull();
+	});
+
+	it("rejects a heading longer than the persisted handoff bound", () => {
+		// Accepted generation must always be storable: the handoff schema caps a
+		// label at 100 chars, so a longer heading is rejected here, not later by a
+		// failed save.
+		const longLabel = "L".repeat(101);
+		expect(
+			parseAskOptionsJson(
+				JSON.stringify({
+					questions: [
+						{
+							id: "a",
+							question: "Valid?",
+							type: "select",
+							options: [
+								{ label: longLabel, description: "Ada deskripsi." },
+								{ label: "Opsi lain", description: "Ada deskripsi." },
+							],
+						},
+						{ id: "b", question: "Valid?", type: "text" },
+						{ id: "c", question: "Valid?", type: "text" },
+					],
+				}),
+			),
+		).toBeNull();
+		expect(
+			parseAskOptionsJson(
+				JSON.stringify({
+					questions: [
+						{
+							id: "a",
+							question: "Valid?",
+							type: "select",
+							options: [
+								{ label: "L".repeat(100), description: "Ada deskripsi." },
+								{ label: "Opsi lain", description: "Ada deskripsi." },
+							],
+						},
+						{ id: "b", question: "Valid?", type: "text" },
+						{ id: "c", question: "Valid?", type: "text" },
+					],
+				}),
+			)?.[0].options?.[0].label.length,
+		).toBe(100);
+	});
+
+	it("still accepts legacy short-text options and gives them an identity", () => {
+		const result = parseAskOptionsJson(
+			JSON.stringify({
+				questions: [
+					{
+						id: "a",
+						question: "Valid?",
+						type: "select",
+						options: ["Lokal", "Server"],
+					},
+					{ id: "b", question: "Valid?", type: "text" },
+					{ id: "c", question: "Valid?", type: "text" },
+				],
+			}),
+		);
+		expect(result?.[0].options).toEqual([
+			{ id: "a-opt1", label: "Lokal" },
+			{ id: "a-opt2", label: "Server" },
 		]);
 	});
 });
@@ -117,14 +309,21 @@ describe("parseAskOptionsJson", () => {
 				id: "target_audience",
 				question: "Siapa target audiens?",
 				type: "select",
-				options: ["UMKM", "Enterprise"],
+				options: [
+					{ id: "target_audience-opt1", label: "UMKM" },
+					{ id: "target_audience-opt2", label: "Enterprise" },
+				],
 			},
 			{ id: "brand_name", question: "Nama brand kamu?", type: "text" },
 			{
 				id: "features",
 				question: "Fitur apa saja yang penting?",
 				type: "multiselect",
-				options: ["Auth", "Payment", "Chat"],
+				options: [
+					{ id: "features-opt1", label: "Auth" },
+					{ id: "features-opt2", label: "Payment" },
+					{ id: "features-opt3", label: "Chat" },
+				],
 			},
 		]);
 	});
@@ -375,5 +574,31 @@ describe("parseAskOptionsJson recommendations", () => {
 		);
 		expect(result?.[0]).not.toHaveProperty("recommended");
 		expect(result?.[0]).not.toHaveProperty("recommendationReason");
+	});
+
+	it("keeps the recommended index pointing at the same option after parsing", () => {
+		// The canonical order is never shuffled, so whatever the model pointed at
+		// stays pointed at — a display layer may sort a copy, never this array.
+		const result = parseAskOptionsJson(
+			JSON.stringify({
+				questions: [
+					{
+						id: "a",
+						question: "Q?",
+						type: "select",
+						options: [
+							{ label: "Lokal", description: "Tersimpan di perangkat." },
+							{ label: "Server", description: "Tersimpan di backend." },
+						],
+						recommended: 1,
+						recommendationReason: "Repo memakai penyimpanan server.",
+					},
+					...base,
+				],
+			}),
+		);
+		const [first] = result ?? [];
+		expect(first?.recommended).toBe(1);
+		expect(first?.options?.[first.recommended ?? -1]?.label).toBe("Server");
 	});
 });

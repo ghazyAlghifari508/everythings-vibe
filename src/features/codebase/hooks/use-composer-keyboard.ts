@@ -14,6 +14,7 @@ import {
 	type ComposerSlashCommandItem,
 	detectMentionQuery,
 	detectSlashQuery,
+	filterMentionCandidates,
 	filterSlashCommands,
 } from "@/features/codebase/services/composer-interactions";
 import type { CodebaseArtifactRef } from "../components/explorer/codebase-file-card";
@@ -21,21 +22,15 @@ import type { CodebaseArtifactRef } from "../components/explorer/codebase-file-c
 export function useComposerKeyboard({
 	draft,
 	artifacts,
-	normalizedRepoFiles,
 	featureName,
 	resolvedProjectId,
-	codebaseId,
-	currentSnapshotId,
 	onSelectMentionCandidate,
 	onSelectSlashCommand,
 }: {
 	draft: string;
 	artifacts: readonly CodebaseArtifactRef[];
-	normalizedRepoFiles: readonly string[];
 	featureName?: string;
 	resolvedProjectId: string | null;
-	codebaseId?: string | null;
-	currentSnapshotId?: string | null;
 	onSelectMentionCandidate: (
 		candidate: ComposerMentionCandidate,
 		inlineMention: { tokenStart: number; tokenEnd: number } | null,
@@ -50,7 +45,7 @@ export function useComposerKeyboard({
 	isMentionButtonOpen: boolean;
 	setIsMentionButtonOpen: Dispatch<SetStateAction<boolean>>;
 	mentionSearch: string;
-	setMentionSearch: Dispatch<SetStateAction<string>>;
+	setMentionSearch: (value: string) => void;
 	mentionActiveIndex: number;
 	setMentionActiveIndex: Dispatch<SetStateAction<number>>;
 	slashActiveIndex: number;
@@ -59,16 +54,22 @@ export function useComposerKeyboard({
 	setDismissedSlashToken: Dispatch<SetStateAction<string | null>>;
 	isMentionPopoverOpen: boolean;
 	effectiveMentionQuery: string;
-	mentionCandidates: ReturnType<typeof buildMentionCandidates>;
+	mentionDocuments: readonly ComposerMentionCandidate[];
+	filteredMentionDocuments: readonly ComposerMentionCandidate[];
+	hasMentionDocuments: boolean;
 	isSlashPopoverOpen: boolean;
 	filteredSlashCommands: readonly ComposerSlashCommandItem[];
 	inlineMentionTokenKey: string | null;
 	handleSelectMention: (candidate: ComposerMentionCandidate) => void;
 	handleSelectSlash: (cmd: ComposerSlashCommandItem) => void;
 	handleComposerKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
+	handleMentionSearchKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
 } {
 	const [isMentionButtonOpen, setIsMentionButtonOpen] = useState(false);
-	const [mentionSearch, setMentionSearch] = useState("");
+	const [mentionSearchState, setMentionSearchState] = useState<{
+		query: string;
+		tokenKey: string | null;
+	}>({ query: "", tokenKey: null });
 	const [mentionActiveIndex, setMentionActiveIndex] = useState(0);
 	const [slashActiveIndex, setSlashActiveIndex] = useState(0);
 	const [dismissedMentionToken, setDismissedMentionToken] = useState<
@@ -82,34 +83,45 @@ export function useComposerKeyboard({
 	const inlineMentionTokenKey = inlineMention
 		? `${inlineMention.tokenStart}:${inlineMention.query}`
 		: null;
-	const isMentionPopoverOpen =
-		isMentionButtonOpen ||
-		(inlineMention !== null && dismissedMentionToken !== inlineMentionTokenKey);
-	const effectiveMentionQuery = isMentionButtonOpen
+
+	// The popover has two entry points. A search override is stored together with
+	// the `@` token that was live when it was typed, so editing the draft (a new
+	// token key) hands the query back to the textarea with no reset effect.
+	const mentionSearch =
+		mentionSearchState.tokenKey === inlineMentionTokenKey
+			? mentionSearchState.query
+			: "";
+
+	const handleMentionSearchChange = useCallback(
+		(query: string) =>
+			setMentionSearchState({ query, tokenKey: inlineMentionTokenKey }),
+		[inlineMentionTokenKey],
+	);
+
+	const effectiveMentionQuery = mentionSearch.trim()
 		? mentionSearch
 		: (inlineMention?.query ?? "");
 
-	const mentionCandidates = useMemo(
+	const mentionDocuments = useMemo(
 		() =>
 			buildMentionCandidates({
 				artifacts,
-				repositoryFiles: normalizedRepoFiles,
 				featureName,
 				projectId: resolvedProjectId,
-				codebaseId,
-				snapshotId: currentSnapshotId,
-				query: effectiveMentionQuery,
 			}),
-		[
-			artifacts,
-			normalizedRepoFiles,
-			featureName,
-			resolvedProjectId,
-			codebaseId,
-			currentSnapshotId,
-			effectiveMentionQuery,
-		],
+		[artifacts, featureName, resolvedProjectId],
 	);
+	const hasMentionDocuments = mentionDocuments.length > 0;
+	const filteredMentionDocuments = useMemo(
+		() => filterMentionCandidates(mentionDocuments, effectiveMentionQuery),
+		[mentionDocuments, effectiveMentionQuery],
+	);
+
+	const isMentionPopoverOpen =
+		isMentionButtonOpen ||
+		(inlineMention !== null &&
+			hasMentionDocuments &&
+			dismissedMentionToken !== inlineMentionTokenKey);
 
 	const inlineSlash = useMemo(() => detectSlashQuery(draft), [draft]);
 	const inlineSlashTokenKey = inlineSlash
@@ -129,11 +141,16 @@ export function useComposerKeyboard({
 		(candidate: ComposerMentionCandidate) => {
 			onSelectMentionCandidate(candidate, inlineMention, inlineMentionTokenKey);
 			setIsMentionButtonOpen(false);
-			setMentionSearch("");
+			handleMentionSearchChange("");
 			setDismissedMentionToken(inlineMentionTokenKey);
 			setMentionActiveIndex(0);
 		},
-		[inlineMention, inlineMentionTokenKey, onSelectMentionCandidate],
+		[
+			inlineMention,
+			inlineMentionTokenKey,
+			onSelectMentionCandidate,
+			handleMentionSearchChange,
+		],
 	);
 
 	const handleSelectSlash = useCallback(
@@ -145,34 +162,55 @@ export function useComposerKeyboard({
 		[inlineSlash, inlineSlashTokenKey, onSelectSlashCommand],
 	);
 
+	// One navigation contract for both entry points: the textarea keeps the
+	// caret while typing `@`, the search input owns it after a button click.
+	const handleMentionKeyDown = useCallback(
+		(event: KeyboardEvent<HTMLElement>) => {
+			const total = filteredMentionDocuments.length;
+			if (event.key === "ArrowDown" && total > 0) {
+				event.preventDefault();
+				setMentionActiveIndex((idx) => (idx + 1) % total);
+			} else if (event.key === "ArrowUp" && total > 0) {
+				event.preventDefault();
+				setMentionActiveIndex((idx) => (idx - 1 + total) % total);
+			} else if (event.key === "Escape") {
+				event.preventDefault();
+				setIsMentionButtonOpen(false);
+				setDismissedMentionToken(inlineMentionTokenKey);
+			} else if ((event.key === "Enter" || event.key === "Tab") && total > 0) {
+				const chosen =
+					filteredMentionDocuments[Math.min(mentionActiveIndex, total - 1)];
+				if (chosen) {
+					event.preventDefault();
+					handleSelectMention(chosen);
+				}
+			}
+		},
+		[
+			filteredMentionDocuments,
+			mentionActiveIndex,
+			inlineMentionTokenKey,
+			handleSelectMention,
+		],
+	);
+
+	const handleMentionSearchKeyDown = useCallback(
+		(event: KeyboardEvent<HTMLInputElement>) => {
+			if (
+				event.key === "Enter" ||
+				event.key === "Tab" ||
+				event.key === "Escape"
+			)
+				event.preventDefault();
+			handleMentionKeyDown(event);
+		},
+		[handleMentionKeyDown],
+	);
+
 	const handleComposerKeyDown = useCallback(
 		(event: KeyboardEvent<HTMLTextAreaElement>) => {
 			if (isMentionPopoverOpen) {
-				const combined = [
-					...mentionCandidates.documents,
-					...mentionCandidates.files.slice(0, 30),
-				];
-				const total = combined.length;
-				if (event.key === "ArrowDown" && total > 0) {
-					event.preventDefault();
-					setMentionActiveIndex((idx) => (idx + 1) % total);
-				} else if (event.key === "ArrowUp" && total > 0) {
-					event.preventDefault();
-					setMentionActiveIndex((idx) => (idx - 1 + total) % total);
-				} else if (event.key === "Escape") {
-					event.preventDefault();
-					setIsMentionButtonOpen(false);
-					setDismissedMentionToken(inlineMentionTokenKey);
-				} else if (
-					(event.key === "Enter" || event.key === "Tab") &&
-					total > 0
-				) {
-					const chosen = combined[Math.min(mentionActiveIndex, total - 1)];
-					if (chosen) {
-						event.preventDefault();
-						handleSelectMention(chosen);
-					}
-				}
+				handleMentionKeyDown(event);
 				return;
 			}
 			if (isSlashPopoverOpen) {
@@ -201,10 +239,7 @@ export function useComposerKeyboard({
 		},
 		[
 			isMentionPopoverOpen,
-			mentionCandidates,
-			mentionActiveIndex,
-			inlineMentionTokenKey,
-			handleSelectMention,
+			handleMentionKeyDown,
 			isSlashPopoverOpen,
 			filteredSlashCommands,
 			slashActiveIndex,
@@ -217,7 +252,7 @@ export function useComposerKeyboard({
 		isMentionButtonOpen,
 		setIsMentionButtonOpen,
 		mentionSearch,
-		setMentionSearch,
+		setMentionSearch: handleMentionSearchChange,
 		mentionActiveIndex,
 		setMentionActiveIndex,
 		slashActiveIndex,
@@ -226,12 +261,15 @@ export function useComposerKeyboard({
 		setDismissedSlashToken,
 		isMentionPopoverOpen,
 		effectiveMentionQuery,
-		mentionCandidates,
+		mentionDocuments,
+		filteredMentionDocuments,
+		hasMentionDocuments,
 		isSlashPopoverOpen,
 		filteredSlashCommands,
 		inlineMentionTokenKey,
 		handleSelectMention,
 		handleSelectSlash,
 		handleComposerKeyDown,
+		handleMentionSearchKeyDown,
 	};
 }

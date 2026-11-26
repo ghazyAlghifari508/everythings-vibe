@@ -103,6 +103,14 @@ export function inferSpacingBaseUnit(
 
 // Classifies a spacing value by the context it was measured in. A value only
 // receives a purpose its evidence supports; everything else stays "measured".
+const CONTAINER_ROLES = [
+	"main",
+	"section",
+	"header",
+	"footer",
+	"article",
+] as const;
+
 export function classifySpacingToken(
 	group: GroupedMeasurement,
 	elements: VisualElementEvidence[],
@@ -117,8 +125,15 @@ export function classifySpacingToken(
 		valuePx > 0 &&
 		valuePx % baseUnit === 0;
 	let purpose: SpacingPurpose = "Measured spacing";
-	if (group.property === "max-width") purpose = "Container max-width";
-	else if (roles.includes("nav")) purpose = "Navigation spacing";
+	// A max-width on a single small element is not the page container. The class
+	// is claimed only when a page-level role or a repeated measurement supports
+	// it; otherwise the value stays a measured spacing observation.
+	const containerEvidence =
+		group.frequency >= 2 ||
+		roles.some((role) => (CONTAINER_ROLES as readonly string[]).includes(role));
+	if (group.property === "max-width") {
+		if (containerEvidence) purpose = "Container max-width";
+	} else if (roles.includes("nav")) purpose = "Navigation spacing";
 	else if (roles.includes("cta") && group.property === "padding")
 		purpose = "Action padding";
 	else if (

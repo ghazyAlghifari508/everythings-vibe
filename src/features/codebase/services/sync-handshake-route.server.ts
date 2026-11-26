@@ -6,36 +6,27 @@
 // session/attempt/snapshot identity and moves waiting_for_cli -> connected; a
 // repeated handshake is idempotent. The CLI enforces the minimum version
 // client-side from the returned cliMinVersion.
-import { and, desc, eq } from "drizzle-orm";
-import { db } from "@/db";
-import { codebaseSyncSessions, codebases, subscriptions } from "@/db/schema";
-import { checkRateLimit } from "@/lib/rate-limit";
-import type { Plan } from "@/types/database";
+//
+// This is the operation that commits a connection. The attempt's earlier
+// announcement (`/codebase/connect`) records that the CLI started, but it never
+// advances the status: only this transaction may, because only it carries the
+// repository identity the upload is bound to.
 import { normalizeRepositoryName } from "./library";
 import {
 	compareRepositoryIdentity,
 	normalizeRepositoryIdentity,
 } from "./repository-identity";
+import { cliHandshakeRequestSchema, cliHandshakeResponseSchema } from "./sync";
 import {
-	CODEBASE_SYNC_RATE_LIMIT_ACTION,
-	cliHandshakeRequestSchema,
-	cliHandshakeResponseSchema,
-	getSessionUsability,
-	requireSupportedCliVersion,
-} from "./sync";
-import { hashSyncToken } from "./sync.server";
+	enforceCliSyncBudget,
+	evaluateCliVersion,
+	resolveCliSyncAccess,
+} from "./sync-cli-auth.server";
 import {
 	runSyncHandshakeTransaction,
 	type SyncHandshakeResult,
 } from "./sync-handshake-transaction.server";
 import { SyncBindingError } from "./sync-transport";
-
-function bearerToken(request: Request): string | null {
-	const header = request.headers.get("Authorization");
-	if (!header || !header.startsWith("Bearer ")) return null;
-	const token = header.slice(7).trim();
-	return token ? token : null;
-}
 
 export async function handleCodebaseSyncHandshake(input: {
 	request: Request;
@@ -43,86 +34,12 @@ export async function handleCodebaseSyncHandshake(input: {
 }): Promise<Response> {
 	const { request, params } = input;
 	const codebaseId = params.id;
-	const rawToken = bearerToken(request);
-	if (!rawToken)
-		return Response.json(
-			{
-				error: "Invalid sync credential",
-				code: "INVALID_SYNC_CREDENTIAL",
-			},
-			{ status: 401 },
-		);
 
-	// Credential lookup is codebase-bound: a token issued for one codebase never
-	// authenticates another (uniform 401, no oracle). The raw token is hashed
-	// immediately and never logged/stored.
-	const [session] = await db
-		.select()
-		.from(codebaseSyncSessions)
-		.where(
-			and(
-				eq(codebaseSyncSessions.credentialHash, hashSyncToken(rawToken)),
-				eq(codebaseSyncSessions.codebaseId, codebaseId),
-			),
-		)
-		.limit(1);
-	if (!session)
-		return Response.json(
-			{
-				error: "Invalid sync credential",
-				code: "INVALID_SYNC_CREDENTIAL",
-			},
-			{ status: 401 },
-		);
-
-	const usability = getSessionUsability(session);
-	if (!usability.usable) {
-		if (usability.code === "SYNC_SESSION_EXPIRED") {
-			await db
-				.update(codebaseSyncSessions)
-				.set({ status: "expired", updatedAt: new Date() })
-				.where(eq(codebaseSyncSessions.id, session.id));
-			return Response.json(
-				{
-					error: "Sync session expired. Create a new sync session.",
-					code: "SYNC_SESSION_EXPIRED",
-				},
-				{ status: 410 },
-			);
-		}
-		return Response.json(
-			{
-				error: "Sync credential is no longer valid",
-				code:
-					usability.code === "SYNC_CREDENTIAL_REVOKED"
-						? "SYNC_CREDENTIAL_REVOKED"
-						: "SYNC_SESSION_TERMINAL",
-			},
-			{ status: 401 },
-		);
-	}
-
-	// Ownership flows through the credential owner; the codebase must still exist
-	// and belong to that owner.
-	const [codebase] = await db
-		.select({
-			id: codebases.id,
-			userId: codebases.userId,
-			name: codebases.name,
-			nameSource: codebases.nameSource,
-			repositoryIdentity: codebases.repositoryIdentity,
-		})
-		.from(codebases)
-		.where(eq(codebases.id, codebaseId))
-		.limit(1);
-	if (!codebase || codebase.userId !== session.userId)
-		return Response.json(
-			{
-				error: "Invalid sync credential",
-				code: "INVALID_SYNC_CREDENTIAL",
-			},
-			{ status: 401 },
-		);
+	// Credential resolution is shared with the connect announcement, so both
+	// boundaries answer "may this CLI act on this codebase" identically.
+	const access = await resolveCliSyncAccess({ request, codebaseId });
+	if (!access.ok) return access.response;
+	const { session, codebase } = access;
 
 	const body = await request.json().catch(() => null);
 	const parsedBody = cliHandshakeRequestSchema.safeParse(body);
@@ -136,20 +53,14 @@ export async function handleCodebaseSyncHandshake(input: {
 	// malformed CLI is rejected here before any session state changes. The
 	// recorded version is re-checked on every upload/complete request. 426 is
 	// non-retryable for the CLI.
-	try {
-		requireSupportedCliVersion(
-			parsedBody.data.cliVersion,
-			session.cliMinVersion,
-		);
-	} catch (error) {
-		return Response.json(
-			{
-				error: error instanceof Error ? error.message : "CLI update required",
-				code: "CLI_UPDATE_REQUIRED",
-			},
-			{ status: 426 },
-		);
-	}
+	const versionFailure = evaluateCliVersion(
+		session,
+		parsedBody.data.cliVersion,
+	);
+	if (versionFailure) return versionFailure;
+
+	const budgetFailure = await enforceCliSyncBudget(session);
+	if (budgetFailure) return budgetFailure;
 
 	// The CLI reports the repository folder name as soon as it has resolved the
 	// local root. Validation happens in exactly one place; `null` means "no
@@ -168,29 +79,6 @@ export async function handleCodebaseSyncHandshake(input: {
 			? parsedBody.data.repositoryIdentity
 			: null,
 	);
-
-	const [sub] = await db
-		.select({ plan: subscriptions.plan })
-		.from(subscriptions)
-		.where(eq(subscriptions.userId, session.userId))
-		.orderBy(desc(subscriptions.createdAt))
-		.limit(1);
-	const rawPlan = sub?.plan || "free";
-	// cast boundary: the runtime check above already restricts the value; the
-	// assertion only recovers the literal type `Array.includes` widens away.
-	const plan: Plan = ["free", "pro", "hengker"].includes(rawPlan)
-		? (rawPlan as Plan)
-		: "free";
-	const rateCheck = await checkRateLimit(
-		session.userId,
-		plan,
-		CODEBASE_SYNC_RATE_LIMIT_ACTION,
-	);
-	if (!rateCheck.allowed)
-		return Response.json(
-			{ error: "Too many requests", retryAfter: 60 },
-			{ status: 429 },
-		);
 
 	// Serialize handshake per session using advisory xact lock: concurrent
 	// handshake retries cannot race to create duplicate snapshots or

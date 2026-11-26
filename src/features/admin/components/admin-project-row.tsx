@@ -7,10 +7,10 @@ import type { AdminProjectItem } from "../types";
 
 function getProjectTargetRoute(
 	step: string | null | undefined,
-): "/prd/$id" | "/ac/$id" | "/task/$id" {
-	if (step === "task") return "/task/$id";
-	if (step === "ac") return "/ac/$id";
-	return "/prd/$id";
+): "/vibeplan/$id/prd" | "/vibeplan/$id/ac" | "/vibeplan/$id/task" {
+	if (step === "task") return "/vibeplan/$id/task";
+	if (step === "ac") return "/vibeplan/$id/ac";
+	return "/vibeplan/$id/prd";
 }
 
 export interface AdminProjectRowProps {

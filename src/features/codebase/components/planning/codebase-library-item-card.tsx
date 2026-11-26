@@ -20,7 +20,9 @@ import {
 	storePlanCodebaseStepPointer,
 } from "@/features/codebase/services/plan-storage";
 
-function formatLibraryDate(value: string | null): string | null {
+export const METADATA_SEPARATOR = " | ";
+
+export function formatLibraryDate(value: string | null): string | null {
 	if (!value) return null;
 	const date = new Date(value);
 	if (Number.isNaN(date.getTime())) return null;
@@ -31,6 +33,17 @@ function formatLibraryDate(value: string | null): string | null {
 		hour: "2-digit",
 		minute: "2-digit",
 	}).format(date);
+}
+
+export function formatLibraryMetadata(
+	item: Pick<CodebaseLibraryItem, "fileCount" | "planCount">,
+	displayDate: string | null,
+): string[] {
+	return [
+		item.fileCount !== null ? `${item.fileCount} file` : null,
+		item.planCount > 0 ? `${item.planCount} rencana fitur` : null,
+		displayDate ? `Diperbarui ${displayDate}` : null,
+	].filter((part): part is string => part !== null && part.trim().length > 0);
 }
 
 /**
@@ -71,11 +84,8 @@ export function CodebaseLibraryItemCard({
 	const status = CODEBASE_LIBRARY_STATUS_LABELS[statusKey];
 	const action = resolveLibraryItemAction(item);
 	const isAttention = statusKey === "needs_analysis";
-	const metaParts = [
-		item.fileCount !== null ? `${item.fileCount} file` : null,
-		item.planCount > 0 ? `${item.planCount} fitur plan` : null,
-		displayDate ? `Terakhir diperbarui ${displayDate}` : null,
-	].filter((part): part is string => part !== null);
+	const isActionableStatus = statusKey !== "ready";
+	const metaParts = formatLibraryMetadata(item, displayDate);
 	const cardClassName =
 		"flex min-w-0 flex-1 flex-col gap-2 rounded-xl p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo";
 
@@ -85,11 +95,13 @@ export function CodebaseLibraryItemCard({
 				<span className="truncate text-base font-medium text-snow">
 					{item.name}
 				</span>
-				<span
-					className={`shrink-0 text-xs ${isAttention ? "text-crimson" : "text-fog"}`}
-				>
-					{status}
-				</span>
+				{isActionableStatus ? (
+					<span
+						className={`shrink-0 text-xs ${isAttention ? "text-crimson" : "text-fog"}`}
+					>
+						{status}
+					</span>
+				) : null}
 			</span>
 			{item.summary ? (
 				<span className="line-clamp-2 text-sm leading-6 text-fog">
@@ -97,9 +109,15 @@ export function CodebaseLibraryItemCard({
 				</span>
 			) : null}
 			{stack.length > 0 ? (
-				<span className="text-xs text-slate">{stack.join(" · ")}</span>
+				<span className="text-xs text-slate">
+					{stack.join(METADATA_SEPARATOR)}
+				</span>
 			) : null}
-			<span className="text-[11px] text-slate">{metaParts.join(" · ")}</span>
+			{metaParts.length > 0 ? (
+				<span className="text-[11px] text-slate">
+					{metaParts.join(METADATA_SEPARATOR)}
+				</span>
+			) : null}
 			{selectionActive ? null : (
 				<span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-snow">
 					{action.label}
