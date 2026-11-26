@@ -160,16 +160,16 @@ describe("KanbanBoard", () => {
 		const c = renderBoard();
 
 		await vi.waitFor(() => {
-			expect(c.textContent).toContain("Kanban - Test Kanban App");
+			// The merged header states the board title, then the CLI status line.
+			expect(c.textContent).toContain("Kanban");
 			expect(c.textContent).toContain(
 				"Belum ada update status. Jalankan everythings-vibe CLI untuk update otomatis",
 			);
 		});
 
-		// Header contains both title and status within <header>
 		const header = c.querySelector("header");
 		expect(header).toBeDefined();
-		expect(header?.textContent).toContain("Kanban - Test Kanban App");
+		expect(header?.textContent).toContain("Kanban");
 		expect(header?.textContent).toContain(
 			"Belum ada update status. Jalankan everythings-vibe CLI untuk update otomatis",
 		);
