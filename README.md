@@ -415,13 +415,15 @@ Deploy a persistent Node worker from the same source revision alongside the web 
 pnpm studio:worker
 ```
 
-Skill Markdown and CSV sources are pinned by SHA-256 in the skill manifest.
-`pnpm studio:assets` verifies them and regenerates the committed TypeScript asset
-module used by both Node and SSR; no runtime filesystem paths or Vite loaders are
-needed after bundling. Development and worker scripts prepare it automatically.
-CI must run `pnpm test` or `pnpm build`: both reject stale generated assets rather
-than silently repairing them. After intentionally updating pinned sources and the
-manifest, run `pnpm studio:assets` and commit the generated module together.
+The selectable Studio design skills (and the pinned Markdown/CSV sources they
+were generated from) were retired in P7. Studio now composes one mandatory
+internal standard — the base quality contract plus the platform and product
+contracts — and takes its visual direction only from the built-in themes, an
+uploaded `DESIGN.md`, or a VibeScrape reference. There is no generated asset
+module, no `studio:assets` step and no stale-asset gate; `pnpm test` and
+`pnpm build` no longer prepare or verify anything before running. Historic
+projects keep loading because their rows are read as-is; see
+`docs/prompt-design-studio/p7-implementation.md`.
 
 Install the existing `tsx` dependency on the worker host (including dev dependencies),
 provide the same `DATABASE_URL` and AI router configuration as the web app, and

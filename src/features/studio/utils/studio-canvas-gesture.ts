@@ -1,80 +1,44 @@
-export interface WheelGestureLike {
+import { WHEEL_LINE_HEIGHT_PX } from "@/lib/constants";
+
+export interface WheelPanInput {
 	deltaX: number;
 	deltaY: number;
 	deltaMode: number;
-	ctrlKey?: boolean;
-	metaKey?: boolean;
 }
 
-export type WheelGestureType = "zoom" | "pan";
+export interface WheelPanDelta {
+	x: number;
+	y: number;
+}
+
+function toPixels(delta: number, multiplier: number): number {
+	const pixels = delta * multiplier;
+	return Number.isFinite(pixels) ? pixels : 0;
+}
 
 /**
- * Minimum vertical pixel delta characteristic of a physical mouse wheel click notch.
- * Standard Windows/Linux/macOS mouse wheels emit notches of ~100-120px in pixel mode,
- * or line/page mode (deltaMode 1/2). Trackpad continuous scroll generates micro-deltas (1-15px)
- * or fractional sub-pixel values.
+ * Studio always treats the wheel as a pan on both axes. Hardware heuristics
+ * are deliberately absent: the same event can arrive from a mouse notch or a
+ * trackpad, and guessing wrong made scrolling jump the zoom level.
  */
-export const WHEEL_DISCRETE_NOTCH_THRESHOLD_PX = 40;
-
-/**
- * Classifies whether a wheel event represents an intentional zoom gesture or a pan.
- *
- * Policy:
- * 1. Ctrl / Cmd key pressed: Trackpad pinch-to-zoom or Ctrl+wheel -> "zoom".
- * 2. Non-zero deltaMode (DOM_DELTA_LINE or DOM_DELTA_PAGE): Physical mouse wheel
- *    notches reporting line or page steps -> "zoom" (unless purely horizontal, which pans).
- * 3. Horizontal component present (Math.abs(deltaX) > 0): Trackpad 2-finger scroll
- *    or horizontal pan -> "pan".
- * 4. Sub-pixel fractional delta (deltaY % 1 !== 0): High-precision continuous trackpad
- *    scrolling -> "pan".
- * 5. Discrete integer notch (deltaX === 0, Number.isInteger(deltaY), Math.abs(deltaY) >= 40):
- *    Physical mouse wheel click -> "zoom".
- * 6. Ambiguous micro-step (deltaX === 0, Math.abs(deltaY) < 40): Trackpad slow vertical
- *    scroll fallback -> "pan".
- */
-export function classifyWheelGesture(
-	event: WheelGestureLike,
-): WheelGestureType {
-	if (event.ctrlKey || event.metaKey) {
-		return "zoom";
-	}
-
-	// Line- or page-based delta mode is characteristic of physical mouse wheels.
-	if (event.deltaMode !== 0) {
-		if (event.deltaY !== 0) return "zoom";
-		if (event.deltaX !== 0) return "pan";
-		return "pan";
-	}
-
-	// Horizontal motion represents 2D trackpad scrolling or horizontal wheel pan.
-	if (Math.abs(event.deltaX) > 0) {
-		return "pan";
-	}
-
-	// Zero delta has no action.
-	if (event.deltaY === 0) {
-		return "pan";
-	}
-
-	// Sub-pixel fractional deltas are produced by continuous trackpads (macOS/Windows Precision).
-	if (!Number.isInteger(event.deltaY)) {
-		return "pan";
-	}
-
-	// Discrete integer steps characteristic of mouse wheel notches (e.g., 100, 120, -100).
-	if (Math.abs(event.deltaY) >= WHEEL_DISCRETE_NOTCH_THRESHOLD_PX) {
-		return "zoom";
-	}
-
-	// Ambiguous small integer micro-steps: fallback to pan to avoid jarring accidental zooms.
-	return "pan";
+export function normalizeWheelPanDelta(
+	event: WheelPanInput,
+	viewport: Pick<HTMLElement, "clientWidth" | "clientHeight">,
+): WheelPanDelta {
+	// Read deltaMode before the deltas; browsers can adjust their reported units.
+	const mode = event.deltaMode;
+	const scale = mode === 1 ? WHEEL_LINE_HEIGHT_PX : 1;
+	return {
+		x: toPixels(event.deltaX, mode === 2 ? viewport.clientWidth : scale),
+		y: toPixels(event.deltaY, mode === 2 ? viewport.clientHeight : scale),
+	};
 }
 
 /**
  * Canvas-owned gesture surfaces: hits that belong to the canvas itself even
  * though they are wrapped in a `<button>` for pointer and keyboard selection
- * (a frame artboard's hit area). Wheel zoom and pan must keep working while the
- * pointer is over them, exactly as they do over the bare background.
+ * (a frame artboard's hit area). Wheel pan must keep working while the pointer
+ * is over them, exactly as it does over the bare background.
  */
 export const CANVAS_GESTURE_SURFACE_SELECTOR = "[data-canvas-gesture-surface]";
 
@@ -100,7 +64,7 @@ export function isCanvasControlTarget(target: EventTarget | null): boolean {
 /**
  * Detects whether an event target is an interactive or scrollable overlay
  * (e.g. textarea, select, dialog, or scrollable container) where wheel scrolling
- * must not be intercepted by the canvas zoom/pan.
+ * must not be intercepted by the canvas pan.
  */
 export function isScrollableOrEditableTarget(
 	target: EventTarget | null,
@@ -110,14 +74,10 @@ export function isScrollableOrEditableTarget(
 
 	// A frame's selection hit area is a `<button>` only for keyboard and
 	// assistive-technology access; the pointer gesture over it belongs to the
-	// canvas, so it must neither block zoom nor count as a scrollable overlay.
-	if (target.closest(CANVAS_GESTURE_SURFACE_SELECTOR) !== null) {
-		return false;
-	}
+	// canvas, so it must neither block pan nor count as a scrollable overlay.
+	if (target.closest(CANVAS_GESTURE_SURFACE_SELECTOR) !== null) return false;
 
-	if (target.closest(CANVAS_CONTROL_SELECTOR) !== null) {
-		return true;
-	}
+	if (target.closest(CANVAS_CONTROL_SELECTOR) !== null) return true;
 
 	let current: Element | null = target;
 	while (current && current !== rootElement && current !== document.body) {
@@ -131,9 +91,7 @@ export function isScrollableOrEditableTarget(
 			(overflowX === "auto" || overflowX === "scroll") &&
 			current.scrollWidth > current.clientWidth;
 
-		if (canScrollY || canScrollX) {
-			return true;
-		}
+		if (canScrollY || canScrollX) return true;
 		current = current.parentElement;
 	}
 

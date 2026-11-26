@@ -21,7 +21,12 @@ function studioBackAriaLabel(
 	blueprint: StudioDesignBlueprint,
 	screen: string,
 ): string | null {
-	if (!isContextualScreenName(screen)) return null;
+	const navigationRole = blueprint.screenPlan.find(
+		(entry) => entry.name === screen,
+	)?.navigationRole;
+	if (navigationRole === "primary") return null;
+	if (navigationRole !== "contextual" && !isContextualScreenName(screen))
+		return null;
 	const activeId = blueprint.canonicalShell?.activeDestinations[screen];
 	if (!activeId) return "Kembali";
 	const index = blueprint.navigationContract.destinations.indexOf(activeId);
@@ -36,10 +41,13 @@ export function studioCanonicalNavigation(
 ): string {
 	const contract = blueprint.navigationContract;
 	const active = blueprint.canonicalShell?.activeDestinations[screen] ?? null;
+	const publicWebsite =
+		blueprint.productIdentity.layoutIntent === "public-website";
 	return `<nav data-studio-navigation aria-label="Navigasi utama">${contract.ordering
 		.map((id) => {
 			const index = contract.destinations.indexOf(id);
-			return `<a href="#" data-destination="${escapeStudioHtml(id)}"${id === active ? ' aria-current="page"' : ""}>${renderCanonicalIcon(contract.iconMapping[id] ?? "circle")}<span>${escapeStudioHtml(contract.labels[index] ?? id)}</span></a>`;
+			const cta = publicWebsite && contract.ctaDestination === id;
+			return `<a href="#" data-destination="${escapeStudioHtml(id)}"${cta ? " data-studio-cta" : ""}${id === active ? ' aria-current="page"' : ""}>${publicWebsite ? "" : renderCanonicalIcon(contract.iconMapping[id] ?? "circle")}<span>${escapeStudioHtml(contract.labels[index] ?? id)}</span></a>`;
 		})
 		.join("")}</nav>`;
 }
@@ -61,7 +69,12 @@ export function studioCanonicalHeader(
 		? `<img src="${escapeStudioHtml(logoUrl.trim())}" alt="Logo" width="32" height="32">`
 		: "";
 	if (shell?.navigation !== "bottom") {
-		return `<header data-studio-header data-studio-appbar="web"><div data-studio-brand>${logo}<strong>${escapeStudioHtml(blueprint.productIdentity.productName)}</strong></div><span data-studio-user aria-hidden="true">${renderCanonicalIcon("user")}</span></header>`;
+		const brand = `<div data-studio-brand>${logo}<strong>${escapeStudioHtml(blueprint.productIdentity.productName)}</strong></div>`;
+		if (blueprint.productIdentity.layoutIntent === "public-website") {
+			// Native disclosure keeps one link set usable without a React or script runtime.
+			return `<header data-studio-header data-studio-appbar="web"><div data-studio-header-inner>${brand}<details data-studio-menu><summary>Menu</summary>${studioCanonicalNavigation(blueprint, screen)}</details></div></header>`;
+		}
+		return `<header data-studio-header data-studio-appbar="web">${brand}</header>`;
 	}
 	const backLabel = studioBackAriaLabel(blueprint, screen);
 	const back = backLabel

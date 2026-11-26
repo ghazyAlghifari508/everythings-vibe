@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { StudioComposer } from "@/features/studio/components/composer/studio-composer";
 import {
-	buildPaletteConicGradient,
+	buildPaletteSegments,
 	filterValidHexColors,
 } from "@/features/studio/components/composer/studio-palette-disk";
 import { STUDIO_DESIGN_PRESETS } from "@/features/studio/services/studio-presets";
@@ -60,12 +60,22 @@ describe("FIX 06 — Replace Three Separate Theme Dots with One Multicolor Circu
 				amberPreset?.tokens.ink,
 			);
 
-			// Verify conic-gradient background contains Amber token colors
-			const bg = disk.style.backgroundImage;
-			expect(bg).toContain("conic-gradient");
-			expect(bg).toContain("120.00deg");
-			expect(bg).toContain("240.00deg");
-			expect(bg).toContain("360.00deg");
+			// Clipped SVG sectors paint the disk; no CSS border can cut the edge.
+			const svg = disk.querySelector("svg");
+			expect(svg).not.toBeNull();
+			expect(svg?.getAttribute("viewBox")).toBe("0 0 16 16");
+			expect(disk.className).not.toContain("border");
+			expect(disk.style.backgroundImage).toBe("");
+
+			const segments = disk.querySelectorAll("[data-segment]");
+			expect(segments.length).toBe(3);
+			expect(segments[0]?.getAttribute("fill")).toBe(
+				amberPreset?.tokens.canvas,
+			);
+			expect(segments[1]?.getAttribute("fill")).toBe(
+				amberPreset?.tokens.primary,
+			);
+			expect(segments[2]?.getAttribute("fill")).toBe(amberPreset?.tokens.ink);
 
 			// Accessible label mentions Amber and its colors
 			expect(disk.getAttribute("aria-label")).toContain("Amber");
@@ -136,11 +146,11 @@ describe("FIX 06 — Replace Three Separate Theme Dots with One Multicolor Circu
 			const disk = screen.getByTestId("studio-palette-disk");
 			const tokens = disk.querySelectorAll("[data-color]");
 			expect(tokens.length).toBe(4);
-			const bg = disk.style.backgroundImage;
-			expect(bg).toContain("90.00deg");
-			expect(bg).toContain("180.00deg");
-			expect(bg).toContain("270.00deg");
-			expect(bg).toContain("360.00deg");
+			const segments = disk.querySelectorAll("[data-segment]");
+			expect(segments.length).toBe(4);
+			expect(
+				[...segments].map((segment) => segment.getAttribute("fill")),
+			).toEqual(fourColors);
 		});
 
 		it("divides disk into 2 halves when 2 colors are extracted", () => {
@@ -157,9 +167,11 @@ describe("FIX 06 — Replace Three Separate Theme Dots with One Multicolor Circu
 			const disk = screen.getByTestId("studio-palette-disk");
 			const tokens = disk.querySelectorAll("[data-color]");
 			expect(tokens.length).toBe(2);
-			const bg = disk.style.backgroundImage;
-			expect(bg).toContain("180.00deg");
-			expect(bg).toContain("360.00deg");
+			const segments = disk.querySelectorAll("[data-segment]");
+			expect(segments.length).toBe(2);
+			expect(
+				[...segments].map((segment) => segment.getAttribute("fill")),
+			).toEqual(twoColors);
 		});
 	});
 
@@ -316,7 +328,7 @@ describe("FIX 06 — Replace Three Separate Theme Dots with One Multicolor Circu
 		});
 	});
 
-	describe("Utility functions: filterValidHexColors and buildPaletteConicGradient", () => {
+	describe("Utility functions: filterValidHexColors and buildPaletteSegments", () => {
 		it("filters hex colors strictly", () => {
 			expect(filterValidHexColors(null)).toEqual([]);
 			expect(filterValidHexColors([])).toEqual([]);
@@ -332,12 +344,17 @@ describe("FIX 06 — Replace Three Separate Theme Dots with One Multicolor Circu
 			).toEqual(["#fff", "#ffffff", "#12345678", "#abc"]);
 		});
 
-		it("builds correct conic gradient strings", () => {
-			expect(buildPaletteConicGradient([])).toBe("");
-			expect(buildPaletteConicGradient(["#123456"])).toBe("#123456");
-			expect(buildPaletteConicGradient(["#aaa", "#bbb"])).toBe(
-				"conic-gradient(from 0deg, #aaa 0.00deg 180.00deg, #bbb 180.00deg 360.00deg)",
-			);
+		it("builds one solid disk plus overlapping sectors for the remaining colors", () => {
+			expect(buildPaletteSegments([])).toEqual([]);
+			expect(buildPaletteSegments(["#123456"])).toEqual([
+				{ color: "#123456", path: null },
+			]);
+
+			const segments = buildPaletteSegments(["#aaa", "#bbb"]);
+			expect(segments).toHaveLength(2);
+			expect(segments[0]).toEqual({ color: "#aaa", path: null });
+			// The second sector starts before 180deg so the shared edge overlaps.
+			expect(segments[1]?.path).toContain("A 8 8 0 1 1");
 		});
 	});
 });

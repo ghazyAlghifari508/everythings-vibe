@@ -21,9 +21,11 @@ export function StudioFrameShimmer({
 			data-testid={viewport === "mobile" ? "mobile-shimmer" : "web-shimmer"}
 			data-frame-status={status}
 			aria-label={
-				status === "queued"
-					? "Menunggu antrean generate layar"
-					: "Layar sedang digenerate"
+				status === "preparing"
+					? "Menyiapkan dokumen HTML"
+					: status === "queued"
+						? "Menunggu antrean generate layar"
+						: "Layar sedang digenerate"
 			}
 			className={`studio-frame-shimmer block size-full ${className}`}
 		/>

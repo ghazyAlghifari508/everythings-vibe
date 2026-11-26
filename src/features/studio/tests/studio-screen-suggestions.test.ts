@@ -182,16 +182,17 @@ describe("deriveStudioScreenSuggestions", () => {
 			}),
 		);
 
-		expect(suggestions.map((suggestion) => suggestion.title)).toEqual([
-			"Buat halaman riwayat perjalanan",
-			"Rancang wishlist paket wisata",
-			"Tambahkan profil traveler",
+		expect(suggestions.map((suggestion) => suggestion.cardCopy)).toEqual([
+			"Simulasikan paket wisata yang kehabisan kuota",
+			"Uji validasi tanggal pulang sebelum tanggal berangkat",
+			"Rancang riwayat perjalanan dengan filter status",
 		]);
-		expect(suggestions.map((suggestion) => suggestion.reason)).toEqual([
+		expect(suggestions.map((suggestion) => suggestion.targetFrameName)).toEqual(
+			["Detail Paket", "Checkout", undefined],
+		);
+		expect(suggestions[2]?.reason).toBe(
 			'Alur aplikasi travel menyebut "wisata"',
-			'Alur aplikasi travel menyebut "wisata"',
-			'Alur aplikasi travel menyebut "wisata"',
-		]);
+		);
 	});
 
 	it("reads a finance project as a finance project, not a travel one", () => {
@@ -426,5 +427,176 @@ describe("suggestion revision cache", () => {
 		expect(after.map((suggestion) => suggestion.title)).not.toContain(
 			"Catat transaksi harian",
 		);
+	});
+});
+
+describe("contextual bubble suggestions", () => {
+	it("labels a travel project with the actions the next trip needs", () => {
+		const suggestions = deriveStudioScreenSuggestions(
+			context({
+				projectId: "trip-squad",
+				projectTitle: "Squad Trip",
+				designMode: "mobile",
+				prdContent:
+					"# Squad Trip\n\nAplikasi wisata untuk merencanakan perjalanan bersama: destinasi, festival lokal, dan pembagian biaya trip.",
+				frameNames: [
+					"Riwayat Perjalanan",
+					"Wishlist Paket Wisata",
+					"Profil Traveler",
+				],
+			}),
+		);
+
+		expect(suggestions.map((suggestion) => suggestion.cardCopy)).toEqual([
+			"Perjelas status pesanan pada riwayat perjalanan",
+			"Uji validasi data kontak yang belum lengkap",
+			"Buka jelajah destinasi dengan destinasi per wilayah dengan rekomendasi.",
+		]);
+		// The card shows a full sentence; the prompt behind it stays complete.
+		const explore = suggestions.find((suggestion) =>
+			suggestion.cardCopy.startsWith("Buka jelajah destinasi"),
+		);
+		expect(explore?.prompt).toContain("Buat satu halaman Jelajahi Destinasi");
+		expect(explore?.prompt).toContain("filter kategori");
+		expect(explore?.prompt).toContain("Jangan mengubah halaman lain.");
+	});
+
+	it("gives a coffee app order history, favourites and promos", () => {
+		const suggestions = deriveStudioScreenSuggestions(
+			context({
+				projectId: "kopi-senja",
+				projectTitle: "Kopi Senja",
+				designMode: "mobile",
+				prdContent:
+					"# Kopi Senja\n\nAplikasi kedai kopi: pesan menu, simpan favorit, dan pakai promo.",
+				frameNames: ["Beranda", "Menu"],
+			}),
+		);
+
+		expect(suggestions.map((suggestion) => suggestion.cardCopy)).toEqual([
+			"Lihat riwayat pesanan dengan status yang jelas",
+			"Simpan favorit kopi dengan menu favorit, catatan rasa, dan pesan cepat.",
+			"Kelola detail promo dengan voucher aktif, syarat, dan masa berlaku.",
+		]);
+	});
+
+	it("gives a portfolio the case study, experience and contact screens", () => {
+		const suggestions = deriveStudioScreenSuggestions(
+			context({
+				projectId: "raka-studio",
+				projectTitle: "Raka Studio",
+				designMode: "web",
+				prdContent:
+					"# Raka Studio\n\nPortofolio desainer produk: studi kasus, pengalaman kerja, dan kontak.",
+				frameNames: ["Beranda"],
+			}),
+		);
+
+		expect(suggestions.map((suggestion) => suggestion.cardCopy)).toEqual([
+			"Perbesar visual proyek pada tampilan beranda",
+			"Rancang detail studi kasus yang menonjolkan hasil proyek",
+			"Tambahkan formulir kontak untuk peluang kerja remote",
+		]);
+	});
+
+	it("names the audience and the platform inside the prompt", () => {
+		const web = deriveStudioScreenSuggestions(
+			context({
+				designMode: "web",
+				frameNames: ["Dashboard"],
+				blueprint: BLUEPRINT,
+			}),
+		)[0];
+		const mobile = deriveStudioScreenSuggestions(
+			context({
+				designMode: "mobile",
+				frameNames: ["Dashboard"],
+				blueprint: BLUEPRINT,
+			}),
+		)[0];
+
+		expect(web?.prompt).toContain("Sasarannya Pemilik warung.");
+		expect(web?.prompt).not.toContain("tata letak mobile");
+		expect(mobile?.prompt).toContain("tata letak mobile satu kolom");
+	});
+
+	it("proposes the step after a screen the canvas already has", () => {
+		const suggestions = deriveStudioScreenSuggestions(
+			context({ frameNames: ["Katalog"] }),
+		);
+		const copies = suggestions.map((suggestion) => suggestion.cardCopy);
+
+		// "Katalog" alone never says what comes next; the journey gap does.
+		expect(copies.slice(0, 2)).toEqual([
+			"Periksa keranjang sebelum melanjutkan pemesanan",
+			"Selesaikan pembayaran dengan ringkasan yang jelas",
+		]);
+		expect(suggestions[0]?.reason).toBe('Alur lanjutan dari layar "Katalog"');
+	});
+
+	it("never shows the same action phrase twice", () => {
+		const cases = [
+			context({ frameNames: ["Beranda"], prdContent: PRD }),
+			context({
+				frameNames: ["Dashboard"],
+				blueprint: BLUEPRINT,
+			}),
+			context({
+				projectTitle: "Kopi Senja",
+				prdContent: "Aplikasi kedai kopi: pesan menu, favorit, promo.",
+			}),
+		];
+		for (const input of cases) {
+			const copies = deriveStudioScreenSuggestions(input).map(
+				(suggestion) => suggestion.cardCopy,
+			);
+			expect(new Set(copies).size).toBe(copies.length);
+			// A card is an action sentence, never a bare page noun.
+			for (const copy of copies) {
+				expect(copy.trim()).toBeTruthy();
+				expect(copy).not.toMatch(/^(Halaman|Buat halaman)\b/i);
+			}
+		}
+	});
+});
+
+describe("conversation-aware suggestion cache", () => {
+	it("re-derives the row when the user's own brief changes", () => {
+		const base = studioSuggestionRevision(context({ frameNames: ["Beranda"] }));
+		expect(
+			studioSuggestionRevision(
+				context({
+					frameNames: ["Beranda"],
+					projectBrief: "Aplikasi kedai kopi untuk memesan menu.",
+				}),
+			),
+		).not.toBe(base);
+		expect(studioSuggestionRevision(context({ frameNames: ["Beranda"] }))).toBe(
+			base,
+		);
+	});
+
+	it("reads the domain from the brief before any frame exists", () => {
+		const fromBrief = deriveStudioScreenSuggestions(
+			context({
+				projectTitle: "Tanpa Judul",
+				projectBrief:
+					"Tolong buatkan aplikasi kedai kopi untuk memesan menu dan menyimpan favorit.",
+			}),
+		);
+		expect(fromBrief[0]?.cardCopy).toBe(
+			"Lihat riwayat pesanan dengan status yang jelas",
+		);
+	});
+
+	it("reuses one list instance while the conversation is unchanged", () => {
+		const input = context({
+			frameNames: ["Beranda"],
+			prdContent: PRD,
+			projectBrief: "Aplikasi dompet untuk mencatat pengeluaran.",
+		});
+		const first = getStudioScreenSuggestions(input);
+		const again = getStudioScreenSuggestions({ ...input });
+		expect(again).toBe(first);
 	});
 });

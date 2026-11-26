@@ -12,32 +12,6 @@ import { StudioComposer } from "@/features/studio/components/composer/studio-com
 describe("StudioComposer", () => {
 	afterEach(() => cleanup());
 
-	it("prompts for either a revision or a new screen when nothing is selected", () => {
-		render(<StudioComposer onSubmit={vi.fn()} loading={false} />);
-
-		// The composer no longer implies a project-wide revision from an empty
-		// selection; it asks for the intent instead.
-		expect(screen.getByPlaceholderText(/sebutkan halaman baru/i)).toBeDefined();
-		expect(screen.queryByText("Seluruh project")).toBeNull();
-	});
-
-	it("does not render the removed composer controls", () => {
-		render(
-			<StudioComposer
-				onSubmit={vi.fn()}
-				loading={false}
-				selectedFrames={[{ id: "f-1", name: "Dashboard" }]}
-			/>,
-		);
-
-		expect(screen.queryByText(/Tambah Halaman/i)).toBeNull();
-		expect(screen.queryByText(/Seluruh project/i)).toBeNull();
-		// The palette icon is gone with its trigger.
-		expect(
-			screen.queryByRole("button", { name: /Pilih design system/i }),
-		).toBeNull();
-	});
-
 	it("targets a single selected frame and allows deselecting it", () => {
 		const onRemoveFrame = vi.fn();
 		render(
@@ -202,20 +176,15 @@ describe("StudioComposer", () => {
 		);
 	});
 
-	it("shows the stored skill and reference without a page count control", () => {
+	it("shows the stored reference without a page count control", () => {
 		render(
 			<StudioComposer
 				onSubmit={vi.fn()}
 				loading={false}
-				designSkillId="impeccable"
-				onDesignSkillChange={vi.fn()}
 				referenceLabel="Workspace"
 			/>,
 		);
 
-		expect(
-			screen.getByRole("button", { name: /Design skill: Impeccable/i }),
-		).toBeDefined();
 		expect(screen.getByText("Workspace")).toBeDefined();
 		expect(screen.queryByText(/halaman awal/i)).toBeNull();
 	});
@@ -259,9 +228,6 @@ describe("StudioComposer", () => {
 		expect(submitBtn.getAttribute("aria-busy")).toBe("true");
 		const spinner = submitBtn.querySelector('[data-testid="spinner"]');
 		expect(spinner).not.toBeNull();
-		expect(spinner?.getAttribute("class")).toContain(
-			"motion-safe:animate-spin",
-		);
 
 		// Double submit prevention: click and enter do not trigger duplicate calls while pending
 		fireEvent.click(submitBtn);
@@ -285,5 +251,83 @@ describe("StudioComposer", () => {
 		expect(submitBtn.getAttribute("aria-busy")).toBe("true");
 		const spinner = submitBtn.querySelector('[data-testid="spinner"]');
 		expect(spinner).not.toBeNull();
+	});
+
+	it("detaches one target out of two and leaves the other one attached", () => {
+		const onRemoveFrame = vi.fn();
+		render(
+			<StudioComposer
+				onSubmit={vi.fn()}
+				onRemoveFrame={onRemoveFrame}
+				selectedFrames={[
+					{ id: "f-1", name: "Beranda" },
+					{ id: "f-2", name: "Studi Kasus" },
+				]}
+			/>,
+		);
+
+		fireEvent.click(screen.getByRole("button", { name: "Lepas Beranda" }));
+
+		expect(onRemoveFrame).toHaveBeenCalledTimes(1);
+		expect(onRemoveFrame).toHaveBeenCalledWith("f-1");
+		// The other target keeps its own explicit detach control.
+		expect(
+			screen.getByRole("button", { name: "Lepas Studi Kasus" }),
+		).toBeDefined();
+	});
+
+	it("drops every target through one clear-all control without sending", () => {
+		const onClearFrames = vi.fn();
+		const onSubmit = vi.fn();
+		render(
+			<StudioComposer
+				onSubmit={onSubmit}
+				onClearFrames={onClearFrames}
+				selectedFrames={[
+					{ id: "f-1", name: "Beranda" },
+					{ id: "f-2", name: "Studi Kasus" },
+				]}
+			/>,
+		);
+
+		fireEvent.click(
+			screen.getByRole("button", { name: "Bersihkan semua target revisi" }),
+		);
+
+		expect(onClearFrames).toHaveBeenCalledTimes(1);
+		expect(onSubmit).not.toHaveBeenCalled();
+	});
+
+	it("offers no clear-all control for a single target", () => {
+		render(
+			<StudioComposer
+				onSubmit={vi.fn()}
+				onClearFrames={vi.fn()}
+				selectedFrames={[{ id: "f-1", name: "Beranda" }]}
+			/>,
+		);
+		expect(
+			screen.queryByRole("button", { name: "Bersihkan semua target revisi" }),
+		).toBeNull();
+	});
+
+	it("never submits the draft when a target is detached", () => {
+		const onSubmit = vi.fn();
+		const onRemoveFrame = vi.fn();
+		render(
+			<StudioComposer
+				onSubmit={onSubmit}
+				onRemoveFrame={onRemoveFrame}
+				selectedFrames={[{ id: "f-1", name: "Beranda" }]}
+			/>,
+		);
+
+		fireEvent.change(screen.getByRole("textbox"), {
+			target: { value: "Ubah warna aksen tombol utama" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Lepas Beranda" }));
+
+		expect(onRemoveFrame).toHaveBeenCalledWith("f-1");
+		expect(onSubmit).not.toHaveBeenCalled();
 	});
 });

@@ -85,6 +85,7 @@ import { Route as ApiStudioProjectRouteImport } from './routes/api/studio.projec
 import { Route as ApiTaskProjectIdRouteImport } from './routes/api/task/$projectId'
 import { Route as ApiTaskGenerateRouteImport } from './routes/api/task/generate'
 import { Route as ApiUserPlanRouteImport } from './routes/api/user/plan'
+import { Route as DesignIdPreviewRouteImport } from './routes/design/$id_.preview'
 import { Route as DesignScrapIndexRouteImport } from './routes/design/scrap.index'
 import { Route as DesignScrapIdRouteImport } from './routes/design/scrap.$id'
 import { Route as DesignScrapHistoryRouteImport } from './routes/design/scrap.history'
@@ -510,6 +511,11 @@ const ApiUserPlanRoute = ApiUserPlanRouteImport.update({
   path: '/api/user/plan',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DesignIdPreviewRoute = DesignIdPreviewRouteImport.update({
+  id: '/design/$id_/preview',
+  path: '/design/$id/preview',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DesignScrapIndexRoute = DesignScrapIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -825,6 +831,7 @@ export interface FileRoutesByFullPath {
   '/api/task/$projectId': typeof ApiTaskProjectIdRoute
   '/api/task/generate': typeof ApiTaskGenerateRoute
   '/api/user/plan': typeof ApiUserPlanRoute
+  '/design/$id/preview': typeof DesignIdPreviewRoute
   '/design/scrap/$id': typeof DesignScrapIdRoute
   '/design/scrap/history': typeof DesignScrapHistoryRoute
   '/prd/share/$token': typeof PrdShareTokenRoute
@@ -941,6 +948,7 @@ export interface FileRoutesByTo {
   '/api/task/$projectId': typeof ApiTaskProjectIdRoute
   '/api/task/generate': typeof ApiTaskGenerateRoute
   '/api/user/plan': typeof ApiUserPlanRoute
+  '/design/$id/preview': typeof DesignIdPreviewRoute
   '/design/scrap/$id': typeof DesignScrapIdRoute
   '/design/scrap/history': typeof DesignScrapHistoryRoute
   '/prd/share/$token': typeof PrdShareTokenRoute
@@ -1064,6 +1072,7 @@ export interface FileRoutesById {
   '/api/task/$projectId': typeof ApiTaskProjectIdRoute
   '/api/task/generate': typeof ApiTaskGenerateRoute
   '/api/user/plan': typeof ApiUserPlanRoute
+  '/design/$id_/preview': typeof DesignIdPreviewRoute
   '/design/scrap/$id': typeof DesignScrapIdRoute
   '/design/scrap/history': typeof DesignScrapHistoryRoute
   '/prd/share/$token': typeof PrdShareTokenRoute
@@ -1188,6 +1197,7 @@ export interface FileRouteTypes {
     | '/api/task/$projectId'
     | '/api/task/generate'
     | '/api/user/plan'
+    | '/design/$id/preview'
     | '/design/scrap/$id'
     | '/design/scrap/history'
     | '/prd/share/$token'
@@ -1304,6 +1314,7 @@ export interface FileRouteTypes {
     | '/api/task/$projectId'
     | '/api/task/generate'
     | '/api/user/plan'
+    | '/design/$id/preview'
     | '/design/scrap/$id'
     | '/design/scrap/history'
     | '/prd/share/$token'
@@ -1426,6 +1437,7 @@ export interface FileRouteTypes {
     | '/api/task/$projectId'
     | '/api/task/generate'
     | '/api/user/plan'
+    | '/design/$id_/preview'
     | '/design/scrap/$id'
     | '/design/scrap/history'
     | '/prd/share/$token'
@@ -1530,6 +1542,7 @@ export interface RootRouteChildren {
   ApiTaskProjectIdRoute: typeof ApiTaskProjectIdRoute
   ApiTaskGenerateRoute: typeof ApiTaskGenerateRoute
   ApiUserPlanRoute: typeof ApiUserPlanRoute
+  DesignIdPreviewRoute: typeof DesignIdPreviewRoute
   PrdShareTokenRoute: typeof PrdShareTokenRoute
   ApiCodebasesIndexRoute: typeof ApiCodebasesIndexRoute
   ApiProjectsIndexRoute: typeof ApiProjectsIndexRoute
@@ -2080,6 +2093,13 @@ declare module '@tanstack/react-router' {
       path: '/api/user/plan'
       fullPath: '/api/user/plan'
       preLoaderRoute: typeof ApiUserPlanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/design/$id_/preview': {
+      id: '/design/$id_/preview'
+      path: '/design/$id/preview'
+      fullPath: '/design/$id/preview'
+      preLoaderRoute: typeof DesignIdPreviewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/design/scrap/': {
@@ -2662,6 +2682,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTaskProjectIdRoute: ApiTaskProjectIdRoute,
   ApiTaskGenerateRoute: ApiTaskGenerateRoute,
   ApiUserPlanRoute: ApiUserPlanRoute,
+  DesignIdPreviewRoute: DesignIdPreviewRoute,
   PrdShareTokenRoute: PrdShareTokenRoute,
   ApiCodebasesIndexRoute: ApiCodebasesIndexRoute,
   ApiProjectsIndexRoute: ApiProjectsIndexRoute,

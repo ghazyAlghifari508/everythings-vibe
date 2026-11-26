@@ -477,3 +477,25 @@ a {
   }
 }
 
+
+/* Mobile chat drawer: Radix keeps it mounted until the exit animation ends. */
+@keyframes studioChatIn {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes studioChatOut {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(-12px); }
+}
+@keyframes studioChatFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.studio-chat-drawer[data-state="open"] { animation: studioChatIn 200ms ease-out both; }
+.studio-chat-drawer[data-state="closed"] { animation: studioChatOut 160ms ease-in both; }
+.studio-chat-scrim[data-state="open"] { animation: studioChatFade 200ms ease-out both; }
+.studio-chat-scrim[data-state="closed"] { animation: studioChatFade 160ms ease-in reverse both; }
+@media (prefers-reduced-motion: reduce) {
+  .studio-chat-drawer[data-state],
+  .studio-chat-scrim[data-state] { animation: none; }
+}

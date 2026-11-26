@@ -55,6 +55,8 @@ vi.mock("@/lib/services/ai-orchestrator", () => ({
 						targetAudience: "Umum",
 						platform: isMobile ? "mobile" : "web",
 						visualDirection: "Bersih",
+						brandTone: "Calm",
+						layoutIntent: isMobile ? "mobile-application" : "public-website",
 					},
 					designTokens: {
 						primary: "#8ed462",
@@ -69,6 +71,12 @@ vi.mock("@/lib/services/ai-orchestrator", () => ({
 						border: "1px solid #d3d3d3",
 						elevation: "none",
 					},
+					layout: {
+						gutter: 24,
+						contentMaxWidth: isMobile ? 390 : 1120,
+						spacing: [4, 8, 16, 24],
+						typography: [14, 16, 24, 32],
+					},
 					sharedComponents: {
 						header: "Bar",
 						navigation: "Tabs",
@@ -77,6 +85,7 @@ vi.mock("@/lib/services/ai-orchestrator", () => ({
 						cards: "12px",
 						tabs: "Seg",
 						icons: "Lucide",
+						media: "No media needed",
 					},
 					navigationContract: {
 						destinations,
@@ -89,6 +98,15 @@ vi.mock("@/lib/services/ai-orchestrator", () => ({
 						name: s.name,
 						role: s.description,
 						order: s.order,
+						navigationRole: "primary",
+						composition: {
+							primaryTask: s.description,
+							layout: isMobile ? "summary" : "editorial",
+							hierarchy: ["Task content"],
+							patterns: [],
+							responsive: "reflow",
+							media: "none",
+						},
 					})),
 				},
 			});

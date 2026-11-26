@@ -54,6 +54,7 @@ services:
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET}
       NINE_ROUTER_URL: ${NINE_ROUTER_URL:-http://localhost:20128}
       NINE_ROUTER_API_KEY: ${NINE_ROUTER_API_KEY:-}
+      STUDIO_PEXELS_API_KEY: ${STUDIO_PEXELS_API_KEY:-}
     profiles: ["workers"]
     depends_on:
       web:

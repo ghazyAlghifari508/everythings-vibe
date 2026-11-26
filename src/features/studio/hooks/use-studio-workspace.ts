@@ -1,27 +1,33 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { z } from "zod";
 import type {
 	StudioFrameRow,
 	StudioJobRow,
+	StudioMessageRow,
 	StudioProjectRow,
 } from "@/db/schema";
 import type { StudioComposerSubmitResult } from "@/features/studio/components/composer/studio-composer";
 import { useStudioPlanningRetry } from "@/features/studio/hooks/use-studio-planning-retry";
-import { useStudioScreenSuggestions } from "@/features/studio/hooks/use-studio-screen-suggestions";
 import { useStudioStatus } from "@/features/studio/hooks/use-studio-status";
 import { useStudioWorkspaceActions } from "@/features/studio/hooks/use-studio-workspace-actions";
+import {
+	readStudioChatStorage,
+	writeStudioChatStorage,
+} from "@/features/studio/services/studio-chat-storage";
 import { extractDesignSystemTokens } from "@/features/studio/services/studio-design-tokens";
-import type { StudioDesignSkillId } from "@/features/studio/services/studio-generation-options";
 import { STUDIO_DESIGN_PRESETS } from "@/features/studio/services/studio-presets";
-import type { StudioScreenSuggestion } from "@/features/studio/services/studio-screen-suggestions";
 import type { StudioDetailLoaderData } from "@/features/studio/types/studio";
+import type { StudioStatus } from "@/features/studio/types/studio-status";
+import { pruneStudioFrameSelection } from "@/features/studio/utils/studio-frame-selection";
 import { deriveStudioLifecycle } from "@/features/studio/utils/studio-lifecycle";
 
-const NO_SUGGESTIONS: readonly StudioScreenSuggestion[] = [];
+const selectedFrameIdsSchema = z.array(z.string().min(1));
 
 export interface StudioWorkspaceState {
 	project: StudioProjectRow;
 	frames: StudioFrameRow[];
 	activeJob: StudioJobRow | null;
+	messages: StudioMessageRow[];
 	selectedFrameId: string | null;
 	selectedFrameIds: string[];
 	selectedFrames: StudioFrameRow[];
@@ -40,11 +46,12 @@ export interface StudioWorkspaceState {
 	readyFramesCount: number;
 	storedReferenceLabel: string | null;
 	storedReferenceColors: readonly string[] | null;
-	/** Empty while work is in flight; a new screen is already on its way. */
-	suggestions: readonly StudioScreenSuggestion[];
+	/** Attaches exactly one live frame by name; null clears composer targets. */
+	selectTargetFrameByName: (frameName: string | null) => void;
 	selectFrame: (id: string | null, additive?: boolean) => void;
 	selectFrames: (ids: string[]) => void;
 	removeSelectedFrame: (id: string) => void;
+	clearSelectedFrames: () => void;
 	setError: (message: string) => void;
 	handleDuplicate: () => Promise<void>;
 	handleDelete: () => Promise<void>;
@@ -52,10 +59,18 @@ export interface StudioWorkspaceState {
 	handleComposerSubmit: (
 		promptText: string,
 	) => Promise<StudioComposerSubmitResult>;
-	handleSkillChange: (skillId: StudioDesignSkillId) => Promise<void>;
 	handleRetryFrame: (frameId: string) => Promise<void>;
 	handleRetryPlanning: () => Promise<void>;
 	handleDownloadAllZip: () => Promise<void>;
+	syncProjectStatus: (
+		onSuccess?: (status: StudioStatus) => void,
+	) => Promise<void>;
+	publishCommitted: (
+		projectId: string,
+		frameId: string,
+		revision: number,
+		html: string,
+	) => void;
 }
 
 export function useStudioWorkspace(
@@ -65,14 +80,17 @@ export function useStudioWorkspace(
 		project,
 		frames,
 		activeJob,
+		messages,
 		isProcessing,
 		syncProjectStatus,
+		publishCommitted,
 		error: syncError,
 		clearError: clearSyncError,
 	} = useStudioStatus(initialData);
 	const lifecycle = deriveStudioLifecycle({ project, frames, activeJob });
-	const [selectedFrameId, setSelectedFrameId] = useState<string | null>(null);
 	const [selectedFrameIds, setSelectedFrameIds] = useState<string[]>([]);
+	const selectedFrameId =
+		selectedFrameIds.length === 1 ? selectedFrameIds[0] : null;
 	const [error, setActionError] = useState("");
 	const setError = useCallback(
 		(message: string) => {
@@ -85,12 +103,30 @@ export function useStudioWorkspace(
 	useEffect(() => {
 		if (loader.current === initialData) return;
 		if (loader.current.project.id !== initialData.project.id) {
-			setSelectedFrameId(null);
 			setSelectedFrameIds([]);
 		}
 		loader.current = initialData;
 		setActionError("");
 	}, [initialData]);
+
+	const selectionKey = `studio-chat-selection:${project.userId}:${project.id}`;
+	const [loadedSelectionKey, setLoadedSelectionKey] = useState("");
+	useEffect(() => {
+		let stored: unknown = [];
+		try {
+			stored = JSON.parse(readStudioChatStorage(selectionKey) ?? "[]");
+		} catch {
+			stored = [];
+		}
+		const parsed = selectedFrameIdsSchema.safeParse(stored);
+		const ids = parsed.success ? [...new Set(parsed.data)] : [];
+		setSelectedFrameIds(ids);
+		setLoadedSelectionKey(selectionKey);
+	}, [selectionKey]);
+	useEffect(() => {
+		if (loadedSelectionKey === selectionKey)
+			writeStudioChatStorage(selectionKey, JSON.stringify(selectedFrameIds));
+	}, [loadedSelectionKey, selectionKey, selectedFrameIds]);
 
 	const selectFrame = useCallback((id: string | null, additive = false) => {
 		setSelectedFrameIds((previous) =>
@@ -102,7 +138,6 @@ export function useStudioWorkspace(
 						: [...previous, id]
 					: [id],
 		);
-		setSelectedFrameId(additive ? null : id);
 	}, []);
 
 	// Marquee selection reports the whole id set at once. Deduping and keeping
@@ -111,19 +146,12 @@ export function useStudioWorkspace(
 	const selectFrames = useCallback((ids: string[]) => {
 		const unique = [...new Set(ids)];
 		setSelectedFrameIds(unique);
-		setSelectedFrameId(unique.length === 1 ? unique[0] : null);
 	}, []);
 
 	const readyFramesCount = useMemo(
 		() => frames.filter((f) => f.status === "ready").length,
 		[frames],
 	);
-
-	const projectSuggestions = useStudioScreenSuggestions(project, frames);
-	// While a job is running the project is mid-plan, and a next-screen request
-	// would race the planning step that rewrites the frame list. Suggestions
-	// come back as soon as the canvas is idle again.
-	const suggestions = isProcessing ? NO_SUGGESTIONS : projectSuggestions;
 
 	// Derived selection state must keep a stable identity: a fresh array on
 	// every poll tick would re-render the composer even when nothing changed.
@@ -134,14 +162,43 @@ export function useStudioWorkspace(
 
 	const removeSelectedFrame = useCallback((id: string) => {
 		setSelectedFrameIds((previous) => previous.filter((entry) => entry !== id));
-		setSelectedFrameId((previous) => (previous === id ? null : previous));
 	}, []);
+
+	const clearSelectedFrames = useCallback(() => {
+		setSelectedFrameIds([]);
+	}, []);
+
+	// A card may only attach a frame that actually exists. An unknown name
+	// clears the attachment instead of sending a stale target to the server.
+	const selectTargetFrameByName = useCallback(
+		(frameName: string | null) => {
+			if (!frameName) {
+				clearSelectedFrames();
+				return;
+			}
+			const frame = frames.find((entry) => entry.name === frameName);
+			if (frame) selectFrame(frame.id);
+			else clearSelectedFrames();
+		},
+		[clearSelectedFrames, frames, selectFrame],
+	);
+
+	// A frame row can be replaced (planning rewrites its slots) or deleted while
+	// its id is still selected. The operation endpoint refuses an unknown target,
+	// so a stale id would reject every selected-frame request while the composer
+	// showed no chip to remove. Pruning keeps targets and canvas in step; both
+	// setters bail out when nothing changed, so a poll never re-renders.
+	const liveFrameIds = useMemo(() => frames.map((frame) => frame.id), [frames]);
+	useEffect(() => {
+		setSelectedFrameIds((previous) =>
+			pruneStudioFrameSelection(previous, liveFrameIds),
+		);
+	}, [liveFrameIds]);
 
 	const actions = useStudioWorkspaceActions({
 		project,
 		frames,
 		selectedFrameIds,
-		isProcessing,
 		syncProjectStatus,
 		setError,
 	});
@@ -201,6 +258,7 @@ export function useStudioWorkspace(
 		project,
 		frames,
 		activeJob,
+		messages: messages ?? [],
 		selectedFrameId,
 		selectedFrameIds,
 		selectedFrames,
@@ -217,18 +275,20 @@ export function useStudioWorkspace(
 		readyFramesCount,
 		storedReferenceLabel,
 		storedReferenceColors,
-		suggestions,
+		selectTargetFrameByName,
 		selectFrame,
 		selectFrames,
 		removeSelectedFrame,
+		clearSelectedFrames,
 		setError,
 		handleDuplicate: actions.handleDuplicate,
 		handleDelete: actions.handleDelete,
 		handleRename: actions.handleRename,
 		handleComposerSubmit: actions.handleComposerSubmit,
-		handleSkillChange: actions.handleSkillChange,
 		handleRetryFrame: actions.handleRetryFrame,
 		handleRetryPlanning: planningRetry.handleRetryPlanning,
 		handleDownloadAllZip: actions.handleDownloadAllZip,
+		syncProjectStatus,
+		publishCommitted,
 	};
 }

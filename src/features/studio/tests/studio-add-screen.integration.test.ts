@@ -15,7 +15,6 @@ const generation = vi.hoisted(() => ({
 	calls: [] as Array<{
 		framePrompt: string;
 		activeScreen: string;
-		designSkillId: string;
 		blueprintProduct: string | null;
 	}>,
 	failure: null as Error | null,
@@ -33,13 +32,11 @@ vi.mock("../services/studio-frame-generation", async (importOriginal) => {
 		generateValidatedFrameHtml: async (input: {
 			framePrompt: string;
 			activeScreen: string;
-			designSkillId: string;
 			blueprint: { productIdentity?: { productName?: string } } | null;
 		}) => {
 			generation.calls.push({
 				framePrompt: input.framePrompt,
 				activeScreen: input.activeScreen,
-				designSkillId: input.designSkillId,
 				blueprintProduct: input.blueprint?.productIdentity?.productName ?? null,
 			});
 			if (generation.failure) throw generation.failure;
@@ -153,9 +150,8 @@ it("generates only the added screen with the project's shared context", async ()
 	expect(generation.calls).toHaveLength(1);
 	const call = generation.calls[0];
 	expect(call?.activeScreen).toBe("Profile");
-	// Shared DESIGN.md tokens and skill are reused.
+	// The shared DESIGN.md reference is reused for the new screen.
 	expect(call?.framePrompt).toContain("#123456");
-	expect(call?.designSkillId).toBe("impeccable");
 	// The new screen follows the project's shared blueprint and screen list.
 	expect(call?.blueprintProduct).toBe("Kasir Cepat");
 	expect(call?.framePrompt).toContain("SHARED_DESIGN_BLUEPRINT");

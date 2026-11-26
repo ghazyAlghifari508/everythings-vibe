@@ -1,19 +1,31 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ScrapeError } from "@/lib/design-errors";
+import { assembleCanonicalShell } from "../services/studio-canonical-shell";
+import type { StudioDesignBlueprint } from "../services/studio-design-blueprint";
 import { getStudioFrameVisual } from "../services/studio-frame-visual";
+import { financeBlueprint } from "./fixtures/studio-evaluation-fixtures";
 
 const mocks = vi.hoisted(() => {
 	const select = vi.fn<
 		() => Promise<Array<{ id: string; filename: string; createdAt: Date }>>
 	>(async () => []);
-	const update = vi.fn(async () => undefined);
-	const set = vi.fn(() => ({ where: update }));
+	const update = vi.fn(async () => [{ id: "frame-a" }]);
+	const set = vi.fn(() => ({
+		where: update,
+		from: () => ({ where: () => ({ returning: update }) }),
+	}));
 	const insert = vi.fn(async () => [{ id: "asset-a" }]);
 	return {
 		select,
 		update,
 		set,
 		insert,
+		project: {
+			id: "project-a",
+			userId: "user-a",
+			designMd: null,
+			designBlueprint: null as StudioDesignBlueprint | null,
+		},
 		capture: vi.fn(async () => ({
 			width: 390,
 			height: 900,
@@ -21,6 +33,8 @@ const mocks = vi.hoisted(() => {
 		})),
 		frame: {
 			id: "frame-a",
+			name: "Beranda",
+			revision: 1,
 			htmlCode: "<main>Sample</main>",
 			viewport: "mobile",
 			visualHash: null as string | null,
@@ -37,7 +51,7 @@ vi.mock("@/db", () => ({
 }));
 vi.mock("../services/studio-project-detail", () => ({
 	getStudioProjectDetail: async () => ({
-		project: { designMd: null },
+		project: mocks.project,
 		frames: [mocks.frame],
 	}),
 }));
@@ -56,12 +70,20 @@ afterEach(() => {
 	vi.restoreAllMocks();
 });
 
+// jsdom's installOwnProperties reads the shared global performance.now while it
+// builds its own window clock, so a call-count-coupled mockReturnValueOnce has a
+// queued value stolen and a real timestamp leaks into elapsedMs. Drive the clock
+// with a monotonic counter instead: capture duration stays measured and logged,
+// independent of how many times jsdom reads the global during assembly.
+function mockMonotonicClock() {
+	let ticks = 0;
+	vi.spyOn(performance, "now").mockImplementation(() => ticks++);
+}
+
 describe("frame preview capture isolation and telemetry", () => {
 	it("classifies capture failure without changing ready HTML or storing an image", async () => {
 		const log = vi.spyOn(console, "info").mockImplementation(() => {});
-		vi.spyOn(performance, "now")
-			.mockReturnValueOnce(10)
-			.mockReturnValueOnce(60);
+		mockMonotonicClock();
 		mocks.capture.mockRejectedValueOnce(new Error("private resource details"));
 		await expect(
 			getStudioFrameVisual("project-a", "frame-a", "user-a"),
@@ -77,16 +99,14 @@ describe("frame preview capture isolation and telemetry", () => {
 		expect(log.mock.calls).toEqual([
 			[
 				"[studio.preview.capture]",
-				{ outcome: "failed", elapsedMs: 50, assetCount: 0 },
+				{ outcome: "failed", elapsedMs: expect.any(Number), assetCount: 0 },
 			],
 		]);
 	});
 
 	it("measures actual capture duration without logging HTML, assets, or identifiers", async () => {
 		const log = vi.spyOn(console, "info").mockImplementation(() => {});
-		vi.spyOn(performance, "now")
-			.mockReturnValueOnce(20)
-			.mockReturnValueOnce(55);
+		mockMonotonicClock();
 		await expect(
 			getStudioFrameVisual("project-a", "frame-a", "user-a"),
 		).resolves.toMatchObject({ width: 390, height: 900 });
@@ -95,7 +115,7 @@ describe("frame preview capture isolation and telemetry", () => {
 		).toEqual([
 			[
 				"[studio.preview.capture]",
-				{ outcome: "captured", elapsedMs: 35, assetCount: 0 },
+				{ outcome: "captured", elapsedMs: expect.any(Number), assetCount: 0 },
 			],
 		]);
 		expect(mocks.insert).toHaveBeenCalledTimes(1);
@@ -136,6 +156,36 @@ describe("frame preview capture isolation and telemetry", () => {
 			["[studio.preview.capture]", { outcome: "cached", assetCount: 1 }],
 		]);
 		mocks.frame.visualHash = null;
+	});
+
+	it("recaptures instead of serving legacy pixels when canonical HTML changed", async () => {
+		vi.spyOn(console, "info").mockImplementation(() => {});
+		const original = mocks.frame.htmlCode;
+		mocks.project.designBlueprint = financeBlueprint;
+		mocks.frame.htmlCode = assembleCanonicalShell(
+			'<html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><main data-studio-content><p>Updated content</p></main></body></html>',
+			financeBlueprint,
+			"Beranda",
+			null,
+		);
+		mocks.frame.visualHash = "legacy-hash";
+		mocks.select.mockResolvedValueOnce([
+			{
+				id: "old-visual",
+				filename: "visual-legacy-hash-390x844.jpg",
+				createdAt: new Date(),
+			},
+		]);
+		try {
+			await expect(
+				getStudioFrameVisual("project-a", "frame-a", "user-a"),
+			).resolves.toMatchObject({ width: 390, height: 900 });
+			expect(mocks.capture).toHaveBeenCalledTimes(1);
+		} finally {
+			mocks.project.designBlueprint = null;
+			mocks.frame.htmlCode = original;
+			mocks.frame.visualHash = null;
+		}
 	});
 
 	it("records capture and storage timing through the shared Studio timing contract", async () => {

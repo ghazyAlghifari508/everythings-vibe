@@ -1,8 +1,30 @@
+import { JSDOM } from "jsdom";
+import { escapeStudioHtml } from "./studio-canonical-chrome";
+import { canonicalGutter, canonicalPalette } from "./studio-canonical-style";
 import type { StudioDesignBlueprint } from "./studio-design-blueprint";
 import type { CanonicalDesignSystem } from "./studio-design-tokens";
 
+// The only external stylesheet host the design system itself uses for fonts
+// (`CanonicalDesignSystem.typography.googleFontUrl`). Anything else stays an
+// unmarked external stylesheet, which the photo contract rejects.
+const STUDIO_FONT_STYLESHEET_HOSTS = new Set(["fonts.googleapis.com"]);
+
+function isStudioFontStylesheet(href: string | null): boolean {
+	if (!href) return false;
+	try {
+		const url = new URL(href, "https://studio.invalid");
+		return (
+			url.protocol === "https:" &&
+			STUDIO_FONT_STYLESHEET_HOSTS.has(url.hostname)
+		);
+	} catch {
+		return false;
+	}
+}
+
 export function generateDesignSystemHtmlHeader(
 	tokens: CanonicalDesignSystem,
+	usesTailwind = true,
 ): string {
 	const parts: string[] = [];
 
@@ -10,7 +32,7 @@ export function generateDesignSystemHtmlHeader(
 		parts.push(
 			`<link rel="preconnect" href="https://fonts.googleapis.com">`,
 			`<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>`,
-			`<link href="${tokens.typography.googleFontUrl}" rel="stylesheet">`,
+			`<link href="${escapeStudioHtml(tokens.typography.googleFontUrl)}" rel="stylesheet">`,
 		);
 	}
 
@@ -43,7 +65,7 @@ export function generateDesignSystemHtmlHeader(
 
 	const bodyRules: string[] = [];
 	if (tokens.colors.canvas) {
-		bodyRules.push(`background-color: ${tokens.colors.canvas} !important;`);
+		bodyRules.push(`background-color: ${tokens.colors.canvas};`);
 	}
 	if (tokens.colors.ink) {
 		bodyRules.push(`color: ${tokens.colors.ink};`);
@@ -56,11 +78,11 @@ export function generateDesignSystemHtmlHeader(
 :root {
   ${cssVars.join("\n  ")}
 }
-body {
+:where(body) {
   ${bodyRules.join("\n  ")}
 }
-${tokens.shapes.borderRadius.buttons ? `button, .btn, [role="button"] { border-radius: ${tokens.shapes.borderRadius.buttons}; }` : ""}
-${tokens.shapes.borderRadius.cards ? `.card, [data-card] { border-radius: ${tokens.shapes.borderRadius.cards}; }` : ""}
+${tokens.shapes.borderRadius.buttons ? `:where(button, .btn, [role="button"]) { border-radius: ${tokens.shapes.borderRadius.buttons}; }` : ""}
+${tokens.shapes.borderRadius.cards ? `:where(.card, [data-card]) { border-radius: ${tokens.shapes.borderRadius.cards}; }` : ""}
 </style>`);
 
 	// Tailwind configuration
@@ -87,7 +109,7 @@ tailwind.config = {
 };
 </script>`;
 
-	parts.push(twConfigScript);
+	if (usesTailwind) parts.push(twConfigScript);
 
 	return parts.join("\n");
 }
@@ -98,84 +120,79 @@ export function enforceDesignSystemOnHtml(
 	logoUrl?: string | null,
 	blueprint?: StudioDesignBlueprint | null,
 ): string {
-	let output = html;
-	output = output
-		.replace(
-			/<style\b[^>]*id=["']studio-design-tokens["'][^>]*>[\s\S]*?<\/style>/gi,
-			"",
-		)
-		.replace(
-			/<script\b[^>]*id=["']studio-tailwind-tokens["'][^>]*>[\s\S]*?<\/script>/gi,
-			"",
-		);
-
-	// 1. Inject design system tokens into <head> if tokens exist
-	if (tokens && !output.includes("studio-design-tokens")) {
-		const headerHtml = generateDesignSystemHtmlHeader(tokens);
-		if (output.includes("</head>")) {
-			output = output.replace("</head>", `${headerHtml}\n</head>`);
-		} else if (output.includes("<head>")) {
-			output = output.replace("<head>", `<head>\n${headerHtml}`);
-		} else if (output.includes("<!DOCTYPE html>") || output.includes("<html")) {
-			output = output.replace(
-				/<html\b[^>]*>/i,
-				`$&\n<head>\n${headerHtml}\n</head>`,
+	const dom = new JSDOM(html);
+	try {
+		const { document } = dom.window;
+		for (const element of document.querySelectorAll(
+			"#studio-design-tokens, #studio-tailwind-tokens, #studio-blueprint-tokens, [data-studio-font]",
+		))
+			element.remove();
+		// A model-authored font stylesheet from the sanctioned font host is not an
+		// image channel. Mark it like the injected token font link so the photo
+		// contract can distinguish it from arbitrary external CSS.
+		for (const link of document.querySelectorAll(
+			'link[rel="stylesheet"]:not([data-studio-font])',
+		))
+			if (isStudioFontStylesheet(link.getAttribute("href")))
+				link.setAttribute("data-studio-font", "1");
+		if (tokens) {
+			const fragment = document.createElement("template");
+			fragment.innerHTML = generateDesignSystemHtmlHeader(
+				tokens,
+				Boolean(
+					document.querySelector('script[src^="https://cdn.tailwindcss.com"]'),
+				),
 			);
+			for (const link of fragment.content.querySelectorAll("link"))
+				link.setAttribute("data-studio-font", "1");
+			document.head.appendChild(fragment.content);
 		}
-	}
-
-	// 1b. Inject shared blueprint tokens into <head> when a blueprint exists
-	if (blueprint && !output.includes("studio-blueprint-tokens")) {
-		const bp = blueprint.designTokens;
-		const headerHtml = `<style id="studio-blueprint-tokens">:root{--bp-primary:${bp.primary};--bp-secondary:${bp.secondary};--bp-background:${bp.background};--bp-surface:${bp.surface};--bp-font:${bp.fontFamily};--bp-radius:${bp.radius}px;--bp-border:${bp.border};--bp-elevation:${bp.elevation};}</style>`;
-		if (output.includes("</head>")) {
-			output = output.replace("</head>", `${headerHtml}\n</head>`);
-		} else if (output.includes("<head>")) {
-			output = output.replace("<head>", `<head>\n${headerHtml}`);
-		} else if (output.includes("<!DOCTYPE html>") || output.includes("<html")) {
-			output = output.replace(
-				/<html\b[^>]*>/i,
-				`$&\n<head>\n${headerHtml}\n</head>`,
+		if (blueprint) {
+			const bp = blueprint.designTokens;
+			const style = document.createElement("style");
+			style.id = "studio-blueprint-tokens";
+			style.textContent = `:root{--bp-primary:${bp.primary};--bp-secondary:${bp.secondary};--bp-background:${bp.background};--bp-surface:${bp.surface};--bp-font:${bp.fontFamily};--bp-radius:${bp.radius}px;--bp-border:${bp.border};--bp-elevation:${bp.elevation};}`;
+			if (blueprint.compositionOwner === "model") {
+				const palette = canonicalPalette(blueprint, tokens);
+				const layout = blueprint.layout;
+				const scale = (prefix: string, values?: number[]) =>
+					(values ?? [])
+						.map((value, index) => `--app-${prefix}-${index}:${value}px;`)
+						.join("");
+				style.textContent += `:root{--app-primary:${palette.primary};--app-secondary:${bp.secondary};--app-on-primary:${palette.onPrimary};--app-canvas:${palette.canvas};--app-surface:${palette.surface};--app-ink:${palette.ink};--app-muted:${palette.muted};--app-border:${palette.border};--app-font:${palette.font};--app-radius:${tokens?.shapes.borderRadius.cards ?? `${bp.radius}px`};--app-gutter:${canonicalGutter(blueprint)}px;--app-content-width:${layout?.contentMaxWidth ?? 1440}px;${scale("space", layout?.spacing)}${scale("type", layout?.typography)}}
+:where(html){box-sizing:border-box}
+:where(*, *::before, *::after){box-sizing:inherit}
+:where(body){margin:0;background:var(--app-canvas);color:var(--app-ink);font-family:var(--app-font);overflow-wrap:break-word}
+:where(main,[data-studio-navigation]){min-inline-size:0}
+:where(img,video){max-inline-size:100%;block-size:auto}
+:where(a,button,summary,input,select,textarea):focus-visible{outline:2px solid currentColor;outline-offset:2px}`;
+			}
+			document.head.appendChild(style);
+		}
+		const links = new Set<string>();
+		for (const link of document.querySelectorAll("link[href]")) {
+			const key = `${link.getAttribute("rel")}:${link.getAttribute("href")}`;
+			if (links.has(key)) link.remove();
+			else links.add(key);
+		}
+		if (logoUrl?.trim() && !blueprint) {
+			const logo = logoUrl.trim();
+			const hasLogo = [...document.images].some(
+				(image) => image.getAttribute("src") === logo,
 			);
-		}
-	}
-
-	// 2. Ensure body background matches canvas color if specified
-	if (tokens?.colors.canvas) {
-		const canvasHex = tokens.colors.canvas;
-		// If body tag does not have style or has contrasting bg, ensure inline background style
-		output = output.replace(/<body\b([^>]*)>/i, (_match, attrs: string) => {
-			if (/style\s*=\s*["'][^"']*background[^"']*["']/i.test(attrs)) {
-				// already has inline background
-				return `<body${attrs}>`;
-			}
-			if (/style\s*=\s*["']/i.test(attrs)) {
-				return `<body${attrs.replace(/style\s*=\s*["']/, `style="background-color: ${canvasHex}; `)}>`;
-			}
-			return `<body${attrs} style="background-color: ${canvasHex};">`;
-		});
-	}
-
-	// 3. Logo enforcement: if logoUrl is provided, ensure logo is referenced in HTML
-	if (logoUrl && logoUrl.trim().length > 0) {
-		const cleanLogo = logoUrl.trim();
-		const hasLogo = output.includes(cleanLogo);
-		if (!hasLogo) {
-			// Find navigation or header container and replace generic logo/initials or prepend
-			const imgTag = `<img src="${cleanLogo}" alt="Logo" class="h-8 w-auto object-contain" />`;
-			if (/<header\b[^>]*>/i.test(output)) {
-				output = output.replace(
-					/(<header\b[^>]*>[\s\S]*?<div\b[^>]*class=["'][^"']*(?:logo|brand)[^"']*["'][^>]*>)([\s\S]*?)(<\/div>)/i,
-					`$1${imgTag}$3`,
-				);
-			} else if (/<nav\b[^>]*>/i.test(output)) {
-				output = output.replace(
-					/(<nav\b[^>]*>[\s\S]*?<div\b[^>]*class=["'][^"']*(?:logo|brand)[^"']*["'][^>]*>)([\s\S]*?)(<\/div>)/i,
-					`$1${imgTag}$3`,
-				);
+			const brand = document.querySelector(
+				"header .logo, header .brand, nav .logo, nav .brand",
+			);
+			if (!hasLogo && brand) {
+				const image = document.createElement("img");
+				image.setAttribute("src", logo);
+				image.setAttribute("alt", "Logo");
+				image.setAttribute("class", "h-8 w-auto object-contain");
+				brand.replaceChildren(image);
 			}
 		}
+		return `<!DOCTYPE html>${document.documentElement.outerHTML}`;
+	} finally {
+		dom.window.close();
 	}
-
-	return output;
 }

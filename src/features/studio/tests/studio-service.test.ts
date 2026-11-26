@@ -10,6 +10,7 @@ import { reviseStudioProject } from "../services/studio-revision-service";
 
 // Mock database
 const mockDb = {
+	execute: vi.fn(),
 	insert: vi.fn(),
 	select: vi.fn(),
 	update: vi.fn(),
@@ -374,6 +375,21 @@ describe("Studio Service", () => {
 				updatedAt: new Date(),
 			};
 
+			mockDb.select
+				.mockReturnValueOnce({
+					from: vi.fn().mockReturnValue({
+						innerJoin: vi.fn().mockReturnValue({
+							where: vi
+								.fn()
+								.mockReturnValue({ limit: vi.fn().mockResolvedValue([]) }),
+						}),
+					}),
+				})
+				.mockReturnValueOnce({
+					from: vi.fn().mockReturnValue({
+						where: vi.fn().mockResolvedValue([{ id: mockProject.id }]),
+					}),
+				});
 			mockDb.insert
 				.mockReturnValueOnce({
 					values: vi.fn().mockReturnValue({
@@ -384,39 +400,18 @@ describe("Studio Service", () => {
 					values: vi.fn().mockReturnValue({
 						returning: vi.fn().mockResolvedValue([mockJob]),
 					}),
-				})
-				.mockReturnValueOnce({
-					values: vi.fn().mockReturnValue({
-						returning: vi.fn().mockResolvedValue(
-							[1, 2, 3].map((n) => ({
-								id: `frame-${n}`,
-								projectId: "proj-10",
-								name: `Layar ${n}`,
-								description: "",
-								viewport: "mobile",
-								order: n - 1,
-								status: "queued",
-							})),
-						),
-					}),
 				});
 
 			const result = await createStudioProjectWithJob("user-1", {
 				title: "POS App",
 				prompt: "Buatkan aplikasi POS kasir mobile dengan 3 layar",
 				designMode: "mobile",
-				initialPageCount: 3,
 			});
 
 			expect(result.project.id).toBe("proj-10");
 			expect(result.job.id).toBe("job-10");
 			expect(result.job.status).toBe("queued");
-			expect(result.frames).toHaveLength(3);
-			expect(result.frames.map((f) => f.name)).toEqual([
-				"Layar 1",
-				"Layar 2",
-				"Layar 3",
-			]);
+			expect(result.frames).toEqual([]);
 		});
 
 		it("synthesizes legacy single-HTML project into one ready frame", async () => {

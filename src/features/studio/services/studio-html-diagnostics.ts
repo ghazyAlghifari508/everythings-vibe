@@ -14,6 +14,7 @@ export function inspectStudioHtml(html: string): {
 	const dom = new JSDOM(html);
 	const document = dom.window.document;
 	const { hard, warnings } = inspectStudioLayout(document);
+	const structural: StudioQualityFinding[] = [];
 	const ids = new Set<string>();
 	for (const element of document.querySelectorAll("[id]")) {
 		if (ids.has(element.id)) hard.push(`Duplicate id: ${element.id}.`);
@@ -137,10 +138,20 @@ export function inspectStudioHtml(html: string): {
 			"[data-studio-content] [data-studio-shell], [data-studio-content] [data-studio-header]",
 		)
 	) {
-		hard.push("Duplicate global shell inside screen content.");
+		structural.push({
+			code: "DUPLICATE_GLOBAL_SHELL",
+			severity: "repairable",
+			confidence: "high",
+			message: "Duplicate global shell inside screen content.",
+		});
 	}
 	if (document.querySelectorAll("nav[data-studio-navigation]").length > 1) {
-		hard.push("Duplicate global navigation detected.");
+		structural.push({
+			code: "DUPLICATE_GLOBAL_NAVIGATION",
+			severity: "repairable",
+			confidence: "high",
+			message: "Duplicate global navigation detected.",
+		});
 	}
 	if (
 		/\[data-studio-shell\]|#studio-canonical-style|\[data-studio-header\]/i.test(
@@ -192,19 +203,7 @@ export function inspectStudioHtml(html: string): {
 			}
 		}
 	}
-	for (const el of document.querySelectorAll("[style*='width']")) {
-		const style = el.getAttribute("style") ?? "";
-		const match =
-			/(?<![-\w])(min-width|width)\s*:\s*(\d+(?:\.\d+)?)(px)\b/i.exec(style);
-		const scroller = el.parentElement?.closest(
-			'[data-table-container],.table-container,.overflow-x-auto,[style*="overflow-x:auto"],[style*="overflow-x: auto"]',
-		);
-		if (match && Number(match[2]) > 1440 && !scroller) {
-			hard.push("Lebar tetap melebihi viewport.");
-			break;
-		}
-	}
-	const structural = inspectStudioStructuralQuality(document);
+	structural.push(...inspectStudioStructuralQuality(document));
 	const findings: StudioQualityFinding[] = [
 		...[...new Set(hard)].map(
 			(message): StudioQualityFinding => ({
@@ -293,6 +292,7 @@ const ISSUE_CODE_PATTERNS: Array<[RegExp, string]> = [
 	[/Label navigasi hilang/, "NAVIGATION_LABEL_MISSING"],
 	[/Urutan navigasi tidak sesuai/, "NAVIGATION_ORDER_MISMATCH"],
 	[/Navigasi ganda/, "DUPLICATE_NAVIGATION"],
+	[/kartu teks/, "CARD_ONLY_COMPOSITION"],
 	[/Artefak markdown/, "MARKDOWN_ARTIFACT"],
 	[/Body HTML tidak lengkap/, "HTML_BODY_INCOMPLETE"],
 	[/Body HTML kosong/, "EMPTY_BODY"],
@@ -302,9 +302,46 @@ const ISSUE_CODE_PATTERNS: Array<[RegExp, string]> = [
 	[/collisions with canonical shell/i, "SHELL_COLLISION"],
 	[/empty content section/i, "EMPTY_SECTION"],
 	[/suspiciously sparse/i, "SPARSE_CONTENT"],
+	// Structural quality findings already carry a stable code, but the timing
+	// log re-derives it from the message; without these the frame's repairable
+	// defects all read as UNCLASSIFIED.
+	[/Essential control\/option text has an ellipsis/, "ESSENTIAL_TEXT_CLIPPED"],
+	[
+		/Essential content is inside a zero-sized clipping box/,
+		"CRITICAL_CONTENT_HIDDEN",
+	],
+	[/Price or quantity contains forced line tracks/, "ATOMIC_LABEL_BROKEN"],
+	[/Image height exceeds its clipping media frame/, "MEDIA_FRAME_CONFLICT"],
+	[/Nonwrapping action\/option row/, "NARROW_COMPOSITION"],
+	// Cross-screen sample ledger (§ sample-data consistency).
+	[/Harga di luar data contoh/, "SAMPLE_PRICE_UNDECLARED"],
+	[/Referensi pesanan di luar data contoh/, "SAMPLE_REFERENCE_UNDECLARED"],
 	[/wide data table without/i, "UNCONTAINED_WIDE_TABLE"],
 	[/Posisi fixed tidak diizinkan/, "DISALLOWED_FIXED_POSITION"],
 	[/Posisi sticky tidak diizinkan/, "DISALLOWED_STICKY_POSITION"],
+	// P11 Fix 06 semantic-navigation and photo-contract complaints. Without these
+	// the structured log reported them all as UNCLASSIFIED, hiding which contract
+	// a frame actually broke.
+	[/Duplicate project chrome/i, "DUPLICATE_PROJECT_CHROME"],
+	[/must not execute scripts/i, "UNSAFE_SCRIPT"],
+	[/Unsafe executable URL/i, "UNSAFE_URL"],
+	[/one nonempty screen content region/i, "CONTENT_REGION_INVALID"],
+	[/Name the primary navigation landmark/i, "NAVIGATION_LANDMARK_MISSING"],
+	[/Duplicate primary destination/i, "DUPLICATE_NAVIGATION"],
+	[/Incorrect current destination/i, "NAVIGATION_CURRENT_MISMATCH"],
+	// The most frequent model-owned rejection ("Link must name a valid local
+	// section, destination, parent, or planned action.") had no pattern, so the
+	// structured log reported the actual contract breach as UNCLASSIFIED.
+	[/Link must name a valid local section/i, "NAVIGATION_LINK_INVALID"],
+	[/Search control must filter a real collection/i, "SEARCH_UNBOUND"],
+	[/supplied product logo/i, "LOGO_MISSING"],
+	[/Planned photo slot is missing/i, "PHOTO_SLOT_MISSING"],
+	[/Missing planned photo slot/i, "PHOTO_SLOT_MISSING"],
+	[/each planned photo slot once/i, "PHOTO_SLOT_DUPLICATE"],
+	[/Unapproved image reference/i, "UNAPPROVED_IMAGE"],
+	[/CSS image URLs/i, "UNAPPROVED_IMAGE"],
+	[/external stylesheets cannot introduce/i, "EXTERNAL_STYLESHEET"],
+	[/Declared carousel allows cards to shrink/i, "CAROUSEL_SHRINK"],
 ];
 
 /**

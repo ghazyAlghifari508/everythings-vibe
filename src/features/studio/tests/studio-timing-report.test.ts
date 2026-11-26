@@ -68,15 +68,9 @@ it("reports observed latency and rates without inventing absent measurements", (
 	});
 });
 
-it("separates frame token totals from planning and groups skill latency", () => {
+it("separates frame token totals from planning", () => {
 	const events = [
 		{ stage: "planning-output", outputTokens: 900, durationMs: 10 },
-		{
-			stage: "frame-context",
-			skillId: "impeccable",
-			skillChars: 23457,
-			durationMs: 0,
-		},
 		{
 			stage: "frame-output",
 			outputTokens: 100,
@@ -105,8 +99,6 @@ it("separates frame token totals from planning and groups skill latency", () => 
 	expect(report.meanMeasuredOutputTokensPerFrame).toBe(150);
 	expect(report.meanMeasuredInputTokensPerRequest).toBe(2500);
 	expect(report.firstVisibleMs).toEqual([500]);
-	expect(report.perSkill.impeccable.outputLatency?.mean).toBe(25);
-	expect(report.perSkill.impeccable.guidanceChars).toEqual([23457]);
 });
 
 it("reports rejection and retry frequency with explicit observed denominators", () => {
@@ -127,21 +119,9 @@ it("isolates revisions of the same frame across jobs", () => {
 	const events = [
 		{
 			jobId: "initial",
-			stage: "frame-context",
-			skillId: "none",
-			durationMs: 0,
-		},
-		{
-			jobId: "initial",
 			stage: "frame-output",
 			outputTokens: 100,
 			durationMs: 10,
-		},
-		{
-			jobId: "revision",
-			stage: "frame-context",
-			skillId: "impeccable",
-			durationMs: 0,
 		},
 		{
 			jobId: "revision",
@@ -156,8 +136,12 @@ it("isolates revisions of the same frame across jobs", () => {
 		.join("\n");
 	const report = summarizeStudioTimings(events);
 	expect(report.meanMeasuredOutputTokensPerFrame).toBe(150);
-	expect(report.perSkill.none.outputLatency?.mean).toBe(10);
-	expect(report.perSkill.impeccable.outputLatency?.mean).toBe(20);
+	expect(report.stages["frame-output"]).toEqual({
+		count: 2,
+		mean: 15,
+		p50: null,
+		p95: null,
+	});
 });
 
 it("ignores non-telemetry, malformed, and non-finite input", () => {

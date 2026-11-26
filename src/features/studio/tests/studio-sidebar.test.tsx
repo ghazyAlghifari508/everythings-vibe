@@ -139,7 +139,7 @@ describe("StudioSidebar", () => {
 		const searchInput = screen.getByLabelText("Cari project studio");
 		fireEvent.change(searchInput, { target: { value: "xyznotfound" } });
 
-		expect(screen.getByText("Tidak ada proyek yang cocok.")).toBeDefined();
+		expect(screen.getByText("Tidak ada proyek yang cocok")).toBeDefined();
 
 		const clearButton = screen.getByRole("button", {
 			name: "Hapus pencarian",
@@ -161,6 +161,64 @@ describe("StudioSidebar", () => {
 		expect(
 			screen.getByText("Desain yang kamu buat akan muncul di sini."),
 		).toBeDefined();
+	});
+
+	it("anchors the empty history region where the first project card starts", () => {
+		const { container } = render(
+			<TestSidebar
+				history={[]}
+				onSelectProject={vi.fn()}
+				onDeleteProject={vi.fn(async () => {})}
+			/>,
+		);
+
+		const list = container.querySelector("[data-studio-history-list]");
+		const empty = container.querySelector(
+			'[data-studio-empty-state="history"]',
+		);
+		// First child of the scrolling list: the copy starts at the same top edge
+		// the first card would, instead of floating mid-column.
+		expect(empty).not.toBeNull();
+		expect(list?.firstElementChild).toBe(empty);
+	});
+
+	it("keeps project cards as the first region of the list when history exists", () => {
+		const { container } = render(
+			<TestSidebar
+				history={mockProjects}
+				onSelectProject={vi.fn()}
+				onDeleteProject={vi.fn(async () => {})}
+			/>,
+		);
+
+		expect(
+			container.querySelector("[data-studio-history-list]")?.firstElementChild
+				?.tagName,
+		).toBe("UL");
+		expect(
+			container.querySelector('[data-studio-empty-state="history"]'),
+		).toBeNull();
+	});
+
+	it("marks a search with no matches differently from an empty history", () => {
+		const { container } = render(
+			<TestSidebar
+				history={mockProjects}
+				onSelectProject={vi.fn()}
+				onDeleteProject={vi.fn(async () => {})}
+			/>,
+		);
+
+		fireEvent.change(screen.getByLabelText("Cari project studio"), {
+			target: { value: "xyznotfound" },
+		});
+
+		expect(
+			container.querySelector('[data-studio-empty-state="search"]'),
+		).not.toBeNull();
+		expect(
+			container.querySelector('[data-studio-empty-state="history"]'),
+		).toBeNull();
 	});
 
 	it("calls onSelectProject when clicking a project item", () => {

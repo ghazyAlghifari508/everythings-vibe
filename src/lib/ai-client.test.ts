@@ -11,15 +11,21 @@ vi.mock("ai", () => ({
 
 import { streamText } from "ai";
 import { type StreamOutcome, streamChat } from "./ai-client";
+import { AI_FIRST_TOKEN_TIMEOUT_MS } from "./constants";
 
-function mockStreamText(parts: Array<Record<string, unknown>>) {
+function mockStreamText(
+	parts:
+		| Array<Record<string, unknown>>
+		| AsyncIterable<Record<string, unknown>>,
+) {
 	// Only fullStream matters for streamChat's loop; finishReason is read via
 	// result.finishReason which we don't exercise here.
-	const stub = {
-		fullStream: (async function* () {
-			for (const p of parts) yield p;
-		})(),
-	};
+	const fullStream = Array.isArray(parts)
+		? (async function* () {
+				for (const part of parts) yield part;
+			})()
+		: parts;
+	const stub = { fullStream };
 	vi.mocked(streamText).mockReturnValue(stub as never);
 }
 
@@ -74,5 +80,32 @@ describe("streamChat", () => {
 		const it = streamChat([{ role: "user", content: "hi" }]);
 		const first = await it.next();
 		expect(first.value).toBe("AC ");
+	});
+
+	it("identifies first-token watchdog failures as timeout errors", async () => {
+		vi.useFakeTimers();
+		try {
+			mockStreamText(
+				(async function* () {
+					await new Promise<void>(() => {});
+				})(),
+			);
+			const result = streamChat([{ role: "user", content: "hi" }])
+				.next()
+				.then(
+					() => ({ timedOut: false as const }),
+					(error: unknown) => ({ timedOut: true as const, error }),
+				);
+			await vi.advanceTimersByTimeAsync(AI_FIRST_TOKEN_TIMEOUT_MS);
+			expect(await result).toMatchObject({
+				timedOut: true,
+				error: {
+					name: "TimeoutError",
+					message: expect.stringContaining("4 menit"),
+				},
+			});
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 });

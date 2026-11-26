@@ -7,25 +7,16 @@ import {
 	screen,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-	computeCanvasFit,
-	StudioCanvas,
-} from "@/features/studio/components/canvas/studio-canvas";
+import { StudioCanvas } from "@/features/studio/components/canvas/studio-canvas";
 import { writeStudioCanvasView } from "@/features/studio/services/studio-canvas-view";
 import {
-	STUDIO_CANVAS_COMPOSER_BOTTOM_PX,
-	STUDIO_CANVAS_COMPOSER_MAX_WIDTH_PX,
-	STUDIO_CANVAS_COMPOSER_SIDE_CLEARANCE_PX,
 	STUDIO_CANVAS_HEADER_INSET_PX,
 	STUDIO_CANVAS_INITIAL_MIN_ZOOM,
 	STUDIO_CANVAS_MAX_ZOOM,
 	STUDIO_CANVAS_MIN_ZOOM,
 } from "@/features/studio/types/studio-constants";
-import {
-	canvasComposerBottomCss,
-	canvasComposerWidthCss,
-	canvasZoomRowBottomCss,
-} from "@/features/studio/utils/studio-canvas-layout";
+import { computeCanvasFit } from "@/features/studio/utils/studio-canvas-fit";
+import { canvasZoomRowBottomCss } from "@/features/studio/utils/studio-canvas-layout";
 
 describe("StudioCanvas", () => {
 	afterEach(() => cleanup());
@@ -65,6 +56,10 @@ describe("StudioCanvas", () => {
 			attempts: 0,
 			visualHash: null,
 			promptHash: null,
+			originJobId: null,
+			initialSlot: null,
+			revision: 0,
+			lastJobId: null,
 			createdAt: new Date(),
 			updatedAt: new Date(),
 		},
@@ -81,6 +76,10 @@ describe("StudioCanvas", () => {
 			attempts: 0,
 			visualHash: null,
 			promptHash: null,
+			originJobId: null,
+			initialSlot: null,
+			revision: 0,
+			lastJobId: null,
 			createdAt: new Date(),
 			updatedAt: new Date(),
 		},
@@ -126,7 +125,7 @@ describe("StudioCanvas", () => {
 			/>,
 		);
 
-		const cursor = screen.getByRole("button", { name: /Pilih frame/i });
+		const cursor = screen.getByRole("button", { name: /Pilih frame \(V\)/i });
 		const hand = screen.getByRole("button", { name: /Geser canvas/i });
 		// Both tools live in one compact vertical group on the right edge.
 		const toolbar = cursor.parentElement;
@@ -160,7 +159,7 @@ describe("StudioCanvas", () => {
 		expect(group?.style.bottom).toBe(canvasZoomRowBottomCss());
 		// The tools must not share the zoom group's anchor.
 		const cursorToolbar = screen.getByRole("button", {
-			name: /Pilih frame/i,
+			name: /Pilih frame \(V\)/i,
 		}).parentElement;
 		expect(cursorToolbar?.style.bottom).toBe("");
 	});
@@ -175,7 +174,7 @@ describe("StudioCanvas", () => {
 			/>,
 		);
 
-		const cursor = screen.getByRole("button", { name: /Pilih frame/i });
+		const cursor = screen.getByRole("button", { name: /Pilih frame \(V\)/i });
 		const hand = screen.getByRole("button", { name: /Geser canvas/i });
 		expect(cursor.getAttribute("aria-pressed")).toBe("true");
 		expect(hand.getAttribute("aria-pressed")).toBe("false");
@@ -203,7 +202,7 @@ describe("StudioCanvas", () => {
 		fireEvent.keyDown(input, { key: "h" });
 		expect(
 			screen
-				.getByRole("button", { name: /Pilih frame/i })
+				.getByRole("button", { name: /Pilih frame \(V\)/i })
 				.getAttribute("aria-pressed"),
 		).toBe("true");
 		input.remove();
@@ -243,6 +242,15 @@ describe("StudioCanvas", () => {
 			prompt: "Test",
 			jobType: "initial",
 			targetFrameId: null,
+			requestId: null,
+			requestHash: null,
+			operationIntent: null,
+			operationIndex: null,
+			blueprintJobId: null,
+			dependsOnJobId: null,
+			baseRevision: null,
+			planningCompletedAt: null,
+			errorCode: null,
 			status,
 			error: null,
 			claimedBy: "worker",
@@ -290,6 +298,15 @@ describe("StudioCanvas", () => {
 					prompt: "Test",
 					jobType: "initial",
 					targetFrameId: null,
+					requestId: null,
+					requestHash: null,
+					operationIntent: null,
+					operationIndex: null,
+					blueprintJobId: null,
+					dependsOnJobId: null,
+					baseRevision: null,
+					planningCompletedAt: null,
+					errorCode: null,
 					status: "completed",
 					error: null,
 					claimedBy: null,
@@ -317,6 +334,15 @@ describe("StudioCanvas", () => {
 			prompt: "Test",
 			jobType: "initial",
 			targetFrameId: null,
+			requestId: null,
+			requestHash: null,
+			operationIntent: null,
+			operationIndex: null,
+			blueprintJobId: null,
+			dependsOnJobId: null,
+			baseRevision: null,
+			planningCompletedAt: null,
+			errorCode: null,
 			status: "planning",
 			error: null,
 			claimedBy: null,
@@ -345,9 +371,88 @@ describe("StudioCanvas", () => {
 		expect(container.querySelector('[data-testid$="-shimmer"]')).toBeNull();
 		// The canvas surface and its controls stay available immediately.
 		expect(screen.getByTestId("studio-canvas")).toBeDefined();
-		expect(screen.getByRole("button", { name: /Pilih frame/i })).toBeDefined();
+		expect(
+			screen.getByRole("button", { name: /Pilih frame \(V\)/i }),
+		).toBeDefined();
 		expect(screen.getByRole("button", { name: /Geser canvas/i })).toBeDefined();
 		expect(screen.getByRole("button", { name: /Perbesar/i })).toBeDefined();
+	});
+
+	// Both readout cases below differ only by job status and lease, and the
+	// canvas reads no other job field, so one shared row keeps them honest.
+	const queueJob = {
+		id: "j-queue",
+		projectId: "p-1",
+		userId: "u-1",
+		prompt: "Test",
+		jobType: "initial" as const,
+		targetFrameId: null,
+		requestId: null,
+		requestHash: null,
+		operationIntent: null,
+		operationIndex: null,
+		blueprintJobId: null,
+		dependsOnJobId: null,
+		baseRevision: null,
+		planningCompletedAt: null,
+		errorCode: null,
+		status: "planning" as const,
+		error: null,
+		claimedBy: null,
+		attempts: 0,
+		claimedAt: null,
+		leaseExpiresAt: null,
+		startedAt: null,
+		finishedAt: null,
+		createdAt: new Date(),
+		updatedAt: new Date(),
+	};
+
+	it("leaves phase progress to the chat panel instead of reprinting it on the canvas", () => {
+		const { rerender } = render(
+			<StudioCanvas
+				project={mockProject}
+				frames={[]}
+				activeJob={{ ...queueJob, status: "planning" }}
+				onSelectFrame={vi.fn()}
+			/>,
+		);
+
+		// The chat panel already reports the phase, so a second copy floating
+		// over the canvas would just state the same thing twice.
+		expect(screen.queryByText("Menyusun struktur halaman...")).toBeNull();
+		expect(screen.queryByText("Menunggu antrean generate")).toBeNull();
+
+		rerender(
+			<StudioCanvas
+				project={mockProject}
+				frames={mockFrames}
+				activeJob={{ ...queueJob, status: "generating" }}
+				onSelectFrame={vi.fn()}
+			/>,
+		);
+		expect(screen.queryByText("Menghasilkan halaman...")).toBeNull();
+		// Frames keep their own accessible status while generating.
+		expect(
+			screen.getAllByLabelText("Layar sedang digenerate").length,
+		).toBeGreaterThan(0);
+	});
+
+	it("still reports a genuine queue health problem next to the canvas", () => {
+		render(
+			<StudioCanvas
+				project={mockProject}
+				frames={[]}
+				activeJob={{
+					...queueJob,
+					status: "generating",
+					leaseExpiresAt: new Date(Date.now() - 1000),
+				}}
+				onSelectFrame={vi.fn()}
+			/>,
+		);
+
+		expect(screen.getByText(/Lease worker berakhir/)).toBeDefined();
 	});
 
 	it("renders planning failure state with a retry action when activeJob failed", () => {
@@ -359,6 +464,15 @@ describe("StudioCanvas", () => {
 			prompt: "Test",
 			jobType: "initial",
 			targetFrameId: null,
+			requestId: null,
+			requestHash: null,
+			operationIntent: null,
+			operationIndex: null,
+			blueprintJobId: null,
+			dependsOnJobId: null,
+			baseRevision: null,
+			planningCompletedAt: null,
+			errorCode: null,
 			status: "failed",
 			error: "AI rate limit reached",
 			claimedBy: null,
@@ -411,6 +525,15 @@ describe("StudioCanvas", () => {
 					prompt: "Test",
 					jobType: "initial",
 					targetFrameId: null,
+					requestId: null,
+					requestHash: null,
+					operationIntent: null,
+					operationIndex: null,
+					blueprintJobId: null,
+					dependsOnJobId: null,
+					baseRevision: null,
+					planningCompletedAt: null,
+					errorCode: null,
 					status: "failed",
 					error: "Rencana layar belum berhasil disusun. Coba lagi.",
 					claimedBy: null,
@@ -538,6 +661,10 @@ describe("StudioCanvas", () => {
 			attempts: 0,
 			visualHash: null,
 			promptHash: null,
+			originJobId: null,
+			initialSlot: null,
+			revision: 0,
+			lastJobId: null,
 			createdAt: new Date(),
 			updatedAt: new Date(),
 		}));
@@ -617,19 +744,13 @@ describe("StudioCanvas", () => {
 			expect(renderedScale()).toBeLessThan(STUDIO_CANVAS_INITIAL_MIN_ZOOM);
 		});
 
-		it("lets the user zoom after initialization without being overridden", async () => {
+		it("lets the user zoom after initialization without being overridden", () => {
 			const { rerender } = render(
 				<StudioCanvas project={mockProject} frames={longMobileFrames} />,
 			);
 			const opening = renderedScale();
-			fireEvent.wheel(screen.getByTestId("studio-canvas"), {
-				deltaX: 0,
-				deltaY: -120,
-				deltaMode: 0,
-				clientX: 400,
-				clientY: 300,
-			});
-			await vi.waitFor(() => expect(renderedScale()).toBeGreaterThan(opening));
+			fireEvent.click(screen.getByRole("button", { name: /Perbesar/i }));
+			expect(renderedScale()).toBeGreaterThan(opening);
 			const userScale = renderedScale();
 			// A screen arriving later must not reset the zoom the user chose.
 			rerender(
@@ -642,27 +763,6 @@ describe("StudioCanvas", () => {
 				/>,
 			);
 			expect(renderedScale()).toBe(userScale);
-		});
-	});
-
-	describe("floating overlay geometry", () => {
-		it("caps the composer so it never reaches the zoom row", () => {
-			expect(canvasComposerWidthCss()).toContain(
-				`${STUDIO_CANVAS_COMPOSER_MAX_WIDTH_PX}px`,
-			);
-			expect(canvasComposerWidthCss()).toContain(
-				`${STUDIO_CANVAS_COMPOSER_SIDE_CLEARANCE_PX * 2}px`,
-			);
-		});
-
-		it("keeps the composer clear of the zoom row and the safe area", () => {
-			const bottom = canvasComposerBottomCss();
-			expect(bottom).toContain("env(safe-area-inset-bottom)");
-			expect(bottom).toContain(`${STUDIO_CANVAS_COMPOSER_BOTTOM_PX}px`);
-		});
-
-		it("honours the safe area for the zoom row too", () => {
-			expect(canvasZoomRowBottomCss()).toContain("env(safe-area-inset-bottom)");
 		});
 	});
 
@@ -750,7 +850,7 @@ describe("StudioCanvas", () => {
 		addEventListener.mockRestore();
 	});
 
-	it("zooms on physical mouse wheel scroll without needing modifier keys", async () => {
+	it("pans on a large mouse wheel notch without changing zoom", async () => {
 		render(
 			<StudioCanvas
 				project={mockProject}
@@ -762,6 +862,7 @@ describe("StudioCanvas", () => {
 		const canvas = screen.getByTestId("studio-canvas");
 		const surface = screen.getByTestId("studio-canvas-surface");
 		const before = surface.style.transform;
+		const beforeScale = before.match(/scale\(([^)]+)\)/)?.[1];
 
 		fireEvent.wheel(canvas, {
 			deltaX: 0,
@@ -773,9 +874,12 @@ describe("StudioCanvas", () => {
 		await vi.waitFor(() => {
 			expect(surface.style.transform).not.toBe(before);
 		});
+		expect(surface.style.transform.match(/scale\(([^)]+)\)/)?.[1]).toBe(
+			beforeScale,
+		);
 	});
 
-	it("pans instead of zooming when 2D trackpad gesture has horizontal delta", () => {
+	it("pans instead of zooming when 2D trackpad gesture has horizontal delta", async () => {
 		render(
 			<StudioCanvas
 				project={mockProject}
@@ -795,7 +899,9 @@ describe("StudioCanvas", () => {
 			clientX: 400,
 			clientY: 300,
 		});
-		expect(surface.style.transform).not.toBe(before);
+		await vi.waitFor(() => {
+			expect(surface.style.transform).not.toBe(before);
+		});
 		const beforeScale = before.match(/scale\(([^)]+)\)/)?.[1];
 		const afterScale = surface.style.transform.match(/scale\(([^)]+)\)/)?.[1];
 		expect(afterScale).toBe(beforeScale);

@@ -1,5 +1,5 @@
 import {
-	STUDIO_CANVAS_COMPOSER_INSET_PX,
+	STUDIO_CANVAS_BOTTOM_INSET_PX,
 	STUDIO_CANVAS_FIT_PADDING_PX,
 	STUDIO_CANVAS_FRAME_GAP_PX,
 	STUDIO_CANVAS_FRAME_HEADER_PX,
@@ -19,6 +19,8 @@ export interface StudioCanvasFrameBounds {
 export interface StudioCanvasAvailable {
 	width: number;
 	height: number;
+	/** Left band a floating overlay (the chat panel) covers; frames are framed beside it. */
+	insetLeft?: number;
 }
 
 export interface StudioCanvasFitInput {
@@ -59,10 +61,7 @@ export function computeCanvasTrack(bounds: StudioCanvasFrameBounds[]): {
 	};
 }
 
-/**
- * The band of the canvas the floating overlays leave free: the header sits
- * above it, the composer below it, and the right-centre toolbar narrows it.
- */
+/** Keeps frame bounds clear of the canvas edge and floating controls. */
 export function computeCanvasUsableBand(available: StudioCanvasAvailable): {
 	width: number;
 	height: number;
@@ -70,13 +69,15 @@ export function computeCanvasUsableBand(available: StudioCanvasAvailable): {
 	return {
 		width: Math.max(
 			STUDIO_CANVAS_MIN_VISIBLE_PX,
-			available.width - STUDIO_CANVAS_TOOLBAR_INSET_PX * 2,
+			available.width -
+				(available.insetLeft ?? 0) -
+				STUDIO_CANVAS_TOOLBAR_INSET_PX * 2,
 		),
 		height: Math.max(
 			STUDIO_CANVAS_MIN_VISIBLE_PX,
 			available.height -
 				STUDIO_CANVAS_HEADER_INSET_PX -
-				STUDIO_CANVAS_COMPOSER_INSET_PX,
+				STUDIO_CANVAS_BOTTOM_INSET_PX,
 		),
 	};
 }
@@ -85,7 +86,10 @@ function clampZoom(value: number, minZoom: number, maxZoom: number): number {
 	return Math.min(maxZoom, Math.max(minZoom, value));
 }
 
-function frameOffset(bounds: StudioCanvasFrameBounds[], index: number): number {
+export function frameOffset(
+	bounds: StudioCanvasFrameBounds[],
+	index: number,
+): number {
 	return (
 		bounds.slice(0, index).reduce((total, frame) => total + frame.width, 0) +
 		index * STUDIO_CANVAS_FRAME_GAP_PX
@@ -118,10 +122,11 @@ export function computeCanvasFit({
 	// centres the artboards when they fit. If they exceed the usable canvas
 	// band at minimum readable zoom, prioritize framing the leading artboard
 	// under the insets so content remains comfortably readable and pan-navigable.
+	const insetLeft = available.insetLeft ?? 0;
 	const panX =
 		track.width * zoom > usable.width
-			? STUDIO_CANVAS_TOOLBAR_INSET_PX
-			: (available.width - track.width * zoom) / 2;
+			? insetLeft + STUDIO_CANVAS_TOOLBAR_INSET_PX
+			: insetLeft + (available.width - insetLeft - track.width * zoom) / 2;
 
 	const panY =
 		track.height * zoom > usable.height
@@ -198,9 +203,69 @@ export function computeCanvasInitialView({
 		zoom,
 		pan: {
 			x:
+				(available.insetLeft ?? 0) +
 				STUDIO_CANVAS_HEADER_INSET_PX -
 				(STUDIO_CANVAS_FRAME_PADDING_PX + contentOffset) * zoom,
 			y: STUDIO_CANVAS_HEADER_INSET_PX - STUDIO_CANVAS_FRAME_PADDING_PX * zoom,
+		},
+	};
+}
+
+/**
+ * Pure camera math for the contextual Focus action. Unlike Fit All this frames
+ * one artboard: it keeps a readable width floor for tall mobile screens,
+ * leaves room for the chat panel and both floating tool columns, and top-aligns
+ * when the frame cannot fit vertically. The frame id and its HTML are never
+ * touched; only zoom and pan are produced.
+ */
+export function computeFrameFocus({
+	bounds,
+	available,
+	minZoom,
+	maxZoom,
+	frameIndex,
+	readableMinZoom = STUDIO_CANVAS_INITIAL_MIN_ZOOM,
+}: StudioCanvasFitInput & {
+	frameIndex: number;
+	readableMinZoom?: number;
+}): StudioCanvasView {
+	if (!bounds.length) return { zoom: minZoom, pan: { x: 0, y: 0 } };
+	const index = Math.min(
+		bounds.length - 1,
+		Math.max(0, Number.isFinite(frameIndex) ? Math.trunc(frameIndex) : 0),
+	);
+	const target = bounds[index];
+	if (!target) return { zoom: minZoom, pan: { x: 0, y: 0 } };
+	const usable = computeCanvasUsableBand(available);
+	const zoom = clampZoom(
+		Math.max(
+			readableMinZoom,
+			Math.min(
+				usable.width / (target.width + STUDIO_CANVAS_TOOLBAR_INSET_PX),
+				usable.height / target.height,
+			),
+		),
+		minZoom,
+		maxZoom,
+	);
+	const scaledWidth = target.width * zoom;
+	const scaledHeight = target.height * zoom;
+	const bandLeft = (available.insetLeft ?? 0) + STUDIO_CANVAS_TOOLBAR_INSET_PX;
+	const x =
+		scaledWidth + STUDIO_CANVAS_TOOLBAR_INSET_PX <= usable.width
+			? bandLeft +
+				(usable.width - STUDIO_CANVAS_TOOLBAR_INSET_PX - scaledWidth) / 2
+			: bandLeft;
+	const y =
+		scaledHeight <= usable.height
+			? STUDIO_CANVAS_HEADER_INSET_PX + (usable.height - scaledHeight) / 2
+			: STUDIO_CANVAS_HEADER_INSET_PX;
+	const contentOffset = frameOffset(bounds, index);
+	return {
+		zoom,
+		pan: {
+			x: x - (STUDIO_CANVAS_FRAME_PADDING_PX + contentOffset) * zoom,
+			y: y - STUDIO_CANVAS_FRAME_PADDING_PX * zoom,
 		},
 	};
 }

@@ -8,7 +8,7 @@ import {
 	writeStudioCanvasView,
 } from "@/features/studio/services/studio-canvas-view";
 import {
-	STUDIO_CANVAS_COMPOSER_INSET_PX,
+	STUDIO_CANVAS_BOTTOM_INSET_PX,
 	STUDIO_CANVAS_FIT_PADDING_PX,
 	STUDIO_CANVAS_FRAME_GAP_PX,
 	STUDIO_CANVAS_FRAME_HEADER_PX,
@@ -56,7 +56,7 @@ describe("computeCanvasInitialView", () => {
 		const usableHeight =
 			WIDE.height -
 			STUDIO_CANVAS_HEADER_INSET_PX -
-			STUDIO_CANVAS_COMPOSER_INSET_PX;
+			STUDIO_CANVAS_BOTTOM_INSET_PX;
 		// The whole artboard plus its title line is visible below the header.
 		const contentTop = pan.y + (STUDIO_CANVAS_FIT_PADDING_PX / 2) * zoom;
 		const contentBottom =

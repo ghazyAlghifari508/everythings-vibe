@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { StudioFrameRow } from "@/db/schema";
 import {
 	isStudioCanvasViewVisible,
@@ -6,6 +6,7 @@ import {
 	writeStudioCanvasView,
 } from "@/features/studio/services/studio-canvas-view";
 import {
+	STUDIO_CANVAS_FOCUS_TRANSITION_MS,
 	STUDIO_CANVAS_VIEW_SAVE_DELAY_MS,
 	STUDIO_VISUAL_FALLBACK_HEIGHT,
 	STUDIO_VISUAL_WIDTH,
@@ -13,23 +14,45 @@ import {
 import {
 	computeCanvasFit,
 	computeCanvasInitialView,
+	computeFrameFocus,
+	type StudioCanvasFrameBounds,
 	type StudioCanvasView,
 } from "@/features/studio/utils/studio-canvas-fit";
 import { useIsomorphicLayoutEffect } from "@/hooks/use-isomorphic-layout-effect";
+import type { StudioDevice } from "../types/studio-renderer";
+import {
+	STUDIO_DEVICE_PRESETS,
+	studioNativeDevice,
+} from "../types/studio-renderer";
+
+/** Where a frame the user asked for lives, so only a new request moves the camera. */
+export interface StudioCanvasFocusRequest {
+	frameId: string;
+	nonce: number;
+}
 
 interface UseStudioCanvasViewInput {
 	projectId: string;
 	/** Comfortable scale for this project's viewport class. */
 	preferredZoom: number;
 	frames: StudioFrameRow[];
+	/**
+	 * Width a floating overlay covers on the left. `null` while the layout is not
+	 * known yet, so the opening view is never computed against a guessed width.
+	 */
+	leftInsetPx: number | null;
 	canvasRef: React.RefObject<HTMLElement | null>;
 	selectedFrameId: string | null;
 	zoom: number;
 	pan: { x: number; y: number };
 	minZoom: number;
 	maxZoom: number;
-	setZoom: (value: number | ((prev: number) => number)) => void;
-	setPan: React.Dispatch<React.SetStateAction<{ x: number; y: number }>>;
+	/** Presentation-only viewport choice per frame; never part of generated HTML. */
+	frameDevices?: Readonly<Record<string, StudioDevice>>;
+	/** A new `nonce` moves the camera to that frame, e.g. from a chat result row. */
+	focusRequest?: StudioCanvasFocusRequest | null;
+	setZoom: (value: number) => void;
+	setPan: (value: { x: number; y: number }) => void;
 	resetZoom: () => void;
 }
 
@@ -45,18 +68,24 @@ export function useStudioCanvasView({
 	projectId,
 	preferredZoom,
 	frames,
+	leftInsetPx,
 	canvasRef,
 	selectedFrameId,
 	zoom,
 	pan,
 	minZoom,
 	maxZoom,
+	frameDevices,
+	focusRequest = null,
 	setZoom,
 	setPan,
 	resetZoom,
 }: UseStudioCanvasViewInput): {
 	measureFrame: (id: string, width: number, height: number) => void;
 	fitAll: () => void;
+	bounds: StudioCanvasFrameBounds[];
+	focusFrame: (frameId: string) => void;
+	cancelFocusAnimation: () => void;
 } {
 	// Real artboard measurements only feed Fit All, where the true rendered
 	// heights are exactly what the user asked to see.
@@ -77,6 +106,26 @@ export function useStudioCanvasView({
 		},
 		[],
 	);
+	// Measured artboards win; before measurement the real device preset is the
+	// best available geometry, so a device switch never waits for a screenshot.
+	const frameDevicesKey = frameDevices
+		? Object.entries(frameDevices)
+				.map(([id, value]) => `${id}:${value}`)
+				.join("|")
+		: "";
+	// biome-ignore lint/correctness/useExhaustiveDependencies: frameDevicesKey is the stable identity of frameDevices
+	const bounds = useMemo<StudioCanvasFrameBounds[]>(
+		() =>
+			frames.map((frame) => {
+				const measured = dimensions.get(frame.id);
+				if (measured) return measured;
+				const device =
+					frameDevices?.[frame.id] ?? studioNativeDevice(frame.viewport);
+				const preset = STUDIO_DEVICE_PRESETS[device];
+				return { width: preset.width, height: preset.height };
+			}),
+		[dimensions, frameDevicesKey, frames],
+	);
 
 	const fitAll = useCallback(() => {
 		const canvas = canvasRef.current;
@@ -84,48 +133,118 @@ export function useStudioCanvasView({
 			resetZoom();
 			return;
 		}
-		const bounds = frames.map(
-			(frame) =>
-				dimensions.get(frame.id) ?? {
-					width:
-						frame.viewport === "mobile"
-							? STUDIO_VISUAL_WIDTH.mobile
-							: STUDIO_VISUAL_WIDTH.web,
-					height:
-						frame.viewport === "mobile"
-							? STUDIO_VISUAL_FALLBACK_HEIGHT.mobile
-							: STUDIO_VISUAL_FALLBACK_HEIGHT.web,
-				},
-		);
+		// `bounds` already prefers measured artboards and current device presets.
 		const { zoom: nextZoom, pan: nextPan } = computeCanvasFit({
 			bounds,
-			available: canvas.getBoundingClientRect(),
+			available: {
+				width: canvas.getBoundingClientRect().width,
+				height: canvas.getBoundingClientRect().height,
+				insetLeft: leftInsetPx ?? 0,
+			},
 			minZoom,
 			maxZoom,
 		});
 		setZoom(nextZoom);
 		setPan(nextPan);
 	}, [
+		bounds,
 		canvasRef,
-		dimensions,
-		frames,
+		frames.length,
+		leftInsetPx,
 		maxZoom,
 		minZoom,
 		resetZoom,
 		setPan,
 		setZoom,
 	]);
+	const focusAnimationRef = useRef<number | null>(null);
+	const cancelFocusAnimation = useCallback(() => {
+		if (focusAnimationRef.current === null) return;
+		cancelAnimationFrame(focusAnimationRef.current);
+		focusAnimationRef.current = null;
+	}, []);
+	useEffect(() => () => cancelFocusAnimation(), [cancelFocusAnimation]);
+	const liveViewRef = useRef({ zoom, pan });
+	liveViewRef.current = { zoom, pan };
+	const focusFrame = useCallback(
+		(frameId: string) => {
+			const canvas = canvasRef.current;
+			const index = frames.findIndex((frame) => frame.id === frameId);
+			if (!canvas || index < 0) return;
+			cancelFocusAnimation();
+			const rect = canvas.getBoundingClientRect();
+			const { zoom: targetZoom, pan: targetPan } = computeFrameFocus({
+				bounds,
+				available: {
+					width: rect.width,
+					height: rect.height,
+					insetLeft: leftInsetPx ?? 0,
+				},
+				minZoom,
+				maxZoom,
+				frameIndex: index,
+			});
+			const reduceMotion =
+				typeof window !== "undefined" &&
+				typeof window.matchMedia === "function" &&
+				window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+			if (reduceMotion) {
+				setZoom(targetZoom);
+				setPan(targetPan);
+				return;
+			}
+			const from = liveViewRef.current;
+			const start = performance.now();
+			const tick = (now: number) => {
+				const progress = Math.min(
+					1,
+					(now - start) / STUDIO_CANVAS_FOCUS_TRANSITION_MS,
+				);
+				const eased = 1 - (1 - progress) ** 3;
+				setZoom(from.zoom + (targetZoom - from.zoom) * eased);
+				setPan({
+					x: from.pan.x + (targetPan.x - from.pan.x) * eased,
+					y: from.pan.y + (targetPan.y - from.pan.y) * eased,
+				});
+				if (progress < 1)
+					focusAnimationRef.current = requestAnimationFrame(tick);
+				else focusAnimationRef.current = null;
+			};
+			focusAnimationRef.current = requestAnimationFrame(tick);
+		},
+		[
+			bounds,
+			cancelFocusAnimation,
+			canvasRef,
+			frames,
+			leftInsetPx,
+			maxZoom,
+			minZoom,
+			setPan,
+			setZoom,
+		],
+	);
+
+	// An explicit request (a chat result row) centres that frame; later bounds,
+	// device or selection changes never re-centre the board on their own.
+	useEffect(() => {
+		if (focusRequest) focusFrame(focusRequest.frameId);
+	}, [focusRequest, focusFrame]);
 
 	// Restored or computed before paint: the canvas never shows the throwaway
 	// preset scale first, and no later frame update may override it.
 	const initializedProjectRef = useRef<string | null>(null);
 	useIsomorphicLayoutEffect(() => {
 		if (initializedProjectRef.current === projectId) return;
-		if (!frames.length) return;
+		if (!frames.length || leftInsetPx === null) return;
 		const canvas = canvasRef.current;
 		if (!canvas) return;
 		const rect = canvas.getBoundingClientRect();
-		const available = { width: rect.width, height: rect.height };
+		const available = {
+			width: rect.width,
+			height: rect.height,
+			insetLeft: leftInsetPx,
+		};
 		// A zero-sized canvas (hidden tab, server render, test DOM) has no
 		// geometry to frame yet.
 		if (available.width <= 0 || available.height <= 0) return;
@@ -159,6 +278,7 @@ export function useStudioCanvasView({
 	}, [
 		canvasRef,
 		frames,
+		leftInsetPx,
 		maxZoom,
 		minZoom,
 		preferredZoom,
@@ -194,5 +314,11 @@ export function useStudioCanvasView({
 		[],
 	);
 
-	return { measureFrame, fitAll };
+	return {
+		measureFrame,
+		fitAll,
+		bounds,
+		focusFrame,
+		cancelFocusAnimation,
+	};
 }

@@ -195,7 +195,7 @@ export function StudioDesignCustomPanel({
 							<div className="flex items-center gap-2.5 min-w-0">
 								{state.logo.data ? (
 									<img
-										src={state.logo.data}
+										src={`data:${state.logo.mimeType};base64,${state.logo.data}`}
 										alt="Preview logo"
 										className="size-7 rounded object-contain border border-graphite bg-onyx p-0.5"
 									/>

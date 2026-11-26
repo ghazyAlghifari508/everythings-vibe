@@ -327,9 +327,9 @@ describe("TASK 04 Quality, Responsive Layout & HTML/CSS Reliability (14 Scenario
 			blueprint: financeBlueprint,
 			viewport: "web",
 			expectTokens: false,
-			designSkillId: "none",
 			dsTokens: null,
 			logoUrl: null,
+			preservation: "new-frame",
 			activeScreen: "Beranda",
 		});
 

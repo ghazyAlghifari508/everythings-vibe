@@ -72,9 +72,9 @@ export const GUIDES: readonly WorkflowGuide[] = [
 					"Akses /design dan tulis instruksi komponen, halaman, atau layout yang diinginkan.",
 			},
 			{
-				action: "Pilih skill & referensi",
+				action: "Tautkan referensi desain",
 				detail:
-					"Gunakan panduan styling bawaan atau tautkan token desain dari VibeScrape untuk konsistensi visual.",
+					"Pilih tema bawaan, unggah DESIGN.md, atau tautkan token desain dari VibeScrape untuk konsistensi visual.",
 			},
 			{
 				action: "Inspeksi kanvas multi-screen",

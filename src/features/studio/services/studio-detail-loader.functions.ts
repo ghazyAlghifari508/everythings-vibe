@@ -14,6 +14,8 @@ export const loadStudioDetail = createServerFn({ method: "GET" })
 			project: detail.project,
 			frames: detail.frames,
 			activeJob: detail.activeJob,
+			jobs: detail.jobs,
+			messages: detail.messages,
 			logoUrl: detail.logoUrl,
 			revisions: detail.revisions,
 			latest: detail.latest,

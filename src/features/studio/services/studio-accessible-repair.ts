@@ -2,7 +2,7 @@ import { JSDOM } from "jsdom";
 
 export function repairStudioAccessibleLabels(html: string): string {
 	const dom = new JSDOM(html, { includeNodeLocations: true });
-	const replacements: Array<{ offset: number; label: string }> = [];
+	const replacements: Array<{ offset: number; attribute: string }> = [];
 	for (const button of dom.window.document.querySelectorAll("button")) {
 		if (
 			button.textContent?.trim() ||
@@ -36,14 +36,41 @@ export function repairStudioAccessibleLabels(html: string): string {
 		if (!label || !location) continue;
 		replacements.push({
 			offset: location.endOffset - 1,
-			label: label
-				.replace(/&/g, "&amp;")
-				.replace(/"/g, "&quot;")
-				.replace(/</g, "&lt;"),
+			attribute: `aria-label="${label.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;")}"`,
 		});
 	}
-	// ponytail: only single explicit image/svg alternatives are safe; ambiguous controls remain for bounded AI correction.
-	for (const { offset, label } of replacements.reverse())
-		html = `${html.slice(0, offset)} aria-label="${label}"${html.slice(offset)}`;
+	const usedIds = new Set(
+		Array.from(
+			dom.window.document.querySelectorAll("[id]"),
+			(element) => element.id,
+		).filter(Boolean),
+	);
+	let generatedId = 0;
+	for (const input of dom.window.document.querySelectorAll(
+		'input[type="search"]',
+	)) {
+		const location = dom.nodeLocation(input)?.startTag;
+		if (!location) continue;
+		let id = input.id.trim();
+		if (!id) {
+			do {
+				id = `studio-search-${++generatedId}`;
+			} while (usedIds.has(id));
+			usedIds.add(id);
+		}
+		const attributes: string[] = [];
+		if (!input.id.trim()) attributes.push(`id="${id}"`);
+		if (!input.getAttribute("name")?.trim()) attributes.push(`name="${id}"`);
+		if (attributes.length)
+			replacements.push({
+				offset: location.endOffset - 1,
+				attribute: attributes.join(" "),
+			});
+	}
+	for (const { offset, attribute } of replacements.sort(
+		(left, right) => right.offset - left.offset,
+	))
+		html = `${html.slice(0, offset)} ${attribute}${html.slice(offset)}`;
+	dom.window.close();
 	return html;
 }

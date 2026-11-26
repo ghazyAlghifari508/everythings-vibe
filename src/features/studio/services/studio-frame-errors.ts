@@ -18,6 +18,10 @@ export type StudioFrameErrorCode =
 	| "STUDIO_DUPLICATE_SCREEN"
 	| "STUDIO_SCREEN_LIMIT"
 	| "STUDIO_NOT_FOUND"
+	| "STUDIO_STALE_REVISION"
+	| "STUDIO_DEPENDENCY_FAILED"
+	| "STUDIO_IDEMPOTENCY_CONFLICT"
+	| "STUDIO_REVISION_TOO_LARGE"
 	| "STUDIO_UNAUTHORIZED";
 
 interface StudioFrameErrorDescriptor {
@@ -106,6 +110,25 @@ export const STUDIO_FRAME_ERRORS: Record<
 		status: 401,
 		message: "Silakan masuk kembali untuk membuka Studio.",
 	},
+	STUDIO_STALE_REVISION: {
+		status: 409,
+		message:
+			"Versi layar telah berubah. Kirim ulang revisi terhadap versi terbaru.",
+	},
+	STUDIO_DEPENDENCY_FAILED: {
+		status: 409,
+		message:
+			"Dependensi desain gagal. Pulihkan perencanaan atau layar sumber, lalu coba lagi.",
+	},
+	STUDIO_IDEMPOTENCY_CONFLICT: {
+		status: 409,
+		message: "Identitas permintaan sudah dipakai untuk operasi lain.",
+	},
+	STUDIO_REVISION_TOO_LARGE: {
+		status: 413,
+		message:
+			"Halaman ini terlalu besar untuk direvisi dengan aman. Desain sebelumnya tetap tersimpan; coba perubahan yang lebih kecil.",
+	},
 };
 
 /**
@@ -122,6 +145,7 @@ export type StudioFrameFailureCategory =
 	| "lease-loss"
 	| "planning-required"
 	| "resource-missing"
+	| "context-budget"
 	| "cancelled"
 	| "unknown";
 
@@ -154,6 +178,10 @@ const FAILURE_CATEGORY_BY_CODE: Record<
 	STUDIO_DUPLICATE_SCREEN: "unknown",
 	STUDIO_SCREEN_LIMIT: "unknown",
 	STUDIO_UNAUTHORIZED: "unknown",
+	STUDIO_STALE_REVISION: "unknown",
+	STUDIO_DEPENDENCY_FAILED: "planning-required",
+	STUDIO_IDEMPOTENCY_CONFLICT: "unknown",
+	STUDIO_REVISION_TOO_LARGE: "context-budget",
 };
 
 const RECOVERY_BY_CATEGORY: Record<
@@ -168,6 +196,7 @@ const RECOVERY_BY_CATEGORY: Record<
 	"lease-loss": "wait-for-recovery",
 	"planning-required": "retry-planning",
 	"resource-missing": "none",
+	"context-budget": "none",
 	cancelled: "retry-generation",
 	unknown: "retry-generation",
 };
@@ -234,6 +263,13 @@ function namedErrorField(error: unknown, field: string): string | null {
 }
 
 export function studioFrameErrorCodeFor(error: unknown): StudioFrameErrorCode {
+	return classifyStudioFrameError(error, 0);
+}
+
+function classifyStudioFrameError(
+	error: unknown,
+	depth: number,
+): StudioFrameErrorCode {
 	if (error instanceof StudioFrameError) return error.code;
 	if (error instanceof ScrapeError) {
 		const mapped = SHARED_CODE_MAP[error.code];
@@ -252,6 +288,18 @@ export function studioFrameErrorCodeFor(error: unknown): StudioFrameErrorCode {
 	}
 	if (kind === "TimeoutError") return "STUDIO_PROVIDER_TIMEOUT";
 	if (kind === "AbortError") return "STUDIO_CANCELLED";
+	if (
+		depth < 4 &&
+		typeof error === "object" &&
+		error !== null &&
+		"cause" in error
+	) {
+		const cause = Reflect.get(error, "cause");
+		if (cause !== null && cause !== undefined) {
+			const causeCode = classifyStudioFrameError(cause, depth + 1);
+			if (causeCode !== "STUDIO_FRAME_FAILED") return causeCode;
+		}
+	}
 	const message = error instanceof Error ? error.message : String(error);
 	if (/unauthorized|forbidden|not authenticated/i.test(message))
 		return "STUDIO_UNAUTHORIZED";

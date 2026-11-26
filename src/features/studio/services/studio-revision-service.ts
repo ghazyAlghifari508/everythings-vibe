@@ -27,7 +27,9 @@ export async function reviseStudioProject(
 
 	const previousHtml = detail.latest?.htmlCode;
 	const designMode = validateStudioDesignMode(detail.designMode);
-	const userPrompt = buildStudioUserPrompt(checked.prompt, {
+	const productBrief = detail.revisions.at(-1)?.prompt ?? detail.title;
+	const revisionRequest = `Original product brief: ${productBrief}\nRequested change: ${checked.prompt}`;
+	const userPrompt = buildStudioUserPrompt(revisionRequest, {
 		previousHtml,
 		designMode,
 		designMd: detail.designMd,
@@ -38,13 +40,16 @@ export async function reviseStudioProject(
 	const dsTokens = extractDesignSystemTokens(detail.designMd);
 	const htmlCode = await generateValidatedFrameHtml({
 		framePrompt: userPrompt,
-		stage: "revision",
 		blueprint: null,
 		viewport: designMode,
 		expectTokens: dsTokens !== null,
-		designSkillId: detail.designSkillId,
 		dsTokens,
 		logoUrl: detail.logoUrl,
+		contentContext: { brief: revisionRequest, prdContent: detail.prdContent },
+		// A project revision always edits committed HTML. If that document cannot
+		// be revised safely, the request fails and the previous revision stays.
+		preservation: previousHtml ? "preserve-existing" : "new-frame",
+		requestedChange: checked.prompt,
 	});
 	const nextVersion = (detail.latest?.version ?? 0) + 1;
 

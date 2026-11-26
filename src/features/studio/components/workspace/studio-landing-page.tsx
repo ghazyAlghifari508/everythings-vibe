@@ -20,10 +20,6 @@ import { StudioMobileHistoryDrawer } from "@/features/studio/components/workspac
 import { StudioSidebar } from "@/features/studio/components/workspace/studio-sidebar";
 import { useStudioHistoryActions } from "@/features/studio/hooks/use-studio-history-actions";
 import {
-	STUDIO_DEFAULT_PAGE_COUNT,
-	type StudioDesignSkillId,
-} from "@/features/studio/services/studio-generation-options";
-import {
 	getStudioPresetDesignMd,
 	STUDIO_DESIGN_PRESETS,
 } from "@/features/studio/services/studio-presets";
@@ -68,8 +64,6 @@ export function StudioLandingPage({
 	const [prompt, setPrompt] = useState(search.prompt ?? "");
 	const [config, setConfig] = useState<LaunchComposerConfig>({
 		designMode: "web",
-		designSkillId: "none" satisfies StudioDesignSkillId,
-		initialPageCount: STUDIO_DEFAULT_PAGE_COUNT,
 	});
 	const [stagedReference, setStagedReference] =
 		useState<StagedReference | null>(null);
@@ -104,11 +98,7 @@ export function StudioLandingPage({
 	function applyShortcut(shortcut: StudioPromptShortcut) {
 		setPrompt(shortcut.prompt);
 		setSelectedShortcutId(shortcut.id);
-		setConfig((previous) => ({
-			...previous,
-			designMode: shortcut.designMode,
-			initialPageCount: shortcut.initialPageCount,
-		}));
+		setConfig({ designMode: shortcut.designMode });
 		setError("");
 		textareaRef.current?.focus();
 	}
@@ -174,10 +164,8 @@ export function StudioLandingPage({
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
-					prompt: prompt.trim(),
+					prompt,
 					designMode: config.designMode,
-					designSkillId: config.designSkillId,
-					initialPageCount: config.initialPageCount,
 					designReference: stagedReference
 						? stagedReference.kind === "theme"
 							? { kind: "theme", id: stagedReference.id }

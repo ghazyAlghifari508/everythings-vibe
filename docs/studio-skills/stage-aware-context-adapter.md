@@ -1,5 +1,11 @@
 # Stage-aware Studio skill context adapter
 
+> **RETIRED (P7).** The whole stage-aware skill context pipeline described here
+> was deleted: `studio-skill-context.server.ts`, `studio-skill-selection.server.ts`,
+> `studio-skill-context-audit.server.ts` and their tests are gone, along with the
+> `skillChars` / `perSkill` timing fields this document measures. Kept as the
+> historical design record. See `docs/prompt-design-studio/p7-implementation.md`.
+
 The upstream design skills (Impeccable, Frontend Design, UI UX Pro Max, Anti-Slop,
 Taste) are shipped verbatim from pinned revisions. Their documents are large —
 Anti-Slop is ~112 KB of Markdown, UI UX Pro Max ~51 KB plus CSV datasets — and

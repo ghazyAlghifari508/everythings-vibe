@@ -143,8 +143,6 @@ export function StudioShortcutCarousel({
 										<span>
 											{shortcut.designMode === "mobile" ? "Mobile" : "Web"}
 										</span>
-										<span aria-hidden>·</span>
-										<span>{shortcut.initialPageCount} halaman</span>
 									</span>
 								</button>
 							</li>

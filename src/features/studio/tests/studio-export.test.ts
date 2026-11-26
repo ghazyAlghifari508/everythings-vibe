@@ -37,6 +37,10 @@ describe("studio-export", () => {
 				attempts: 0,
 				visualHash: null,
 				promptHash: null,
+				originJobId: null,
+				initialSlot: null,
+				revision: 0,
+				lastJobId: null,
 				createdAt: new Date(),
 				updatedAt: new Date(),
 			},
@@ -53,6 +57,10 @@ describe("studio-export", () => {
 				attempts: 0,
 				visualHash: null,
 				promptHash: null,
+				originJobId: null,
+				initialSlot: null,
+				revision: 0,
+				lastJobId: null,
 				createdAt: new Date(),
 				updatedAt: new Date(),
 			},
@@ -69,6 +77,10 @@ describe("studio-export", () => {
 				attempts: 1,
 				visualHash: null,
 				promptHash: null,
+				originJobId: null,
+				initialSlot: null,
+				revision: 0,
+				lastJobId: null,
 				createdAt: new Date(),
 				updatedAt: new Date(),
 			},
@@ -79,25 +91,31 @@ describe("studio-export", () => {
 			global.URL.revokeObjectURL = vi.fn();
 		});
 
-		it("exports ready frames into ZIP archive and triggers download", async () => {
-			const clickSpy = vi.fn();
-			vi.spyOn(document.body, "appendChild");
-			vi.spyOn(document.body, "removeChild");
-
-			// Mock HTMLAnchorElement click
-			const originalCreateElement = document.createElement.bind(document);
-			vi.spyOn(document, "createElement").mockImplementation((tagName) => {
-				const el = originalCreateElement(tagName);
-				if (tagName === "a") {
-					el.click = clickSpy;
-				}
-				return el;
-			});
-
-			await exportProjectAsZip("Finance Mobile App", "p-1", mockFrames);
-
-			expect(global.URL.createObjectURL).toHaveBeenCalled();
-			expect(clickSpy).toHaveBeenCalled();
+		it("exports a historic project whose row still carries a retired design skill", async () => {
+			vi.stubGlobal(
+				"fetch",
+				vi.fn(async (url: string) =>
+					Response.json({
+						html: url.includes("f-1")
+							? "<html><body>Dashboard Content</body></html>"
+							: "<html><body>Transactions Content</body></html>",
+					}),
+				),
+			);
+			// `designSkillId` is retained legacy metadata on the project row; the
+			// exporter reads the persisted frames, so a historic project exports
+			// exactly like a current one.
+			const legacyProject = {
+				id: "p-legacy",
+				title: "Legacy App",
+				designSkillId: "impeccable",
+			};
+			await exportProjectAsZip(legacyProject.title, legacyProject.id, [
+				mockFrames[0],
+				mockFrames[1],
+			]);
+			expect(global.URL.createObjectURL).toHaveBeenCalledTimes(1);
+			vi.unstubAllGlobals();
 		});
 
 		it("rejects empty output rather than acknowledging a nonexistent download", async () => {
@@ -109,7 +127,13 @@ describe("studio-export", () => {
 		it("rejects unavailable required assets rather than exporting broken private references", async () => {
 			vi.stubGlobal(
 				"fetch",
-				vi.fn(async () => new Response(null, { status: 404 })),
+				vi.fn(async (url: string) =>
+					url.includes("document=1")
+						? Response.json({
+								html: '<html><body><img src="/api/studio/asset?id=asset-1&amp;cap=token"></body></html>',
+							})
+						: new Response(null, { status: 404 }),
+				),
 			);
 			await expect(
 				exportProjectAsZip("Sample", "p-1", [

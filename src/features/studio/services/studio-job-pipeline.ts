@@ -1,11 +1,6 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import {
-	studioFrames,
-	studioJobs,
-	studioProjects,
-	studioRevisions,
-} from "@/db/schema";
+import { studioFrames, studioJobs, studioProjects } from "@/db/schema";
 import { STUDIO_FRAME_CONCURRENCY } from "../types/studio-constants";
 import { isTemporarySlot } from "../utils/studio-lifecycle";
 import { extractDesignSystemTokens } from "./studio-design-tokens";
@@ -31,12 +26,14 @@ import {
 } from "./studio-planning";
 import { resolveStudioProjectTitle } from "./studio-project-title";
 import { validateStudioDesignMode } from "./studio-prompt-validation";
+import type { StudioWorkerExecution } from "./studio-worker-scheduler";
 
 export async function runStudioJobPipeline(
 	jobId: string,
 	projectId: string,
 	userId: string,
 	shutdownSignal?: AbortSignal,
+	execution?: StudioWorkerExecution,
 ): Promise<void> {
 	const workerId = crypto.randomUUID();
 	const acquisitionStartedAt = Date.now();
@@ -47,7 +44,7 @@ export async function runStudioJobPipeline(
 	const startedAt = Date.now();
 	// A failure before the shared blueprint exists is a planning failure, not a
 	// screen failure: the recovery the user needs is the whole plan, not one frame.
-	let sharedPlanningCompleted = false;
+	let sharedPlanningCompleted = job.jobType !== "initial";
 	studioJobTiming("queue-wait", job.createdAt.getTime(), {
 		jobId,
 		projectId,
@@ -58,7 +55,12 @@ export async function runStudioJobPipeline(
 			() => refreshStudioJobLease(jobId, workerId),
 			async (signal) => {
 				if (job.jobType !== "initial") {
-					await runStudioFrameOperation(job, claim, signal);
+					if (execution)
+						await execution.runModel(
+							() => runStudioFrameOperation(job, claim, signal),
+							signal,
+						);
+					else await runStudioFrameOperation(job, claim, signal);
 					return;
 				}
 				const [project] = await db
@@ -80,25 +82,33 @@ export async function runStudioJobPipeline(
 				studioJobTiming("project-context", Date.now(), {
 					jobId,
 					projectId,
-					skillId: project.designSkillId,
 					referenceChars: project.designMd?.length ?? 0,
 					prdChars: project.prdContent?.length ?? 0,
 				});
 				let frames = await db
 					.select()
 					.from(studioFrames)
-					.where(eq(studioFrames.projectId, projectId))
+					.where(
+						and(
+							eq(studioFrames.projectId, projectId),
+							eq(studioFrames.originJobId, jobId),
+						),
+					)
 					.orderBy(asc(studioFrames.order));
 				let blueprint = project.designBlueprint;
-				if (frames.length === 0 || frames.some(isTemporarySlot)) {
+				// Planning runs only for slots this job still owns and the planner has not
+				// named. Frames from other jobs cannot mask provisional slots because the
+				// query above is scoped by origin, and a completed plan is never re-run.
+				if (
+					!job.planningCompletedAt &&
+					(frames.length === 0 || frames.some(isTemporarySlot))
+				) {
 					const planningStartedAt = Date.now();
-					const planning = await planStudioScreens(
-						job,
-						project,
-						designMode,
-						claim,
-						signal,
-					);
+					const plan = () =>
+						planStudioScreens(job, project, designMode, claim, signal);
+					const planning = execution
+						? await execution.runModel(plan, signal)
+						: await plan();
 					signal.throwIfAborted();
 					blueprint = planning.designBlueprint;
 					const plannedTitle = resolveStudioProjectTitle({
@@ -111,6 +121,7 @@ export async function runStudioJobPipeline(
 							.update(studioProjects)
 							.set({
 								designBlueprint: planning.designBlueprint,
+								initialPageCount: planning.screenPlan.screens.length,
 								updatedAt: new Date(),
 							})
 							.where(
@@ -138,34 +149,48 @@ export async function runStudioJobPipeline(
 							userId,
 							planning.screenPlan.screens,
 							tx,
+							jobId,
 						);
 					});
 					studioJobTiming("planning", planningStartedAt, { jobId, projectId });
+				} else {
+					await withStudioJobWrite(claim, async (tx) => {
+						await tx
+							.update(studioJobs)
+							.set({
+								status: "generating",
+								planningCompletedAt: job.planningCompletedAt ?? new Date(),
+								error: null,
+								updatedAt: new Date(),
+							})
+							.where(
+								and(eq(studioJobs.id, jobId), eq(studioJobs.userId, userId)),
+							);
+					});
 				}
 				sharedPlanningCompleted = true;
-				await withStudioJobWrite(claim, async (tx) => {
-					await tx
-						.update(studioJobs)
-						.set({ status: "generating", error: null, updatedAt: new Date() })
-						.where(eq(studioJobs.id, jobId));
-				});
+				execution?.notify();
 				const frameStartedAt = Date.now();
 				const allScreenNames = frames.map((frame) => frame.name);
 				const results = await runWithConcurrency(
 					frames.map((frame) => async () => {
-						const result = await generateInitialFrame({
-							frame,
-							jobPrompt: job.prompt,
-							allScreenNames,
-							designSkillId: project.designSkillId,
-							designMd: project.designMd,
-							logoUrl,
-							dsTokens,
-							blueprint,
-							prdContent: project.prdContent,
-							lease: claim,
-							signal,
-						});
+						const generate = () =>
+							generateInitialFrame({
+								frame,
+								jobPrompt: job.prompt,
+								allScreenNames,
+								designMd: project.designMd,
+								logoUrl,
+								dsTokens,
+								blueprint,
+								prdContent: project.prdContent,
+								lease: claim,
+								signal,
+							});
+						const result = execution
+							? await execution.runModel(generate, signal)
+							: await generate();
+						execution?.notify();
 						if (result.ok && frame.status !== "ready")
 							studioJobTiming("frame-ready", job.createdAt.getTime(), {
 								jobId,
@@ -179,23 +204,8 @@ export async function runStudioJobPipeline(
 				signal.throwIfAborted();
 				studioJobTiming("frames", frameStartedAt, { jobId, projectId });
 				const ready = results.filter((result) => result.ok);
-				const first = ready[0];
 				const persistenceStartedAt = Date.now();
 				await withStudioJobWrite(claim, async (tx) => {
-					if (first?.ok) {
-						const [existing] = await tx
-							.select({ id: studioRevisions.id })
-							.from(studioRevisions)
-							.where(eq(studioRevisions.projectId, projectId))
-							.limit(1);
-						if (!existing)
-							await tx.insert(studioRevisions).values({
-								projectId,
-								prompt: job.prompt,
-								htmlCode: first.htmlCode,
-								version: 1,
-							});
-					}
 					await tx
 						.update(studioJobs)
 						.set({
@@ -266,8 +276,17 @@ export async function runStudioJobPipeline(
 								eq(studioFrames.projectId, projectId),
 								inArray(studioFrames.status, ["queued", "generating"]),
 								job.targetFrameId
-									? eq(studioFrames.id, job.targetFrameId)
-									: undefined,
+									? and(
+											eq(studioFrames.id, job.targetFrameId),
+											eq(studioFrames.revision, job.baseRevision ?? 0),
+										)
+									: and(
+											eq(studioFrames.originJobId, jobId),
+											// A screen that already produced HTML is never failed by
+											// a sibling's failure; only this job's own ungenerated
+											// slots reach the failed state.
+											isNull(studioFrames.htmlCode),
+										),
 							),
 						);
 					await tx
@@ -275,6 +294,7 @@ export async function runStudioJobPipeline(
 						.set({
 							status: "failed",
 							error: failureMessage,
+							errorCode: studioFrameErrorCodeFor(failure),
 							claimedBy: null,
 							claimedAt: null,
 							leaseExpiresAt: null,

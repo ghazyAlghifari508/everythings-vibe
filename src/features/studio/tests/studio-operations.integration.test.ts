@@ -157,7 +157,7 @@ it("targets only the selected frames for a selected-frame revision", async () =>
 });
 
 it("revises every frame only when the message explicitly asks for it", async () => {
-	const { userId, project } = await seedProject();
+	const { userId, project, frames } = await seedProject();
 	const accepted = await enqueueStudioOperation(project.id, userId, {
 		prompt: "Ubah semua halaman menjadi lebih minimal",
 		requestId: crypto.randomUUID(),
@@ -165,8 +165,22 @@ it("revises every frame only when the message explicitly asks for it", async () 
 	expect(accepted.intent).toBe("revise_project");
 	if (accepted.intent === "clarify") throw new Error("unexpected clarify");
 	expect(accepted.jobs).toHaveLength(4);
+	expect(accepted.jobs.map((job) => job.targetFrameId).sort()).toEqual(
+		frames.map((frame) => frame.id).sort(),
+	);
+	// Accepting the revision must not hide approved output: the frames keep their
+	// ready state and HTML, and the queue is what states the work is pending.
 	const stored = await storedFrames(project.id);
-	expect(stored.every((frame) => frame.status === "queued")).toBe(true);
+	expect(stored.map((frame) => frame.status)).toEqual([
+		"ready",
+		"ready",
+		"ready",
+		"ready",
+	]);
+	expect(stored.map((frame) => frame.htmlCode)).toEqual(
+		frames.map((frame) => frame.htmlCode),
+	);
+	expect(accepted.jobs.every((job) => job.status === "queued")).toBe(true);
 });
 
 it("clarifies instead of regenerating when the instruction has no target", async () => {

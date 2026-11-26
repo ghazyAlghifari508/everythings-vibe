@@ -1,5 +1,10 @@
 # Controlled Quality Evaluation Matrix: 6 Product Types × 6 Design Skills
 
+> **RETIRED (P7).** The six skill states no longer exist, so this matrix cannot be
+> re-run as written. The product-type coverage and the base quality standard it
+> separated out both survive. Kept as historical evidence; see
+> `docs/prompt-design-studio/p7-implementation.md`.
+
 **Author:** VibeDesign Studio Engineering  
 **Task:** P3 — Comprehensive Design Skill Audit, Taste Upgrade to v2.1.5, and Base Quality Separation  
 **Verification Mode:** Deterministic contract verification, schema and DOM structural evaluation, stage budget bounds, and mocked provider pipeline (No browser QA executed per non-negotiable instruction).

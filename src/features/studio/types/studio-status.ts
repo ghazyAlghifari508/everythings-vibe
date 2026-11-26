@@ -2,16 +2,15 @@ import { z } from "zod";
 import type {
 	StudioFrameRow,
 	StudioJobRow,
+	StudioMessageRow,
 	StudioProjectRow,
 } from "@/db/schema";
 import { studioDesignBlueprintSchema } from "../services/studio-design-blueprint";
-import {
-	studioDesignReferenceMetadataSchema,
-	studioDesignSkillIdSchema,
-} from "../services/studio-generation-options";
+import { studioDesignReferenceMetadataSchema } from "../services/studio-generation-options";
 import { studioTitleSourceSchema } from "../services/studio-project-title";
 import { deriveStudioLifecycle } from "../utils/studio-lifecycle";
 import { STUDIO_JOB_QUEUE_HEALTH_MS } from "./studio-constants";
+import { studioMessageSchema } from "./studio-conversation";
 
 const date = z.union([
 	z.date(),
@@ -27,7 +26,9 @@ const projectSchema = z.object({
 	titleSource: studioTitleSourceSchema,
 	designMode: z.enum(["web", "mobile"]),
 	designMd: nullableText,
-	designSkillId: studioDesignSkillIdSchema,
+	// Legacy column: retained only so a historic project row validates. Current
+	// code neither reads nor writes it beyond that passthrough.
+	designSkillId: z.string(),
 	initialPageCount: z.int().nullable(),
 	designReference: studioDesignReferenceMetadataSchema.nullable(),
 	designBlueprint: studioDesignBlueprintSchema.nullable(),
@@ -53,6 +54,10 @@ const frameSchema = z.object({
 	attempts: z.int().nonnegative(),
 	visualHash: nullableText,
 	promptHash: nullableText,
+	originJobId: nullableText.default(null),
+	initialSlot: z.int().nullable().default(null),
+	revision: z.int().nonnegative().default(0),
+	lastJobId: nullableText.default(null),
 	...timestamps,
 }) satisfies z.ZodType<StudioFrameRow>;
 
@@ -78,6 +83,15 @@ const jobSchema = z.object({
 	leaseExpiresAt: date.nullable(),
 	startedAt: date.nullable(),
 	finishedAt: date.nullable(),
+	requestId: nullableText.default(null),
+	requestHash: nullableText.default(null),
+	operationIntent: nullableText.default(null),
+	operationIndex: z.int().nullable().default(null),
+	blueprintJobId: nullableText.default(null),
+	dependsOnJobId: nullableText.default(null),
+	baseRevision: z.int().nullable().default(null),
+	planningCompletedAt: date.nullable().default(null),
+	errorCode: nullableText.default(null),
 	...timestamps,
 }) satisfies z.ZodType<StudioJobRow>;
 
@@ -86,20 +100,33 @@ export const studioStatusSchema = z
 		project: projectSchema,
 		frames: z.array(frameSchema),
 		activeJob: jobSchema.nullable(),
+		jobs: z.array(jobSchema).optional(),
+		messages: z.array(studioMessageSchema).optional(),
 	})
 	.refine(
-		({ project, frames, activeJob }) =>
+		({ project, frames, activeJob, jobs, messages }) =>
 			frames.every((frame) => frame.projectId === project.id) &&
 			(!activeJob ||
 				(activeJob.projectId === project.id &&
 					activeJob.userId === project.userId)) &&
+			(jobs ?? []).every(
+				(job) => job.projectId === project.id && job.userId === project.userId,
+			) &&
+			(messages ?? []).every(
+				(message) =>
+					message.projectId === project.id && message.userId === project.userId,
+			) &&
+			new Set((messages ?? []).map((message) => message.id)).size ===
+				(messages?.length ?? 0) &&
 			new Set(frames.map((frame) => frame.id)).size === frames.length,
 	);
 
 export interface StudioStatus {
 	project: StudioProjectRow;
 	frames: StudioFrameRow[];
+	jobs?: StudioJobRow[];
 	activeJob: StudioJobRow | null;
+	messages?: StudioMessageRow[];
 }
 
 export function isStudioProcessing(status: StudioStatus) {
