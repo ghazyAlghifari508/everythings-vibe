@@ -998,7 +998,7 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 		) as HTMLButtonElement | null;
 		expect(badge).not.toBeNull();
 		expect(badge?.tagName.toLowerCase()).toBe("button");
-		expect(badge?.textContent).toContain("Progress task · 2/5 selesai");
+		expect(badge?.textContent).toContain("Progress task, 2/5 selesai");
 
 		act(() => {
 			badge?.dispatchEvent(new MouseEvent("click", { bubbles: true }));

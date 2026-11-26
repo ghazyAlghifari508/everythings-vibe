@@ -41,10 +41,10 @@ describe("P08 — Actionable Task Progress & Banner Relocation", () => {
 
 		const button = screen.getByTestId("codebase-kanban-badge");
 		expect(button.tagName.toLowerCase()).toBe("button");
-		expect(button.textContent).toContain("Progress task · 1/4 selesai");
+		expect(button.textContent).toContain("Progress task, 1/4 selesai");
 		expect(button.textContent).not.toContain("Live");
 		expect(button.getAttribute("aria-label")).toBe(
-			"Progress task · 1/4 selesai",
+			"Progress task, 1/4 selesai",
 		);
 	});
 
@@ -129,7 +129,7 @@ describe("P08 — Actionable Task Progress & Banner Relocation", () => {
 			/>,
 		);
 		expect(screen.getByTestId("codebase-kanban-badge").textContent).toContain(
-			"Progress task · 2/5 selesai",
+			"Progress task, 2/5 selesai",
 		);
 		fireEvent.click(screen.getByTestId("codebase-kanban-badge"));
 		expect(currentTarget).toBe("tasks-feat-a");
@@ -142,7 +142,7 @@ describe("P08 — Actionable Task Progress & Banner Relocation", () => {
 			/>,
 		);
 		expect(screen.getByTestId("codebase-kanban-badge").textContent).toContain(
-			"Progress task · 8/10 selesai",
+			"Progress task, 8/10 selesai",
 		);
 		fireEvent.click(screen.getByTestId("codebase-kanban-badge"));
 		expect(currentTarget).toBe("tasks-feat-b");
