@@ -9,12 +9,26 @@ import {
 	waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useUIStore } from "@/store";
+import { useChatStore, useUIStore } from "@/store";
 import { Navbar } from "./navbar";
 import { canShowNavbarTopUp } from "./navbar-topup-helper";
 
 let mockPathname = "/vibeplan/test-project-1/prd";
 let mockSearch: Record<string, unknown> = {};
+const baseWorkspace = {
+	projectId: "test-project-1",
+	projectName: "Project",
+	progress: "fitur",
+	step: "fitur",
+	acStatus: "pending",
+	taskStatus: "pending",
+	featuresStatus: "completed",
+	hasFeatures: true,
+	hasPrd: false,
+	hasAc: false,
+	hasTasks: false,
+};
+let mockWorkspace = { ...baseWorkspace };
 
 vi.mock("@tanstack/react-router", () => ({
 	useLocation: ({
@@ -35,14 +49,7 @@ vi.mock("@tanstack/react-router", () => ({
 			matches: Array<{
 				routeId: string;
 				params: { id: string };
-				loaderData: {
-					projectName: string;
-					progress: string;
-					acStatus: string;
-					taskStatus: string;
-					featuresStatus: string;
-					hasAc: boolean;
-				};
+				loaderData: typeof mockWorkspace;
 			}>,
 		) => unknown;
 	}) =>
@@ -52,14 +59,7 @@ vi.mock("@tanstack/react-router", () => ({
 						{
 							routeId: "/vibeplan/$id",
 							params: { id: "test-project-1" },
-							loaderData: {
-								projectName: "Project",
-								progress: "fitur",
-								acStatus: "pending",
-								taskStatus: "pending",
-								featuresStatus: "completed",
-								hasAc: false,
-							},
+							loaderData: mockWorkspace,
 						},
 					]
 				: [],
@@ -156,6 +156,8 @@ function openUserMenu() {
 beforeEach(() => {
 	mockPathname = "/vibeplan/test-project-1/prd";
 	mockSearch = {};
+	mockWorkspace = { ...baseWorkspace };
+	useChatStore.getState().resetChat();
 	mockPlanData.plan = "free";
 	mockPlanData.topUpEligible = false;
 	sessionState.user = { id: "user-1", email: "user@test.com" };
@@ -233,6 +235,60 @@ describe("Navbar Paywall Integration Contract", () => {
 		expect(source).toContain("text-amber-400");
 	});
 });
+describe("Navbar PRD forward CTA", () => {
+	beforeEach(() => {
+		mockPathname = "/vibeplan/test-project-1/prd";
+		mockPlanData.plan = "pro";
+	});
+
+	it("never shows 'Kembali ke Fitur' while the parent snapshot is stale (step=fitur, no PRD yet)", () => {
+		renderNavbar();
+		expect(
+			screen.queryByRole("button", { name: /Kembali ke Fitur/i }),
+		).toBeNull();
+		const cta = screen.getByRole("button", { name: /Generate AC/i });
+		expect(cta.hasAttribute("disabled")).toBe(true);
+	});
+
+	it("enables Generate AC once the persisted PRD reaches the parent snapshot, even if step lags", () => {
+		mockWorkspace = { ...baseWorkspace, step: "fitur", hasPrd: true };
+		renderNavbar();
+		expect(
+			screen.queryByRole("button", { name: /Kembali ke Fitur/i }),
+		).toBeNull();
+		const cta = screen.getByRole("button", { name: /Generate AC/i });
+		expect(cta.hasAttribute("disabled")).toBe(false);
+	});
+
+	it("keeps Generate AC disabled while a PRD stream is running", () => {
+		mockWorkspace = { ...baseWorkspace, hasPrd: true };
+		useChatStore.getState().setGeneratingPRD(true);
+		renderNavbar();
+		expect(
+			screen
+				.getByRole("button", { name: /Generate AC/i })
+				.hasAttribute("disabled"),
+		).toBe(true);
+	});
+
+	it("opens the existing AC when it is already persisted", () => {
+		mockWorkspace = { ...baseWorkspace, hasPrd: true, hasAc: true };
+		renderNavbar();
+		expect(screen.getByRole("button", { name: /Lanjut ke AC/i })).toBeDefined();
+		expect(screen.queryByRole("button", { name: /Generate AC/i })).toBeNull();
+	});
+
+	it("shows the upgrade paywall CTA for free plans", () => {
+		mockPlanData.plan = "free";
+		mockWorkspace = { ...baseWorkspace, hasPrd: true };
+		renderNavbar();
+		expect(
+			screen.getByRole("button", { name: /Upgrade ke Pro/i }),
+		).toBeDefined();
+		expect(screen.queryByRole("button", { name: /Generate AC/i })).toBeNull();
+	});
+});
+
 describe("Navbar Fitur Generate PRD Contract", () => {
 	it("renders Generate PRD action on the fitur step", () => {
 		mockPathname = "/vibeplan/test-project-1/fitur";

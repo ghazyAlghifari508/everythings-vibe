@@ -32,6 +32,7 @@ export async function reviseStudioProject(
 	const checked = validateStudioPrompt(prompt);
 	if (!checked.ok) throw new ScrapeError("INVALID_URL", checked.error);
 	const detail = await getStudioProject(projectId, userId);
+
 	const scope = {
 		operation: "studio.revise" as const,
 		frames: 1,
@@ -52,7 +53,7 @@ export async function reviseStudioProject(
 				userId,
 				prompt: checked.prompt,
 				jobType: "revise",
-				status: "running",
+				status: "generating",
 			})
 			.returning();
 		if (!job) throw new ScrapeError("STORAGE_FAILED");
@@ -69,25 +70,32 @@ export async function reviseStudioProject(
 	try {
 		const previousHtml = detail.latest?.htmlCode;
 		const designMode = validateStudioDesignMode(detail.designMode);
-		const userPrompt = buildStudioUserPrompt(checked.prompt, {
+		const productBrief = detail.revisions.at(-1)?.prompt ?? detail.title;
+		const revisionRequest = `Original product brief: ${productBrief}\nRequested change: ${checked.prompt}`;
+		const userPrompt = buildStudioUserPrompt(revisionRequest, {
 			previousHtml,
 			designMode,
 			designMd: detail.designMd,
 			logoUrl: detail.logoUrl,
 			prdContent: detail.prdContent,
 		});
+
 		const dsTokens = extractDesignSystemTokens(detail.designMd);
 		const htmlCode = await generateValidatedFrameHtml({
 			framePrompt: userPrompt,
-			stage: "revision",
 			blueprint: null,
 			viewport: designMode,
 			expectTokens: dsTokens !== null,
-			designSkillId: detail.designSkillId,
 			dsTokens,
 			logoUrl: detail.logoUrl,
+			contentContext: { brief: revisionRequest, prdContent: detail.prdContent },
+			// A project revision always edits committed HTML. If that document cannot
+			// be revised safely, the request fails and the previous revision stays.
+			preservation: previousHtml ? "preserve-existing" : "new-frame",
+			requestedChange: checked.prompt,
 		});
 		const nextVersion = (detail.latest?.version ?? 0) + 1;
+
 		const revision = await db.transaction(async (tx) => {
 			const [created] = await tx
 				.insert(studioRevisions)

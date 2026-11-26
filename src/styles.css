@@ -28,17 +28,12 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes typingDotPulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.3); }
-}
 
 .animate-chat-bubble-in { animation: chatBubbleIn 0.3s ease-out both; }
 .animate-hero-fade-in { animation: heroFadeIn 0.2s ease-out 0.8s both; }
 .animate-hero-title { animation: heroItemIn 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.8s both; }
 .animate-hero-subtitle { animation: heroItemIn 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94) 1s both; }
 .animate-hero-chat { animation: heroItemIn 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94) 1.2s both; }
-.animate-typing-dot { animation: typingDotPulse 0.8s infinite; }
 
 :root {
   --sea-ink: #173a40;
@@ -482,3 +477,25 @@ a {
   }
 }
 
+
+/* Mobile chat drawer: Radix keeps it mounted until the exit animation ends. */
+@keyframes studioChatIn {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes studioChatOut {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(-12px); }
+}
+@keyframes studioChatFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.studio-chat-drawer[data-state="open"] { animation: studioChatIn 200ms ease-out both; }
+.studio-chat-drawer[data-state="closed"] { animation: studioChatOut 160ms ease-in both; }
+.studio-chat-scrim[data-state="open"] { animation: studioChatFade 200ms ease-out both; }
+.studio-chat-scrim[data-state="closed"] { animation: studioChatFade 160ms ease-in reverse both; }
+@media (prefers-reduced-motion: reduce) {
+  .studio-chat-drawer[data-state],
+  .studio-chat-scrim[data-state] { animation: none; }
+}

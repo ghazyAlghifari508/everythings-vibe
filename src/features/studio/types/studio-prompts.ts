@@ -10,8 +10,15 @@ export const studioScreenPlanItemSchema = z.object({
 	order: z.number().int().nonnegative(),
 });
 
+export const studioInitialScopeSchema = z.object({
+	requestedCount: z.int().positive().nullable(),
+	rationale: z.string().trim().min(1).max(500),
+	deferred: z.array(z.string().trim().min(1).max(160)).max(12),
+});
+
 export const studioScreenPlanSchema = z.object({
 	projectTitle: z.string().min(1).max(200),
+	scope: studioInitialScopeSchema.optional(),
 	screens: z.array(studioScreenPlanItemSchema).min(1).max(8),
 });
 
@@ -30,6 +37,8 @@ export interface StudioFramePromptOptions {
 	blueprint?: StudioDesignBlueprint | null;
 	activeScreen?: string;
 	prdContent?: string | null;
+	/** Distinguishes a first-time screen from one added to an existing project. */
+	screenOrigin?: "initial" | "add";
 }
 
 export type StudioPromptValidation =

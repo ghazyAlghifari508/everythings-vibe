@@ -59,7 +59,7 @@ describe.skipIf(!ISOLATED_ADMIN_URL)("product trial lifecycle", () => {
 		const start = (key: string) =>
 			createStudioProjectWithJob(
 				userId,
-				{ prompt: "Design a dashboard for a library", initialPageCount: 3 },
+				{ prompt: "Design a dashboard for a library" },
 				undefined,
 				key,
 			);

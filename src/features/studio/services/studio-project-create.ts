@@ -110,9 +110,10 @@ export async function createStudioProject(
 		blueprint: null,
 		viewport: designMode,
 		expectTokens: dsTokens !== null,
-		designSkillId: options.designSkillId,
 		dsTokens,
 		logoUrl,
+		contentContext: { brief: checked.prompt, prdContent: cleanPrdContent },
+		preservation: "new-frame",
 	});
 
 	const [project] = await db
@@ -124,8 +125,6 @@ export async function createStudioProject(
 			designMode,
 			designMd: cleanDesignMd,
 			logoAssetId,
-			designSkillId: options.designSkillId,
-			initialPageCount: options.initialPageCount,
 			designReference: resolved.designReference,
 			prdContent: cleanPrdContent,
 			prdFilename: cleanPrdFilename,

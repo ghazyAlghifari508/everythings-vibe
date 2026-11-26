@@ -9,10 +9,7 @@ import {
 } from "@/db/schema";
 import { buildFixtureModel } from "@/lib/design-fixture";
 import { renderDesignMd } from "@/lib/design-md-render";
-import type {
-	StudioDesignReference,
-	StudioDesignSkillId,
-} from "../services/studio-generation-options";
+import type { StudioDesignReference } from "../services/studio-generation-options";
 import { runStudioJobPipeline } from "../services/studio-job-pipeline";
 import { getStudioPresetDesignMd } from "../services/studio-presets";
 import { createStudioProjectWithJob } from "../services/studio-project-enqueue";
@@ -44,7 +41,6 @@ const CANONICAL = renderDesignMd(buildFixtureModel());
 const THEME_DOC = getStudioPresetDesignMd("workspace") ?? "";
 
 interface Combo {
-	skill: StudioDesignSkillId;
 	reference: StudioDesignReference;
 	designMd: string;
 	primary: string;
@@ -53,56 +49,18 @@ interface Combo {
 
 const COMBOS: Combo[] = [
 	{
-		skill: "none",
 		reference: { kind: "theme", id: "workspace" },
 		designMd: THEME_DOC,
 		primary: "#2563eb",
 		cards: "8px",
 	},
 	{
-		skill: "impeccable",
-		reference: { kind: "theme", id: "workspace" },
-		designMd: THEME_DOC,
-		primary: "#2563eb",
-		cards: "8px",
-	},
-	{
-		skill: "none",
 		reference: { kind: "scrape", id: "scrape-placeholder" },
 		designMd: CANONICAL,
 		primary: "#155eef",
 		cards: "24px",
 	},
 	{
-		skill: "impeccable",
-		reference: { kind: "scrape", id: "scrape-placeholder" },
-		designMd: CANONICAL,
-		primary: "#155eef",
-		cards: "24px",
-	},
-	{
-		skill: "frontend-design",
-		reference: { kind: "scrape", id: "scrape-placeholder" },
-		designMd: CANONICAL,
-		primary: "#155eef",
-		cards: "24px",
-	},
-	{
-		skill: "none",
-		reference: { kind: "custom", filename: "acme.md" },
-		designMd: CANONICAL,
-		primary: "#155eef",
-		cards: "24px",
-	},
-	{
-		skill: "ui-ux-pro-max",
-		reference: { kind: "custom", filename: "acme.md" },
-		designMd: CANONICAL,
-		primary: "#155eef",
-		cards: "24px",
-	},
-	{
-		skill: "taste",
 		reference: { kind: "custom", filename: "acme.md" },
 		designMd: CANONICAL,
 		primary: "#155eef",
@@ -112,7 +70,7 @@ const COMBOS: Combo[] = [
 
 describe("studio design reference compatibility matrix", () => {
 	for (const combo of COMBOS) {
-		it(`applies ${combo.reference.kind} + ${combo.skill} to planning and every frame`, async () => {
+		it(`applies ${combo.reference.kind} to planning and every frame`, async () => {
 			const userId = await createStudioUser();
 			const reference =
 				combo.reference.kind === "scrape"
@@ -123,8 +81,6 @@ describe("studio design reference compatibility matrix", () => {
 					: combo.reference;
 			const { project, job } = await createStudioProjectWithJob(userId, {
 				prompt: "Sample application brief",
-				initialPageCount: 2,
-				designSkillId: combo.skill,
 				designReference: reference,
 				designMd: combo.reference.kind === "custom" ? combo.designMd : null,
 			});
@@ -154,17 +110,6 @@ describe("studio design reference compatibility matrix", () => {
 			for (const messages of frames)
 				expect(messages[1]?.content).toContain(documentHead(combo.designMd));
 
-			// A skill refines within the reference contract; it never replaces the
-			// reference, and "none" must still receive it.
-			const skillClause = "selected design-reference contract";
-			expect(planning[0]?.[0]?.content.includes(skillClause)).toBe(
-				combo.skill !== "none",
-			);
-			for (const messages of frames)
-				expect(messages[0]?.content.includes(skillClause)).toBe(
-					combo.skill !== "none",
-				);
-
 			const stored = await db
 				.select()
 				.from(studioFrames)
@@ -176,8 +121,7 @@ describe("studio design reference compatibility matrix", () => {
 	it("keeps an uploaded logo attached to the persisted project and every frame prompt", async () => {
 		const userId = await createStudioUser();
 		const { project, job } = await createStudioProjectWithJob(userId, {
-			prompt: "Sample application brief",
-			initialPageCount: 1,
+			prompt: "Sample application brief with exactly 1 page",
 			designReference: { kind: "custom", filename: "acme.md" },
 			designMd: CANONICAL,
 			logo: {
@@ -222,8 +166,7 @@ describe("studio design reference compatibility matrix", () => {
 	it("keeps the reference in a retried frame generation", async () => {
 		const userId = await createStudioUser();
 		const { project, job } = await createStudioProjectWithJob(userId, {
-			prompt: "Sample application brief",
-			initialPageCount: 1,
+			prompt: "Sample application brief with exactly 1 page",
 			designReference: { kind: "custom", filename: "acme.md" },
 			designMd: CANONICAL,
 		});

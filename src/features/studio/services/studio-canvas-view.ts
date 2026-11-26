@@ -1,5 +1,5 @@
 import {
-	STUDIO_CANVAS_COMPOSER_INSET_PX,
+	STUDIO_CANVAS_BOTTOM_INSET_PX,
 	STUDIO_CANVAS_FIT_PADDING_PX,
 	STUDIO_CANVAS_FRAME_PADDING_PX,
 	STUDIO_CANVAS_HEADER_INSET_PX,
@@ -110,7 +110,7 @@ export function isStudioCanvasViewVisible(
 	const contentBottom =
 		contentTop +
 		Math.max(0, track.height - STUDIO_CANVAS_FIT_PADDING_PX) * view.zoom;
-	const usableBottom = available.height - STUDIO_CANVAS_COMPOSER_INSET_PX;
+	const usableBottom = available.height - STUDIO_CANVAS_BOTTOM_INSET_PX;
 	const overlapX =
 		Math.min(contentRight, available.width) - Math.max(contentLeft, 0);
 	const overlapY =

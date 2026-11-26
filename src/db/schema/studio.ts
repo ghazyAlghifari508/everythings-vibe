@@ -6,13 +6,16 @@ import {
 	text,
 	timestamp,
 	unique,
+	uniqueIndex,
 } from "drizzle-orm/pg-core";
+import type { StudioDesignReferenceMetadata } from "@/features/studio/services/studio-generation-options";
 import type { StudioTitleSource } from "@/features/studio/services/studio-project-title";
-import type { StudioDesignBlueprint } from "@/lib/studio-design-blueprint";
 import type {
-	StudioDesignReferenceMetadata,
-	StudioDesignSkillId,
-} from "@/lib/studio-generation-options";
+	StudioMessageAttachment,
+	StudioMessageProgress,
+	StudioMessageStatus,
+} from "@/features/studio/types/studio-conversation";
+import type { StudioDesignBlueprint } from "@/lib/studio-design-blueprint";
 import { users } from "./auth";
 
 export const studioProjects = pgTable(
@@ -25,21 +28,22 @@ export const studioProjects = pgTable(
 			.notNull()
 			.references(() => users.id, { onDelete: "cascade" }),
 		title: text("title").notNull(),
-		// Provenance of `title`: "auto" is a system-chosen name (the provisional
-		// title cut from the brief, then the planner's product name), "user" is a
-		// name a person typed through the rename dialog. Planning only replaces a
-		// title still marked "auto", so a rename is never overwritten. Defaults to
-		// "user" so a writer that forgets the column is protected.
+		// Planning can replace auto titles only. Default to user to protect older writers.
 		titleSource: text("title_source")
 			.$type<StudioTitleSource>()
 			.notNull()
 			.default("user"),
 		designMode: text("design_mode").notNull().default("web"),
 		designMd: text("design_md"),
-		designSkillId: text("design_skill_id")
-			.$type<StudioDesignSkillId>()
-			.notNull()
-			.default("none"),
+		/**
+		 * Legacy: the retired user-selectable design skill. Studio no longer
+		 * offers, reads or writes a skill, so this column is inert metadata kept
+		 * so historic projects load and export unchanged. Every new row takes the
+		 * "none" default. Dropping it would destroy history for no functional
+		 * gain; see docs/prompt-design-studio/p7-implementation.md.
+		 */
+		designSkillId: text("design_skill_id").notNull().default("none"),
+		/** Null until adaptive planning commits; historical jobs may have a preselected count. */
 		initialPageCount: integer("initial_page_count"),
 		designReference:
 			jsonb("design_reference").$type<StudioDesignReferenceMetadata>(),
@@ -47,6 +51,7 @@ export const studioProjects = pgTable(
 		designBlueprintVersion: integer("design_blueprint_version")
 			.notNull()
 			.default(1),
+		/** Legacy companion of `designSkillId`; never written by current code. */
 		designSkillVersion: integer("design_skill_version"),
 		logoAssetId: text("logo_asset_id"),
 		prdContent: text("prd_content"),
@@ -103,6 +108,9 @@ export const studioRevisions = pgTable(
 			.references(() => studioProjects.id, { onDelete: "cascade" }),
 		prompt: text("prompt").notNull(),
 		htmlCode: text("html_code").notNull(),
+		frameId: text("frame_id"),
+		frameRevision: integer("frame_revision"),
+		jobId: text("job_id"),
 		version: integer("version").notNull().default(1),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.defaultNow()
@@ -129,6 +137,18 @@ export const studioJobs = pgTable(
 		status: text("status").notNull().default("queued"),
 		error: text("error"),
 		claimedBy: text("claimed_by"),
+		/** One composer request may create several independently recoverable jobs. */
+		requestId: text("request_id"),
+		requestHash: text("request_hash"),
+		operationIntent: text("operation_intent"),
+		operationIndex: integer("operation_index"),
+		blueprintJobId: text("blueprint_job_id"),
+		dependsOnJobId: text("depends_on_job_id"),
+		baseRevision: integer("base_revision"),
+		planningCompletedAt: timestamp("planning_completed_at", {
+			withTimezone: true,
+		}),
+		errorCode: text("error_code"),
 		attempts: integer("attempts").notNull().default(0),
 		claimedAt: timestamp("claimed_at", { withTimezone: true }),
 		leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
@@ -154,6 +174,13 @@ export const studioJobs = pgTable(
 			t.projectId,
 			t.userId,
 		),
+		uniqueIndex("studio_jobs_request_part_idx").on(
+			t.projectId,
+			t.userId,
+			t.requestId,
+			t.operationIndex,
+		),
+		index("studio_jobs_dependency_idx").on(t.dependsOnJobId),
 	],
 );
 
@@ -176,6 +203,19 @@ export const studioFrames = pgTable(
 		attempts: integer("attempts").notNull().default(0),
 		visualHash: text("visual_hash"),
 		promptHash: text("prompt_hash"),
+		/**
+		 * Frame provenance and write ownership. `originJobId` is the job that
+		 * created the row ("initial" for a planned slot, "add" for a screen the
+		 * composer requested), `initialSlot` is the planned position inside that
+		 * job, `revision` counts persisted HTML versions and `lastJobId` names the
+		 * job that wrote the current revision. Provisional, planned, added,
+		 * revised, failed and ready frames are therefore distinguishable from
+		 * persisted relationships instead of from names or display order.
+		 */
+		originJobId: text("origin_job_id"),
+		initialSlot: integer("initial_slot"),
+		revision: integer("revision").notNull().default(0),
+		lastJobId: text("last_job_id"),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.defaultNow()
 			.notNull(),
@@ -188,8 +228,60 @@ export const studioFrames = pgTable(
 		index("studio_frames_order_idx").on(t.order),
 		index("studio_frames_project_status_idx").on(t.projectId, t.status),
 		unique("studio_frames_project_order_unique").on(t.projectId, t.order),
+		index("studio_frames_origin_idx").on(t.originJobId),
+		uniqueIndex("studio_frames_initial_slot_idx").on(
+			t.originJobId,
+			t.initialSlot,
+		),
 	],
 );
+
+/** One project is one conversation; each accepted operation owns a user/assistant pair. */
+export const studioMessages = pgTable(
+	"studio_messages",
+	{
+		id: text("id")
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		projectId: text("project_id")
+			.notNull()
+			.references(() => studioProjects.id, { onDelete: "cascade" }),
+		userId: text("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		/** Request ID for multi-job operations, otherwise the initial/retry job ID. */
+		operationId: text("operation_id").notNull(),
+		jobIds: jsonb("job_ids").$type<string[]>().notNull(),
+		role: text("role").$type<"user" | "assistant">().notNull(),
+		content: text("content").notNull(),
+		order: integer("order").notNull(),
+		status: text("status").$type<StudioMessageStatus>().notNull(),
+		attachments: jsonb("attachments")
+			.$type<StudioMessageAttachment[]>()
+			.notNull()
+			.default([]),
+		/** Public mechanical summary only, never provider errors or reasoning. */
+		progress: jsonb("progress").$type<StudioMessageProgress>(),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(t) => [
+		uniqueIndex("studio_messages_operation_role_idx").on(
+			t.projectId,
+			t.userId,
+			t.operationId,
+			t.role,
+		),
+		uniqueIndex("studio_messages_project_order_idx").on(t.projectId, t.order),
+		index("studio_messages_owner_idx").on(t.userId, t.projectId),
+	],
+);
+
+export type StudioMessageRow = typeof studioMessages.$inferSelect;
 
 export type StudioProjectRow = typeof studioProjects.$inferSelect;
 export type InsertStudioProjectRow = typeof studioProjects.$inferInsert;

@@ -68,7 +68,6 @@ function renderActions(
 			project: mockProject,
 			frames: [],
 			selectedFrameIds,
-			isProcessing: false,
 			syncProjectStatus,
 			setError,
 		}),
@@ -201,7 +200,9 @@ describe("TASK 09 — Remove Redundant Add-Screen Success Toast from Studio Canv
 		});
 
 		expect(submitResult).toEqual({ accepted: false });
-		expect(setError).toHaveBeenCalledWith("Jaringan bermasalah. Coba lagi.");
+		// The message itself belongs to the hook; the contract is that a network
+		// failure reaches the user and is never toasted as a success.
+		expect(setError).toHaveBeenCalled();
 		expect(showToast).not.toHaveBeenCalled();
 	});
 

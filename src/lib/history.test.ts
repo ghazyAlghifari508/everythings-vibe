@@ -169,6 +169,12 @@ describe("historyFilterSchema", () => {
 		expect(historyFilterSchema.parse({})).toEqual({});
 	});
 
+	it("accepts an omitted payload so the history drawer can read the global list", () => {
+		// The drawer calls loadHistory() with no data; before this default the
+		// server function rejected the call and the drawer showed a load error.
+		expect(historyFilterSchema.parse(undefined)).toEqual({});
+	});
+
 	it("rejects an unknown workspace instead of silently listing everything", () => {
 		expect(() => historyFilterSchema.parse({ workspace: "bogus" })).toThrow();
 	});

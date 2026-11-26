@@ -2,6 +2,11 @@ import { getRequestHeaders } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { httpStatusForErrorCode, ScrapeError } from "@/lib/design-errors";
 import { requireUser } from "@/lib/session";
+import {
+	mutateStudioElementHttp,
+	readStudioElementHttp,
+	studioElementHttpSchemas,
+} from "./studio-element-http";
 import { readStudioFrameDocument } from "./studio-frame-document";
 import {
 	STUDIO_FRAME_ERRORS,
@@ -9,16 +14,18 @@ import {
 } from "./studio-frame-errors";
 import { getStudioFrameVisual } from "./studio-frame-visual";
 import { enqueueStudioOperation } from "./studio-operation-enqueue";
+import { readStudioPrototypeHttp } from "./studio-prototype-http";
 import { retryStudioFrame, retryStudioPlanning } from "./studio-retry-service";
+import { readStudioThumbnailHttp } from "./studio-thumbnail-http";
 
 function studioErrorResponse(error: unknown): Response {
-if (error instanceof ScrapeError && error.code === "PRODUCT_PLAN_REQUIRED")
-	return Response.json(
-		{ error: error.message, code: error.code },
-		{ status: httpStatusForErrorCode(error.code) },
-	);
-// Public copy and HTTP status come from the taxonomy; the raw message stays
-// in this server-side diagnostic line.
+	if (error instanceof ScrapeError && error.code === "PRODUCT_PLAN_REQUIRED")
+		return Response.json(
+			{ error: error.message, code: error.code },
+			{ status: httpStatusForErrorCode(error.code) },
+		);
+	// Public copy and HTTP status come from the taxonomy; the raw message stays
+	// in this server-side diagnostic line.
 	const report = studioFrameErrorReport(error);
 	console.error("[studio.frame]", {
 		code: report.code,
@@ -41,6 +48,21 @@ export async function GET({
 	try {
 		const user = await requireUser(getRequestHeaders());
 		const url = new URL(request.url);
+		const elementResponse = await readStudioElementHttp(url, user.id);
+		if (elementResponse) {
+			status = elementResponse.status;
+			return elementResponse;
+		}
+		const prototypeResponse = await readStudioPrototypeHttp(url, user.id);
+		if (prototypeResponse) {
+			status = prototypeResponse.status;
+			return prototypeResponse;
+		}
+		const thumbnailResponse = await readStudioThumbnailHttp(url, user.id);
+		if (thumbnailResponse) {
+			status = thumbnailResponse.status;
+			return thumbnailResponse;
+		}
 		const projectId = url.searchParams.get("projectId");
 		const frameId = url.searchParams.get("frameId");
 		if (!projectId || !frameId) {
@@ -91,12 +113,16 @@ export async function GET({
 }
 
 export const studioFrameBodySchema = z.discriminatedUnion("action", [
+	...studioElementHttpSchemas,
 	z.object({
 		action: z.literal("operation"),
 		projectId: z.string().min(1),
 		prompt: z.string().min(10).max(4000),
 		frameIds: z.array(z.string().min(1)).max(100).optional(),
 		requestId: z.string().uuid(),
+		baseRevisions: z
+			.record(z.string().min(1), z.int().nonnegative())
+			.optional(),
 	}),
 	z.object({
 		action: z.literal("retry"),
@@ -128,11 +154,27 @@ export async function POST({
 			);
 		}
 		const body = parseRes.data;
+		if (
+			body.action === "element-prepare" ||
+			body.action === "element-transition"
+		) {
+			if (request.headers.get("origin") !== new URL(request.url).origin) {
+				return Response.json(
+					{
+						error: "Asal permintaan tidak valid.",
+						code: "STUDIO_UNAUTHORIZED",
+					},
+					{ status: 403 },
+				);
+			}
+			return await mutateStudioElementHttp(body, user.id, request.signal);
+		}
 		if (body.action === "operation") {
 			const accepted = await enqueueStudioOperation(body.projectId, user.id, {
 				prompt: body.prompt,
 				frameIds: body.frameIds,
 				requestId: body.requestId,
+				baseRevisions: body.baseRevisions,
 			});
 			return Response.json(accepted, {
 				status: accepted.intent === "clarify" ? 200 : 202,

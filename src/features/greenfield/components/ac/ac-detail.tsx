@@ -48,7 +48,6 @@ export function AcDetail({
 		isRetrySaving,
 		saveFailed,
 		streamingContent,
-		thinkingText,
 	} = useAcGeneration({
 		projectId,
 		plan,
@@ -63,7 +62,7 @@ export function AcDetail({
 
 	if (!latestPrdContent) {
 		return (
-			<div className="flex h-dvh items-center justify-center bg-onyx text-(--text-primary)">
+			<div className="flex h-full min-h-0 items-center justify-center bg-onyx text-(--text-primary)">
 				<div className="text-center">
 					<Icon
 						icon={File01Icon}
@@ -92,7 +91,7 @@ export function AcDetail({
 
 	return (
 		<>
-			<div className="flex h-dvh flex-col overflow-hidden bg-onyx text-(--text-primary)">
+			<div className="flex h-full min-h-0 flex-col overflow-hidden bg-onyx text-(--text-primary)">
 				<div className="flex flex-1 overflow-hidden">
 					{/* Left: TOC — width/handle live on this wrapper: the aside below
 				    scrolls (overflow-y-auto), and a scrolling ancestor clips
@@ -106,22 +105,10 @@ export function AcDetail({
 						)}
 					>
 						<aside className="h-full w-full overflow-y-auto overflow-x-hidden border-r border-(--color-graphite) bg-onyx p-4">
-							{isStreaming && !streamingContent ? (
-								<div className="space-y-2.5">
-									{[1, 2, 3, 4, 5, 6].map((i) => (
-										<div
-											key={i}
-											className="h-3.5 rounded bg-steel/60 animate-pulse"
-											style={{ width: `${55 + (i % 3) * 15}%` }}
-										/>
-									))}
-								</div>
-							) : (
-								<TableOfContents
-									content={isStreaming ? streamingContent : acContent || ""}
-									maxLevel={2}
-								/>
-							)}
+							<TableOfContents
+								content={isStreaming ? streamingContent : acContent || ""}
+								maxLevel={2}
+							/>
 						</aside>
 						<div
 							aria-hidden="true"
@@ -187,14 +174,13 @@ export function AcDetail({
 								</div>
 							</div>
 						)}
-						{/* AC Viewer: thinking renders once inside GenerationProgress — no second panel. */}
+						{/* AcViewer owns the single compact pre-token loader. */}
 						<div className="flex-1 overflow-hidden">
 							<AcViewer
 								content={acContent}
 								streamingContent={streamingContent}
 								isStreaming={isStreaming}
 								hasError={hasError}
-								thinkingText={thinkingText}
 								onGenerate={handleGenerate}
 								projectName={projectName}
 								plan={plan}

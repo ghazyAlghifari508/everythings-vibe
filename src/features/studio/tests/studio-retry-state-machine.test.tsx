@@ -54,7 +54,6 @@ function renderActions(syncProjectStatus = vi.fn(async () => {})) {
 			project,
 			frames: [],
 			selectedFrameIds: [],
-			isProcessing: false,
 			syncProjectStatus,
 			setError,
 		}),

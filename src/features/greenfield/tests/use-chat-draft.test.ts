@@ -55,6 +55,26 @@ describe("useChatDraft", () => {
 		expect(getPrdDraft("other")).toBe("Other project draft");
 	});
 
+	it("switching project loads that project's draft and keeps the old one under its own key", () => {
+		savePrdDraft("proj-b", "Draft B");
+		const { result, rerender } = renderHook(({ id }) => useChatDraft(id), {
+			initialProps: { id: "proj-a" },
+		});
+		act(() => result.current.setInput("Draft A"));
+
+		rerender({ id: "proj-b" });
+		expect(result.current.input).toBe("Draft B");
+
+		act(() => {
+			vi.advanceTimersByTime(350);
+		});
+		expect(getPrdDraft("proj-a")).toBe("Draft A");
+		expect(getPrdDraft("proj-b")).toBe("Draft B");
+
+		rerender({ id: "proj-c" });
+		expect(result.current.input).toBe("");
+	});
+
 	it("clears draft and input on clearDraft()", () => {
 		savePrdDraft("proj-3", "Temporary draft");
 		const { result } = renderHook(() => useChatDraft("proj-3"));

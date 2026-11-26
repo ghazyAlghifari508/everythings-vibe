@@ -2,6 +2,7 @@
 
 import { useRouter } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useWorkspaceSync } from "@/features/greenfield/hooks/use-workspace-sync";
 import { GENERATION_STATUS_POLL_INTERVAL_MS } from "@/features/greenfield/types/greenfield-constants";
 import { getPendingPrdPrompt } from "@/lib/prompt-handoff";
 import { useChatStore, useUIStore } from "@/store";
@@ -33,6 +34,7 @@ export function usePrdDetail({
 }: UsePrdDetailParams) {
 	const router = useRouter();
 	const openPaywallModal = useUIStore((s) => s.openPaywallModal);
+	useWorkspaceSync(projectId, "hasPrd", Boolean(latestVersion?.content));
 	const [currentContent, setCurrentContent] = useState(
 		latestVersion?.content || "",
 	);
@@ -43,7 +45,8 @@ export function usePrdDetail({
 	// allVersions stays stale until next page load. Track locally so version history
 	// appears immediately after revision without requiring a full page refresh.
 	const [versions, setVersions] = useState(allVersions);
-
+	const activeProjectRef = useRef(projectId);
+	const latestVersionSeenRef = useRef(latestVersion?.version ?? 0);
 	const {
 		isGeneratingPRD,
 		streamingPRDContent,
@@ -120,10 +123,27 @@ export function usePrdDetail({
 		}
 	}, [projectId, initialMessages, setMessages]);
 
-	// Sync content when latestVersion updates
+	// ponytail: only a genuinely new persisted version may replace the canvas.
+	// A loader revalidation with the same version must not yank the document
+	// back to latest while the user is reading an older selected version.
 	useEffect(() => {
-		if (latestVersion) setCurrentContent(latestVersion.content);
+		if (!latestVersion || latestVersion.version <= latestVersionSeenRef.current)
+			return;
+		latestVersionSeenRef.current = latestVersion.version;
+		setCurrentContent(latestVersion.content);
+		setSelectedVersionNum(latestVersion.version);
 	}, [latestVersion]);
+
+	// ponytail: the hook instance can survive a route param change. Locally
+	// refreshed versions/content must never leak into another project's view.
+	useEffect(() => {
+		if (activeProjectRef.current === projectId) return;
+		activeProjectRef.current = projectId;
+		latestVersionSeenRef.current = latestVersion?.version ?? 0;
+		setVersions(allVersions);
+		setCurrentContent(latestVersion?.content ?? "");
+		setSelectedVersionNum(latestVersion?.version ?? 1);
+	}, [projectId, allVersions, latestVersion]);
 	// Return recovery: a loader that missed the save lands with global
 	// generating flags but no streamed bytes. Revalidate once; when the
 	// saved version arrives, latestVersion paints the PRD and the effect

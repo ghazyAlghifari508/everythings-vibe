@@ -27,7 +27,6 @@ describe("Studio PRD Persistence & Ownership", () => {
 			title: "CatatDompet Mobile",
 			prompt: "Buat aplikasi pencatatan keuangan pribadi sesuai PRD",
 			designMode: "mobile",
-			initialPageCount: 3,
 			prdAttachment: {
 				filename: prdFilename,
 				content: prdContent,
@@ -84,7 +83,6 @@ describe("Studio PRD Persistence & Ownership", () => {
 			title: "Legacy No-PRD Project",
 			prompt: "Buat landing page sederhana tanpa dokumen PRD",
 			designMode: "web",
-			initialPageCount: 2,
 		});
 
 		expect(project.prdContent).toBeNull();

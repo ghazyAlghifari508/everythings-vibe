@@ -42,6 +42,15 @@ describe("Studio frame error classification", () => {
 			"retry-generation",
 		],
 		[
+			"provider no-progress watchdog timeout",
+			new Error("Semua model AI sedang tidak tersedia.", {
+				cause: new DOMException("AI tidak merespons", "TimeoutError"),
+			}),
+			"STUDIO_PROVIDER_TIMEOUT",
+			"provider-request",
+			"retry-generation",
+		],
+		[
 			"provider incomplete output",
 			new StudioIncompleteOutputError("INCOMPLETE_OUTPUT", "<html><body>unfin"),
 			"STUDIO_PROVIDER_INCOMPLETE",

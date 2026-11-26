@@ -94,6 +94,15 @@ describe("redirect handling", () => {
 		expect(requests).toHaveLength(FETCH_MAX_REDIRECTS + 1);
 	});
 
+	it("does not forward an authorized request across redirects", async () => {
+		allowLoopback();
+		const response = await fetchAsset(`${origin}/entry`, 0, {
+			authorization: "test-provider-key",
+		});
+		expect(response.status).toBe(302);
+		expect(requests).toEqual(["/entry"]);
+	});
+
 	it("re-validates every redirect target instead of trusting the Location header", async () => {
 		const real = await vi.importActual<typeof import("@/lib/url-validator")>(
 			"@/lib/url-validator",

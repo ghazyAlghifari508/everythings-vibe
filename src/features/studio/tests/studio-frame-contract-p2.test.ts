@@ -269,9 +269,9 @@ describe("strategi koreksi terbatas", () => {
 			blueprint: null,
 			viewport: "web",
 			expectTokens: false,
-			designSkillId: "none",
 			dsTokens: null,
 			logoUrl: null,
+			preservation: "new-frame",
 		});
 		expect(html).toContain("Konten valid");
 		expect(mocked).toHaveBeenCalledTimes(2);
@@ -289,9 +289,9 @@ describe("strategi koreksi terbatas", () => {
 				blueprint: null,
 				viewport: "web",
 				expectTokens: false,
-				designSkillId: "none",
 				dsTokens: null,
 				logoUrl: null,
+				preservation: "new-frame",
 			}),
 		).rejects.toMatchObject({ code: "STUDIO_CONTRACT_VIOLATION" });
 		expect(mocked).toHaveBeenCalledTimes(2);
@@ -368,9 +368,9 @@ describe("klasifikasi error studio", () => {
 			blueprint: null,
 			viewport: "web",
 			expectTokens: false,
-			designSkillId: "none",
 			dsTokens: null,
 			logoUrl: null,
+			preservation: "new-frame",
 		}).catch((error: unknown) => error);
 		const report = studioFrameErrorReport(failure);
 		expect(report.code).toBe("STUDIO_CONTRACT_VIOLATION");

@@ -14,11 +14,7 @@ describe("Studio credit estimate UX", () => {
 			<StudioLaunchComposer
 				prompt=""
 				onPromptChange={vi.fn()}
-				config={{
-					designMode: "web",
-					designSkillId: "none",
-					initialPageCount: 1,
-				}}
+				config={{ designMode: "web" }}
 				onConfigChange={vi.fn()}
 				reference={null}
 				onOpenDesignPicker={vi.fn()}

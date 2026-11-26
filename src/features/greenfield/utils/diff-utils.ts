@@ -51,3 +51,68 @@ export function computeDiff(oldStr: string, newStr: string): DiffLine[] {
 	}
 	return result;
 }
+
+export interface ComparableVersion {
+	version: number;
+	content: string;
+}
+
+export interface ComparePair {
+	oldVersion: number;
+	newVersion: number;
+	oldContent: string;
+	newContent: string;
+}
+
+// ponytail: "compare changes" always resolves to persisted records, never to
+// the live/streaming canvas. Direction is explicit old → new so the existing
+// added/removed semantics stay truthful even when the earliest version is
+// selected or the list is non-contiguous.
+export function resolveComparePair(
+	versions: readonly ComparableVersion[],
+	selectedVersion?: number,
+): ComparePair | null {
+	const byNumber = new Map<number, ComparableVersion>();
+	for (const version of versions) {
+		if (
+			!Number.isInteger(version.version) ||
+			version.version < 1 ||
+			typeof version.content !== "string" ||
+			byNumber.has(version.version)
+		) {
+			continue;
+		}
+		byNumber.set(version.version, version);
+	}
+	if (byNumber.size < 2) return null;
+
+	const ordered = [...byNumber.values()].sort((a, b) => a.version - b.version);
+	const current =
+		(selectedVersion !== undefined
+			? byNumber.get(selectedVersion)
+			: undefined) ?? ordered[ordered.length - 1];
+	if (!current) return null;
+
+	// Existing policy: selected version against the closest earlier revision.
+	for (let index = ordered.length - 1; index >= 0; index--) {
+		const candidate = ordered[index];
+		if (candidate && candidate.version < current.version) {
+			return {
+				oldVersion: candidate.version,
+				newVersion: current.version,
+				oldContent: candidate.content,
+				newContent: current.content,
+			};
+		}
+	}
+
+	// Earliest selected: the only sensible persisted neighbour is a newer one.
+	const next = ordered.find((version) => version.version > current.version);
+	if (!next) return null;
+	return {
+		oldVersion: current.version,
+		newVersion: next.version,
+		oldContent: current.content,
+		newContent: next.content,
+	};
+}

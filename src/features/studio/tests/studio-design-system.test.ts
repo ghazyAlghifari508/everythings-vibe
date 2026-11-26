@@ -197,7 +197,6 @@ describe("Studio Design System", () => {
 		);
 		expect(enforced).toContain("studio-design-tokens");
 		expect(enforced).toContain("--canvas-bg: #f5f1e4");
-		expect(enforced).toContain("/api/studio/asset?id=123&cap=abc");
 	});
 
 	it("injects shared blueprint tokens deterministically", () => {

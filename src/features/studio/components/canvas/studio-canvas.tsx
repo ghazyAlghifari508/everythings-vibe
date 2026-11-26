@@ -1,35 +1,41 @@
-import { memo, useCallback, useRef, useState } from "react";
+import { memo, useCallback, useMemo, useRef, useState } from "react";
 import type { StudioFrameRow } from "@/db/schema";
 import { getCanvasDotStyle } from "@/features/greenfield/components/whiteboard/canvas-connectors";
 import {
 	StudioCanvasPlanningFailure,
-	StudioCanvasQueueReadout,
+	StudioCanvasStatusOverlays,
 	type StudioCanvasTool,
 	StudioCanvasToolPalette,
 	StudioCanvasZoomCorner,
 } from "@/features/studio/components/canvas/studio-canvas-controls";
+import { StudioCanvasFrameActions } from "@/features/studio/components/canvas/studio-canvas-frame-actions";
 import { StudioFrame } from "@/features/studio/components/canvas/studio-frame";
 import { useStudioCanvasInput } from "@/features/studio/hooks/use-studio-canvas-input";
 import { useStudioCanvasMarquee } from "@/features/studio/hooks/use-studio-canvas-marquee";
 import { useStudioCanvasView } from "@/features/studio/hooks/use-studio-canvas-view";
+import { useStudioLivePool } from "@/features/studio/hooks/use-studio-live-pool";
 import {
 	STUDIO_CANVAS_INITIAL_ZOOM,
 	STUDIO_CANVAS_MAX_ZOOM,
 	STUDIO_CANVAS_MIN_ZOOM,
 } from "@/features/studio/types/studio-constants";
+import type { StudioPreviewTarget } from "@/features/studio/types/studio-preview-contract";
+import type { StudioDevice } from "@/features/studio/types/studio-renderer";
 import type {
 	StudioVisibleJob,
 	StudioVisibleProject,
 } from "@/features/studio/types/studio-status";
+import { extractCleanHtml } from "@/features/studio/utils/clean-html";
 import { isCanvasControlTarget } from "@/features/studio/utils/studio-canvas-gesture";
-import { deriveStudioLifecycle } from "@/features/studio/utils/studio-lifecycle";
+import {
+	deriveStudioLifecycle,
+	resolveStudioFrameStatus,
+} from "@/features/studio/utils/studio-lifecycle";
 import { useCanvasZoom } from "@/hooks/use-canvas-zoom";
-
-export type {
-	StudioCanvasFitInput,
-	StudioCanvasFrameBounds,
-} from "@/features/studio/utils/studio-canvas-fit";
-export { computeCanvasFit } from "@/features/studio/utils/studio-canvas-fit";
+import type {
+	StudioElementAction,
+	StudioElementTarget,
+} from "../../types/studio-element";
 
 export interface StudioCanvasProps {
 	project: StudioVisibleProject;
@@ -38,11 +44,6 @@ export interface StudioCanvasProps {
 	selectedFrameId?: string | null;
 	selectedFrameIds?: string[];
 	onSelectFrame?: (frameId: string | null, additive?: boolean) => void;
-	/**
-	 * Commits a whole selection list at once. Marquee selection owns the full
-	 * id set (not a single delta), so the canvas reports the resolved list here
-	 * and the route stays the single source of truth for `selectedFrameIds`.
-	 */
 	onSelectFrames?: (frameIds: string[]) => void;
 	onRetryFrame?: (frameId: string) => void;
 	onRetryPlanning?: () => void;
@@ -50,6 +51,25 @@ export interface StudioCanvasProps {
 	onRefreshStatus?: () => void;
 	retryingFrameIds?: string[];
 	frameRetryErrors?: Record<string, string>;
+	elementTarget?: StudioElementTarget | null;
+	onSelectElement?: (
+		target: StudioElementTarget | null,
+		frameId?: string,
+	) => void;
+	onElementAction?: (
+		action: StudioElementAction,
+		target: StudioElementTarget,
+		text?: string,
+	) => void;
+	elementActionBusy?: boolean;
+	onElementError?: (message: string) => void;
+	frameDevices?: Readonly<Record<string, StudioDevice>>;
+	frameRefreshTokens?: Readonly<Record<string, number>>;
+	onFrameDeviceChange?: (frameId: string, device: StudioDevice) => void;
+	onRefreshFrame?: (frameId: string) => void;
+	onOpenPreview?: (target: StudioPreviewTarget) => void;
+	focusRequest?: { frameId: string; nonce: number } | null;
+	leftInsetPx?: number | null;
 	className?: string;
 }
 
@@ -67,10 +87,22 @@ export const StudioCanvas = memo(function StudioCanvas({
 	onRefreshStatus,
 	retryingFrameIds = [],
 	frameRetryErrors,
+	elementTarget,
+	onSelectElement,
+	onElementAction,
+	elementActionBusy = false,
+	onElementError,
+	frameDevices,
+	frameRefreshTokens,
+	onFrameDeviceChange,
+	onRefreshFrame,
+	onOpenPreview,
+	focusRequest = null,
+	leftInsetPx = 0,
 	className = "",
 }: StudioCanvasProps) {
 	const canvasRef = useRef<HTMLElement>(null);
-	const priorityFrameId = frames.find((frame) => frame.htmlCode)?.id;
+
 	const lifecycle = deriveStudioLifecycle({ project, frames, activeJob });
 	const marqueeRef = useRef<HTMLDivElement>(null);
 	const preferredZoom =
@@ -90,55 +122,66 @@ export const StudioCanvas = memo(function StudioCanvas({
 		updatePan,
 		endPan,
 		nudgePan,
-		onWheel,
 		minZoom,
 		maxZoom,
 	} = useCanvasZoom({
 		minZoom: STUDIO_CANVAS_MIN_ZOOM,
 		maxZoom: STUDIO_CANVAS_MAX_ZOOM,
 		initialZoom: preferredZoom,
-		// The pointer-anchored zoom is expressed in canvas-local space, the same
-		// space the surface transform uses.
-		containerRef: canvasRef,
 	});
 
-	const [tool, setTool] = useState<StudioCanvasTool>("select");
+	const [tool, setActiveTool] = useState<StudioCanvasTool>("select");
 	const [spacePan, setSpacePan] = useState(false);
 	const [isPanning, setIsPanning] = useState(false);
 	const panMode = tool === "hand" || spacePan;
+	const selectedIds = useMemo(() => {
+		if (selectedFrameIds.length) return selectedFrameIds;
+		return selectedFrameId ? [selectedFrameId] : [];
+	}, [selectedFrameId, selectedFrameIds]);
+	const selectedIdentity = selectedIds.length === 1 ? selectedIds[0] : null;
+	const editableFrameIds = useMemo(() => {
+		const ids = new Set<string>();
+		for (const frame of frames) {
+			if (
+				resolveStudioFrameStatus(frame, activeJob) === "ready" &&
+				frame.htmlCode &&
+				extractCleanHtml(frame.htmlCode)
+			) {
+				ids.add(frame.id);
+			}
+		}
+		return ids;
+	}, [frames, activeJob]);
+	const elementTool = tool === "element";
 
-	const { measureFrame, fitAll } = useStudioCanvasView({
-		projectId: project.id,
-		preferredZoom,
+	const { pool: livePool, reportVisibility } = useStudioLivePool({
 		frames,
-		canvasRef,
-		selectedFrameId,
-		zoom,
-		pan,
-		minZoom,
-		maxZoom,
-		setZoom,
-		setPan,
-		resetZoom,
+		selectedFrameId: selectedIdentity,
+		inspectFrameId: elementTool ? (elementTarget?.frameId ?? null) : null,
+		inspectMode: elementTool,
 	});
 
-	// Stable frame callbacks keep the memoized artboards from re-rendering on
-	// every pan frame; the handlers read the latest values through refs.
-	const panModeRef = useRef(panMode);
-	panModeRef.current = panMode;
-	const selectFrameRef = useRef(onSelectFrame);
-	selectFrameRef.current = onSelectFrame;
-	const retryFrameRef = useRef(onRetryFrame);
-	retryFrameRef.current = onRetryFrame;
-	const handleFrameSelect = useCallback((id: string, additive?: boolean) => {
-		if (panModeRef.current) return;
-		selectFrameRef.current?.(id, additive);
-	}, []);
-	const handleFrameRetry = useCallback((id: string) => {
-		retryFrameRef.current?.(id);
-	}, []);
+	const { measureFrame, fitAll, bounds, focusFrame, cancelFocusAnimation } =
+		useStudioCanvasView({
+			projectId: project.id,
+			preferredZoom,
+			frames,
+			leftInsetPx,
+			canvasRef,
+			selectedFrameId: selectedIdentity,
+			zoom,
+			pan,
+			minZoom,
+			maxZoom,
+			frameDevices,
+			focusRequest,
+			setZoom,
+			setPan,
+			resetZoom,
+		});
 
 	const {
+		isMarqueeDragging,
 		handleCanvasPointerDown,
 		handleCanvasPointerMove,
 		handleCanvasPointerUp,
@@ -147,18 +190,58 @@ export const StudioCanvas = memo(function StudioCanvas({
 	} = useStudioCanvasMarquee({
 		canvasRef,
 		marqueeRef,
-		selectedFrameIds,
+		selectedFrameIds: selectedIds,
 		onSelectFrames,
 		panMode,
 	});
 
+	const [liveReadyFrameIds, setLiveReadyFrameIds] = useState<
+		ReadonlySet<string>
+	>(() => new Set());
+	const reportRendererReadiness = useCallback(
+		(frameId: string, ready: boolean) => {
+			setLiveReadyFrameIds((previous) => {
+				if (previous.has(frameId) === ready) return previous;
+				const next = new Set(previous);
+				if (ready) next.add(frameId);
+				else next.delete(frameId);
+				return next;
+			});
+		},
+		[],
+	);
+
+	const selectedFrameIndex = useMemo(
+		() =>
+			selectedIdentity
+				? frames.findIndex((frame) => frame.id === selectedIdentity)
+				: -1,
+		[frames, selectedIdentity],
+	);
+	const selectedFrame = frames[selectedFrameIndex];
+	const showFrameActions =
+		selectedFrame &&
+		editableFrameIds.has(selectedFrame.id) &&
+		!lifecycle.planningFailed &&
+		!elementTool &&
+		!isMarqueeDragging &&
+		!isPanning;
+
+	const selectTool = useCallback(
+		(next: StudioCanvasTool) => {
+			cancelMarquee();
+			if (next !== "element" && elementTarget) onSelectElement?.(null);
+			setActiveTool(next);
+		},
+		[cancelMarquee, elementTarget, onSelectElement],
+	);
 	useStudioCanvasInput({
 		canvasRef,
-		onWheel,
 		setPan,
+		cancelFocusAnimation,
 		nudgePan,
 		endPan,
-		setTool,
+		setTool: selectTool,
 		setSpacePan,
 		setIsPanning,
 		onSelectFrame,
@@ -166,31 +249,21 @@ export const StudioCanvas = memo(function StudioCanvas({
 		hasActiveGesture,
 	});
 
-	// Switching tools abandons any in-progress marquee so a pan or a fresh
-	// selection can never inherit a half-drawn rectangle.
-	const selectTool = useCallback(
-		(next: StudioCanvasTool) => {
-			cancelMarquee();
-			setTool(next);
-		},
-		[cancelMarquee],
-	);
-
 	return (
 		<section
 			ref={canvasRef}
 			data-testid="studio-canvas"
 			aria-label={`Canvas Desain ${project.title}`}
 			onPointerDown={(event) => {
+				if (elementTool) return;
 				if (panMode) {
-					// A real control overlay owns its own press; only the canvas
-					// background and the frame gesture surfaces start a pan.
 					if (isCanvasControlTarget(event.target)) return;
-					if (startPan(event)) setIsPanning(true);
+					if (startPan(event)) {
+						cancelFocusAnimation();
+						setIsPanning(true);
+					}
 					return;
 				}
-				// Select mode: an empty-canvas press arms a marquee. Frames and
-				// floating controls are excluded so their own handlers win.
 				handleCanvasPointerDown(event);
 			}}
 			onPointerMove={(event) => {
@@ -207,22 +280,23 @@ export const StudioCanvas = memo(function StudioCanvas({
 				setIsPanning(false);
 				cancelMarquee();
 			}}
-			// Pointer capture can be revoked mid-drag (element removal, OS
-			// gesture, focus loss). Without this the canvas would keep panning
-			// on the next move and stay stuck in the grabbing cursor, and a
-			// marquee would stay painted with a half-committed selection.
 			onLostPointerCapture={() => {
 				endPan();
 				setIsPanning(false);
 				cancelMarquee();
 			}}
-			className={`relative size-full overflow-hidden select-none touch-none bg-charcoal text-snow focus-visible:outline-2 focus-visible:outline-snow ${className}`}
+			className={`relative size-full overflow-hidden overscroll-none select-none touch-pinch-zoom bg-charcoal text-snow focus-visible:outline-2 focus-visible:outline-snow ${className}`}
 			style={{
 				...getCanvasDotStyle(zoom, pan),
-				cursor: panMode ? (isPanning ? "grabbing" : "grab") : "default",
+				cursor: elementTool
+					? "crosshair"
+					: panMode
+						? isPanning
+							? "grabbing"
+							: "grab"
+						: "default",
 			}}
 		>
-			{/* Transformed Canvas Surface holding frames */}
 			<div
 				data-testid="studio-canvas-surface"
 				className="absolute top-0 left-0 flex items-start gap-14 p-24"
@@ -237,21 +311,32 @@ export const StudioCanvas = memo(function StudioCanvas({
 							key={frame.id}
 							frame={frame}
 							job={activeJob}
-							priorityPreview={frame.id === priorityFrameId}
+							viewportRef={canvasRef}
 							initialJobTiming={
 								activeJob?.jobType === "initial" ? activeJob : undefined
 							}
 							onMeasure={measureFrame}
-							isSelected={
-								selectedFrameIds.length
-									? selectedFrameIds.includes(frame.id)
-									: selectedFrameId === frame.id
-							}
-							onSelect={handleFrameSelect}
-							onRetry={handleFrameRetry}
+							isSelected={selectedIds.includes(frame.id)}
+							onSelect={onSelectFrame}
+							onRetry={onRetryFrame}
 							isRetryPending={retryingFrameIds.includes(frame.id)}
 							retryError={frameRetryErrors?.[frame.id]}
 							isCanvasPanning={panMode}
+							inspectElement={elementTool && editableFrameIds.has(frame.id)}
+							elementTarget={
+								elementTarget?.frameId === frame.id ? elementTarget : null
+							}
+							onSelectElement={onSelectElement}
+							onElementAction={onElementAction}
+							elementActionBusy={elementActionBusy}
+							onElementError={onElementError}
+							canvasZoom={zoom}
+							menuLeftInsetPx={leftInsetPx ?? 0}
+							liveEnabled={livePool.includes(frame.id)}
+							device={frameDevices?.[frame.id]}
+							onVisibilityChange={reportVisibility}
+							refreshToken={frameRefreshTokens?.[frame.id]}
+							onRendererReadinessChange={reportRendererReadiness}
 						/>
 					))
 				) : lifecycle.planningFailed ? (
@@ -263,33 +348,30 @@ export const StudioCanvas = memo(function StudioCanvas({
 					/>
 				) : null}
 			</div>
-			{lifecycle.inconsistent && (
-				<output className="absolute left-3 top-20 z-20 max-w-md rounded-xl border border-graphite bg-obsidian p-4 text-sm text-fog">
-					<p>Proses selesai, tetapi sebagian data desain belum tersedia.</p>
-					{onRefreshStatus && (
-						<button
-							type="button"
-							onClick={onRefreshStatus}
-							className="mt-2 rounded px-2 py-1 text-snow focus-visible:outline-2 focus-visible:outline-snow"
-						>
-							Muat ulang status
-						</button>
-					)}
-				</output>
-			)}
-
-			{activeJob && (
-				<StudioCanvasQueueReadout
-					activeJob={activeJob}
-					hasFrames={frames.length > 0}
+			{showFrameActions && (
+				<StudioCanvasFrameActions
+					canvasRef={canvasRef}
+					frame={selectedFrame}
+					frameIndex={selectedFrameIndex}
+					bounds={bounds}
+					zoom={zoom}
+					pan={pan}
+					leftInsetPx={leftInsetPx ?? 0}
+					device={frameDevices?.[selectedFrame.id]}
+					liveReady={liveReadyFrameIds.has(selectedFrame.id)}
+					onDeviceChange={onFrameDeviceChange}
+					onFocus={focusFrame}
+					onRefresh={onRefreshFrame}
+					onPreview={onOpenPreview}
 				/>
 			)}
+			<StudioCanvasStatusOverlays
+				inconsistent={lifecycle.inconsistent}
+				activeJob={activeJob}
+				leftInsetPx={leftInsetPx ?? 0}
+				onRefreshStatus={onRefreshStatus}
+			/>
 
-			{/* Selection rectangle. Painted imperatively during a drag so a
-			    pointermove never re-renders the canvas; it only appears once the
-			    drag passes the threshold and is hidden again on release/cancel.
-			    Styling stays restrained: a clear accent outline over a light
-			    accent wash, matching the selected-frame border colour. */}
 			<div
 				ref={marqueeRef}
 				data-testid="studio-marquee"
@@ -298,7 +380,11 @@ export const StudioCanvas = memo(function StudioCanvas({
 				className="pointer-events-none absolute z-10 rounded-sm border border-blue-600/70 bg-blue-600/10"
 			/>
 
-			<StudioCanvasToolPalette tool={tool} onSelectTool={selectTool} />
+			<StudioCanvasToolPalette
+				tool={tool}
+				onSelectTool={selectTool}
+				canSelectElement={editableFrameIds.size > 0 && Boolean(onSelectElement)}
+			/>
 
 			<StudioCanvasZoomCorner
 				zoom={zoom}

@@ -150,19 +150,35 @@ export function deriveProvisionalStudioTitle(prompt: string): string {
 	);
 }
 
-/**
- * Final title for a project whose planning step just finished: the planner's
- * product name when it is usable, otherwise the brand the brief stated, the
- * provisional title, or the neutral fallback.
- */
+/** Resolve the workspace label without modifying the blueprint's UI brand. */
 export function resolveStudioProjectTitle(input: {
 	candidate?: string | null;
 	productName?: string | null;
 	prompt?: string | null;
 }): string {
-	return (
-		normalizeStudioProjectTitle(input.candidate) ??
+	const title = normalizeStudioProjectTitle(input.candidate);
+	const brief = input.prompt ?? "";
+	const brand =
 		normalizeStudioProjectTitle(input.productName) ??
-		deriveProvisionalStudioTitle(input.prompt ?? "")
+		normalizeStudioProjectTitle(brief.match(QUOTED_BRAND_PATTERN)?.[1]);
+	if (
+		title &&
+		words(title).length > 1 &&
+		title.toLowerCase() !== brand?.toLowerCase()
+	)
+		return title;
+	const purpose = normalizeStudioProjectTitle(
+		cutAtTrailingConnector(
+			collapseWhitespace(brief.replace(QUOTED_BRAND_PATTERN, "")),
+		),
 	);
+	if (brand && purpose && purpose.toLowerCase() !== brand.toLowerCase())
+		return (
+			normalizeStudioProjectTitle(
+				purpose.toLowerCase().includes(brand.toLowerCase())
+					? purpose
+					: `${brand}: ${purpose}`,
+			) ?? purpose
+		);
+	return purpose ?? brand ?? deriveProvisionalStudioTitle(brief);
 }

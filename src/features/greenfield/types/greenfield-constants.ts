@@ -11,3 +11,6 @@ export const HISTORY_PAGE_SIZE = 12;
 export const KANBAN_SSE_INTERVAL_MS = 3_000;
 export const KANBAN_POLL_INTERVAL_MS = 10_000;
 export const GENERATION_STATUS_POLL_INTERVAL_MS = 2_500;
+
+// DOM id the Navbar Chat trigger points at via aria-controls.
+export const PRD_CHAT_PANEL_ID = "prd-chat-panel";

@@ -1,4 +1,4 @@
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, exists, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
 	acVersions,
@@ -36,10 +36,22 @@ export async function readWorkspaceProject(
 			acStatus: projects.acStatus,
 			taskStatus: projects.taskStatus,
 			hasFeatures: sql<boolean>`coalesce(jsonb_array_length(${projects.featureTree}->'features'), 0) > 0`,
-			hasPrd: sql<boolean>`exists(select 1 from ${prdVersions} where ${prdVersions.projectId} = ${projects.id})`,
-			hasAc: sql<boolean>`exists(select 1 from ${acVersions} where ${acVersions.projectId} = ${projects.id})`,
-			hasTasks: sql<boolean>`exists(select 1 from ${tasks} where ${tasks.projectId} = ${projects.id})`,
-			hasHandoff: sql<boolean>`exists(select 1 from ${codebaseAskHandoffs} where ${codebaseAskHandoffs.projectId} = ${projects.id} and ${codebaseAskHandoffs.userId} = ${userId} and length(${codebaseAskHandoffs.compiledPrompt}) > 0 and jsonb_array_length(${codebaseAskHandoffs.answers}) > 0)`,
+			hasPrd: sql<boolean>`${exists(db.select({ one: sql`1` }).from(prdVersions).where(eq(prdVersions.projectId, projects.id)))}`,
+			hasAc: sql<boolean>`${exists(db.select({ one: sql`1` }).from(acVersions).where(eq(acVersions.projectId, projects.id)))}`,
+			hasTasks: sql<boolean>`${exists(db.select({ one: sql`1` }).from(tasks).where(eq(tasks.projectId, projects.id)))}`,
+			hasHandoff: sql<boolean>`${exists(
+				db
+					.select({ one: sql`1` })
+					.from(codebaseAskHandoffs)
+					.where(
+						and(
+							eq(codebaseAskHandoffs.projectId, projects.id),
+							eq(codebaseAskHandoffs.userId, userId),
+							sql`length(${codebaseAskHandoffs.compiledPrompt}) > 0`,
+							sql`jsonb_array_length(${codebaseAskHandoffs.answers}) > 0`,
+						),
+					),
+			)}`,
 		})
 		.from(projects)
 		.where(

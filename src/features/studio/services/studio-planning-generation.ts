@@ -97,18 +97,23 @@ export async function generateStudioPlan(input: {
 							input.designMode,
 							input.count,
 							input.requireVisualDirection,
+							true,
 						);
+			const ownershipError =
+				parsed.ok && parsed.blueprint.compositionOwner !== "model";
 			studioJobTiming("planning-validation", startedAt, {
 				...input.timing,
 				attempt: request + 1,
-				code: parsed.ok ? "VALID" : "INVALID_OUTPUT",
+				code: parsed.ok && !ownershipError ? "VALID" : "INVALID_OUTPUT",
 			});
-			if (parsed.ok)
+			if (parsed.ok && !ownershipError)
 				return { screenPlan: parsed.plan, designBlueprint: parsed.blueprint };
 			if (corrections >= STUDIO_PLANNING_CORRECTION_MAX)
 				throw new StudioFrameError("STUDIO_CONTRACT_VIOLATION");
 			corrections++;
-			correction = parsed.error;
+			correction = parsed.ok
+				? 'Use compositionOwner "model" and semantic screen-to-destination mappings; omit canonicalShell and ctaDestination.'
+				: parsed.error;
 			lastFailure = new StudioFrameError("STUDIO_CONTRACT_VIOLATION");
 		} catch (error) {
 			signal.throwIfAborted();

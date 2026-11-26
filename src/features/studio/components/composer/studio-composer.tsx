@@ -1,23 +1,24 @@
+import { TextArea, Tooltip } from "@heroui/react";
 import {
 	ArrowUp01Icon,
 	Cancel01Icon,
 	PaintBoardIcon,
 } from "@hugeicons/core-free-icons";
-import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+	type Dispatch,
+	type FormEvent,
+	type SetStateAction,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { Icon } from "@/components/ui/icon";
 import { Spinner } from "@/components/ui/spinner";
-import type { StudioDesignSkillId } from "@/features/studio/services/studio-generation-options";
 import { STUDIO_DESIGN_PRESETS } from "@/features/studio/services/studio-presets";
 import { STUDIO_MIN_PROMPT_CHARS } from "@/features/studio/services/studio-prompt-validation";
-import type { StudioScreenSuggestion } from "@/features/studio/services/studio-screen-suggestions";
 import { shouldSubmitComposerEvent } from "@/features/studio/utils/composer-keyboard";
-import {
-	canvasComposerBottomCss,
-	canvasComposerWidthCss,
-} from "@/features/studio/utils/studio-canvas-layout";
+import type { StudioElementTarget } from "../../types/studio-element";
 import { filterValidHexColors, StudioPaletteDisk } from "./studio-palette-disk";
-import { StudioSkillSelect } from "./studio-skill-select";
-import { StudioSuggestionRow } from "./studio-suggestion-row";
 
 /**
  * The server resolves the operation, so the composer only reports whether the
@@ -27,6 +28,8 @@ export interface StudioComposerSubmitResult {
 	accepted: boolean;
 	/** Set when the server needs the user to be more specific. */
 	clarify?: string;
+	/** Server refusal that the workspace answers with the credit modal or /pricing. */
+	creditState?: "insufficient" | "plan_gated";
 }
 
 export interface StudioComposerProps {
@@ -34,38 +37,54 @@ export interface StudioComposerProps {
 		prompt: string,
 	) => Promise<StudioComposerSubmitResult> | StudioComposerSubmitResult;
 	loading?: boolean;
+	value?: string;
+	onValueChange?: Dispatch<SetStateAction<string>>;
 	className?: string;
 	selectedFrames?: { id: string; name: string }[];
 	onRemoveFrame?: (id: string) => void;
-	designSkillId?: StudioDesignSkillId;
-	onDesignSkillChange?: (skillId: StudioDesignSkillId) => void;
+	/** Drops every composer target at once; the canvas frames themselves stay. */
+	onClearFrames?: () => void;
 	referenceLabel?: string | null;
 	referenceColors?: readonly string[] | null;
-	/** Next-screen cards derived from the project's own structure. */
-	suggestions?: readonly StudioScreenSuggestion[];
 	creditLabel?: string | null;
+	elementTarget?: StudioElementTarget | null;
+	onRemoveElement?: () => void;
 }
 
 export function StudioComposer({
 	onSubmit,
 	loading = false,
+	value,
+	onValueChange,
 	className = "",
 	selectedFrames = [],
 	onRemoveFrame,
-	designSkillId,
-	onDesignSkillChange,
+	onClearFrames,
 	referenceLabel,
 	referenceColors,
-	suggestions = [],
 	creditLabel,
+	elementTarget,
+	onRemoveElement,
 }: StudioComposerProps) {
-	const [prompt, setPrompt] = useState("");
+	const [localPrompt, setLocalPrompt] = useState("");
+	const prompt = value ?? localPrompt;
+	const setPrompt = onValueChange ?? setLocalPrompt;
 	const [sending, setSending] = useState(false);
 	const [error, setError] = useState("");
 	const [clarify, setClarify] = useState("");
-	const inputRef = useRef<HTMLTextAreaElement>(null);
 	const pending = useRef(false);
 	const singleFrame = selectedFrames.length === 1 ? selectedFrames[0] : null;
+	const targetFrame = selectedFrames.find(
+		(frame) => frame.id === elementTarget?.frameId,
+	);
+	const composerTargets = elementTarget
+		? [
+				{
+					id: elementTarget.frameId,
+					name: `${targetFrame?.name ?? "Layar"} / ${elementTarget.label}`,
+				},
+			]
+		: selectedFrames;
 
 	const resolvedColors = useMemo(() => {
 		if (referenceColors && referenceColors.length > 0) {
@@ -94,14 +113,8 @@ export function StudioComposer({
 	const canSubmit =
 		trimmedPrompt.length >= STUDIO_MIN_PROMPT_CHARS && !loading && !sending;
 
-	useEffect(() => {
-		const input = inputRef.current;
-		if (!input) return;
-		input.style.height = prompt ? "auto" : "";
-		input.style.height = `${input.scrollHeight}px`;
-	}, [prompt]);
-
 	async function submit() {
+		const submitted = prompt;
 		const trimmed = prompt.trim();
 		if (trimmed.length < STUDIO_MIN_PROMPT_CHARS || loading || pending.current)
 			return;
@@ -111,7 +124,8 @@ export function StudioComposer({
 		setClarify("");
 		try {
 			const result = await onSubmit(trimmed);
-			if (result.accepted) setPrompt("");
+			if (result.accepted)
+				setPrompt((current) => (current === submitted ? "" : current));
 			else if (result.clarify) setClarify(result.clarify);
 		} catch (failure) {
 			setError(
@@ -129,100 +143,95 @@ export function StudioComposer({
 		void submit();
 	}
 
-	// A suggestion only fills the composer: the user still reviews and submits,
-	// so clicking a card never spends a generation credit on its own.
-	function insertSuggestion(suggestion: StudioScreenSuggestion) {
-		setPrompt(suggestion.prompt);
-		setClarify("");
-		inputRef.current?.focus();
-	}
-
 	return (
 		<div
 			data-testid="studio-composer"
-			className={`absolute left-1/2 z-30 -translate-x-1/2 ${className}`}
-			// The zoom controls own the bottom-right corner, so the composer is
-			// inset from both sides and its width is capped by the same
-			// clearance fit-to-content reserves. It therefore narrows on small
-			// viewports instead of overlapping the zoom row.
-			style={{
-				bottom: canvasComposerBottomCss(),
-				width: canvasComposerWidthCss(),
-			}}
+			className={`min-w-0 ${className}`}
 			onPointerDown={(event) => event.stopPropagation()}
 			onWheel={(event) => event.stopPropagation()}
 		>
-			{suggestions.length > 0 ? (
-				<StudioSuggestionRow
-					suggestions={suggestions}
-					disabled={loading || sending}
-					onSelect={insertSuggestion}
-				/>
-			) : null}
 			<form
 				onSubmit={handleSubmit}
-				className="flex flex-col gap-3 rounded-xl border border-iron bg-obsidian p-3 text-snow focus-within:border-snow"
+				className="flex flex-col gap-3 rounded-xl border border-iron bg-obsidian p-3 text-snow transition-colors duration-150 focus-within:border-snow"
 			>
-				{selectedFrames.length > 0 ? (
-					<div className="flex max-h-20 flex-wrap items-center gap-2 overflow-y-auto">
+				{composerTargets.length > 0 ? (
+					<div className="flex flex-wrap items-center gap-2">
 						<span className="text-xs text-fog">
-							{singleFrame
-								? `Editing: ${singleFrame.name}`
-								: `Merevisi ${selectedFrames.length} layar terpilih`}
+							{elementTarget
+								? "Elemen terpilih"
+								: singleFrame
+									? `Editing: ${singleFrame.name}`
+									: `Merevisi ${selectedFrames.length} layar terpilih`}
 						</span>
-						{selectedFrames.map((frame) => (
-							<span
-								key={frame.id}
-								className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-iron px-1.5 py-0.5 text-xs text-snow"
-							>
-								<span className="truncate">{frame.name}</span>
-								<button
-									type="button"
-									aria-label={`Lepas ${frame.name}`}
-									onClick={() => onRemoveFrame?.(frame.id)}
-									className="rounded p-0.5 hover:bg-steel focus-visible:outline-2 focus-visible:outline-snow"
+						<ul
+							aria-label="Target revisi"
+							className="flex max-h-24 min-w-0 flex-wrap items-center gap-1.5 overflow-y-auto"
+						>
+							{composerTargets.map((frame) => (
+								<li
+									key={frame.id}
+									className="inline-flex max-w-full items-center gap-1 rounded-md border border-iron py-0.5 pr-0.5 pl-2 text-xs text-snow"
 								>
-									<Icon icon={Cancel01Icon} size={12} />
-								</button>
-							</span>
-						))}
+									<span className="truncate">{frame.name}</span>
+									{/* Detaching a target never deletes the frame: the canvas
+									    keeps every artboard and only this selection clears. */}
+									<Tooltip>
+										<Tooltip.Trigger<"button">
+											render={(props) => <button {...props} type="button" />}
+											aria-label={`Lepas ${frame.name}`}
+											onClick={() =>
+												elementTarget
+													? onRemoveElement?.()
+													: onRemoveFrame?.(frame.id)
+											}
+											className="flex size-11 shrink-0 items-center justify-center rounded text-mist hover:bg-steel hover:text-snow focus-visible:outline-2 focus-visible:outline-snow"
+										>
+											<Icon icon={Cancel01Icon} size={14} aria-hidden="true" />
+										</Tooltip.Trigger>
+										<Tooltip.Content className="rounded-md border border-graphite bg-charcoal px-2 py-1 text-xs text-snow">
+											Lepas dari target revisi
+										</Tooltip.Content>
+									</Tooltip>
+								</li>
+							))}
+						</ul>
+						{!elementTarget && selectedFrames.length > 1 && onClearFrames ? (
+							<button
+								type="button"
+								onClick={onClearFrames}
+								aria-label="Bersihkan semua target revisi"
+								className="ml-auto min-h-9 shrink-0 rounded px-2 text-xs text-fog hover:bg-steel hover:text-snow focus-visible:outline-2 focus-visible:outline-snow"
+							>
+								Bersihkan
+							</button>
+						) : null}
 					</div>
 				) : null}
-				{onDesignSkillChange || referenceLabel ? (
+				{referenceLabel ? (
 					<div className="flex flex-wrap items-center gap-2">
-						{onDesignSkillChange && designSkillId ? (
-							<StudioSkillSelect
-								value={designSkillId}
-								onChange={onDesignSkillChange}
-								disabled={loading || sending}
-							/>
-						) : null}
-						{referenceLabel ? (
-							<span
-								data-testid="studio-reference-chip"
-								className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-iron px-1.5 py-1 text-xs text-mist"
-							>
-								{resolvedColors && resolvedColors.length > 0 ? (
-									<StudioPaletteDisk
-										colors={resolvedColors}
-										label={referenceLabel}
-									/>
-								) : (
-									<Icon
-										icon={PaintBoardIcon}
-										size={12}
-										className="shrink-0 text-mist"
-										aria-hidden="true"
-									/>
-								)}
-								<span className="truncate">{referenceLabel}</span>
-							</span>
-						) : null}
+						<span
+							data-testid="studio-reference-chip"
+							className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-iron px-1.5 py-1 text-xs text-mist"
+						>
+							{resolvedColors && resolvedColors.length > 0 ? (
+								<StudioPaletteDisk
+									colors={resolvedColors}
+									label={referenceLabel}
+								/>
+							) : (
+								<Icon
+									icon={PaintBoardIcon}
+									size={12}
+									className="shrink-0 text-mist"
+									aria-hidden="true"
+								/>
+							)}
+							<span className="truncate">{referenceLabel}</span>
+						</span>
 					</div>
 				) : null}
 				<div className="flex items-end gap-2">
-					<textarea
-						ref={inputRef}
+					<TextArea
 						value={prompt}
 						rows={2}
 						aria-label="Instruksi desain"
@@ -235,14 +244,15 @@ export function StudioComposer({
 							}
 						}}
 						placeholder={
-							singleFrame
-								? `Minta perubahan khusus untuk layar ${singleFrame.name}...`
-								: selectedFrames.length > 1
-									? `Minta perubahan untuk ${selectedFrames.length} layar terpilih...`
-									: "Minta revisi, atau sebutkan halaman baru yang ingin dibuat..."
+							elementTarget
+								? `Minta perubahan hanya pada ${elementTarget.label}...`
+								: singleFrame
+									? `Minta perubahan khusus untuk layar ${singleFrame.name}...`
+									: selectedFrames.length > 1
+										? `Minta perubahan untuk ${selectedFrames.length} layar terpilih...`
+										: "Minta revisi, atau sebutkan halaman baru yang ingin dibuat..."
 						}
-						disabled={loading || sending}
-						className="max-h-40 min-h-12 min-w-0 flex-1 resize-none bg-transparent px-1 text-sm leading-6 text-snow placeholder:text-fog focus:outline-none disabled:opacity-60"
+						className="field-sizing-content max-h-40 min-h-12 min-w-0 flex-1 resize-none rounded-md border-0 bg-transparent px-1 text-sm leading-6 text-snow placeholder:text-fog focus-visible:outline-none"
 					/>
 					<button
 						type="submit"
@@ -251,7 +261,7 @@ export function StudioComposer({
 						aria-busy={loading || sending ? "true" : undefined}
 						title="Kirim prompt (Enter)"
 						style={{ background: "var(--btn-bg)", color: "var(--btn-text)" }}
-						className="flex size-10 shrink-0 items-center justify-center rounded-lg hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-snow disabled:cursor-not-allowed disabled:opacity-40"
+						className="flex size-11 shrink-0 items-center justify-center rounded-lg hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-snow disabled:cursor-not-allowed disabled:opacity-40"
 					>
 						{loading || sending ? (
 							<Spinner size={18} className="text-current" />

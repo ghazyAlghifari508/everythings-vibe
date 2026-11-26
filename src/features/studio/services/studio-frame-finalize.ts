@@ -52,6 +52,8 @@ export function finalizeStudioFrameHtml(
 ): StudioFrameFinalizeResult {
 	const clean = extractCleanHtml(html);
 	if (!clean) return { html: "", repairCount: 0 };
+	if (input.blueprint?.compositionOwner === "model")
+		return { html: clean, repairCount: 0 };
 	const assemble =
 		Boolean(input.blueprint && input.screen) &&
 		(input.mode !== "refresh" || ASSEMBLED_MARKERS.test(clean));

@@ -5,34 +5,21 @@ const mocks = vi.hoisted(() => ({
 	pipeline: vi.fn<() => Promise<void>>(),
 	query: vi.fn().mockResolvedValue({ rows: [{ locked: true }] }),
 	release: vi.fn(),
+	jobs: [
+		{ id: "job-a", projectId: "project", userId: "owner", jobType: "revise" },
+		{ id: "job-b", projectId: "project", userId: "owner", jobType: "revise" },
+	],
 }));
 vi.mock("@/db", () => ({
 	db: {
 		$client: {
-			connect: async () => ({ query: mocks.query, release: mocks.release }),
-		},
-		select: () => ({
-			from: () => ({
-				where: () => ({
-					orderBy: () => ({
-						limit: async () => [
-							{
-								id: "job-a",
-								projectId: "project",
-								userId: "owner",
-								jobType: "revise",
-							},
-							{
-								id: "job-b",
-								projectId: "project",
-								userId: "owner",
-								jobType: "revise",
-							},
-						],
-					}),
-				}),
+			connect: async () => ({
+				query: mocks.query,
+				release: mocks.release,
+				on: () => {},
+				off: () => {},
 			}),
-		}),
+		},
 	},
 }));
 vi.mock("../services/studio-job-pipeline", () => ({
@@ -40,11 +27,24 @@ vi.mock("../services/studio-job-pipeline", () => ({
 }));
 vi.mock("../services/studio-job-lease", () => ({
 	recoverStalledStudioJobs: async () => {},
+	STUDIO_WORKER_POLL_MS: 2000,
+}));
+// The queue is drained once: a second call must report nothing runnable, which
+// is what lets the dispatcher settle instead of redispatching finished work.
+vi.mock("../services/studio-job-dependencies", () => ({
+	listRunnableStudioJobs: async () =>
+		mocks.jobs.length ? mocks.jobs.splice(0) : [],
 }));
 
 import { dispatchStudioWorkerBatch } from "../services/studio-worker-dispatch";
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+	vi.restoreAllMocks();
+	mocks.jobs = [
+		{ id: "job-a", projectId: "project", userId: "owner", jobType: "revise" },
+		{ id: "job-b", projectId: "project", userId: "owner", jobType: "revise" },
+	];
+});
 it("settles concurrent jobs, retains secure rejection diagnostics and releases the lock", async () => {
 	let active = 0;
 	let peak = 0;

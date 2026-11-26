@@ -1,13 +1,12 @@
+import { Spinner } from "@/components/ui/spinner";
 import type { ChatMessage } from "@/store";
 import { ChatBubble } from "./chat-bubble";
 import { ChatStreamStatus } from "./chat-stream-status";
-import { TypingIndicator } from "./typing-indicator";
 
 export interface ChatMessageListProps {
 	messages: ChatMessage[];
 	isStreaming: boolean;
 	streamingContent: string;
-	thinkingText: string;
 	currentSection: string | null;
 	completedSections: string[];
 	isGeneratingPRD: boolean;
@@ -19,7 +18,6 @@ export function ChatMessageList({
 	messages,
 	isStreaming,
 	streamingContent,
-	thinkingText,
 	currentSection,
 	completedSections,
 	isGeneratingPRD,
@@ -39,23 +37,22 @@ export function ChatMessageList({
 				<ChatBubble key={msg.id} role={msg.role} content={msg.content} />
 			))}
 
-			{isStreaming && thinkingText && !streamingContent && (
-				<details className="mb-2 px-4 text-xs text-fog/60" open>
-					<summary className="cursor-pointer select-none">
-						AI sedang berpikir...
-					</summary>
-					<pre className="custom-scrollbar mt-1 max-h-40 overflow-y-auto whitespace-pre-wrap text-xs text-fog/40">
-						{thinkingText}
-					</pre>
-				</details>
-			)}
-
 			{isStreaming && streamingContent && (
 				// biome-ignore lint/a11y/useValidAriaRole: role is the chat-message domain prop, never rendered to the DOM (see chat-bubble.tsx)
 				<ChatBubble role="assistant" content={streamingContent} isStreaming />
 			)}
 
-			{isStreaming && !streamingContent && !thinkingText && <TypingIndicator />}
+			{/* Document generation uses the real section checklist above. Every
+			    other pending reply gets ONE compact status, never raw reasoning
+			    or blinking dots. */}
+			{isStreaming && !streamingContent && (!isGeneratingPRD || isRevising) && (
+				<output className="flex items-center gap-2 px-1 py-3 text-xs text-fog">
+					<Spinner size={14} />
+					<span>
+						{isRevising ? "Menyusun revisi..." : "Menunggu balasan..."}
+					</span>
+				</output>
+			)}
 		</div>
 	);
 }

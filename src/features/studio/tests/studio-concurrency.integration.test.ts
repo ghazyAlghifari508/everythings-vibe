@@ -38,11 +38,14 @@ vi.mock("@/lib/services/ai-orchestrator", () => ({
 					projectTitle: "Conc",
 					screens,
 					blueprint: {
+						compositionOwner: "model",
 						productIdentity: {
 							productName: "Conc",
 							targetAudience: "U",
 							platform: "web",
 							visualDirection: "Bersih",
+							brandTone: "Precise",
+							layoutIntent: "web-application",
 						},
 						designTokens: {
 							primary: "#0f0f0f",
@@ -57,6 +60,12 @@ vi.mock("@/lib/services/ai-orchestrator", () => ({
 							border: "1px solid #d3d3d3",
 							elevation: "none",
 						},
+						layout: {
+							gutter: 24,
+							contentMaxWidth: 1120,
+							spacing: [4, 8, 16, 24],
+							typography: [14, 16, 24, 32],
+						},
 						sharedComponents: {
 							header: "H",
 							navigation: "N",
@@ -65,6 +74,7 @@ vi.mock("@/lib/services/ai-orchestrator", () => ({
 							cards: "C",
 							tabs: "T",
 							icons: "Lucide",
+							media: "No media needed",
 						},
 						navigationContract: {
 							destinations,
@@ -77,6 +87,16 @@ vi.mock("@/lib/services/ai-orchestrator", () => ({
 							name: s.name,
 							role: s.description,
 							order: s.order,
+							navigationRole: "primary",
+							destinationId: destinations[s.order],
+							composition: {
+								primaryTask: s.description,
+								layout: "workspace",
+								hierarchy: ["Task content"],
+								patterns: [],
+								responsive: "reflow",
+								media: "none",
+							},
 						})),
 					},
 				}),

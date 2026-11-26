@@ -1,146 +1,69 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import {
-	classifyWheelGesture,
 	isCanvasControlTarget,
 	isScrollableOrEditableTarget,
-	WHEEL_DISCRETE_NOTCH_THRESHOLD_PX,
+	normalizeWheelPanDelta,
 } from "@/features/studio/utils/studio-canvas-gesture";
+import { WHEEL_LINE_HEIGHT_PX } from "@/lib/constants";
 
-describe("classifyWheelGesture", () => {
-	it("classifies trackpad pinch or Ctrl/Cmd wheel as zoom", () => {
-		expect(
-			classifyWheelGesture({
-				deltaX: 0,
-				deltaY: 5.4,
-				deltaMode: 0,
-				ctrlKey: true,
-			}),
-		).toBe("zoom");
+const page = { clientWidth: 1024, clientHeight: 700 };
+const normalize = (input: Parameters<typeof normalizeWheelPanDelta>[0]) =>
+	normalizeWheelPanDelta(input, page);
 
-		expect(
-			classifyWheelGesture({
-				deltaX: 0,
-				deltaY: -10,
-				deltaMode: 0,
-				metaKey: true,
-			}),
-		).toBe("zoom");
+describe("normalizeWheelPanDelta", () => {
+	it("normalizes a large integer notch into pan pixels without zoom", () => {
+		expect(normalize({ deltaX: 0, deltaY: -120, deltaMode: 0 })).toEqual({
+			x: 0,
+			y: -120,
+		});
+		expect(normalize({ deltaX: 0, deltaY: 100, deltaMode: 0 })).toEqual({
+			x: 0,
+			y: 100,
+		});
 	});
 
-	it("classifies physical mouse wheel with line or page deltaMode as zoom", () => {
-		// Firefox and Windows line-based mouse wheel
-		expect(
-			classifyWheelGesture({
-				deltaX: 0,
-				deltaY: 3,
-				deltaMode: 1, // DOM_DELTA_LINE
-			}),
-		).toBe("zoom");
-
-		expect(
-			classifyWheelGesture({
-				deltaX: 0,
-				deltaY: -1,
-				deltaMode: 2, // DOM_DELTA_PAGE
-			}),
-		).toBe("zoom");
+	it("keeps fractional trackpad deltas", () => {
+		expect(normalize({ deltaX: 0, deltaY: -14.28, deltaMode: 0 })).toEqual({
+			x: 0,
+			y: -14.28,
+		});
 	});
 
-	it("classifies discrete integer wheel notch (deltaMode 0, deltaX 0, abs(deltaY) >= threshold) as zoom", () => {
-		// Standard mouse wheel notch up (-100, -120) -> Zoom in
-		expect(
-			classifyWheelGesture({
-				deltaX: 0,
-				deltaY: -100,
-				deltaMode: 0,
-			}),
-		).toBe("zoom");
-
-		// Standard mouse wheel notch down (100, 120) -> Zoom out
-		expect(
-			classifyWheelGesture({
-				deltaX: 0,
-				deltaY: 120,
-				deltaMode: 0,
-			}),
-		).toBe("zoom");
-
-		// Exactly on the threshold
-		expect(
-			classifyWheelGesture({
-				deltaX: 0,
-				deltaY: WHEEL_DISCRETE_NOTCH_THRESHOLD_PX,
-				deltaMode: 0,
-			}),
-		).toBe("zoom");
+	it("respects horizontal and diagonal scroll", () => {
+		expect(normalize({ deltaX: 25, deltaY: 0, deltaMode: 0 })).toEqual({
+			x: 25,
+			y: 0,
+		});
+		expect(normalize({ deltaX: 5, deltaY: 100, deltaMode: 0 })).toEqual({
+			x: 5,
+			y: 100,
+		});
 	});
 
-	it("classifies trackpad continuous scroll with fractional deltaY as pan", () => {
-		expect(
-			classifyWheelGesture({
-				deltaX: 0,
-				deltaY: 2.5,
-				deltaMode: 0,
-			}),
-		).toBe("pan");
-
-		expect(
-			classifyWheelGesture({
-				deltaX: 0,
-				deltaY: -14.28,
-				deltaMode: 0,
-			}),
-		).toBe("pan");
+	it("normalizes line and page delta modes on both axes", () => {
+		expect(normalize({ deltaX: 3, deltaY: -2, deltaMode: 1 })).toEqual({
+			x: 3 * WHEEL_LINE_HEIGHT_PX,
+			y: -2 * WHEEL_LINE_HEIGHT_PX,
+		});
+		expect(normalize({ deltaX: 1, deltaY: -1, deltaMode: 2 })).toEqual({
+			x: page.clientWidth,
+			y: -page.clientHeight,
+		});
 	});
 
-	it("classifies trackpad gesture with horizontal deltaX as pan", () => {
-		// Pure horizontal scroll
+	it("maps non-finite and zero deltas to no pan", () => {
 		expect(
-			classifyWheelGesture({
-				deltaX: 25,
-				deltaY: 0,
+			normalize({
+				deltaX: Number.NaN,
+				deltaY: Number.POSITIVE_INFINITY,
 				deltaMode: 0,
 			}),
-		).toBe("pan");
-
-		// Diagonal 2D trackpad gesture
-		expect(
-			classifyWheelGesture({
-				deltaX: 5,
-				deltaY: 100,
-				deltaMode: 0,
-			}),
-		).toBe("pan");
-	});
-
-	it("falls back to pan for ambiguous small integer micro-steps", () => {
-		// Trackpad slow vertical scrolling with integer values below threshold
-		expect(
-			classifyWheelGesture({
-				deltaX: 0,
-				deltaY: 3,
-				deltaMode: 0,
-			}),
-		).toBe("pan");
-
-		expect(
-			classifyWheelGesture({
-				deltaX: 0,
-				deltaY: -12,
-				deltaMode: 0,
-			}),
-		).toBe("pan");
-	});
-
-	it("returns pan for zero delta", () => {
-		expect(
-			classifyWheelGesture({
-				deltaX: 0,
-				deltaY: 0,
-				deltaMode: 0,
-			}),
-		).toBe("pan");
+		).toEqual({ x: 0, y: 0 });
+		expect(normalize({ deltaX: 0, deltaY: 0, deltaMode: 0 })).toEqual({
+			x: 0,
+			y: 0,
+		});
 	});
 });
 

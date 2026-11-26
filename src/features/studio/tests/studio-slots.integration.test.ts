@@ -47,7 +47,7 @@ async function cleanupUser(userId: string) {
 }
 
 describe("atomic frame slots", () => {
-	it("membuat N slots Layar 1..N dalam transaksi yang sama", async () => {
+	it("persists the initial request without speculative slots", async () => {
 		const userId = await createOwner();
 		try {
 			const { project, job, frames } = await createStudioProjectWithJob(
@@ -57,20 +57,18 @@ describe("atomic frame slots", () => {
 					prompt:
 						"Aplikasi pemesanan kopi dengan katalog menu, kustomisasi gula dan es, checkout pembayaran, serta riwayat pesanan pengguna",
 					designMode: "mobile",
-					initialPageCount: 4,
 				},
 			);
 			expect(job.projectId).toBe(project.id);
-			expect(frames).toHaveLength(4);
-			expect(frames.map((f) => f.name)).toEqual([
-				"Layar 1",
-				"Layar 2",
-				"Layar 3",
-				"Layar 4",
-			]);
-			expect(frames.every((f) => f.status === "queued")).toBe(true);
-			expect(frames.every((f) => f.projectId === project.id)).toBe(true);
-			expect(frames.map((f) => f.order)).toEqual([0, 1, 2, 3]);
+			expect(project.initialPageCount).toBeNull();
+			expect(job.status).toBe("queued");
+			expect(frames).toEqual([]);
+			expect(
+				await db
+					.select()
+					.from(studioFrames)
+					.where(eq(studioFrames.projectId, project.id)),
+			).toEqual([]);
 		} finally {
 			await cleanupUser(userId);
 		}
@@ -84,7 +82,6 @@ describe("atomic frame slots", () => {
 				prompt:
 					"Aplikasi pemesanan kopi dengan katalog menu dan checkout pembayaran yang mudah digunakan",
 				designMode: "mobile",
-				initialPageCount: 2,
 			});
 			const joined = frames.map((f) => f.name).join(" ");
 			expect(joined).not.toMatch(/Dashboard|Payment|Settings|Transaksi/i);
@@ -93,7 +90,7 @@ describe("atomic frame slots", () => {
 		}
 	});
 
-	it("duplicate request dalam 10 detik mengembalikan slots yang sama tanpa duplikat", async () => {
+	it("deduplicates concurrent launches before slots exist", async () => {
 		const userId = await createOwner();
 		try {
 			const input = {
@@ -101,19 +98,19 @@ describe("atomic frame slots", () => {
 				prompt:
 					"Aplikasi pemesanan kopi dengan katalog menu, checkout pembayaran, dan pelacakan pesanan real-time",
 				designMode: "mobile" as const,
-				initialPageCount: 3,
 			};
-			const first = await createStudioProjectWithJob(userId, input);
-			const second = await createStudioProjectWithJob(userId, input);
+			const [first, second] = await Promise.all([
+				createStudioProjectWithJob(userId, input),
+				createStudioProjectWithJob(userId, input),
+			]);
 			expect(second.project.id).toBe(first.project.id);
-			expect(second.frames.map((f) => f.id).sort()).toEqual(
-				first.frames.map((f) => f.id).sort(),
-			);
+			expect(second.job.id).toBe(first.job.id);
+			expect(second.frames).toEqual([]);
 			const rows = await db
 				.select()
 				.from(studioFrames)
 				.where(eq(studioFrames.projectId, first.project.id));
-			expect(rows).toHaveLength(3);
+			expect(rows).toEqual([]);
 		} finally {
 			await cleanupUser(userId);
 		}

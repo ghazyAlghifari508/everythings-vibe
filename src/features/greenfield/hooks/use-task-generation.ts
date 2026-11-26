@@ -75,9 +75,6 @@ export function useTaskGeneration({
 	const [isGenerating, setIsGenerating] = useState(() =>
 		resolveInitialGenerating(hasAc, taskStatus, Boolean(taskTree)),
 	);
-	// Real streamed reasoning from the model's SSE `thinking` events — the
-	// only honest "AI is working" signal we have (no-hardcode.md Rule 7).
-	const [thinkingText, setThinkingText] = useState("");
 	const [hasError, setHasError] = useState(false);
 	const [generatedTaskTree, setGeneratedTaskTree] = useState<TaskTree | null>(
 		null,
@@ -160,7 +157,6 @@ export function useTaskGeneration({
 		}
 		isGeneratingRef.current = true;
 		setIsGenerating(true);
-		setThinkingText("");
 		setHasError(false);
 
 		abortRef.current?.abort();
@@ -229,16 +225,7 @@ export function useTaskGeneration({
 				const event: StreamEvent | null = parseStreamEvent(data);
 				// Unknown or malformed frames are skipped — the stream stays live.
 				if (!event) continue;
-				if (event.type === "thinking") {
-					setThinkingText((prev) => prev + event.content);
-				} else if (event.type === "thinking_reset") {
-					// A failed upstream attempt already streamed reasoning; the
-					// retry starts fresh instead of appending a duplicate.
-					setThinkingText("");
-				} else if (event.type === "delta") {
-					// Real output flowing — reasoning display has served its purpose.
-					setThinkingText("");
-				} else if (event.type === "done") {
+				if (event.type === "done") {
 					receivedTerminalEvent = true;
 					if (!isTaskTree(event.taskTree)) {
 						setHasError(true);
@@ -362,6 +349,5 @@ export function useTaskGeneration({
 		hasError,
 		isGenerating,
 		revealCount,
-		thinkingText,
 	};
 }

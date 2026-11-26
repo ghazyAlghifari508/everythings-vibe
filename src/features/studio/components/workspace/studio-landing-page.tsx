@@ -23,10 +23,6 @@ import { useStudioCreditQuote } from "@/features/studio/hooks/use-studio-credit-
 import { useStudioHistoryActions } from "@/features/studio/hooks/use-studio-history-actions";
 import type { StudioQuoteScope } from "@/features/studio/services/studio-credit-policy";
 import {
-	STUDIO_DEFAULT_PAGE_COUNT,
-	type StudioDesignSkillId,
-} from "@/features/studio/services/studio-generation-options";
-import {
 	getStudioPresetDesignMd,
 	STUDIO_DESIGN_PRESETS,
 } from "@/features/studio/services/studio-presets";
@@ -38,6 +34,7 @@ import type {
 	AttachedLogo,
 	StudioHistoryItem,
 } from "@/features/studio/types/studio";
+import { STUDIO_INITIAL_SCREEN_LIMIT } from "@/features/studio/types/studio-constants";
 
 /** A design reference staged on the landing screen, not yet sent. */
 export type StagedReference =
@@ -71,8 +68,6 @@ export function StudioLandingPage({
 	const [prompt, setPrompt] = useState(search.prompt ?? "");
 	const [config, setConfig] = useState<LaunchComposerConfig>({
 		designMode: "web",
-		designSkillId: "none" satisfies StudioDesignSkillId,
-		initialPageCount: STUDIO_DEFAULT_PAGE_COUNT,
 	});
 	const [stagedReference, setStagedReference] =
 		useState<StagedReference | null>(null);
@@ -93,14 +88,14 @@ export function StudioLandingPage({
 	const scope = useMemo<StudioQuoteScope>(
 		() => ({
 			operation: "studio.generate",
-			frames: config.initialPageCount,
+			frames: STUDIO_INITIAL_SCREEN_LIMIT,
 			promptChars: prompt.trim().length,
 			designMdChars:
 				stagedReference && "designMd" in stagedReference
 					? stagedReference.designMd.length
 					: 0,
 		}),
-		[prompt, config.initialPageCount, stagedReference],
+		[prompt, stagedReference],
 	);
 	const [quoteScope, setQuoteScope] = useState<StudioQuoteScope>(scope);
 	useEffect(() => {
@@ -130,11 +125,7 @@ export function StudioLandingPage({
 	function applyShortcut(shortcut: StudioPromptShortcut) {
 		setPrompt(shortcut.prompt);
 		setSelectedShortcutId(shortcut.id);
-		setConfig((previous) => ({
-			...previous,
-			designMode: shortcut.designMode,
-			initialPageCount: shortcut.initialPageCount,
-		}));
+		setConfig({ designMode: shortcut.designMode });
 		setError("");
 		textareaRef.current?.focus();
 	}
@@ -199,8 +190,6 @@ export function StudioLandingPage({
 			const body = JSON.stringify({
 				prompt: prompt.trim(),
 				designMode: config.designMode,
-				designSkillId: config.designSkillId,
-				initialPageCount: config.initialPageCount,
 				designReference: stagedReference
 					? stagedReference.kind === "theme"
 						? { kind: "theme", id: stagedReference.id }

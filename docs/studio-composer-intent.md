@@ -56,13 +56,49 @@ clarifications never reach the model with a destructive default.
 
 - project ownership (`WHERE user_id = ?`, re-read `FOR UPDATE`),
 - frame membership for revision targets,
-- new-screen count (`STUDIO_MAX_PAGE_COUNT` per request),
+- new-screen count (`STUDIO_ADD_SCREEN_LIMIT` per follow-up request),
 - duplicate names within the request and against existing screens
   (`STUDIO_DUPLICATE_SCREEN`, HTTP 409),
 - job idempotency: `${requestId}:add:${index}` and `${requestId}:${frameId}`,
   so a repeated submit reuses the queued jobs instead of adding a duplicate,
 - concurrent operations still refuse to re-queue a frame that is
   `queued`/`generating`.
+
+## Composer targets (selected frames)
+
+The composer's attachments and the canvas selection are the same state; there is
+exactly one owner, `useStudioWorkspace`.
+
+- **State.** `selectedFrameIds` is the target set. `selectedFrames` is derived by
+  filtering the live frame rows, so a chip always carries an `id` (what the
+  request sends) and the frame's current `name` (what the user reads). The frame
+  `revision` is never part of the client target set; the server derives the base
+  revision from the row it locked.
+- **Detach policy.** Clicking a chip's X removes only that id from
+  `selectedFrameIds` (`removeSelectedFrame`) and therefore also clears the
+  canvas selection ring for it, because the canvas reads the same array. The
+  frame row, its HTML and its history are untouched: detaching is a composer
+  scope action, never a delete. This matches the Stitch observation in
+  `p1-architecture-research.md` §2.3, where removing a chip returns the composer
+  to project scope and the screen stays on the canvas.
+- **Clear all.** With more than one target the row also exposes one "Bersihkan"
+  control, which empties the same state. Both controls are `type="button"`, so a
+  detach can never submit the draft.
+- **Stale targets.** A frame row can disappear (planning deletes and reinserts
+  its slots) while its id is still selected. The operation endpoint refuses a
+  revision whose target set names an unknown frame
+  (`STUDIO_INVALID_INPUT`), so a surviving ghost id used to reject every
+  selected-frame request while the composer showed no chip for it. A pruning
+  effect in `useStudioWorkspace` (`pruneStudioFrameSelection`) keeps the set equal
+  to the live canvas, and returns the same array reference when nothing was
+  dropped so a poll never re-renders the composer.
+- **Selection persistence.** `sessionStorage` keyed by `user:project`, written
+  only after the restore for that key completed. A restore is immediately pruned
+  against the live canvas, so reloading cannot revive a deleted frame's id.
+- **Submit snapshot.** `useStudioComposerRequest` copies the target ids at submit
+  time and uses that copy for both the idempotency signature and the request
+  body. A canvas selection change while the request is in flight belongs to the
+  user's next message, never to the operation already sent.
 
 ## Add-screen preserves the project
 
@@ -92,12 +128,31 @@ deliberately.
 The backend ability to create a frame is not removed: it moved into the
 composer-driven `add_screen` operation.
 
+## Adaptive initial planning
+
+`POST /api/studio/generate` accepts the brief, platform and optional PRD or design
+reference, not a page count. A queued launch returns `frameIds: []` and
+`pageCount: null`. An active duplicate can return the already planned slots.
+
+The shared planner selects up to five initial screens and returns their scope,
+including any deferred requirements. A lease-fenced transaction saves the
+blueprint, actual count and named initial slots together. The original request
+survives planning failure. Recovering an already-planned job reuses its slots.
+Follow-up adds keep their own frame IDs and wait for the blueprint; they do not
+contribute to initial progress. Deferred scope appears in the initial chat turn.
+
+The same planning call proposes a workspace title, separate from the UI brand.
+Only automatic titles can be updated. Existing fixed-count projects and their
+exports remain readable. Studio does not reserve or deduct account credits for
+this workflow; provider concurrency and retry limits remain in place.
+
 ## Verification
 
 ```sh
 pnpm vitest run src/features/studio/tests/studio-composer-intent.test.ts
 pnpm vitest run src/features/studio/tests/studio-composer-intent-server.test.ts
 pnpm vitest run src/features/studio/tests/studio-composer.test.tsx
+pnpm vitest run src/features/studio/tests/studio-frame-selection.test.ts
 pnpm vitest run src/features/studio/tests/studio-frame-route.test.ts
 pnpm vitest run src/features/studio/tests/studio-operations.integration.test.ts
 pnpm vitest run src/features/studio/tests/studio-add-screen.integration.test.ts

@@ -1,22 +1,13 @@
 import { z } from "zod";
-import {
-	STUDIO_MAX_PAGE_COUNT,
-	STUDIO_MIN_PAGE_COUNT,
-} from "./studio-generation-options";
 
 // A shortcut populates the composer with a full editable brief. It never
-// submits on its own and never overrides an explicitly selected skill or
-// design reference.
+// submits on its own and never overrides an explicitly selected design
+// reference.
 export const studioPromptShortcutSchema = z.object({
 	id: z.string().min(1).max(100),
 	title: z.string().min(1).max(120),
 	category: z.string().min(1).max(80),
 	designMode: z.enum(["web", "mobile"]),
-	initialPageCount: z
-		.number()
-		.int()
-		.min(STUDIO_MIN_PAGE_COUNT)
-		.max(STUDIO_MAX_PAGE_COUNT),
 	preview: z.string().min(1).max(280),
 	prompt: z.string().min(200).max(6000),
 });
@@ -29,7 +20,6 @@ export const STUDIO_PROMPT_SHORTCUTS: readonly StudioPromptShortcut[] = [
 		title: "Kopi Specialty Ordering",
 		category: "Food & Beverage",
 		designMode: "mobile",
-		initialPageCount: 4,
 		preview:
 			"Aplikasi pesan kopi specialty: eksplorasi menu, kustomisasi minuman, keranjang, dan lacak pesanan.",
 		prompt: `Aplikasi mobile ordering untuk kedai kopi specialty "Ruang Seduh".
@@ -50,7 +40,6 @@ Audiens: pelanggan urban usia 18-35 tahun yang memesan dari ponsel satu tangan; 
 		title: "Personal Finance Tracker",
 		category: "Keuangan",
 		designMode: "mobile",
-		initialPageCount: 4,
 		preview:
 			"Pencatat keuangan pribadi: ringkasan arus kas, anggaran kategori, tambah transaksi, dan laporan.",
 		prompt: `Aplikasi mobile pencatat keuangan pribadi "CatatDompet" untuk pengguna Indonesia.
@@ -71,7 +60,6 @@ Audiens: karyawan muda yang mencatat pengeluaran harian; alur pencatatan transak
 		title: "SaaS Analytics Dashboard",
 		category: "Dashboard",
 		designMode: "web",
-		initialPageCount: 3,
 		preview:
 			"Dashboard analitik SaaS: metrik MRR/churn, grafik tren, tabel pelanggan, dan filter periode.",
 		prompt: `Dashboard analitik web untuk produk SaaS "Metriq" yang dipakai tim growth dan finance.
@@ -91,7 +79,6 @@ Audiens: founder dan tim operasional bisnis non-teknis; format angka memakai not
 		title: "Travel Booking Experience",
 		category: "Travel",
 		designMode: "mobile",
-		initialPageCount: 5,
 		preview:
 			"Pemesanan travel: cari destinasi, hasil + filter, detail paket, checkout, dan e-tiket.",
 		prompt: `Aplikasi mobile pemesanan travel "Jelajahin" untuk liburan domestik Indonesia.
@@ -113,7 +100,6 @@ Audiens: wisatawan usia 20-35 tahun yang aktif membandingkan pilihan perjalanan;
 		title: "Developer Portfolio",
 		category: "Personal Brand",
 		designMode: "web",
-		initialPageCount: 3,
 		preview:
 			"Portofolio developer: hero + keahlian, galeri proyek studi kasus, dan kontak.",
 		prompt: `Website portofolio personal untuk software engineer "Nadia Prameswari" yang mencari peran frontend senior remote.

@@ -1,11 +1,15 @@
 import { JSDOM } from "jsdom";
 import { STUDIO_VISUAL_WIDTH } from "@/features/studio/types/studio-constants";
 import type { StudioDesignBlueprint } from "./studio-design-blueprint";
+import { validateStudioSampleLedger } from "./studio-sample-ledger";
+import { validateStudioSemanticNavigation } from "./studio-semantic-navigation";
 
 export interface ValidateGeneratedHtmlOptions {
 	blueprint: StudioDesignBlueprint | null;
 	viewport: "web" | "mobile";
 	expectTokens: boolean;
+	screen?: string;
+	logoUrl?: string | null;
 }
 
 /**
@@ -260,6 +264,96 @@ function hasOverflowingFixedWidth(
 	}
 }
 
+const TEXT_ONLY_CARD_CONTENT =
+	"img,picture,svg,video,canvas,table,form,input,select,textarea,button,a,ul,ol,dl,figure";
+const NON_BLOCK_TAGS: Record<string, true> = {
+	SCRIPT: true,
+	STYLE: true,
+	TEMPLATE: true,
+	NOSCRIPT: true,
+	LINK: true,
+	META: true,
+};
+
+/**
+ * A public page whose top-level content is nothing but boxed text blocks has
+ * no composition — the reported "website made of plain cards" failure.
+ *
+ * The unit of analysis is the content region's own children, so a wall built
+ * from plain divs is caught as well as one built from sections.
+ *
+ * Evidence is deliberately structural: an explicit card marker, a border, or a
+ * shadow. A background colour alone is a legitimate editorial device (full-width
+ * colour-block sections), so it is not card evidence here; JSDOM cannot measure
+ * containment either. A page with any media, link, list or control in a block
+ * cannot trip this, and it is only ever a single bounded repair.
+ */
+function hasCardOnlyComposition(
+	html: string,
+	blueprint: StudioDesignBlueprint,
+): boolean {
+	if (blueprint.productIdentity.layoutIntent !== "public-website") return false;
+	const dom = new JSDOM(html);
+	try {
+		const document = dom.window.document;
+		const content =
+			document.querySelector("[data-studio-content]") ?? document.body;
+		if (!content) return false;
+		const blocks = Array.from(content.children).filter(
+			(element) => !NON_BLOCK_TAGS[element.tagName],
+		);
+		if (blocks.length < 3) return false;
+		return blocks.every((block) => {
+			if (!(block.textContent ?? "").trim()) return false;
+			if (block.querySelector(TEXT_ONLY_CARD_CONTENT)) return false;
+			if (block.hasAttribute("data-card")) return true;
+			const style = dom.window.getComputedStyle(block);
+			return (
+				Number.parseFloat(style.borderTopWidth) > 0 ||
+				(!!style.boxShadow && style.boxShadow !== "none")
+			);
+		});
+	} finally {
+		dom.window.close();
+	}
+}
+
+/**
+ * A planned photography slot is a contract, not a suggestion. Large inline
+ * scenery is legitimate illustration when no photography was planned, but it
+ * must not silently replace a slot the planner committed to fill.
+ */
+function hasScenerySubstitute(
+	html: string,
+	blueprint: StudioDesignBlueprint,
+	screen?: string,
+): boolean {
+	const plan = blueprint.screenPlan.find(({ name }) => name === screen);
+	if (!plan?.photos?.length) return false;
+	const dom = new JSDOM(html);
+	try {
+		const document = dom.window.document;
+		if (document.querySelector("[data-studio-photo]")) return false;
+		for (const svg of document.querySelectorAll("svg")) {
+			const box = (svg.getAttribute("viewBox") ?? "")
+				.split(/[\s,]+/)
+				.map((value) => Number(value));
+			const large =
+				box.length === 4 &&
+				box.every((value) => Number.isFinite(value)) &&
+				box[2] >= 320 &&
+				box[3] >= 200;
+			const detailed =
+				svg.querySelectorAll("path,polygon,polyline,rect,circle,ellipse")
+					.length >= 4;
+			if (large || detailed) return true;
+		}
+		return false;
+	} finally {
+		dom.window.close();
+	}
+}
+
 // Deterministic structural validation for generated HTML. String checks
 // cannot prove visual correctness; they only catch concrete contract
 // violations that warrant one bounded corrective regeneration.
@@ -281,7 +375,16 @@ export function validateGeneratedHtml(
 	if (opts.expectTokens && !html.includes("studio-design-tokens")) {
 		issues.push("Token design system hilang.");
 	}
-	if (opts.blueprint) {
+	if (opts.blueprint?.compositionOwner === "model") {
+		issues.push(
+			...validateStudioSemanticNavigation(
+				html,
+				opts.blueprint,
+				opts.screen,
+				opts.logoUrl,
+			),
+		);
+	} else if (opts.blueprint) {
 		const structure = extractNavigationStructure(html, opts.blueprint);
 		const expected = opts.blueprint.navigationContract.labels;
 		for (const label of expected) {
@@ -300,6 +403,22 @@ export function validateGeneratedHtml(
 		}
 		if (structure.fullNavCount > 1) {
 			issues.push("Navigasi ganda terdeteksi.");
+		}
+	}
+	if (opts.blueprint) {
+		if (
+			opts.blueprint.compositionOwner === "model" &&
+			opts.screen &&
+			hasScenerySubstitute(html, opts.blueprint, opts.screen)
+		)
+			issues.push(
+				"Planned photo slot is missing; do not replace it with decorative artwork.",
+			);
+		issues.push(...validateStudioSampleLedger(html, opts.blueprint));
+		if (hasCardOnlyComposition(html, opts.blueprint)) {
+			issues.push(
+				"Komposisi halaman publik hanya berupa kartu teks; gunakan hero, karya, editorial, atau galeri sesuai isi.",
+			);
 		}
 	}
 	if (stripCodeBlocks(html).includes("```")) {

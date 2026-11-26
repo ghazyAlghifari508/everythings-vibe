@@ -16,7 +16,7 @@ Verified by reading the actual files, not filenames.
 | Button (CVA) | `src/components/ui/button.tsx` | `secondary` variant used by the picker footer. |
 | Design picker dialog | `src/components/design/studio-design-picker-dialog.tsx` | hand-rolled `role="tablist"` / `role="tab"` / `role="tabpanel"` with three tabs (`tema`, `template`, `milik`); theme grid; custom DESIGN.md + logo staging. |
 | Page-count selector | `src/components/design/studio-page-count-select.tsx` | 1–5 radio-style `DropdownMenu` menu reading `STUDIO_MIN/MAX/DEFAULT_PAGE_COUNT`. |
-| Skill selector | `src/components/design/studio-skill-select.tsx` | single-select `DropdownMenu` over `STUDIO_DESIGN_SKILLS`, stable ids from `studioDesignSkillIdSchema`. |
+| Skill selector | `src/features/studio/components/composer/studio-skill-select.tsx` (retired in P7) | single-select `DropdownMenu` over `STUDIO_DESIGN_SKILLS`, stable ids from `studioDesignSkillIdSchema`. Deleted with the skill feature; the composer now shows the design reference chip only. |
 | Landing composer | `src/components/design/studio-launch-composer.tsx` | reference trigger button (currently `Plus` when empty, `Palette` when active). |
 
 Installed runtime packages relevant here: `@radix-ui/react-dialog`, `@radix-ui/react-dropdown-menu`,

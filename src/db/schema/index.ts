@@ -8,4 +8,5 @@ export * from "./product-trials";
 export * from "./projects";
 export * from "./scrape";
 export * from "./studio";
+export * from "./studio-element-revisions";
 export * from "./usage-metering";

@@ -1,6 +1,15 @@
-import { LockKeyIcon } from "@hugeicons/core-free-icons";
+import {
+	ArrowUp02Icon,
+	LockKeyIcon,
+	StopIcon,
+} from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
+
+// Anything the user expects to act on its own; a press on one must not be
+// redirected to the textarea.
+const INTERACTIVE_SELECTOR =
+	'a[href], button, input, select, textarea, [role="button"]';
 
 export interface ChatInputAreaProps {
 	input: string;
@@ -27,6 +36,30 @@ export function ChatInputArea({
 	projectId,
 	inputRef,
 }: ChatInputAreaProps) {
+	const canFocusFromSurface =
+		!isReadOnly && !isStreaming && !isEffectivelyDisabled;
+
+	// The composer is one visual field: pressing its empty padding or footer row
+	// focuses the textarea. mousedown (not click) so the browser never parks
+	// focus on the wrapper first. Controls keep their own action.
+	const focusFromSurface = (event: React.MouseEvent<HTMLDivElement>) => {
+		if (!canFocusFromSurface || event.defaultPrevented) return;
+		const target = event.target;
+		if (!(target instanceof HTMLElement)) return;
+		if (target.closest(INTERACTIVE_SELECTOR)) return;
+		const el = inputRef?.current;
+		if (!el) return;
+		event.preventDefault();
+		el.focus({ preventScroll: true });
+		el.setSelectionRange(el.value.length, el.value.length);
+	};
+
+	const actionLabel = isStreaming
+		? "Hentikan proses"
+		: projectId
+			? "Update PRD"
+			: "Generate PRD";
+
 	return (
 		<div className="border-t border-graphite p-4">
 			{isReadOnly ? (
@@ -51,16 +84,22 @@ export function ChatInputArea({
 					</div>
 				</output>
 			) : (
-				<div className="relative flex flex-col rounded-md bg-charcoal shadow-[var(--shadow-inset)] transition-shadow duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] focus-within:shadow-[inset_0_0_0_1px_rgba(94,106,210,0.85)]">
+				// biome-ignore lint/a11y/noStaticElementInteractions: pointer convenience only; the textarea and button keep native keyboard semantics
+				<div
+					data-testid="chat-composer"
+					onMouseDown={focusFromSurface}
+					className="relative flex flex-col rounded-md bg-charcoal shadow-[var(--shadow-inset)] transition-shadow duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] focus-within:shadow-[inset_0_0_0_1px_rgba(94,106,210,0.85)]"
+				>
 					<textarea
 						ref={inputRef}
 						value={input}
 						onChange={(e) => setInput(e.target.value)}
 						onKeyDown={(e) => {
-							if (e.key === "Enter" && !e.shiftKey) {
-								e.preventDefault();
-								onSend();
-							}
+							if (e.key !== "Enter" || e.shiftKey) return;
+							// IME candidate confirmation also reports Enter.
+							if (e.nativeEvent.isComposing) return;
+							e.preventDefault();
+							onSend();
 						}}
 						placeholder={
 							isEffectivelyDisabled
@@ -80,7 +119,7 @@ export function ChatInputArea({
 						rows={2}
 						disabled={isStreaming || isEffectivelyDisabled}
 					/>
-					<div className="flex items-center justify-between px-3 pb-3 pt-1">
+					<div className="flex items-center justify-end px-3 pb-3 pt-1">
 						<button
 							type="button"
 							onClick={isStreaming ? onCancel : onSend}
@@ -88,47 +127,20 @@ export function ChatInputArea({
 								!isStreaming &&
 								(!input.trim() || isSubmitting || isEffectivelyDisabled)
 							}
+							aria-label={actionLabel}
+							title={actionLabel}
 							className={cn(
-								"flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] disabled:opacity-30 active:scale-[0.98]",
+								"flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo/60 disabled:opacity-30 active:scale-[0.98] max-md:h-11 max-md:w-11",
 								isStreaming
 									? "bg-crimson text-white hover:bg-crimson/90"
 									: "btn-primary hover:brightness-105",
 							)}
-							title={
-								isStreaming
-									? "Hentikan Proses"
-									: projectId
-										? "Update PRD"
-										: "Generate PRD"
-							}
 						>
-							{isStreaming ? (
-								<svg
-									aria-hidden="true"
-									width="12"
-									height="12"
-									viewBox="0 0 16 16"
-									fill="currentColor"
-								>
-									<rect x="3" y="3" width="10" height="10" rx="1" />
-								</svg>
-							) : (
-								<svg
-									width="14"
-									height="14"
-									viewBox="0 0 16 16"
-									fill="none"
-									aria-hidden="true"
-								>
-									<path
-										d="M2 8L14 8M10 4L14 8L10 12"
-										stroke="currentColor"
-										strokeWidth="2"
-										strokeLinecap="round"
-										strokeLinejoin="round"
-									/>
-								</svg>
-							)}
+							<Icon
+								icon={isStreaming ? StopIcon : ArrowUp02Icon}
+								size={16}
+								strokeWidth={2}
+							/>
 						</button>
 					</div>
 				</div>

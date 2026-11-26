@@ -18,10 +18,7 @@ vi.mock("@/features/studio/services/studio-project-enqueue", () => ({
 		return {
 			project: { id: "proj-100", title: "Test Project" },
 			job: { id: "job-100", status: "queued" },
-			frames: [
-				{ id: "frame-1", projectId: "proj-100", order: 0 },
-				{ id: "frame-2", projectId: "proj-100", order: 1 },
-			],
+			frames: [],
 		};
 	},
 }));
@@ -143,8 +140,8 @@ describe("POST /api/studio/generate", () => {
 			projectId: "proj-100",
 			jobId: "job-100",
 			status: "queued",
-			frameIds: ["frame-1", "frame-2"],
-			pageCount: 2,
+			frameIds: [],
+			pageCount: null,
 		});
 	});
 

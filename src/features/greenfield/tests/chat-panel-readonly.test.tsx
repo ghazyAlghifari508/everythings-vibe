@@ -72,3 +72,32 @@ describe("ChatPanel read-only mode", () => {
 		expect(c.querySelector("textarea")).not.toBeNull();
 	});
 });
+
+describe("ChatPanel PRD recovery bar", () => {
+	const retryLabel = "Generate ulang PRD";
+
+	it("offers regeneration when the project has no saved PRD and nothing is generating", async () => {
+		const c = renderPanel({ projectId: "test-proj", currentPrdContent: "" });
+		await act(async () => {});
+		expect(c.textContent).toContain(retryLabel);
+	});
+
+	it("hides it once a PRD is saved", async () => {
+		const c = renderPanel({
+			projectId: "test-proj",
+			currentPrdContent: "# PRD",
+		});
+		await act(async () => {});
+		expect(c.textContent).not.toContain(retryLabel);
+	});
+
+	it("hides it for a locked read-only project", async () => {
+		const c = renderPanel({
+			projectId: "test-proj",
+			isReadOnly: true,
+			currentPrdContent: "",
+		});
+		await act(async () => {});
+		expect(c.textContent).not.toContain(retryLabel);
+	});
+});

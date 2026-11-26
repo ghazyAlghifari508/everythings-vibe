@@ -39,6 +39,8 @@ export interface FetchAssetOptions {
 	maxBytes?: number;
 	reserveBytes?: (bytes: number) => boolean;
 	range?: { start: number; end?: number; suffixLength?: number };
+	authorization?: string;
+	allowRedirects?: boolean;
 }
 
 export interface FetchedAsset {
@@ -86,6 +88,9 @@ export async function fetchAsset(
 			Accept: "*/*",
 			"Accept-Language": "en-US,en;q=0.9",
 			"Accept-Encoding": "identity",
+			...(options.authorization
+				? { Authorization: options.authorization }
+				: {}),
 			...(options.range
 				? {
 						Range: options.range.suffixLength
@@ -103,7 +108,7 @@ export async function fetchAsset(
 			// instead of a rejection the pipeline can classify.
 			res.on("error", reject);
 			const next = redirectTarget(res, url);
-			if (next) {
+			if (next && options.allowRedirects !== false && !options.authorization) {
 				if (options.reserveBytes) res.destroy();
 				else res.resume();
 				fetchAsset(next, redirects + 1, options).then(resolve, reject);
@@ -161,6 +166,7 @@ export async function fetchAsset(
 		req.on("timeout", () => req.destroy(new ScrapeError("FETCH_TIMEOUT")));
 		const abort = () => req.destroy(new ScrapeError("JOB_TIMEOUT"));
 		options.signal?.addEventListener("abort", abort, { once: true });
+		if (options.signal?.aborted) abort();
 		req.on("close", () => options.signal?.removeEventListener("abort", abort));
 		req.on("error", reject);
 		req.end();

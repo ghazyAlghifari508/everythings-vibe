@@ -7,29 +7,14 @@ import {
 	readStudioApiError,
 	requestStudioFrameRetry,
 } from "@/features/studio/services/studio-frame-retry-client";
-import type { StudioDesignSkillId } from "@/features/studio/services/studio-generation-options";
 import type { StudioVisibleProject } from "@/features/studio/types/studio-status";
 import { useUIStore } from "@/store";
-
-/** Reads what one composer request resolved to, so the UI explains clarify. */
-function readComposerOutcome(body: unknown): {
-	intent: string | null;
-	message: string | null;
-} {
-	if (typeof body !== "object" || body === null)
-		return { intent: null, message: null };
-	const intent =
-		"intent" in body && typeof body.intent === "string" ? body.intent : null;
-	const message =
-		"message" in body && typeof body.message === "string" ? body.message : null;
-	return { intent, message };
-}
+import { useStudioComposerRequest } from "./use-studio-composer-request";
 
 export interface UseStudioWorkspaceActionsOptions {
 	project: StudioVisibleProject;
 	frames: StudioFrameRow[];
 	selectedFrameIds: string[];
-	isProcessing: boolean;
 	syncProjectStatus: () => Promise<void>;
 	setError: (error: string) => void;
 }
@@ -38,12 +23,17 @@ export function useStudioWorkspaceActions({
 	project,
 	frames,
 	selectedFrameIds,
-	isProcessing,
 	syncProjectStatus,
 	setError,
 }: UseStudioWorkspaceActionsOptions) {
-	const [composerLoading, setComposerLoading] = useState(false);
-	const [preferenceSaving, setPreferenceSaving] = useState(false);
+	const { composerLoading, handleComposerSubmit: submitStudioComposerRequest } =
+		useStudioComposerRequest({
+			projectId: project.id,
+			userId: project.userId,
+			selectedFrameIds,
+			syncProjectStatus,
+			setError,
+		});
 	const [exportingZip, setExportingZip] = useState(false);
 	const [deleting, setDeleting] = useState(false);
 	const [renaming, setRenaming] = useState(false);
@@ -55,9 +45,22 @@ export function useStudioWorkspaceActions({
 	const [creditsExhausted, setCreditsExhausted] = useState<string | null>(null);
 
 	const navigate = useNavigate();
+	// Admission is decided by the operation endpoint's own code, so the submit is
+	// a single request: an exhausted account gets the modal (or the pricing page)
+	// from the same response that would otherwise have created the job.
+	const handleComposerSubmit = useCallback(
+		async (promptText: string): Promise<StudioComposerSubmitResult> => {
+			const result = await submitStudioComposerRequest(promptText);
+			if (result.creditState === "insufficient")
+				setCreditsExhausted("Kredit tidak cukup untuk operasi ini.");
+			if (result.creditState === "plan_gated")
+				void navigate({ to: "/pricing" });
+			return result;
+		},
+		[navigate, submitStudioComposerRequest],
+	);
 	const router = useRouter();
 	const showToast = useUIStore((state) => state.showToast);
-	const pendingRequest = useRef<{ signature: string; id: string } | null>(null);
 	// The in-flight guard is a ref: two clicks in one tick both read the rendered
 	// state before React commits it, and only the ref sees the first request.
 	const retryingFrames = useRef(new Set<string>());
@@ -170,105 +173,6 @@ export function useStudioWorkspaceActions({
 		}
 	}, [deleting, navigate, project.id, router, setError, showToast]);
 
-	const handleComposerSubmit = useCallback(
-		async (promptText: string): Promise<StudioComposerSubmitResult> => {
-			setComposerLoading(true);
-			setError("");
-			const signature = JSON.stringify({ promptText, selectedFrameIds });
-			if (pendingRequest.current?.signature !== signature)
-				pendingRequest.current = { signature, id: crypto.randomUUID() };
-			try {
-				const res = await fetch("/api/studio/frame", {
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({
-						action: "operation",
-						projectId: project.id,
-						prompt: promptText,
-						frameIds: selectedFrameIds,
-						requestId: pendingRequest.current.id,
-					}),
-				});
-				if (!res.ok) {
-					const body = (await res.json().catch(() => null)) as {
-						error?: string;
-						code?: string;
-					} | null;
-					if (body?.code === "INSUFFICIENT_CREDITS") {
-						setCreditsExhausted(
-							body.error ?? "Kredit tidak cukup untuk operasi ini.",
-						);
-						return { accepted: false };
-					}
-					if (
-						body?.code === "TRIAL_EXHAUSTED" ||
-						body?.code === "PRODUCT_PLAN_REQUIRED"
-					) {
-						void navigate({ to: "/pricing" });
-						return { accepted: false };
-					}
-					setError(body?.error ?? "Permintaan desain ditolak.");
-					return { accepted: false };
-				}
-				const outcome = readComposerOutcome(await res.json().catch(() => null));
-				await syncProjectStatus();
-				pendingRequest.current = null;
-				if (outcome.intent === "clarify")
-					return { accepted: false, clarify: outcome.message ?? undefined };
-				// ponytail: add_screen success toasts intentionally removed; progress is communicated via canvas frame shimmer states.
-				return { accepted: true };
-			} catch {
-				setError("Jaringan bermasalah. Coba lagi.");
-				return { accepted: false };
-			} finally {
-				setComposerLoading(false);
-			}
-		},
-		[navigate, project.id, selectedFrameIds, setError, syncProjectStatus],
-	);
-
-	const handleSkillChange = useCallback(
-		async (skillId: StudioDesignSkillId) => {
-			if (isProcessing || preferenceSaving || project.designSkillId === skillId)
-				return;
-			setPreferenceSaving(true);
-			setError("");
-			try {
-				const response = await fetch("/api/studio/project", {
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({
-						action: "preferences",
-						projectId: project.id,
-						designSkillId: skillId,
-					}),
-				});
-				if (!response.ok) {
-					throw new Error(
-						await readStudioApiError(response, "Gagal menyimpan design skill."),
-					);
-				}
-				await syncProjectStatus();
-			} catch (failure) {
-				setError(
-					failure instanceof Error
-						? failure.message
-						: "Gagal menyimpan design skill.",
-				);
-			} finally {
-				setPreferenceSaving(false);
-			}
-		},
-		[
-			isProcessing,
-			preferenceSaving,
-			project.designSkillId,
-			project.id,
-			setError,
-			syncProjectStatus,
-		],
-	);
-
 	const handleRetryFrame = useCallback(
 		async (frameId: string) => {
 			if (retryingFrames.current.has(frameId)) return;
@@ -325,7 +229,6 @@ export function useStudioWorkspaceActions({
 		handleDelete,
 		handleRename,
 		handleComposerSubmit,
-		handleSkillChange,
 		handleRetryFrame,
 		handleDownloadAllZip,
 	};

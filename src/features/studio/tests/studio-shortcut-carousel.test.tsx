@@ -105,7 +105,7 @@ describe("StudioShortcutCarousel", () => {
 		expect(received?.id).toBe(first.id);
 		expect(received?.prompt.length).toBeGreaterThanOrEqual(200);
 		expect(received?.designMode).toBe(first.designMode);
-		expect(received?.initialPageCount).toBe(first.initialPageCount);
+		expect(received).not.toHaveProperty("initialPageCount");
 	});
 
 	it("menandai brief terpilih lewat selectedId", () => {

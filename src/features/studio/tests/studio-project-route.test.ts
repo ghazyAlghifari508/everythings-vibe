@@ -11,9 +11,6 @@ const duplicate = vi.hoisted(() =>
 const remove = vi.hoisted(() =>
 	vi.fn(async (projectId: string) => ({ id: projectId })),
 );
-const updatePreferences = vi.hoisted(() =>
-	vi.fn(async (projectId: string) => ({ id: projectId })),
-);
 const renameProject = vi.hoisted(() =>
 	vi.fn(async (projectId: string, _userId: string, title: string) => ({
 		id: projectId,
@@ -37,10 +34,6 @@ vi.mock("@/features/studio/services/studio-project-lifecycle", () => ({
 	duplicateStudioProject: duplicate,
 	deleteStudioProject: remove,
 	renameStudioProject: renameProject,
-}));
-
-vi.mock("@/features/studio/services/studio-preferences-service", () => ({
-	updateStudioPreferences: updatePreferences,
 }));
 
 vi.mock("@/features/studio/services/studio-project-detail", () => ({
@@ -121,7 +114,8 @@ describe("GET /api/studio/project", () => {
 	});
 
 	it("rejects the removed design-system action as an unsupported operation", async () => {
-		updatePreferences.mockClear();
+		renameProject.mockClear();
+		remove.mockClear();
 		const response = await POST({
 			request: new Request("https://app.test/api/studio/project", {
 				method: "POST",
@@ -137,7 +131,30 @@ describe("GET /api/studio/project", () => {
 		expect(await response.json()).toEqual({
 			error: "Aksi project tidak valid.",
 		});
-		expect(updatePreferences).not.toHaveBeenCalled();
+		expect(renameProject).not.toHaveBeenCalled();
+		expect(remove).not.toHaveBeenCalled();
+	});
+
+	it("rejects the removed design-skill preference action as an unsupported operation", async () => {
+		renameProject.mockClear();
+		remove.mockClear();
+		const response = await POST({
+			request: new Request("https://app.test/api/studio/project", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					action: "preferences",
+					projectId: "proj-1",
+					designSkillId: "taste",
+				}),
+			}),
+		});
+		expect(response.status).toBe(400);
+		expect(await response.json()).toEqual({
+			error: "Aksi project tidak valid.",
+		});
+		expect(renameProject).not.toHaveBeenCalled();
+		expect(remove).not.toHaveBeenCalled();
 	});
 
 	it("renames through the authenticated owner and returns the persisted project", async () => {
@@ -212,32 +229,6 @@ describe("GET /api/studio/project", () => {
 			session.failure = null;
 			log.mockRestore();
 		}
-	});
-
-	it("persists skill preference updates for the authenticated owner", async () => {
-		updatePreferences.mockClear();
-		const response = await POST({
-			request: new Request("https://app.test/api/studio/project", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					action: "preferences",
-					projectId: "proj-1",
-					designSkillId: "taste",
-				}),
-			}),
-		});
-		expect(response.status).toBe(200);
-		expect(await response.json()).toEqual({ project: { id: "proj-1" } });
-		expect(updatePreferences).toHaveBeenCalledWith(
-			"proj-1",
-			"user-123",
-			expect.objectContaining({
-				action: "preferences",
-				projectId: "proj-1",
-				designSkillId: "taste",
-			}),
-		);
 	});
 
 	it("returns project detail with frames and active job", async () => {

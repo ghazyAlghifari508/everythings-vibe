@@ -53,13 +53,21 @@ export const studioProviderMock = {
 			return {
 				firstChunk: JSON.stringify({
 					projectTitle: "Sample",
+					scope: {
+						requestedCount: requested ? count : null,
+						rationale: "Fixture coverage",
+						deferred: [],
+					},
 					screens,
 					blueprint: {
+						compositionOwner: "model",
 						productIdentity: {
 							productName: "Sample",
 							targetAudience: "General",
 							platform: viewport,
 							visualDirection: "Clean",
+							brandTone: "Precise",
+							layoutIntent: "web-application",
 						},
 						designTokens: {
 							primary: "#0f0f0f",
@@ -74,6 +82,12 @@ export const studioProviderMock = {
 							border: "1px solid #d3d3d3",
 							elevation: "none",
 						},
+						layout: {
+							gutter: 24,
+							contentMaxWidth: 1120,
+							spacing: [4, 8, 16, 24],
+							typography: [14, 16, 24, 32],
+						},
 						sharedComponents: {
 							header: "Bar",
 							navigation: "Tabs",
@@ -82,6 +96,7 @@ export const studioProviderMock = {
 							cards: "12px",
 							tabs: "Seg",
 							icons: "Lucide",
+							media: "No media needed",
 						},
 						navigationContract: {
 							destinations,
@@ -94,6 +109,16 @@ export const studioProviderMock = {
 							name: screen.name,
 							role: screen.description,
 							order: screen.order,
+							navigationRole: "primary",
+							destinationId: destinations[screen.order],
+							composition: {
+								primaryTask: screen.description,
+								layout: "workspace",
+								hierarchy: ["Task content"],
+								patterns: [],
+								responsive: "reflow",
+								media: "none",
+							},
 						})),
 					},
 				}),
@@ -104,10 +129,11 @@ export const studioProviderMock = {
 			/SCREEN TO BUILD: "([^"]+)"/.exec(messages[1]?.content ?? "")?.[1] ?? "";
 		const frameFailure = studioProvider.frameError?.(screenName);
 		if (frameFailure) throw frameFailure;
+		const logoUrl = /official application brand logo at: "([^"]+)"/.exec(
+			messages[1]?.content ?? "",
+		)?.[1];
 		return {
-			firstChunk: `<html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><nav>${studioProvider.labels
-				.map((label) => `<a href="#">${label}</a>`)
-				.join("")}</nav><main>Konten</main></body></html>`,
+			firstChunk: `<html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body>${logoUrl ? `<img src="${logoUrl.replaceAll("&", "&amp;")}" alt="Logo">` : ""}<main data-studio-content>Konten</main></body></html>`,
 			generator: (async function* () {})(),
 		};
 	},

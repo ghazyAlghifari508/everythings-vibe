@@ -49,6 +49,10 @@ function statusFixture() {
 			attempts: 0,
 			visualHash: null,
 			promptHash: null,
+			originJobId: null,
+			initialSlot: null,
+			revision: 0,
+			lastJobId: null,
 			createdAt: date,
 			updatedAt: date,
 		}),
@@ -60,6 +64,15 @@ function statusFixture() {
 		prompt: "Sample",
 		jobType: "initial",
 		targetFrameId: null,
+		requestId: null,
+		requestHash: null,
+		operationIntent: null,
+		operationIndex: null,
+		blueprintJobId: null,
+		dependsOnJobId: null,
+		baseRevision: null,
+		planningCompletedAt: null,
+		errorCode: null,
 		status: "generating",
 		error: null,
 		claimedBy: "worker-1",
@@ -248,6 +261,36 @@ describe("Studio authoritative synchronization", () => {
 			await result.current.syncProjectStatus();
 		});
 		expect(result.current.frames[0]).toEqual(initial.frames[0]);
+	});
+	it("keeps a committed Pencil revision when a late status response carries older HTML", async () => {
+		const initial = statusFixture();
+		const current = initial.frames[0];
+		const { result } = renderHook(() => useStudioStatus(initial));
+		act(() =>
+			result.current.publishCommitted(
+				initial.project.id,
+				current.id,
+				1,
+				"<main>Saved</main>",
+			),
+		);
+		expect(result.current.frames[0]).toMatchObject({
+			revision: 1,
+			htmlCode: "<main>Saved</main>",
+		});
+		const stale = {
+			...initial,
+			frames: [
+				{ ...current, updatedAt: new Date("2026-01-03T00:00:00Z") },
+				...initial.frames.slice(1),
+			],
+		};
+		fetchMock.mockResolvedValueOnce(reply(stale));
+		await act(() => result.current.syncProjectStatus());
+		expect(result.current.frames[0]).toMatchObject({
+			revision: 1,
+			htmlCode: "<main>Saved</main>",
+		});
 	});
 
 	it("does not apply old project state during navigation or reconnect", async () => {

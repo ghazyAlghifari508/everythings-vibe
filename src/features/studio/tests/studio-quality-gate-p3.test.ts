@@ -20,10 +20,10 @@ const input = {
 	framePrompt: "Coffee checkout",
 	viewport: "mobile",
 	blueprint: null,
-	designSkillId: "none",
 	expectTokens: false,
 	dsTokens: null,
 	logoUrl: null,
+	preservation: "new-frame",
 } as const;
 const page = (body: string) =>
 	`<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><main data-studio-content>${body}</main></body></html>`;
@@ -56,21 +56,14 @@ it("rejects truncated HTML before canonical assembly can normalize it into appar
 });
 
 describe("P3 quality gate lifecycle", () => {
-	it.each([
-		"none",
-		"anti-slop",
-		"taste",
-		"frontend-design",
-		"impeccable",
-		"ui-ux-pro-max",
-	] as const)("repairs a broken atomic price with skill %s", async (designSkillId) => {
+	it("repairs a broken atomic price with one bounded correction", async () => {
 		respond(
 			'<button data-primary>Checkout <span data-ui="value">Rp<br>42.000</span></button>',
 		);
 		respond(
 			'<button data-primary>Checkout <span data-ui="value">Rp42.000</span></button>',
 		);
-		const html = await generateValidatedFrameHtml({ ...input, designSkillId });
+		const html = await generateValidatedFrameHtml(input);
 		expect(inspectStudioHtml(html).repairable).toEqual([]);
 		expect(tryStreamWithFallback).toHaveBeenCalledTimes(2);
 	});
@@ -79,9 +72,9 @@ describe("P3 quality gate lifecycle", () => {
 		const broken = "<output data-quantity>3<br>Item</output>";
 		respond(broken);
 		respond(broken);
-		await expect(
-			generateValidatedFrameHtml({ ...input, stage: "revision" }),
-		).rejects.toMatchObject({ code: "STUDIO_CONTRACT_VIOLATION" });
+		await expect(generateValidatedFrameHtml(input)).rejects.toMatchObject({
+			code: "STUDIO_CONTRACT_VIOLATION",
+		});
 		expect(tryStreamWithFallback).toHaveBeenCalledTimes(2);
 	});
 

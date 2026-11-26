@@ -31,6 +31,7 @@ export async function tryStreamWithFallback(
 		);
 	}
 	let lastError = "";
+	let lastFailure: unknown;
 	let providerRetries = 0;
 
 	for (let i = 0; i < models.length; i++) {
@@ -87,6 +88,7 @@ export async function tryStreamWithFallback(
 				};
 			} catch (e) {
 				lastError = e instanceof Error ? e.message : String(e);
+				lastFailure = e;
 				abortController.abort();
 				await gen.return().catch(() => {});
 				// ponytail: the caller is gone — releasing the server-side
@@ -109,5 +111,6 @@ export async function tryStreamWithFallback(
 	}
 	throw new Error(
 		`Semua model AI sedang tidak tersedia. Coba lagi dalam beberapa menit. (${lastError})`,
+		{ cause: lastFailure },
 	);
 }

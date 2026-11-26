@@ -144,17 +144,17 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 							<Icon icon={Menu01Icon} size={16} />
 						</button>
 					)}
-					<Logo height={28} />
+					<Logo height={28} className="[&>span]:hidden sm:[&>span]:inline" />
 				</div>
 				{isCodebaseSyncRoute ? (
-					<div className="flex md:hidden flex-1 items-center justify-center">
+					<div className="flex lg:hidden flex-1 items-center justify-center">
 						<CodebaseStepNav
 							step={codebasePlanStep}
 							onSelectStep={setCodebasePlanStep}
 						/>
 					</div>
 				) : isFlowStepRoute ? (
-					<div className="flex md:hidden flex-1 items-center justify-center">
+					<div className="flex lg:hidden flex-1 items-center justify-center">
 						<FlowStepNav
 							step={projectNavData?.step}
 							taskStatus={projectNavData?.taskStatus}
@@ -162,7 +162,7 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 						/>
 					</div>
 				) : null}
-				<div className="hidden md:flex flex-1 items-center justify-center">
+				<div className="hidden lg:flex flex-1 items-center justify-center">
 					{isCodebaseSyncRoute ? (
 						<CodebaseStepNav
 							step={codebasePlanStep}

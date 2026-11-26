@@ -2,7 +2,6 @@ import { and, asc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
 	type InsertStudioAssetRow,
-	type InsertStudioFrameRow,
 	type InsertStudioJobRow,
 	type InsertStudioProjectRow,
 	type StudioFrameRow,
@@ -13,12 +12,11 @@ import {
 	studioJobs,
 	studioProjects,
 } from "@/db/schema";
-import {
-	admitProductWork,
-	STUDIO_TRIAL_FRAMES,
-} from "@/features/billing/services/product-trials.server";
+import { admitProductWork } from "@/features/billing/services/product-trials.server";
 import { ScrapeError } from "@/lib/design-errors";
+import { STUDIO_INITIAL_SCREEN_LIMIT } from "../types/studio-constants";
 import type { CreateStudioProjectInput } from "../types/studio-service";
+import { appendStudioConversation } from "./studio-conversation";
 import {
 	reserveStudioOperationCharge,
 	serverStudioQuote,
@@ -90,60 +88,72 @@ export async function createStudioProjectWithJob(
 		prdContentHash = validContent.contentHash;
 	}
 
-	const tenSecondsAgo = new Date(Date.now() - 10_000);
-	const [recentJob] = await db
-		.select({
-			job: studioJobs,
-			project: studioProjects,
-		})
-		.from(studioJobs)
-		.innerJoin(studioProjects, eq(studioJobs.projectId, studioProjects.id))
-		.where(
-			and(
-				eq(studioJobs.userId, userId),
-				eq(studioJobs.prompt, checked.prompt),
-				eq(studioProjects.userId, userId),
-				eq(studioProjects.designMode, designMode),
-				eq(studioProjects.designSkillId, options.designSkillId),
-				eq(studioProjects.initialPageCount, options.initialPageCount),
-				cleanDesignMd === null
-					? isNull(studioProjects.designMd)
-					: eq(studioProjects.designMd, cleanDesignMd),
-				resolved.designReference === null
-					? isNull(studioProjects.designReference)
-					: eq(studioProjects.designReference, resolved.designReference),
-				prdContentHash === null
-					? isNull(studioProjects.prdContentHash)
-					: eq(studioProjects.prdContentHash, prdContentHash),
-				validatedLogo
-					? sql`exists (select 1 from ${studioAssets} where ${studioAssets.id} = ${studioProjects.logoAssetId} and ${studioAssets.userId} = ${userId} and ${studioAssets.data} = ${validatedLogo.data} and ${studioAssets.mimeType} = ${validatedLogo.mimeType})`
-					: isNull(studioProjects.logoAssetId),
-				gte(studioJobs.createdAt, tenSecondsAgo),
-				inArray(studioJobs.status, ["queued", "planning", "generating"]),
-			),
-		)
-		.limit(1);
+	return db.transaction(async (tx) => {
+		await tx.execute(
+			sql`select pg_advisory_xact_lock(hashtext('studio-launch'), hashtext(${userId}))`,
+		);
+		const tenSecondsAgo = new Date(Date.now() - 10_000);
+		const [recentJob] = await tx
+			.select({
+				job: studioJobs,
+				project: studioProjects,
+			})
+			.from(studioJobs)
+			.innerJoin(studioProjects, eq(studioJobs.projectId, studioProjects.id))
+			.where(
+				and(
+					eq(studioJobs.userId, userId),
+					eq(studioJobs.prompt, checked.prompt),
+					eq(studioJobs.jobType, "initial"),
+					eq(studioProjects.userId, userId),
+					eq(studioProjects.designMode, designMode),
+					cleanDesignMd === null
+						? isNull(studioProjects.designMd)
+						: eq(studioProjects.designMd, cleanDesignMd),
+					resolved.designReference === null
+						? isNull(studioProjects.designReference)
+						: eq(studioProjects.designReference, resolved.designReference),
+					prdContentHash === null
+						? isNull(studioProjects.prdContentHash)
+						: eq(studioProjects.prdContentHash, prdContentHash),
+					validatedLogo
+						? sql`exists (select 1 from ${studioAssets} where ${studioAssets.id} = ${studioProjects.logoAssetId} and ${studioAssets.userId} = ${userId} and ${studioAssets.data} = ${validatedLogo.data} and ${studioAssets.mimeType} = ${validatedLogo.mimeType})`
+						: isNull(studioProjects.logoAssetId),
+					gte(studioJobs.createdAt, tenSecondsAgo),
+					inArray(studioJobs.status, ["queued", "planning", "generating"]),
+				),
+			)
+			.limit(1);
 
-	if (recentJob && !requestKey) {
-		const recentFrames = await db
-			.select()
-			.from(studioFrames)
-			.where(eq(studioFrames.projectId, recentJob.project.id))
-			.orderBy(asc(studioFrames.order));
-		return {
-			project: recentJob.project,
-			job: recentJob.job,
-			frames: recentFrames,
+		// A keyed request is answered by the admission replay below, not by the
+		// time-windowed lookback: the idempotency record is the authority.
+		if (recentJob && !requestKey) {
+			const recentFrames = await tx
+				.select()
+				.from(studioFrames)
+				.where(
+					and(
+						eq(studioFrames.projectId, recentJob.project.id),
+						eq(studioFrames.originJobId, recentJob.job.id),
+					),
+				)
+				.orderBy(asc(studioFrames.order));
+			return {
+				project: recentJob.project,
+				job: recentJob.job,
+				frames: recentFrames,
+			};
+		}
+
+		// The planner decides the real screen count, so the authorization covers the
+		// ceiling it may reach; settlement charges for the frames actually delivered.
+		const quoteScope = {
+			operation: "studio.generate" as const,
+			frames: STUDIO_INITIAL_SCREEN_LIMIT,
+			promptChars: checked.prompt.length,
+			designMdChars: cleanDesignMd?.length ?? 0,
 		};
-	}
-	const quoteScope = {
-		operation: "studio.generate" as const,
-		frames: options.initialPageCount,
-		promptChars: checked.prompt.length,
-		designMdChars: cleanDesignMd?.length ?? 0,
-	};
-	const quote = serverStudioQuote(quoteScope);
-	const { project, job, frames } = await db.transaction(async (tx) => {
+		const quote = serverStudioQuote(quoteScope);
 		const admission = await admitProductWork(tx, userId, "studio", "trial", {
 			key: requestKey,
 			payload: {
@@ -173,17 +183,14 @@ export async function createStudioProjectWithJob(
 					),
 				);
 			if (!match) throw new ScrapeError("TRIAL_EXHAUSTED");
-			const frames = await tx
+			const replayFrames = await tx
 				.select()
 				.from(studioFrames)
 				.where(eq(studioFrames.projectId, match.project.id))
 				.orderBy(asc(studioFrames.order));
-			return { ...match, frames };
+			return { ...match, frames: replayFrames };
 		}
-		const slotCount =
-			admission.kind === "trial"
-				? STUDIO_TRIAL_FRAMES
-				: options.initialPageCount;
+
 		let logoAssetId: string | null = null;
 		if (validatedLogo) {
 			const [asset] = await tx
@@ -208,8 +215,6 @@ export async function createStudioProjectWithJob(
 				designMode,
 				designMd: cleanDesignMd,
 				logoAssetId,
-				designSkillId: options.designSkillId,
-				initialPageCount: slotCount,
 				designReference: resolved.designReference,
 				prdContent: cleanPrdContent,
 				prdFilename: cleanPrdFilename,
@@ -250,42 +255,22 @@ export async function createStudioProjectWithJob(
 		}
 
 		if (admission.kind === "trial") await admission.reserve(newJob.id);
-		if (quote && admission.kind !== "trial") {
+		if (quote && admission.kind !== "trial")
 			await reserveStudioOperationCharge(tx, {
 				userId,
 				projectId: newProject.id,
 				jobId: newJob.id,
-				scope: { ...quoteScope, frames: slotCount },
+				scope: quoteScope,
 				idempotencyKey: `studio-generate:${newJob.id}`,
 			});
-		}
-		const slots = await tx
-			.insert(studioFrames)
-			.values(
-				Array.from(
-					{ length: slotCount },
-					(_, index) =>
-						({
-							projectId: newProject.id,
-							name: `Layar ${index + 1}`,
-							description: "",
-							viewport: designMode,
-							order: index,
-							status: "queued",
-						}) satisfies InsertStudioFrameRow,
-				),
-			)
-			.returning();
 
-		if (slots.length !== slotCount) {
-			throw new ScrapeError(
-				"STORAGE_FAILED",
-				"Gagal menyiapkan slot layar studio.",
-			);
-		}
-
-		return { project: newProject, job: newJob, frames: slots };
+		await appendStudioConversation(tx, {
+			projectId: newProject.id,
+			userId,
+			operationId: newJob.id,
+			prompt: input.prompt,
+			jobs: [newJob],
+		});
+		return { project: newProject, job: newJob, frames: [] };
 	});
-
-	return { project, job, frames };
 }

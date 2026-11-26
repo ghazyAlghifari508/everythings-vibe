@@ -1,4 +1,10 @@
-import { type RefObject, useCallback, useEffect, useRef } from "react";
+import {
+	type RefObject,
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
 import { STUDIO_CANVAS_MARQUEE_DRAG_THRESHOLD_PX } from "@/features/studio/types/studio-constants";
 import {
 	exceedsDragThreshold,
@@ -20,6 +26,7 @@ interface UseStudioCanvasMarqueeInput {
 }
 
 interface StudioCanvasMarqueeGesture {
+	isMarqueeDragging: boolean;
 	handleCanvasPointerDown: (event: React.PointerEvent) => void;
 	handleCanvasPointerMove: (event: React.PointerEvent) => void;
 	handleCanvasPointerUp: (event: React.PointerEvent) => void;
@@ -45,6 +52,7 @@ export function useStudioCanvasMarquee({
 	onSelectFrames,
 	panMode,
 }: UseStudioCanvasMarqueeInput): StudioCanvasMarqueeGesture {
+	const [isMarqueeDragging, setIsMarqueeDragging] = useState(false);
 	// Latest selection and commit handler for the marquee gesture, read through
 	// refs so the pointer handlers stay stable and never re-render the frames.
 	const selectedFrameIdsRef = useRef(selectedFrameIds);
@@ -119,18 +127,13 @@ export function useStudioCanvasMarquee({
 		gestureRef.current = null;
 		paintMarquee(null);
 		if (gesture?.active) {
+			setIsMarqueeDragging(false);
 			selectFramesRef.current?.(gesture.base);
 		}
 	}, [paintMarquee]);
 
 	/** Drops the gesture and rectangle without touching the route selection. */
 	const abortMarquee = useCallback(() => {
-		gestureRef.current = null;
-		paintMarquee(null);
-	}, [paintMarquee]);
-
-	/** Commits the current preview selection and hides the rectangle. */
-	const commitMarquee = useCallback(() => {
 		gestureRef.current = null;
 		paintMarquee(null);
 	}, [paintMarquee]);
@@ -169,17 +172,18 @@ export function useStudioCanvasMarquee({
 				x: event.clientX - canvasRect.left,
 				y: event.clientY - canvasRect.top,
 			};
-			if (
-				!gesture.active &&
-				!exceedsDragThreshold(
-					gesture.start,
-					current,
-					STUDIO_CANVAS_MARQUEE_DRAG_THRESHOLD_PX,
+			if (!gesture.active) {
+				if (
+					!exceedsDragThreshold(
+						gesture.start,
+						current,
+						STUDIO_CANVAS_MARQUEE_DRAG_THRESHOLD_PX,
+					)
 				)
-			) {
-				return;
+					return;
+				gesture.active = true;
+				setIsMarqueeDragging(true);
 			}
-			gesture.active = true;
 			const marquee = normalizeRect(gesture.start, current);
 			paintMarquee(marquee);
 			const resolved = resolveMarqueeSelection(marquee, measureFrameBounds(), {
@@ -200,17 +204,17 @@ export function useStudioCanvasMarquee({
 		(event: React.PointerEvent) => {
 			const gesture = gestureRef.current;
 			if (!gesture || gesture.pointerId !== event.pointerId) return;
+			gestureRef.current = null;
 			if (gesture.active) {
-				// The preview already equals the committed set; keep it.
-				commitMarquee();
+				setIsMarqueeDragging(false);
+				paintMarquee(null);
 				return;
 			}
 			// A press with no drag is a click: on empty canvas it clears the
 			// selection, while shift keeps the current selection intact.
-			gestureRef.current = null;
 			if (!gesture.additive) selectFramesRef.current?.([]);
 		},
-		[commitMarquee],
+		[paintMarquee],
 	);
 
 	const hasActiveGesture = useCallback(() => gestureRef.current !== null, []);
@@ -227,6 +231,7 @@ export function useStudioCanvasMarquee({
 	useEffect(() => abortMarquee, [abortMarquee]);
 
 	return {
+		isMarqueeDragging,
 		handleCanvasPointerDown,
 		handleCanvasPointerMove,
 		handleCanvasPointerUp,

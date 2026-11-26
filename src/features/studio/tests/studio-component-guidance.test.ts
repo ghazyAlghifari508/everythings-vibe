@@ -14,16 +14,7 @@ import {
 	travelBlueprint,
 } from "./fixtures/studio-evaluation-fixtures";
 
-// Component-first review outcome for standalone HTML frames:
-// - shadcn/ui: Radix + React + cn() helpers cannot run in a single-file document
-//   without shipping a framework runtime; only its Tailwind token/class patterns
-//   transfer.
-// - HeroUI, Magic UI, React Bits: React/TSX components (some requiring
-//   framer-motion) — same limitation.
-// - Thinking Orbs: canvas/WebGL orbs need a script; Studio frames are static.
-// Therefore the verified component surface stays semantic HTML + inline
-// CSS/Tailwind from the shared blueprint, and the skill layer adds no generic UI
-// instructions of its own. This test locks that compatibility in.
+// Static adaptations share identity and native semantics without a component-library runtime.
 const RAW_HTML =
 	'<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><main data-studio-content><section data-card><h2>Ringkasan</h2><p>Data contoh</p><button data-primary>Lihat detail</button></section></main></body></html>';
 
