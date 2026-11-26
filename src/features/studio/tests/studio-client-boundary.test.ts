@@ -190,6 +190,10 @@ describe("Studio client module boundary", () => {
 		);
 		expect(
 			scanRuntimeGraph(roots, {
+				// TanStack Start compiles every `*.functions.ts` module into an RPC
+				// stub in the client build, so its server imports never ship. The
+				// boundary stops the walk there and keeps routes through it honest.
+				boundary: (path) => /\.functions\.ts$/.test(path),
 				violation: (specifier, next) =>
 					SERVER_ONLY_SPECIFIERS.test(specifier) ||
 					Boolean(next && SERVER_ONLY_PATHS.test(next)),
@@ -239,7 +243,9 @@ describe("Studio and Scrape domain boundary", () => {
 		expect(scriptEntryFile("scrape:worker")).toBe(
 			"src/features/scrape/services/scrape-worker.ts",
 		);
-		expect(scriptEntryFile("dev:all")).toBe(
+		// `dev:all` first builds the Studio skill assets, then delegates to the
+		// scrape orchestrator entry point.
+		expect(scriptValue("dev:all") ?? "").toContain(
 			"src/features/scrape/services/scrape-dev-all.ts",
 		);
 		expect(scriptValue("scrape:worker") ?? "").not.toContain("vite");

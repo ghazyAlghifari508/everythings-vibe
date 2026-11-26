@@ -34,6 +34,7 @@ export type {
 	CreditServiceStore,
 	CreditSubscription,
 	CreditSubscriptionOriginErrorCode,
+	PlanReserveCreditOperationInput,
 	ReserveCreditOperationInput,
 	SettleCreditOperationInput,
 } from "@/features/billing/types/credit-contracts";

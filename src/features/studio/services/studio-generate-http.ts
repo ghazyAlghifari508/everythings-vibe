@@ -1,7 +1,7 @@
 import { getRequestHeaders } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { STUDIO_DESIGN_MD_MAX_CHARS } from "@/features/studio/types/studio-constants";
-import { ScrapeError } from "@/lib/design-errors";
+import { httpStatusForErrorCode, ScrapeError } from "@/lib/design-errors";
 import { requireUser } from "@/lib/session";
 import { StudioReferenceError } from "./studio-design-reference.server";
 import {
@@ -45,7 +45,10 @@ function studioErrorResponse(error: unknown, operation: string): Response {
 	console.error("[studio.generate]", { operation, correlationId, code });
 	if (error instanceof ScrapeError) {
 		const isClientError =
-			error.code === "INVALID_URL" || error.code === "WEBSITE_BLOCKED";
+			error.code === "INVALID_URL" ||
+			error.code === "WEBSITE_BLOCKED" ||
+			error.code.startsWith("TRIAL_") ||
+			error.code === "PRODUCT_PLAN_REQUIRED";
 		return Response.json(
 			{
 				error: isClientError
@@ -53,7 +56,14 @@ function studioErrorResponse(error: unknown, operation: string): Response {
 					: "Studio belum dapat memproses permintaan. Coba lagi.",
 				code,
 			},
-			{ status: isClientError ? 400 : 500 },
+			{
+				status:
+					error.code === "WEBSITE_BLOCKED"
+						? 400
+						: isClientError
+							? httpStatusForErrorCode(error.code)
+							: 500,
+			},
 		);
 	}
 	if (unauthorized) {
@@ -148,11 +158,18 @@ export async function POST({
 			};
 		}
 
+		const requestKey = request.headers.get("Idempotency-Key") ?? undefined;
+		if (requestKey !== undefined && !/^[a-zA-Z0-9-]{16,100}$/.test(requestKey))
+			return Response.json(
+				{ error: "Request key tidak valid." },
+				{ status: 400 },
+			);
 		if (typeof body.projectId === "string" && body.projectId.length > 0) {
 			const revision = await reviseStudioProject(
 				body.projectId,
 				user.id,
 				checked.prompt,
+				requestKey,
 			);
 			return Response.json(
 				{
@@ -164,15 +181,20 @@ export async function POST({
 			);
 		}
 
-		const { project, job, frames } = await createStudioProjectWithJob(user.id, {
-			title: body.title,
-			prompt: body.prompt,
-			designMode: body.designMode,
-			designMd: body.designMd,
-			logo: body.logo,
-			designReference: body.designReference,
-			prdAttachment: validatedPrd,
-		});
+		const { project, job, frames } = await createStudioProjectWithJob(
+			user.id,
+			{
+				title: body.title,
+				prompt: checked.prompt,
+				designMode: body.designMode,
+				designMd: body.designMd,
+				logo: body.logo,
+				designReference: body.designReference,
+				prdAttachment: validatedPrd,
+			},
+			undefined,
+			requestKey,
+		);
 
 		return Response.json(
 			{

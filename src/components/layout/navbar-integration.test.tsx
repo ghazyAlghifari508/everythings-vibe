@@ -368,6 +368,18 @@ describe("Navbar Rebranding & Layout", () => {
 		expect(screen.getAllByRole("link", { name: /^Pricing$/i })).toHaveLength(1);
 	});
 
+	it("closes the mobile menu with Escape", () => {
+		mockPathname = "/";
+		renderNavbar();
+
+		const toggle = screen.getByRole("button", { name: "Toggle menu" });
+		fireEvent.click(toggle);
+		expect(toggle.getAttribute("aria-expanded")).toBe("true");
+		fireEvent.keyDown(document, { key: "Escape" });
+		expect(toggle.getAttribute("aria-expanded")).toBe("false");
+		expect(screen.getAllByRole("link", { name: /^Pricing$/i })).toHaveLength(1);
+	});
+
 	it("renders hamburger menu button for history drawer on home", () => {
 		mockPathname = "/";
 		renderNavbar();

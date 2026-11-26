@@ -10,6 +10,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import * as React from "react";
+import { Badge } from "@/components/ui/badge";
 import { Icon } from "@/components/ui/icon";
 import { useUserPlan } from "@/features/billing/hooks/use-user-plan";
 import {
@@ -201,11 +202,7 @@ export function TopUpModal({ open, onOpenChange }: TopUpModalProps) {
 													<span className="text-sm font-semibold text-snow">
 														{pkg.name} ({pkg.credits} Kredit)
 													</span>
-													{pkg.recommended && (
-														<span className="rounded border border-fog/30 bg-white/10 px-1.5 py-0.2 text-[10px] font-medium text-snow">
-															Rekomendasi
-														</span>
-													)}
+													<Badge>Rekomendasi</Badge>
 												</div>
 												<p className="mt-1 text-xs text-fog leading-relaxed">
 													{pkg.description}
@@ -254,7 +251,7 @@ export function TopUpModal({ open, onOpenChange }: TopUpModalProps) {
 							type="button"
 							disabled={loading || !selectedPackage}
 							onClick={handleBuy}
-							aria-label={`Beli ${selectedPackage?.credits ?? 0} Kredit — Rp ${selectedPackage ? selectedPackage.priceIdr.toLocaleString("id-ID") : 0}`}
+							aria-label={`Beli ${selectedPackage?.credits ?? 0} Kredit, Rp ${selectedPackage ? selectedPackage.priceIdr.toLocaleString("id-ID") : 0}`}
 							className="btn-primary flex h-10 w-full items-center justify-center gap-2 rounded-lg font-inter text-sm font-[510] transition-all hover:brightness-105 active:scale-[0.99] disabled:opacity-50"
 						>
 							{loading ? (
@@ -269,7 +266,7 @@ export function TopUpModal({ open, onOpenChange }: TopUpModalProps) {
 								</>
 							) : (
 								<span>
-									Beli {selectedPackage?.credits} Kredit — Rp{" "}
+									Beli {selectedPackage?.credits} Kredit, Rp{" "}
 									{selectedPackage?.priceIdr.toLocaleString("id-ID")}
 								</span>
 							)}

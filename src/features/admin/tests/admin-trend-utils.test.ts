@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	buildDateRangeSeries,
 	formatDateKey,
+	formatDateKeyInZone,
 	formatDateLabel,
 	mergeTrendData,
 } from "../utils/admin-trend-utils";
@@ -23,6 +24,12 @@ describe("Admin Trend Utils", () => {
 		expect(series[0].date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
 		expect(series[0].label).toBeTruthy();
 		expect(series[6].date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+	});
+
+	it("formats the same instant into the requested calendar zone", () => {
+		const instant = new Date("2026-08-27T18:30:00.000Z");
+		expect(formatDateKeyInZone(instant, "Asia/Jakarta")).toBe("2026-08-28");
+		expect(formatDateKeyInZone(instant, "UTC")).toBe("2026-08-27");
 	});
 
 	it("merges database rows into continuous series with 0-padding for missing dates", () => {

@@ -129,9 +129,12 @@ beforeEach(() => {
 
 it("repairs count mismatch with retained options and persists the exact accepted plan", async () => {
 	const userId = crypto.randomUUID();
-	await db
-		.insert(users)
-		.values({ id: userId, email: `${userId}@example.test` });
+	await db.insert(users).values({
+		id: userId,
+		email: `${userId}@example.test`,
+		// Planning behaviour under test; exempt owners skip the Free trial.
+		billingExempt: true,
+	});
 	try {
 		const [project] = await db
 			.insert(studioProjects)
@@ -183,9 +186,12 @@ it("repairs count mismatch with retained options and persists the exact accepted
 it("fails a repeated cardinality violation without fabricating or persisting screens", async () => {
 	provider.counts = [2, 2];
 	const userId = crypto.randomUUID();
-	await db
-		.insert(users)
-		.values({ id: userId, email: `${userId}@example.test` });
+	await db.insert(users).values({
+		id: userId,
+		email: `${userId}@example.test`,
+		// Planning behaviour under test; exempt owners skip the Free trial.
+		billingExempt: true,
+	});
 	try {
 		const [project] = await db
 			.insert(studioProjects)
@@ -219,9 +225,12 @@ it("fails a repeated cardinality violation without fabricating or persisting scr
 it("does not deduplicate different requested configuration", async () => {
 	provider.enabled = false;
 	const userId = crypto.randomUUID();
-	await db
-		.insert(users)
-		.values({ id: userId, email: `${userId}@example.test` });
+	await db.insert(users).values({
+		id: userId,
+		email: `${userId}@example.test`,
+		// Planning behaviour under test; exempt owners skip the Free trial.
+		billingExempt: true,
+	});
 	try {
 		const input = {
 			prompt: "Sample application brief",

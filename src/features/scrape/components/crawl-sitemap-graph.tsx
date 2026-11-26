@@ -269,7 +269,7 @@ export function CrawlSitemapGraph({
 			<div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-fog">
 				<p>Peta halaman berdasarkan link yang ditemukan saat crawl.</p>
 				<p className="tabular-nums">
-					Legenda: ✓ Berhasil · ! Gagal · ⊘ Dilewati · ○ Antre
+					Legenda: ✓ Berhasil, ! Gagal, ⊘ Dilewati, ○ Antre
 				</p>
 			</div>
 		</div>

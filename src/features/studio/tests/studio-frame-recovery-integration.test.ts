@@ -13,9 +13,12 @@ async function seed(
 ) {
 	const userId = crypto.randomUUID();
 	owners.push(userId);
-	await db
-		.insert(users)
-		.values({ id: userId, email: `${userId}@example.test` });
+	await db.insert(users).values({
+		id: userId,
+		email: `${userId}@example.test`,
+		// Frame behaviour under test; exempt owners take the paid path.
+		billingExempt: true,
+	});
 	const [project] = await db
 		.insert(studioProjects)
 		.values({ userId, title: "Recovery Suite" })

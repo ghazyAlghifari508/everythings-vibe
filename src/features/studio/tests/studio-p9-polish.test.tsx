@@ -1,5 +1,6 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render as renderBase, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { StudioFrame } from "@/features/studio/components/canvas/studio-frame";
 import { StudioFrameShimmer } from "@/features/studio/components/canvas/studio-frame-shimmer";
@@ -42,6 +43,25 @@ function mockFrame(
 		createdAt: new Date(),
 		updatedAt: new Date(),
 		...overrides,
+	};
+}
+
+const queryClient = new QueryClient({
+	defaultOptions: { queries: { retry: false } },
+});
+
+// The Studio workspace reads plan state through react-query, so every render
+// and rerender keeps the provider mounted.
+function render(ui: React.ReactElement) {
+	const view = renderBase(
+		<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+	);
+	return {
+		...view,
+		rerender: (next: React.ReactElement) =>
+			view.rerender(
+				<QueryClientProvider client={queryClient}>{next}</QueryClientProvider>,
+			),
 	};
 }
 

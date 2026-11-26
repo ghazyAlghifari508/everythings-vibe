@@ -65,7 +65,7 @@ export function CodebaseChatWorkspacePlanSelection() {
 			</p>
 			<p className="max-w-sm text-xs leading-5 text-fog">
 				Repository ini punya beberapa fitur plan. Pilih satu dari daftar di atas
-				untuk melanjutkan — setiap fitur punya planning sendiri.
+				untuk melanjutkan. Setiap fitur punya planning sendiri.
 			</p>
 		</div>
 	);

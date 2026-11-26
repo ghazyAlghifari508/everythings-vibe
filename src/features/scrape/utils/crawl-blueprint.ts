@@ -60,7 +60,7 @@ function overview(
 	if (input.capturedAt) lines.push(`- Captured at: ${input.capturedAt}`);
 	if (input.scope)
 		lines.push(
-			`- Scope: max ${input.scope.maxPages} halaman · kedalaman ${input.scope.maxDepth}${input.scope.followSubdomains ? " · termasuk subdomain" : ""}${input.scope.urlRegex ? ` · filter: \`${input.scope.urlRegex}\`` : ""}`,
+			`- Scope: max ${input.scope.maxPages} halaman, kedalaman ${input.scope.maxDepth}${input.scope.followSubdomains ? ", termasuk subdomain" : ""}${input.scope.urlRegex ? `, filter: \`${input.scope.urlRegex}\`` : ""}`,
 		);
 	else lines.push("- Scope: berdasarkan hasil tersimpan");
 
@@ -119,7 +119,7 @@ function informationArchitecture(
 		);
 		lines.push("");
 		for (const target of shared.shared)
-			lines.push(`- ${escapeCell(target.label)} — ${target.url}`);
+			lines.push(`- ${escapeCell(target.label)}: ${target.url}`);
 	}
 	lines.push("");
 
@@ -158,7 +158,7 @@ function pagePatterns(pages: Page[], lines: string[]): void {
 		);
 		for (const url of pattern.pages)
 			lines.push(
-				`  - ${escapeCell(shortCrawlLabel(pageByUrl(pages, url)?.title ?? null, url))} — ${url}`,
+				`  - ${escapeCell(shortCrawlLabel(pageByUrl(pages, url)?.title ?? null, url))}: ${url}`,
 			);
 	}
 	lines.push("");
@@ -242,7 +242,7 @@ function coverageSection(
 	else
 		for (const row of problematic)
 			lines.push(
-				`- ${row.status}: ${row.url} — ${row.error ? escapeCell(row.error) : "tanpa detail"}`,
+				`- ${row.status}: ${row.url}, ${row.error ? escapeCell(row.error) : "tanpa detail"}`,
 			);
 	lines.push("");
 }

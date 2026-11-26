@@ -300,9 +300,9 @@ describe("CodebaseChatWorkspaceHeader component", () => {
 		) as HTMLButtonElement | null;
 		expect(progressBtn).not.toBeNull();
 		expect(progressBtn?.tagName.toLowerCase()).toBe("button");
-		expect(progressBtn?.textContent).toContain("Progress task · 3/5 selesai");
+		expect(progressBtn?.textContent).toContain("Progress task, 3/5 selesai");
 		expect(progressBtn?.getAttribute("aria-label")).toContain(
-			"Progress task · 3/5 selesai",
+			"Progress task, 3/5 selesai",
 		);
 
 		act(() => {

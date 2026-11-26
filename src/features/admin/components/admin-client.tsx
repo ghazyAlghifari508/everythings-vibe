@@ -2,6 +2,7 @@
 
 import {
 	BubbleChatIcon,
+	Coins01Icon,
 	CreditCardIcon,
 	DashboardSquare01Icon,
 	GitBranchIcon,
@@ -56,6 +57,13 @@ const NAV_ITEMS: NavItem[] = [
 		isActive: (p: string) =>
 			p === "/admin/transactions" || p.startsWith("/admin/transactions/"),
 	},
+	{
+		href: "/admin/credit",
+		label: "Kredit",
+		icon: Coins01Icon,
+		isActive: (p: string) =>
+			p === "/admin/credit" || p.startsWith("/admin/credit/"),
+	},
 ];
 
 function AdminShellInner({ children }: { children: React.ReactNode }) {
@@ -66,20 +74,11 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
 			{/* Single Sticky Top-Nav Header */}
 			<header className="sticky top-0 z-40 w-full border-b border-graphite bg-charcoal/95 backdrop-blur">
 				<div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
-					{/* Left: Admin Label + Single Nav Landmark */}
+					{/* Left: Single Nav Landmark */}
 					<nav
 						aria-label="Navigasi Admin"
 						className="flex items-center gap-3 sm:gap-4 overflow-hidden min-w-0 flex-1"
 					>
-						<span className="text-sm font-[510] text-snow shrink-0 select-none">
-							Admin
-						</span>
-
-						<div
-							className="h-4 w-px bg-graphite/60 shrink-0"
-							aria-hidden="true"
-						/>
-
 						<div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto hide-scrollbar py-1">
 							{NAV_ITEMS.map((item) => {
 								const isActive = item.isActive(pathname);

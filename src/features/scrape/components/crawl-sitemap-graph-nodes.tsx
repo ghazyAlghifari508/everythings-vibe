@@ -36,8 +36,8 @@ export function CrawlSitemapNodes({
 						type="button"
 						onClick={() => onSelect(row.id)}
 						aria-pressed={selected}
-						aria-label={`${node.label} — ${statusText(row.status)}`}
-						title={`${row.title ? `${row.title}\n` : ""}${row.url}\nStatus: ${statusText(row.status)} · Depth ${row.depth}\nTautan: ${node.incomingCount} masuk, ${node.outgoingCount} keluar`}
+						aria-label={`${node.label}, ${statusText(row.status)}`}
+						title={`${row.title ? `${row.title}\n` : ""}${row.url}\nStatus: ${statusText(row.status)}, Depth ${row.depth}\nTautan: ${node.incomingCount} masuk, ${node.outgoingCount} keluar`}
 						className={cn(
 							"absolute flex flex-col justify-between rounded-lg border p-2.5 text-left transition-all focus-visible:ring-2 focus-visible:ring-indigo",
 							selected
@@ -81,7 +81,7 @@ export function CrawlSitemapNodes({
 						<div className="flex w-full items-center justify-between gap-2 text-[11px] text-fog">
 							<span className="shrink-0 tabular-nums">depth {row.depth}</span>
 							<span className="truncate text-[10px] tabular-nums">
-								{node.incomingCount} masuk · {node.outgoingCount} keluar
+								{node.incomingCount} masuk, {node.outgoingCount} keluar
 							</span>
 						</div>
 					</button>

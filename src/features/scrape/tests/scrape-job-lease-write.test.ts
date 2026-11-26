@@ -59,6 +59,7 @@ function row(): ScrapeRow {
 		jobToken: claim.token,
 		leaseExpiresAt: new Date(Date.now() + SCRAPE_JOB_LEASE_MS),
 		jobAttempts: 1,
+		deletedAt: null,
 		createdAt: new Date("2026-01-01T00:00:00.000Z"),
 		updatedAt: new Date("2026-01-01T00:00:00.000Z"),
 	};

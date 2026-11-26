@@ -125,8 +125,7 @@ export function ScrapeHistorySearchControls({
 				<span className="tabular-nums">
 					{total} hasil
 					<span className="hidden sm:inline">
-						{" "}
-						· Menampilkan {range.start}–{range.end} dari {total}
+						{`, Menampilkan ${range.start}–${range.end} dari ${total}`}
 					</span>
 				</span>
 			</div>

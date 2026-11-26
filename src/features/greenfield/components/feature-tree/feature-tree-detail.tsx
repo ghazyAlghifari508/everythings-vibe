@@ -262,7 +262,7 @@ export function FiturDetail({
 						</h2>
 						<p className="max-w-md text-sm text-fog">
 							Terjadi kesalahan saat menghubungi AI. Daftar fitur belum
-							tersimpan.
+							tersimpan. Tidak ada data yang hilang.
 						</p>
 						<button
 							type="button"

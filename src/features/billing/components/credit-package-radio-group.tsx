@@ -1,6 +1,7 @@
 "use client";
 
 import { Tick01Icon } from "@hugeicons/core-free-icons";
+import { Badge } from "@/components/ui/badge";
 import { Icon } from "@/components/ui/icon";
 import type { TopUpPackage } from "@/features/billing/types/billing-constants";
 import { cn } from "@/lib/utils";
@@ -74,11 +75,7 @@ export function CreditPackageRadioGroup({
 										<span className="text-sm font-semibold text-snow">
 											{pkg.name} ({pkg.credits} Kredit)
 										</span>
-										{pkg.recommended && (
-											<span className="rounded border border-fog/30 bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-snow">
-												Rekomendasi
-											</span>
-										)}
+										<Badge>Rekomendasi</Badge>
 									</span>
 									<span className="mt-0.5 block text-xs text-fog leading-relaxed">
 										{pkg.description}

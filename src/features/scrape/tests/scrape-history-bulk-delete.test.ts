@@ -35,6 +35,39 @@ const storage = vi.hoisted(
 
 vi.mock("@/db", () => {
 	const db = {
+		transaction: (
+			run: (tx: {
+				select: () => {
+					from: () => {
+						where: () => {
+							orderBy: () => {
+								for: () => Promise<{ id: string; userId: string }[]>;
+							};
+							limit: () => Promise<[]>;
+						};
+					};
+				};
+				delete: () => {
+					where: (condition: SQL) => {
+						returning: () => Promise<{ id: string }[]>;
+					};
+				};
+			}) => unknown,
+		): unknown =>
+			run({
+				select: () => ({
+					from: () => ({
+						where: () => ({
+							orderBy: () => ({
+								for: async () =>
+									storage.deleted.map(({ id }) => ({ id, userId: "owner-1" })),
+							}),
+							limit: async () => [],
+						}),
+					}),
+				}),
+				delete: db.delete,
+			}),
 		select: (shape: Record<string, unknown>) => {
 			if (Object.keys(shape).includes("total")) {
 				return {

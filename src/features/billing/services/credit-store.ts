@@ -17,7 +17,7 @@ import type {
 	CreditOperationResult,
 	CreditQuoteInput,
 	CreditServiceStore,
-	ReserveCreditOperationInput,
+	PlanReserveCreditOperationInput,
 	SettleCreditOperationInput,
 } from "@/features/billing/types/credit-contracts";
 import { CreditSubscriptionOriginError } from "@/features/billing/types/credit-contracts";
@@ -33,7 +33,7 @@ export function createCreditService(store: CreditServiceStore) {
 		},
 
 		reserveCreditOperation(
-			input: ReserveCreditOperationInput,
+			input: PlanReserveCreditOperationInput,
 		): CreditOperationResult {
 			requireProject(store, input.userId, input.projectId);
 			const existing = [...store.operations.values()].find(
@@ -372,7 +372,7 @@ export type CreditService = ReturnType<typeof createCreditService>;
 
 export function reserveCreditOperationWithStore(
 	store: CreditServiceStore,
-	input: ReserveCreditOperationInput,
+	input: PlanReserveCreditOperationInput,
 ): CreditOperationResult {
 	return createCreditService(store).reserveCreditOperation(input);
 }

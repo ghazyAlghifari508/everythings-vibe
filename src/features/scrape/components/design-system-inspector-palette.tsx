@@ -150,8 +150,8 @@ function PaletteColorCard({
 					<details className="group mt-1.5">
 						<summary className="cursor-pointer font-mono text-[11px] text-slate hover:text-fog focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo">
 							{color.confidence}
-							{color.frequency > 0 ? ` · ${color.frequency} elemen` : ""}
-							{" · bukti"}
+							{color.frequency > 0 ? `, ${color.frequency} elemen` : ""}
+							{", bukti"}
 						</summary>
 						{color.rationale ? (
 							<p className="mt-1 text-xs leading-5 text-fog">

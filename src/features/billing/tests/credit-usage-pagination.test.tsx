@@ -21,6 +21,8 @@ function createMockOperation(id: string, name: string): CreditOperationItem {
 		id,
 		projectId: `proj-${id}`,
 		projectName: name,
+		product: "vibeplan_greenfield",
+		fundingSource: "subscription_balance",
 		kind: "prd_generation",
 		stage: "prd",
 		state: "settled",

@@ -2,6 +2,13 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+const planState = vi.hoisted(() => ({
+	remaining: null as number | null,
+	credits: null as number | null,
+	creditsUsed: null as number | null,
+	billingExempt: false as boolean,
+	subscriptionState: "free_active" as string,
+}));
 vi.mock("@tanstack/react-router", () => ({
 	Link: ({
 		children,
@@ -39,8 +46,11 @@ vi.mock("@/features/billing/hooks/use-user-plan", () => ({
 	useUserPlan: () => ({
 		data: {
 			plan: "free",
-			subscriptionState: "free_active",
-			billingExempt: false,
+			subscriptionState: planState.subscriptionState,
+			billingExempt: planState.billingExempt,
+			credits: planState.credits ?? 0,
+			creditsUsed: planState.creditsUsed ?? 0,
+			remaining: planState.remaining ?? 0,
 		},
 	}),
 }));
@@ -51,6 +61,11 @@ import type { BillingPaymentItem } from "../services/billing-settings.functions"
 describe("Billing layout and payment history preview", () => {
 	afterEach(() => {
 		cleanup();
+		planState.remaining = null;
+		planState.credits = null;
+		planState.creditsUsed = null;
+		planState.billingExempt = false;
+		planState.subscriptionState = "free_active";
 	});
 
 	const dummyPayment = (
@@ -68,17 +83,25 @@ describe("Billing layout and payment history preview", () => {
 		updatedAt: "2026-10-25T10:00:00Z",
 	});
 
+	const billingEntitlements = {
+		trials: { studio: "available" as const, scrape: "available" as const },
+		productChargingEnabled: { studio: false, scrape: false },
+	};
+	const emptyUsage = {
+		availableCredits: 0,
+		reservedCredits: 0,
+		totalCreditsUsed: 0,
+		operations: [],
+		productBreakdown: [],
+		periodStart: "2026-10-01T00:00:00.000Z",
+	};
 	it("uses CSS grid row stretching on desktop without items-start to match card heights", () => {
 		const { container } = render(
 			<BillingPage
 				subscription={undefined}
 				payments={[]}
-				creditUsage={{
-					availableCredits: 0,
-					reservedCredits: 0,
-					totalCreditsUsed: 0,
-					operations: [],
-				}}
+				creditUsage={{ ...emptyUsage }}
+				{...billingEntitlements}
 			/>,
 		);
 
@@ -108,12 +131,8 @@ describe("Billing layout and payment history preview", () => {
 			<BillingPage
 				subscription={undefined}
 				payments={payments}
-				creditUsage={{
-					availableCredits: 0,
-					reservedCredits: 0,
-					totalCreditsUsed: 0,
-					operations: [],
-				}}
+				creditUsage={{ ...emptyUsage }}
+				{...billingEntitlements}
 			/>,
 		);
 
@@ -134,12 +153,8 @@ describe("Billing layout and payment history preview", () => {
 			<BillingPage
 				subscription={undefined}
 				payments={payments}
-				creditUsage={{
-					availableCredits: 0,
-					reservedCredits: 0,
-					totalCreditsUsed: 0,
-					operations: [],
-				}}
+				creditUsage={{ ...emptyUsage }}
+				{...billingEntitlements}
 			/>,
 		);
 
@@ -159,12 +174,8 @@ describe("Billing layout and payment history preview", () => {
 			<BillingPage
 				subscription={undefined}
 				payments={[]}
-				creditUsage={{
-					availableCredits: 0,
-					reservedCredits: 0,
-					totalCreditsUsed: 0,
-					operations: [],
-				}}
+				creditUsage={{ ...emptyUsage }}
+				{...billingEntitlements}
 			/>,
 		);
 
@@ -197,11 +208,11 @@ describe("Billing layout and payment history preview", () => {
 				}}
 				payments={[]}
 				creditUsage={{
+					...emptyUsage,
 					availableCredits: 95,
-					reservedCredits: 0,
 					totalCreditsUsed: 10,
-					operations: [],
 				}}
+				{...billingEntitlements}
 			/>,
 		);
 
@@ -210,5 +221,28 @@ describe("Billing layout and payment history preview", () => {
 			screen.getByRole("button", { name: /cancel langganan/i }),
 		).toBeTruthy();
 		expect(screen.getByRole("link", { name: /beli paket/i })).toBeTruthy();
+	});
+	it("uses the canonical plan balance for the credit meter", () => {
+		planState.remaining = 5;
+		planState.credits = 105;
+		planState.creditsUsed = 80;
+		planState.subscriptionState = "active_paid";
+		render(
+			<BillingPage
+				subscription={undefined}
+				payments={[]}
+				creditUsage={{
+					...emptyUsage,
+					availableCredits: 25,
+					reservedCredits: 20,
+					totalCreditsUsed: 80,
+				}}
+				{...billingEntitlements}
+			/>,
+		);
+		expect(screen.getByRole("meter").getAttribute("aria-valuetext")).toContain(
+			"80 / 105, 20 direservasi, sisa 5 kredit",
+		);
+		expect(screen.getByText(/20 direservasi/)).toBeTruthy();
 	});
 });

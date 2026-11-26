@@ -34,6 +34,8 @@ interface PanelProps {
 	onOpenChange: (open: boolean) => void;
 	draft: { prompt: string; setPrompt: Dispatch<SetStateAction<string>> };
 	elementEditing?: StudioElementEditing;
+	/** Server-authoritative credit estimate; null hides the line. */
+	creditLabel?: string | null;
 	/** Selects and focuses the canvas frame a result row names. */
 	onOpenFrame: (frameId: string) => void;
 }
@@ -47,6 +49,7 @@ function PanelBody({
 	onToggleExpanded,
 	scrollMemory,
 	onOpenFrame,
+	creditLabel = null,
 }: Omit<PanelProps, "desktop" | "open"> & {
 	expandedIds: ReadonlySet<string>;
 	onToggleExpanded: (id: string) => void;
@@ -120,6 +123,7 @@ function PanelBody({
 			) : null}
 			<div className="shrink-0 px-3 pt-2 pb-3">
 				<StudioComposer
+					creditLabel={creditLabel}
 					value={draft.prompt}
 					elementTarget={elementEditing?.target}
 					onRemoveElement={elementEditing?.clearTarget}

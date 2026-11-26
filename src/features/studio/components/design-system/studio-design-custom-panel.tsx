@@ -126,7 +126,7 @@ export function StudioDesignCustomPanel({
 							{colorCount > 0 || fontFamily ? (
 								<span className="text-fog">
 									{colorCount} warna
-									{fontFamily ? ` · ${fontFamily}` : ""}
+									{fontFamily ? `, ${fontFamily}` : ""}
 								</span>
 							) : null}
 						</div>

@@ -68,7 +68,7 @@ export function HistoryDrawerShell({
 									Riwayat Projek
 								</h2>
 								<span className="shrink-0 rounded border border-graphite bg-charcoal px-1.5 py-0.5 font-mono text-[10px] text-fog">
-									{failed ? "—" : `${allItemsCount} Item`}
+									{failed ? "-" : `${allItemsCount} Item`}
 								</span>
 							</div>
 							<button

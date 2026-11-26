@@ -2,11 +2,12 @@
 
 import { Folder02Icon } from "@hugeicons/core-free-icons";
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
 import { PageHeading } from "@/components/ui";
 import { Icon } from "@/components/ui/icon";
 import { Logo } from "@/components/ui/logo";
+import { CreditExhaustedModal } from "@/features/billing/components/credit-exhausted-modal";
 import { getCanvasDotStyle } from "@/features/greenfield/components/whiteboard/canvas-connectors";
 import type { ScrapeDesignSource } from "@/features/scrape/services/scrape-design-md-service";
 import {
@@ -18,7 +19,9 @@ import { StudioShortcutCarousel } from "@/features/studio/components/studio-shor
 import { StudioLandingProfile } from "@/features/studio/components/workspace/studio-landing-profile";
 import { StudioMobileHistoryDrawer } from "@/features/studio/components/workspace/studio-mobile-history-drawer";
 import { StudioSidebar } from "@/features/studio/components/workspace/studio-sidebar";
+import { useStudioCreditQuote } from "@/features/studio/hooks/use-studio-credit-quote";
 import { useStudioHistoryActions } from "@/features/studio/hooks/use-studio-history-actions";
+import type { StudioQuoteScope } from "@/features/studio/services/studio-credit-policy";
 import {
 	getStudioPresetDesignMd,
 	STUDIO_DESIGN_PRESETS,
@@ -31,6 +34,7 @@ import type {
 	AttachedLogo,
 	StudioHistoryItem,
 } from "@/features/studio/types/studio";
+import { STUDIO_INITIAL_SCREEN_LIMIT } from "@/features/studio/types/studio-constants";
 
 /** A design reference staged on the landing screen, not yet sent. */
 export type StagedReference =
@@ -78,8 +82,31 @@ export function StudioLandingPage({
 	);
 	const [error, setError] = useState("");
 	const [loading, setLoading] = useState(false);
+	const [creditsExhausted, setCreditsExhausted] = useState<{
+		message: string;
+	} | null>(null);
+	const scope = useMemo<StudioQuoteScope>(
+		() => ({
+			operation: "studio.generate",
+			frames: STUDIO_INITIAL_SCREEN_LIMIT,
+			promptChars: prompt.trim().length,
+			designMdChars:
+				stagedReference && "designMd" in stagedReference
+					? stagedReference.designMd.length
+					: 0,
+		}),
+		[prompt, stagedReference],
+	);
+	const [quoteScope, setQuoteScope] = useState<StudioQuoteScope>(scope);
+	useEffect(() => {
+		const timer = setTimeout(() => setQuoteScope(scope), 250);
+		return () => clearTimeout(timer);
+	}, [scope]);
+	const quoteView = useStudioCreditQuote(quoteScope);
+
 	const isSubmittingRef = useRef(false);
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
+	const requestKey = useRef<{ body: string; key: string } | null>(null);
 	useEffect(() => {
 		if (search.prompt !== undefined) setPrompt(search.prompt);
 	}, [search.prompt]);
@@ -160,49 +187,70 @@ export function StudioLandingPage({
 		setLoading(true);
 		setError("");
 		try {
-			const res = await fetch("/api/studio/generate", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					prompt,
-					designMode: config.designMode,
-					designReference: stagedReference
-						? stagedReference.kind === "theme"
-							? { kind: "theme", id: stagedReference.id }
-							: stagedReference.kind === "scrape"
-								? { kind: "scrape", id: stagedReference.id }
-								: { kind: "custom", filename: stagedReference.filename }
+			const body = JSON.stringify({
+				prompt: prompt.trim(),
+				designMode: config.designMode,
+				designReference: stagedReference
+					? stagedReference.kind === "theme"
+						? { kind: "theme", id: stagedReference.id }
+						: stagedReference.kind === "scrape"
+							? { kind: "scrape", id: stagedReference.id }
+							: { kind: "custom", filename: stagedReference.filename }
+					: null,
+				// A scrape reference carries no document: the server reads the
+				// stored DESIGN.md for the caller.
+				designMd:
+					stagedReference && "designMd" in stagedReference
+						? stagedReference.designMd
 						: null,
-					// A scrape reference carries no document: the server reads the
-					// stored DESIGN.md for the caller.
-					designMd:
-						stagedReference && "designMd" in stagedReference
-							? stagedReference.designMd
-							: null,
-					prdAttachment: stagedPrd
+				prdAttachment: stagedPrd
+					? {
+							filename: stagedPrd.filename,
+							content: stagedPrd.content,
+						}
+					: null,
+				logo:
+					stagedReference?.kind === "custom" && stagedReference.logo
 						? {
-								filename: stagedPrd.filename,
-								content: stagedPrd.content,
+								filename: stagedReference.logo.filename,
+								mimeType: stagedReference.logo.mimeType,
+								data: stagedReference.logo.data,
 							}
 						: null,
-					logo:
-						stagedReference?.kind === "custom" && stagedReference.logo
-							? {
-									filename: stagedReference.logo.filename,
-									mimeType: stagedReference.logo.mimeType,
-									data: stagedReference.logo.data,
-								}
-							: null,
-				}),
+			});
+			if (requestKey.current?.body !== body)
+				requestKey.current = { body, key: crypto.randomUUID() };
+			const res = await fetch("/api/studio/generate", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					"Idempotency-Key": requestKey.current.key,
+				},
+				body,
 			});
 			const data = (await res.json().catch(() => null)) as {
 				projectId?: string;
 				error?: string;
+				code?: string;
 			} | null;
 			if (!res.ok || !data?.projectId) {
+				if (
+					data?.code === "TRIAL_EXHAUSTED" ||
+					data?.code === "PRODUCT_PLAN_REQUIRED"
+				) {
+					void navigate({ to: "/pricing" });
+					return;
+				}
+				if (data?.code === "INSUFFICIENT_CREDITS") {
+					setCreditsExhausted({
+						message: data.error ?? "Kredit tidak cukup untuk operasi ini.",
+					});
+					return;
+				}
 				setError(data?.error ?? "Studio gagal generate. Coba lagi.");
 				return;
 			}
+			requestKey.current = null;
 			void navigate({
 				to: "/design/$id",
 				params: { id: data.projectId },
@@ -309,6 +357,7 @@ export function StudioLandingPage({
 							onError={setError}
 							onSubmit={() => void submit()}
 							textareaRef={textareaRef}
+							creditLabel={quoteView?.label ?? null}
 						/>
 
 						<StudioShortcutCarousel
@@ -334,6 +383,15 @@ export function StudioLandingPage({
 				onSelectCustom={handleSelectCustom}
 				onSelectScrape={handleSelectScrape}
 				onClear={() => setStagedReference(null)}
+			/>
+			<CreditExhaustedModal
+				isOpen={creditsExhausted !== null}
+				onClose={() => setCreditsExhausted(null)}
+				errorMessage={creditsExhausted?.message ?? ""}
+				projectId=""
+				stage="prd"
+				requiredCredits={quoteView?.requiredCredits ?? undefined}
+				availableCredits={quoteView?.availableCredits}
 			/>
 		</div>
 	);

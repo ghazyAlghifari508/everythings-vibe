@@ -316,7 +316,7 @@ describe("selectArchivedPlans", () => {
 describe("describePlanReadiness", () => {
 	it("reports a resumable draft when no artifact exists", () => {
 		expect(describePlanReadiness(plan("draft-baru"))).toBe(
-			"Draft · Belum selesai",
+			"Draft, Belum selesai",
 		);
 	});
 

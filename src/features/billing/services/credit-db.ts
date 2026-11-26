@@ -9,3 +9,7 @@ export async function getDatabase() {
 export function orValidPeriod(period: AnyColumn) {
 	return sql`(${period} IS NULL OR ${period} >= now())`;
 }
+
+export type CreditTransaction = Parameters<
+	Parameters<Awaited<ReturnType<typeof getDatabase>>["db"]["transaction"]>[0]
+>[0];

@@ -157,7 +157,7 @@ export function DesignResult({
 		if (option) parts.push(`${option.label} ${option.detail}`);
 		if (activeTheme)
 			parts.push(activeTheme === "light" ? "tema terang" : "tema gelap");
-		return parts.join(" · ");
+		return parts.join(", ");
 	}, [activeTheme, activeViewport, viewports]);
 
 	const navItems = SECTION_NAV.filter((item) => {

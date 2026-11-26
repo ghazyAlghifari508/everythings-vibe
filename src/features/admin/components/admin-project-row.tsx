@@ -2,7 +2,10 @@
 
 import { LinkSquare02Icon } from "@hugeicons/core-free-icons";
 import { Link } from "@tanstack/react-router";
+import { Badge } from "@/components/ui/badge";
 import { Icon } from "@/components/ui/icon";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { StatusIndicator } from "@/components/ui/status-indicator";
 import type { AdminProjectItem } from "../types";
 
 function getProjectTargetRoute(
@@ -19,12 +22,14 @@ export interface AdminProjectRowProps {
 
 export function AdminProjectRowItem({ proj }: AdminProjectRowProps) {
 	const isDeleted = Boolean(proj.deletedAt);
-	const stepBadgeColor =
-		proj.step === "task"
-			? "bg-indigo-500/10 text-indigo-300 border-indigo-500/20"
-			: proj.step === "ac"
-				? "bg-purple-500/10 text-purple-300 border-purple-500/20"
-				: "bg-blue-500/10 text-blue-300 border-blue-500/20";
+	const stepLabels: Record<string, string> = {
+		idea: "Ide",
+		questions: "Tanya Jawab",
+		prd: "PRD",
+		ac: "AC",
+		task: "Task",
+	};
+	const step = (proj.step ?? "prd").toLowerCase();
 
 	return (
 		<tr
@@ -37,11 +42,6 @@ export function AdminProjectRowItem({ proj }: AdminProjectRowProps) {
 			<td className="px-5 py-3.5">
 				<div className="flex items-center gap-1.5 font-medium text-snow">
 					<span>{proj.name}</span>
-					{isDeleted && (
-						<span className="rounded border border-rose-500/30 bg-rose-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-rose-300">
-							Terhapus
-						</span>
-					)}
 				</div>
 				{proj.description && (
 					<div className="mt-0.5 line-clamp-1 max-w-xs text-[11px] text-fog">
@@ -56,21 +56,15 @@ export function AdminProjectRowItem({ proj }: AdminProjectRowProps) {
 				<div className="text-[11px] text-fog">{proj.userEmail ?? "-"}</div>
 			</td>
 			<td className="px-5 py-3.5">
-				<span
-					className={`inline-flex items-center rounded border px-2 py-0.5 text-[10px] font-semibold uppercase ${stepBadgeColor}`}
-				>
-					{proj.step ?? "PRD"}
-				</span>
+				<Badge>{stepLabels[step] ?? step}</Badge>
 			</td>
 			<td className="px-5 py-3.5">
 				{isDeleted ? (
-					<span className="inline-flex items-center rounded border border-rose-500/20 bg-rose-500/10 px-2 py-0.5 text-[10px] font-medium text-rose-300">
-						Terhapus
-					</span>
+					<StatusBadge tone="danger">Terhapus</StatusBadge>
 				) : (
-					<span className="inline-flex items-center rounded bg-white/5 px-2 py-0.5 text-[10px] font-medium text-mist capitalize">
+					<StatusIndicator tone="neutral">
 						{proj.status ?? "draft"}
-					</span>
+					</StatusIndicator>
 				)}
 			</td>
 			<td className="px-5 py-3.5 text-fog">

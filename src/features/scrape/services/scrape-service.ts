@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { type ScrapeMode, scrapes, users } from "@/db/schema";
 import { SCRAPE_LIMITS } from "@/features/scrape/types/scrape-contract";
@@ -7,6 +7,8 @@ import {
 	resolveScrapeRetryDecision,
 } from "@/features/scrape/utils/scrape-retry";
 import { ScrapeError } from "@/lib/design-errors";
+import { scrapeRequestSchema } from "../types/scrape-contract";
+import { createScrape } from "./scrape-create-service";
 import { deleteOwnedScrapes } from "./scrape-history-delete-service";
 
 // Public surface for the scrape backend. Each concern lives in its own module;
@@ -23,8 +25,8 @@ export * from "./scrape-pipeline-service";
 export async function retryScrape(
 	scrapeId: string,
 	userId: string,
-): Promise<{ ok: true }> {
-	return db.transaction(async (tx) => {
+): Promise<{ ok: true; scrapeId?: string }> {
+	const fresh = await db.transaction(async (tx) => {
 		const [owner] = await tx
 			.select({ id: users.id })
 			.from(users)
@@ -35,11 +37,21 @@ export async function retryScrape(
 		const [scrape] = await tx
 			.select()
 			.from(scrapes)
-			.where(and(eq(scrapes.id, scrapeId), eq(scrapes.userId, userId)))
+			.where(
+				and(
+					eq(scrapes.id, scrapeId),
+					eq(scrapes.userId, userId),
+					isNull(scrapes.deletedAt),
+				),
+			)
 			.limit(1);
 		if (!scrape)
 			throw new ScrapeError("WEBSITE_BLOCKED", "Scrape tidak ditemukan.");
-		if (scrape.status !== "failed") return { ok: true };
+		if (scrape.status !== "failed") return;
+		const { admitProductWork } = await import(
+			"@/features/billing/services/product-trials.server"
+		);
+		await admitProductWork(tx, userId, "scrape", "paid");
 		// A retry consumes a real worker slot, so it respects the same request
 		// rate limit as creating a new scrape instead of bypassing it.
 		const { checkRateLimit } = await import("@/lib/rate-limit");
@@ -54,6 +66,7 @@ export async function retryScrape(
 			.where(
 				and(
 					eq(scrapes.userId, userId),
+					isNull(scrapes.deletedAt),
 					inArray(scrapes.status, [
 						"queued",
 						"capturing",
@@ -76,6 +89,11 @@ export async function retryScrape(
 				maxActiveJobs: SCRAPE_LIMITS.maxActiveJobs,
 			}),
 		);
+		const request = scrapeRequestSchema.parse(
+			scrape.request ?? { url: scrape.sourceUrl, mode: scrape.mode },
+		);
+		const { serverScrapeQuote } = await import("./scrape-credit.server");
+		if (serverScrapeQuote(request)) return request;
 		// A retry is a fresh attempt at the same request: it keeps the persisted
 		// partial rows, clears the previous failure evidence, and resets the
 		// worker bookkeeping so a new lease can be claimed.
@@ -113,11 +131,21 @@ export async function retryScrape(
 				and(
 					eq(scrapes.id, scrapeId),
 					eq(scrapes.userId, userId),
+					isNull(scrapes.deletedAt),
 					eq(scrapes.status, "failed"),
 				),
 			);
-		return { ok: true };
+		return undefined;
 	});
+	if (!fresh) return { ok: true };
+	const job = await createScrape(
+		userId,
+		fresh.url,
+		fresh.mode,
+		fresh,
+		`retry-${scrapeId}`,
+	);
+	return { ok: true, scrapeId: job.id };
 }
 
 export async function deleteScrape(

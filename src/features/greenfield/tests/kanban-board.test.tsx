@@ -156,6 +156,25 @@ function renderBoard(
 }
 
 describe("KanbanBoard", () => {
+	it("renders header with title and integrated CLI status metadata", async () => {
+		const c = renderBoard();
+
+		await vi.waitFor(() => {
+			// The merged header states the board title, then the CLI status line.
+			expect(c.textContent).toContain("Kanban");
+			expect(c.textContent).toContain(
+				"Belum ada update status. Jalankan everythings-vibe CLI untuk update otomatis",
+			);
+		});
+
+		const header = c.querySelector("header");
+		expect(header).toBeDefined();
+		expect(header?.textContent).toContain("Kanban");
+		expect(header?.textContent).toContain(
+			"Belum ada update status. Jalankan everythings-vibe CLI untuk update otomatis",
+		);
+	});
+
 	it("renders repository identity and live project progress with workspace navigation", async () => {
 		const c = renderBoard({
 			navigationContext: {

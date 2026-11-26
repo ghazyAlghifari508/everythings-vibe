@@ -28,6 +28,8 @@ export interface StudioComposerSubmitResult {
 	accepted: boolean;
 	/** Set when the server needs the user to be more specific. */
 	clarify?: string;
+	/** Server refusal that the workspace answers with the credit modal or /pricing. */
+	creditState?: "insufficient" | "plan_gated";
 }
 
 export interface StudioComposerProps {
@@ -44,6 +46,7 @@ export interface StudioComposerProps {
 	onClearFrames?: () => void;
 	referenceLabel?: string | null;
 	referenceColors?: readonly string[] | null;
+	creditLabel?: string | null;
 	elementTarget?: StudioElementTarget | null;
 	onRemoveElement?: () => void;
 }
@@ -59,6 +62,7 @@ export function StudioComposer({
 	onClearFrames,
 	referenceLabel,
 	referenceColors,
+	creditLabel,
 	elementTarget,
 	onRemoveElement,
 }: StudioComposerProps) {
@@ -266,6 +270,11 @@ export function StudioComposer({
 						)}
 					</button>
 				</div>
+				{creditLabel ? (
+					<p className="text-xs text-fog" data-testid="studio-credit-estimate">
+						{creditLabel}
+					</p>
+				) : null}
 				{error ? (
 					<p role="alert" className="text-xs text-crimson">
 						{error}

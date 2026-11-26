@@ -1,7 +1,7 @@
 {
   "name": "@ghazynabiel/everythings-vibe",
   "version": "3.2.1",
-  "description": "CLI tool for everythings-vibe — manage projects, codebases, and tasks from terminal",
+  "description": "CLI tool for everythings-vibe. Manage projects, codebases, and tasks from terminal",
   "type": "module",
   "main": "dist/index.js",
   "bin": {

@@ -1,5 +1,5 @@
 import type { StudioFrameRow, StudioJobRow } from "@/db/schema";
-import type { StudioStatus } from "../types/studio-status";
+import type { StudioStatus, StudioVisibleJob } from "../types/studio-status";
 
 export function isTemporarySlot(
 	frame: Pick<StudioFrameRow, "name" | "description" | "htmlCode">,
@@ -11,7 +11,9 @@ export function isTemporarySlot(
 	);
 }
 
-export function isStudioJobRunning(job: StudioJobRow | null): boolean {
+export function isStudioJobRunning(
+	job: Pick<StudioJobRow, "status"> | null,
+): boolean {
 	return !!job && ["queued", "planning", "generating"].includes(job.status);
 }
 
@@ -65,7 +67,7 @@ export function deriveStudioLifecycle({
 
 export function resolveStudioFrameStatus(
 	frame: StudioFrameRow,
-	job: StudioJobRow | null,
+	job: StudioVisibleJob | null,
 ): string {
 	if (isStudioJobRunning(job)) {
 		if (

@@ -37,7 +37,7 @@ export function TypeSpecimenRow({ entry }: { entry: InspectorTypeEntry }) {
 		entry.letterSpacing ? `ls ${entry.letterSpacing}` : "",
 	]
 		.filter((part) => part.length > 0)
-		.join(" · ");
+		.join(", ");
 	// Neutral copy per role. The captured page's own text is never used as a
 	// specimen: the document is a reference for other apps, not a replay.
 	const specimen = specimenTextForRole(entry.role);

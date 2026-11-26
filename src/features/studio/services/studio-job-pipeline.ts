@@ -1,8 +1,16 @@
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { studioFrames, studioJobs, studioProjects } from "@/db/schema";
+import {
+	studioFrames,
+	studioJobs,
+	studioProjects,
+	studioRevisions,
+} from "@/db/schema";
+import { settleProductTrial } from "@/features/billing/services/product-trial-settlement.server";
+import type { ShadowOutcome } from "@/features/usage-metering/types/shadow-usage";
 import { STUDIO_FRAME_CONCURRENCY } from "../types/studio-constants";
 import { isTemporarySlot } from "../utils/studio-lifecycle";
+import { settleStudioOperationCharge } from "./studio-credit-adapter.server";
 import { extractDesignSystemTokens } from "./studio-design-tokens";
 import {
 	studioFrameErrorCodeFor,
@@ -26,6 +34,7 @@ import {
 } from "./studio-planning";
 import { resolveStudioProjectTitle } from "./studio-project-title";
 import { validateStudioDesignMode } from "./studio-prompt-validation";
+import { finalizeStudioUsage } from "./studio-usage-metering";
 import type { StudioWorkerExecution } from "./studio-worker-scheduler";
 
 export async function runStudioJobPipeline(
@@ -42,6 +51,9 @@ export async function runStudioJobPipeline(
 	if (!job || job.projectId !== projectId || !job.leaseExpiresAt) return;
 	const claim: StudioJobClaim = { jobId, projectId, userId, workerId };
 	const startedAt = Date.now();
+	let usageOutcome: ShadowOutcome = "unknown";
+	let usageRequestedFrames: number | null = null;
+	let usageCompletedFrames = 0;
 	// A failure before the shared blueprint exists is a planning failure, not a
 	// screen failure: the recovery the user needs is the whole plan, not one frame.
 	let sharedPlanningCompleted = job.jobType !== "initial";
@@ -61,6 +73,9 @@ export async function runStudioJobPipeline(
 							signal,
 						);
 					else await runStudioFrameOperation(job, claim, signal);
+					usageRequestedFrames = 1;
+					usageCompletedFrames = 1;
+					usageOutcome = "success";
 					return;
 				}
 				const [project] = await db
@@ -204,8 +219,31 @@ export async function runStudioJobPipeline(
 				signal.throwIfAborted();
 				studioJobTiming("frames", frameStartedAt, { jobId, projectId });
 				const ready = results.filter((result) => result.ok);
+				usageRequestedFrames = frames.length;
+				usageCompletedFrames = ready.length;
+				usageOutcome =
+					ready.length === frames.length
+						? "success"
+						: ready.length > 0
+							? "partial"
+							: "failed";
+				const first = ready[0];
 				const persistenceStartedAt = Date.now();
 				await withStudioJobWrite(claim, async (tx) => {
+					if (first?.ok) {
+						const [existing] = await tx
+							.select({ id: studioRevisions.id })
+							.from(studioRevisions)
+							.where(eq(studioRevisions.projectId, projectId))
+							.limit(1);
+						if (!existing)
+							await tx.insert(studioRevisions).values({
+								projectId,
+								prompt: job.prompt,
+								htmlCode: first.htmlCode,
+								version: 1,
+							});
+					}
 					await tx
 						.update(studioJobs)
 						.set({
@@ -224,6 +262,21 @@ export async function runStudioJobPipeline(
 							updatedAt: new Date(),
 						})
 						.where(eq(studioJobs.id, jobId));
+					await settleProductTrial(
+						tx,
+						"studio",
+						job.userId,
+						job.id,
+						ready.length,
+					);
+					await settleStudioOperationCharge(tx, {
+						userId: job.userId,
+						jobId: job.id,
+						operationId: job.creditOperationId,
+						outcome: usageOutcome === "unknown" ? "failed" : usageOutcome,
+						completedFrames: ready.length,
+						artifactReference: job.id,
+					});
 					await tx
 						.update(studioProjects)
 						.set({ updatedAt: new Date() })
@@ -252,6 +305,12 @@ export async function runStudioJobPipeline(
 			},
 		);
 	} catch (failure) {
+		usageOutcome =
+			failure instanceof StudioLeaseLostError &&
+			(failure.reason === "JOB_CANCELLED" ||
+				failure.reason === "WORKER_SHUTDOWN")
+				? "cancelled"
+				: "failed";
 		// Lease loss and worker shutdown are not failures of the work: recovery owns
 		// the job again, so finalising here would discard recoverable frames. A job
 		// timeout still holds the lease and is finalised normally.
@@ -302,6 +361,15 @@ export async function runStudioJobPipeline(
 							updatedAt: new Date(),
 						})
 						.where(eq(studioJobs.id, jobId));
+					await settleProductTrial(tx, "studio", job.userId, job.id, 0);
+					await settleStudioOperationCharge(tx, {
+						userId: job.userId,
+						jobId: job.id,
+						operationId: job.creditOperationId,
+						outcome: "failed",
+						completedFrames: 0,
+						artifactReference: job.id,
+					});
 				});
 			} catch (writeFailure) {
 				if (!(writeFailure instanceof StudioLeaseLostError)) throw writeFailure;
@@ -321,6 +389,13 @@ export async function runStudioJobPipeline(
 			jobId,
 			projectId,
 			attempt: job.attempts,
+		});
+		await finalizeStudioUsage({
+			job,
+			outcome: usageOutcome,
+			requestedFrames: usageRequestedFrames,
+			completedFrames: usageCompletedFrames,
+			finishedAt: new Date(),
 		});
 	}
 }

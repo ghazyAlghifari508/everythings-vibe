@@ -129,7 +129,11 @@ describe("Settings layout consistency across child pages", () => {
 					reservedCredits: 0,
 					totalCreditsUsed: 0,
 					operations: [],
+					productBreakdown: [],
+					periodStart: "2026-10-01T00:00:00.000Z",
 				}}
+				trials={{ studio: "available", scrape: "available" }}
+				productChargingEnabled={{ studio: false, scrape: false }}
 			/>,
 		);
 

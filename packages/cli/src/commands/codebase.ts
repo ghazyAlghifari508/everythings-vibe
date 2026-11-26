@@ -225,7 +225,7 @@ function printResult(result: SyncResult, output: SyncOutputMode): void {
 	if (result.ok) {
 		lines.push(
 			`Sync ${result.status}: ${result.uploadedFiles} file(s), ${result.uploadedBytes} byte(s)`,
-			`Session      : ${result.sessionId} · project ${result.projectId}`,
+			`Session      : ${result.sessionId}, project ${result.projectId}`,
 			`Manifest     : ${result.fileCount} included, ${result.excludedCount} excluded`,
 		);
 		if (result.snapshotId) lines.push(`Snapshot     : ${result.snapshotId}`);

@@ -1,8 +1,16 @@
+import type { IconProps } from "@/components/ui/icon";
+import { type StatusTone, statusIcons } from "@/components/ui/status-indicator";
+
 export interface PaymentStatusInfo {
 	label: string;
-	className: string;
+	tone: StatusTone;
+	icon: IconProps["icon"];
 }
 
+/**
+ * Payment domain only. Credit operations keep their own mapping in
+ * credit-usage-status.tsx; never merge the two business states.
+ */
 export function getPaymentStatusInfo(
 	status: string | null | undefined,
 ): PaymentStatusInfo {
@@ -10,59 +18,63 @@ export function getPaymentStatusInfo(
 		case "success":
 		case "settlement":
 		case "capture":
+		case "paid":
 			return {
 				label: "Berhasil",
-				className:
-					"bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20",
+				tone: "success",
+				icon: statusIcons.success,
 			};
 		case "pending":
 			return {
 				label: "Menunggu",
-				className:
-					"bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20",
+				tone: "warning",
+				icon: statusIcons.pending,
 			};
 		case "cancel":
 		case "cancelled":
 			return {
 				label: "Dibatalkan",
-				className: "bg-zinc-500/10 text-zinc-400 border border-zinc-500/20",
+				tone: "neutral",
+				icon: statusIcons.released,
 			};
 		case "expire":
 		case "expired":
 			return {
 				label: "Kedaluwarsa",
-				className: "bg-zinc-500/10 text-zinc-400 border border-zinc-500/20",
+				tone: "neutral",
+				icon: statusIcons.alert,
 			};
 		case "refund":
 			return {
 				label: "Dikembalikan",
-				className:
-					"bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20",
+				tone: "neutral",
+				icon: statusIcons.released,
 			};
 		case "partial_refund":
 			return {
 				label: "Dikembalikan sebagian",
-				className:
-					"bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20",
+				tone: "neutral",
+				icon: statusIcons.released,
 			};
 		case "chargeback":
 		case "partial_chargeback":
 			return {
 				label: "Sengketa pembayaran",
-				className:
-					"bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20",
+				tone: "warning",
+				icon: statusIcons.alert,
 			};
 		case "failed":
 		case "deny":
 			return {
 				label: "Gagal",
-				className:
-					"bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20",
+				tone: "danger",
+				icon: statusIcons.failed,
 			};
 		default:
 			return {
 				label: status || "Gagal",
-				className: "bg-zinc-500/10 text-zinc-400 border border-zinc-500/20",
+				tone: "neutral",
+				icon: statusIcons.alert,
 			};
 	}
 }

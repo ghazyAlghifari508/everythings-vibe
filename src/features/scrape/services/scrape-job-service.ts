@@ -67,6 +67,7 @@ export function scrapeClaimPredicate(claim: ScrapeJobClaim) {
 	return and(
 		eq(scrapes.id, claim.id),
 		eq(scrapes.userId, claim.userId),
+		isNull(scrapes.deletedAt),
 		eq(scrapes.jobToken, claim.token),
 		gt(scrapes.leaseExpiresAt, new Date()),
 	);
@@ -91,11 +92,29 @@ export function createScrapeJobUpdate(
 		if (values.metadata)
 			scrape.metadata = { ...scrape.metadata, ...values.metadata };
 		const { db } = await import("@/db");
-		const rows = await db
-			.update(scrapes)
-			.set({ ...values, updatedAt: new Date() })
-			.where(scrapeClaimPredicate(claim))
-			.returning({ id: scrapes.id });
+		const patch = { ...values, updatedAt: new Date() };
+		const predicate = scrapeClaimPredicate(claim);
+		const rows =
+			values.status === "completed"
+				? await db.transaction(async (tx) => {
+						const rows = await tx
+							.update(scrapes)
+							.set(patch)
+							.where(predicate)
+							.returning();
+						if (rows[0]) {
+							const { settleScrapeTrial } = await import(
+								"./scrape-trial-settlement"
+							);
+							await settleScrapeTrial(tx, rows[0]);
+						}
+						return rows;
+					})
+				: await db
+						.update(scrapes)
+						.set(patch)
+						.where(predicate)
+						.returning({ id: scrapes.id });
 		if (!rows.length)
 			throw new ScrapeError("STORAGE_FAILED", "Job lease sudah tidak berlaku.");
 	};
@@ -109,6 +128,7 @@ export async function claimScrapeJob(): Promise<ScrapeJobClaim | null> {
 			.from(scrapes)
 			.where(
 				and(
+					isNull(scrapes.deletedAt),
 					inArray(scrapes.status, [...activeStatuses]),
 					or(
 						isNull(scrapes.leaseExpiresAt),
@@ -143,6 +163,8 @@ export async function claimScrapeJob(): Promise<ScrapeJobClaim | null> {
 					},
 				})
 				.where(and(eq(scrapes.id, row.id), eq(scrapes.userId, row.userId)));
+			const { settleScrapeTrial } = await import("./scrape-trial-settlement");
+			await settleScrapeTrial(tx, row, "failed");
 			return null;
 		}
 		const token = crypto.randomUUID();

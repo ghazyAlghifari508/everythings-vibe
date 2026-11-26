@@ -151,7 +151,7 @@ describe("CrawlSitemapGraph", () => {
 			/>,
 		);
 
-		fireEvent.click(screen.getByRole("button", { name: /Pricing — Berhasil/ }));
+		fireEvent.click(screen.getByRole("button", { name: /Pricing, Berhasil/ }));
 		expect(onSelect).toHaveBeenCalledWith("p-pricing");
 	});
 
@@ -164,9 +164,9 @@ describe("CrawlSitemapGraph", () => {
 			/>,
 		);
 
-		const homeBtn = screen.getByRole("button", { name: /Home — Berhasil/ });
+		const homeBtn = screen.getByRole("button", { name: /Home, Berhasil/ });
 		const pricingBtn = screen.getByRole("button", {
-			name: /Pricing — Berhasil/,
+			name: /Pricing, Berhasil/,
 		});
 
 		expect(homeBtn.getAttribute("aria-pressed")).toBe("true");
@@ -253,7 +253,7 @@ describe("CrawlSitemapGraph", () => {
 		);
 		expect(edgePaths(container)).toHaveLength(3);
 
-		fireEvent.click(screen.getByRole("button", { name: /Docs — Berhasil/ }));
+		fireEvent.click(screen.getByRole("button", { name: /Docs, Berhasil/ }));
 
 		expect(edgePaths(container)).toHaveLength(2);
 		expect(screen.queryByText(/Tautan ke halaman lain/)).toBeNull();
@@ -287,7 +287,7 @@ describe("CrawlSitemapGraph", () => {
 		);
 
 		expect(
-			screen.getByRole("button", { name: /Home — Berhasil/ }),
+			screen.getByRole("button", { name: /Home, Berhasil/ }),
 		).toBeDefined();
 		expect(screen.queryByText(/Tampilkan tautan lainnya/)).toBeNull();
 	});
@@ -317,7 +317,7 @@ describe("CrawlSitemapGraph", () => {
 			/>,
 		);
 
-		expect(screen.getAllByRole("button", { name: /— Berhasil/ })).toHaveLength(
+		expect(screen.getAllByRole("button", { name: /, Berhasil/ })).toHaveLength(
 			13,
 		);
 	});
@@ -333,7 +333,7 @@ describe("CrawlSitemapGraph", () => {
 		);
 
 		const pricingBtn = screen.getByRole("button", {
-			name: /Pricing — Berhasil/,
+			name: /Pricing, Berhasil/,
 		});
 		pricingBtn.focus();
 		expect(document.activeElement).toBe(pricingBtn);
@@ -423,7 +423,7 @@ describe("CrawlSitemapGraph", () => {
 			/>,
 		);
 
-		const node = screen.getByRole("button", { name: /— Berhasil/ });
+		const node = screen.getByRole("button", { name: /, Berhasil/ });
 		const title = node.getAttribute("title") ?? "";
 		expect(title).toContain(longTitle);
 		expect(title).toContain("https://example.test/");

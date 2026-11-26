@@ -5,13 +5,14 @@ import {
 } from "@hugeicons/core-free-icons";
 import { memo, useRef } from "react";
 import { Icon } from "@/components/ui/icon";
-import type { StudioFrameRow, StudioJobRow } from "@/db/schema";
+import type { StudioFrameRow } from "@/db/schema";
 import {
 	StudioFrameErrorPanel,
 	StudioFrameStatusStrip,
 } from "@/features/studio/components/canvas/studio-frame-error";
 import { StudioFrameShimmer } from "@/features/studio/components/canvas/studio-frame-shimmer";
 import { useStudioFrameRenderer } from "@/features/studio/hooks/use-studio-frame-renderer";
+import type { StudioVisibleJob } from "@/features/studio/types/studio-status";
 import { extractCleanHtml } from "@/features/studio/utils/clean-html";
 import { resolveFrameArtboardMode } from "@/features/studio/utils/studio-frame-artboard";
 import { resolveStudioFrameStatus } from "@/features/studio/utils/studio-lifecycle";
@@ -29,7 +30,7 @@ export { resolveFrameArtboardMode } from "@/features/studio/utils/studio-frame-a
 
 export interface StudioFrameProps {
 	frame: StudioFrameRow;
-	job?: StudioJobRow | null;
+	job?: StudioVisibleJob | null;
 	initialJobTiming?: { id: string; createdAt: Date };
 	isSelected?: boolean;
 	onSelect?: (frameId: string, additive?: boolean) => void;

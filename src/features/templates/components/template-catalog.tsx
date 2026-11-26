@@ -22,6 +22,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Icon, type IconProps } from "@/components/ui/icon";
 import { searchTemplates } from "../services/template-service";
 import type { TemplateCategory, VibeTemplateEntry } from "../types";
@@ -166,12 +167,8 @@ export function TemplateCatalog({
 											<Icon icon={icon} size={20} />
 										</div>
 										<div className="flex flex-wrap items-center gap-1.5">
-											<span className="rounded-full border border-graphite bg-obsidian px-2.5 py-0.5 text-[10px] font-medium capitalize text-mist">
-												{template.category}
-											</span>
-											<span className="rounded-full border border-graphite bg-obsidian px-2.5 py-0.5 text-[10px] font-medium capitalize text-fog">
-												{template.platform}
-											</span>
+											<Badge variant="secondary">{template.category}</Badge>
+											<Badge variant="secondary">{template.platform}</Badge>
 										</div>
 									</div>
 

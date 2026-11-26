@@ -1,12 +1,19 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
 	type InsertStudioRevisionRow,
 	type StudioRevisionRow,
+	studioJobs,
 	studioProjects,
 	studioRevisions,
 } from "@/db/schema";
+import { admitProductWork } from "@/features/billing/services/product-trials.server";
 import { ScrapeError } from "@/lib/design-errors";
+import {
+	reserveStudioOperationCharge,
+	serverStudioQuote,
+	settleStudioOperationCharge,
+} from "./studio-credit-adapter.server";
 import { extractDesignSystemTokens } from "./studio-design-tokens";
 import { generateValidatedFrameHtml } from "./studio-frame-generation";
 import { getStudioProject } from "./studio-project-query";
@@ -20,55 +27,129 @@ export async function reviseStudioProject(
 	projectId: string,
 	userId: string,
 	prompt: string,
+	requestKey?: string,
 ): Promise<StudioRevisionRow> {
 	const checked = validateStudioPrompt(prompt);
 	if (!checked.ok) throw new ScrapeError("INVALID_URL", checked.error);
 	const detail = await getStudioProject(projectId, userId);
 
-	const previousHtml = detail.latest?.htmlCode;
-	const designMode = validateStudioDesignMode(detail.designMode);
-	const productBrief = detail.revisions.at(-1)?.prompt ?? detail.title;
-	const revisionRequest = `Original product brief: ${productBrief}\nRequested change: ${checked.prompt}`;
-	const userPrompt = buildStudioUserPrompt(revisionRequest, {
-		previousHtml,
-		designMode,
-		designMd: detail.designMd,
-		logoUrl: detail.logoUrl,
-		prdContent: detail.prdContent,
-	});
-
-	const dsTokens = extractDesignSystemTokens(detail.designMd);
-	const htmlCode = await generateValidatedFrameHtml({
-		framePrompt: userPrompt,
-		blueprint: null,
-		viewport: designMode,
-		expectTokens: dsTokens !== null,
-		dsTokens,
-		logoUrl: detail.logoUrl,
-		contentContext: { brief: revisionRequest, prdContent: detail.prdContent },
-		// A project revision always edits committed HTML. If that document cannot
-		// be revised safely, the request fails and the previous revision stays.
-		preservation: previousHtml ? "preserve-existing" : "new-frame",
-		requestedChange: checked.prompt,
-	});
-	const nextVersion = (detail.latest?.version ?? 0) + 1;
-
-	const [revision] = await db
-		.insert(studioRevisions)
-		.values({
+	const scope = {
+		operation: "studio.revise" as const,
+		frames: 1,
+		promptChars: checked.prompt.length,
+		designMdChars: detail.designMd?.length ?? 0,
+	};
+	const quote = serverStudioQuote(scope);
+	const { jobId, operationId } = await db.transaction(async (tx) => {
+		await admitProductWork(tx, userId, "studio", "paid", {
+			key: requestKey,
+			payload: { projectId, prompt: checked.prompt, intent: "revise_project" },
+			maximumCredits: quote?.maximumCredits,
+		});
+		const [job] = await tx
+			.insert(studioJobs)
+			.values({
+				projectId,
+				userId,
+				prompt: checked.prompt,
+				jobType: "revise",
+				status: "generating",
+			})
+			.returning();
+		if (!job) throw new ScrapeError("STORAGE_FAILED");
+		const charge = await reserveStudioOperationCharge(tx, {
+			userId,
 			projectId,
-			prompt: checked.prompt,
-			htmlCode,
-			version: nextVersion,
-		} satisfies InsertStudioRevisionRow)
-		.returning();
+			jobId: job.id,
+			scope,
+			idempotencyKey: `studio:${job.id}`,
+		});
+		return { jobId: job.id, operationId: charge?.operationId ?? null };
+	});
 
-	if (!revision) throw new ScrapeError("STORAGE_FAILED");
+	try {
+		const previousHtml = detail.latest?.htmlCode;
+		const designMode = validateStudioDesignMode(detail.designMode);
+		const productBrief = detail.revisions.at(-1)?.prompt ?? detail.title;
+		const revisionRequest = `Original product brief: ${productBrief}\nRequested change: ${checked.prompt}`;
+		const userPrompt = buildStudioUserPrompt(revisionRequest, {
+			previousHtml,
+			designMode,
+			designMd: detail.designMd,
+			logoUrl: detail.logoUrl,
+			prdContent: detail.prdContent,
+		});
 
-	await db
-		.update(studioProjects)
-		.set({ updatedAt: new Date() })
-		.where(eq(studioProjects.id, projectId));
+		const dsTokens = extractDesignSystemTokens(detail.designMd);
+		const htmlCode = await generateValidatedFrameHtml({
+			framePrompt: userPrompt,
+			blueprint: null,
+			viewport: designMode,
+			expectTokens: dsTokens !== null,
+			dsTokens,
+			logoUrl: detail.logoUrl,
+			contentContext: { brief: revisionRequest, prdContent: detail.prdContent },
+			// A project revision always edits committed HTML. If that document cannot
+			// be revised safely, the request fails and the previous revision stays.
+			preservation: previousHtml ? "preserve-existing" : "new-frame",
+			requestedChange: checked.prompt,
+		});
+		const nextVersion = (detail.latest?.version ?? 0) + 1;
 
-	return revision;
+		const revision = await db.transaction(async (tx) => {
+			const [created] = await tx
+				.insert(studioRevisions)
+				.values({
+					projectId,
+					prompt: checked.prompt,
+					htmlCode,
+					version: nextVersion,
+				} satisfies InsertStudioRevisionRow)
+				.returning();
+			if (!created) throw new ScrapeError("STORAGE_FAILED");
+			await settleStudioOperationCharge(tx, {
+				userId,
+				jobId,
+				operationId,
+				outcome: "success",
+				completedFrames: 1,
+				artifactReference: created.id,
+			});
+			await tx
+				.update(studioJobs)
+				.set({
+					status: "completed",
+					finishedAt: new Date(),
+					updatedAt: new Date(),
+				})
+				.where(and(eq(studioJobs.id, jobId), eq(studioJobs.userId, userId)));
+			await tx
+				.update(studioProjects)
+				.set({ updatedAt: new Date() })
+				.where(eq(studioProjects.id, projectId));
+			return created;
+		});
+		return revision;
+	} catch (failure) {
+		await db.transaction(async (tx) => {
+			await settleStudioOperationCharge(tx, {
+				userId,
+				jobId,
+				operationId,
+				outcome: "failed",
+				completedFrames: 0,
+				artifactReference: jobId,
+			});
+			await tx
+				.update(studioJobs)
+				.set({
+					status: "failed",
+					error: "Gagal memproses revisi. Silakan coba lagi.",
+					finishedAt: new Date(),
+					updatedAt: new Date(),
+				})
+				.where(and(eq(studioJobs.id, jobId), eq(studioJobs.userId, userId)));
+		});
+		throw failure;
+	}
 }

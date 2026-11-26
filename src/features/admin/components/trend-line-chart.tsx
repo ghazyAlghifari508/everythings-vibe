@@ -245,7 +245,7 @@ export function TrendLineChart({
 							<span className="h-2 w-2 rounded-full bg-indigo-500" />
 							<span className="text-fog">Pengguna Baru:</span>
 							<span className="font-mono font-medium text-snow">
-								{totalNewUsers}
+								{totalNewUsers.toLocaleString("id-ID")}
 							</span>
 						</div>
 					</div>

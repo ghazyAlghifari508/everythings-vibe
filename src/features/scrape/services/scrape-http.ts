@@ -133,8 +133,11 @@ export async function POST({
 				candidate.action === "retry" &&
 				typeof candidate.scrapeId === "string"
 			) {
-				await retryScrape(candidate.scrapeId, user.id);
-				return Response.json({ ok: true, scrapeId: candidate.scrapeId });
+				const result = await retryScrape(candidate.scrapeId, user.id);
+				return Response.json({
+					ok: true,
+					scrapeId: result?.scrapeId ?? candidate.scrapeId,
+				});
 			}
 			// AI-only enrichment retry from persisted evidence: no recapture,
 			// no new credit charge. Owner scope, rate limit and replay

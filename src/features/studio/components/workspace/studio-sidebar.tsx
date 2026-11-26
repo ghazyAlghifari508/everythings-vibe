@@ -23,6 +23,7 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Icon } from "@/components/ui/icon";
+import { NumericBadge } from "@/components/ui/numeric-badge";
 import { StudioDeleteProjectDialog } from "@/features/studio/components/workspace/studio-delete-project-dialog";
 import { StudioRenameProjectDialog } from "@/features/studio/components/workspace/studio-rename-project-dialog";
 import type { StudioHistoryItem } from "@/features/studio/types/studio";
@@ -130,9 +131,7 @@ export function StudioSidebar({
 					<h2 className="text-xs font-semibold uppercase tracking-wider text-snow">
 						My Projects
 					</h2>
-					<span className="rounded-full bg-onyx border border-graphite px-2 py-0.5 font-mono text-[10px] text-fog">
-						{history.length}
-					</span>
+					<NumericBadge count={history.length} label="proyek tersimpan" />
 				</div>
 			</div>
 
@@ -235,7 +234,6 @@ export function StudioSidebar({
 														},
 													)}
 												</span>
-												<span>·</span>
 												<span className="uppercase tracking-wider">
 													{isMobile ? "Mobile" : "Web"}
 												</span>

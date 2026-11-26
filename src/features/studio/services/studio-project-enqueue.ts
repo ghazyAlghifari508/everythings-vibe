@@ -12,9 +12,15 @@ import {
 	studioJobs,
 	studioProjects,
 } from "@/db/schema";
+import { admitProductWork } from "@/features/billing/services/product-trials.server";
 import { ScrapeError } from "@/lib/design-errors";
+import { STUDIO_INITIAL_SCREEN_LIMIT } from "../types/studio-constants";
 import type { CreateStudioProjectInput } from "../types/studio-service";
 import { appendStudioConversation } from "./studio-conversation";
+import {
+	reserveStudioOperationCharge,
+	serverStudioQuote,
+} from "./studio-credit-adapter.server";
 import { resolveStudioDesignReference } from "./studio-design-reference.server";
 import { studioGenerationOptionsSchema } from "./studio-generation-options";
 import { validateAndProcessLogo } from "./studio-logo-service";
@@ -31,6 +37,7 @@ export async function createStudioProjectWithJob(
 	userId: string,
 	titleOrInput: string | CreateStudioProjectInput,
 	legacyPrompt?: string,
+	requestKey?: string,
 ): Promise<{
 	project: StudioProjectRow;
 	job: StudioJobRow;
@@ -118,7 +125,9 @@ export async function createStudioProjectWithJob(
 			)
 			.limit(1);
 
-		if (recentJob) {
+		// A keyed request is answered by the admission replay below, not by the
+		// time-windowed lookback: the idempotency record is the authority.
+		if (recentJob && !requestKey) {
 			const recentFrames = await tx
 				.select()
 				.from(studioFrames)
@@ -134,6 +143,52 @@ export async function createStudioProjectWithJob(
 				job: recentJob.job,
 				frames: recentFrames,
 			};
+		}
+
+		// The planner decides the real screen count, so the authorization covers the
+		// ceiling it may reach; settlement charges for the frames actually delivered.
+		const quoteScope = {
+			operation: "studio.generate" as const,
+			frames: STUDIO_INITIAL_SCREEN_LIMIT,
+			promptChars: checked.prompt.length,
+			designMdChars: cleanDesignMd?.length ?? 0,
+		};
+		const quote = serverStudioQuote(quoteScope);
+		const admission = await admitProductWork(tx, userId, "studio", "trial", {
+			key: requestKey,
+			payload: {
+				options,
+				prompt: checked.prompt,
+				cleanTitle,
+				prdContentHash,
+				validatedLogo,
+			},
+			maximumCredits: quote?.maximumCredits,
+		});
+		if (admission.kind === "replay") {
+			const [match] = await tx
+				.select({ job: studioJobs, project: studioProjects })
+				.from(studioJobs)
+				.innerJoin(
+					studioProjects,
+					and(
+						eq(studioJobs.projectId, studioProjects.id),
+						eq(studioProjects.userId, userId),
+					),
+				)
+				.where(
+					and(
+						eq(studioJobs.userId, userId),
+						eq(studioJobs.id, admission.jobId),
+					),
+				);
+			if (!match) throw new ScrapeError("TRIAL_EXHAUSTED");
+			const replayFrames = await tx
+				.select()
+				.from(studioFrames)
+				.where(eq(studioFrames.projectId, match.project.id))
+				.orderBy(asc(studioFrames.order));
+			return { ...match, frames: replayFrames };
 		}
 
 		let logoAssetId: string | null = null;
@@ -198,6 +253,16 @@ export async function createStudioProjectWithJob(
 				"Gagal membuat antrean studio job.",
 			);
 		}
+
+		if (admission.kind === "trial") await admission.reserve(newJob.id);
+		if (quote && admission.kind !== "trial")
+			await reserveStudioOperationCharge(tx, {
+				userId,
+				projectId: newProject.id,
+				jobId: newJob.id,
+				scope: quoteScope,
+				idempotencyKey: `studio-generate:${newJob.id}`,
+			});
 
 		await appendStudioConversation(tx, {
 			projectId: newProject.id,

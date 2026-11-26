@@ -62,7 +62,7 @@ describe("revision request boundary", () => {
 						id: "prd-project",
 						projectId: "project",
 						targetKind: "prd",
-						label: "@PRD · Pencarian",
+						label: "@PRD: Pencarian",
 						fileName: "PRD.md",
 					},
 					{
@@ -85,7 +85,7 @@ describe("revision request boundary", () => {
 						id: "prd-other",
 						projectId: "other-project",
 						targetKind: "prd",
-						label: "@PRD · Other",
+						label: "@PRD: Other",
 						fileName: "PRD.md",
 					},
 				],

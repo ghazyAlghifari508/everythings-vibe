@@ -210,16 +210,28 @@ Berdasarkan audit riil codebase setelah refactor credit modal (per Oktober 2026)
    - [x] Ringankan file modal menjadi orchestrator tipis $\le$ 250 baris (226 baris).
    - Catatan: kontrak `POST /api/payments/create` (`planId`, `returnUrl`, `projectId`), resume-intent, aturan eligibility, dan redirect tidak berubah. Test `credit-exhausted-modal.test.tsx` diperluas menjadi 21 kasus.
 
-3. **`src/features/codebase/components/planning/codebase-resync-modal.tsx` (467 baris):** Belum selesai.
-   - Menampung step indicator 3 langkah, blok salin prompt re-sync, monitoring status snapshot, dan footer verifikasi.
-   - [ ] Ekstraksi step indicator dan blok "Salin instruksi" ke sub-komponen terpisah.
-   - [ ] Ringankan file modal hingga $\le$ 400 baris.
+3. **`src/features/codebase/components/planning/codebase-resync-modal.tsx`:** $\checkmark$ Selesai 2026-11-25. File kini **227 baris**, dengan step indicator dan blok salin instruksi sudah pindah ke `codebase-resync-modal-steps.tsx` (341 baris). Catatan lama "467 baris" sudah tidak berlaku.
+
+#### Sisa Pelanggaran Batas 400 Baris (Terverifikasi p16, 2026-11-25)
+
+Audit `wc -l` atas seluruh file produksi di bawah `src/` (tanpa file tes, tanpa `routeTree.gen.ts`) menemukan 8 file yang masih melewati batas keras 400 baris:
+
+1. `src/features/codebase/services/library.ts` (619)
+2. `src/features/codebase/services/stack.ts` (433)
+3. `src/features/studio/services/studio-design-skill-registry.server.ts` (426)
+4. `src/features/studio/components/workspace/studio-landing-page.tsx` (407)
+5. `src/features/scrape/utils/design-md-render-components.ts` (406)
+6. `src/features/admin/components/admin-credit-usage-panel.tsx` (405)
+7. `src/features/admin/components/admin-projects-view.tsx` (402)
+8. `src/features/studio/services/studio-design-tokens.ts` (399 setelah ekstraksi helper di p16, sebelumnya 401)
+
+Item 8 sudah dikembalikan ke bawah batas. Tujuh file lainnya adalah utang modularitas yang sudah ada sebelum audit p16 dan belum dipecah.
 
 #### Acceptance Criteria Refactor
 
-- [ ] Seluruh file kode produksi di bawah `src/` berukuran $\le$ 400 baris. Tersisa `codebase-resync-modal.tsx` (467 baris); `routeTree.gen.ts` dikecualikan sebagai generated source.
+- [ ] Seluruh file kode produksi di bawah `src/` berukuran $\le$ 400 baris. Tersisa 7 file (619, 433, 426, 407, 406, 405, 402 baris) sesuai daftar "Sisa Pelanggaran Batas 400 Baris"; `routeTree.gen.ts` dikecualikan sebagai generated source.
 - [x] Nol type bypass (`as any`, `as never`, `@ts-ignore` dilarang per `no-type-bypass.md`): terverifikasi nol pada source produksi authored.
-- [ ] Seluruh test suite Vitest tetap hijau tanpa pelunakan assertions. 5259 lulus, 3 gagal pre-existing di luar scope refactor: `agent-thinking.test.tsx` (timeout), `scrap.$id.test.tsx` (timeout), dan `payment-service.test.ts` (membaca facade `src/db/schema.ts` yang sudah dimodularisasi; tabel `payments`/`subscriptions` kini di `src/db/schema/billing.ts`).
+- [ ] Seluruh test suite Vitest tetap hijau tanpa pelunakan assertions. Status p16 (2026-11-25): 670 file, 6696 tes, 6665 lulus, 6 gagal. Sisa kegagalan bukan cacat kode: `studio-worker-lock.integration.test.ts` dan `studio-e2e-scenarios.test.ts` menunggu worker `dev:all` berhenti karena worker aktif memegang advisory lock dispatch, dan `agent-thinking.test.tsx` flaky di bawah beban paralel (lulus 17/17 saat dijalankan sendiri). `scrap.$id.test.tsx` sudah ditutup dengan timeout realistis, dan `payment-service.test.ts` lulus.
 
 ---
 
@@ -349,6 +361,21 @@ Persiapan lokal pada Inisiatif 12 dikerjakan melalui `docs/prompt-random/p4.md`;
 - [ ] **Fase 4 — Konfigurasi VPS & Reverse Proxy Caddy:** Template `Caddyfile` localhost/parameterized domain dan panduan konfigurasi tersedia; provisioning VPS, firewall (UFW 80/443/22), DNS/domain, dan verifikasi HTTPS publik menunggu infrastruktur nyata.
 - [ ] **Fase 5 — Pipeline CI/CD:** Tidak ada remote deploy workflow tanpa VPS/otorisasi; build-only CI dapat ditambahkan setelah kebutuhan runner ditentukan.
 - [ ] **Fase 6 — Cutover & Verifikasi Live:** Arahkan DNS domain utama ke IP VPS, verifikasi sertifikat SSL otomatis, uji Better Auth login, Midtrans webhook callback, dan background workers.
+
+---
+
+### Inisiatif 13: Universal Multi-Product Credits (VibePlan, Studio, Scrape)
+
+- **Status:** `In Progress` (TASK 06 selesai: fondasi ledger dan registry; rollout belum selesai)
+- **Dokumen:** `docs/universal-credit-ledger.md`
+- [x] TASK 06: ledger `credit_operations` mendukung resource Studio/Scrape, `product`, `funding_source`, `allocation_epoch`, migrasi 0045, registry operasi dengan harga `unconfigured`.
+- [x] Migrasi 0045, 0046, 0047, 0048, 0049 diterapkan ke database dev lokal (`localhost:5432/novaplan`) pada p16; `pnpm db:migrate` bersih dan `analysis-credit.integration.test.ts` lulus. Staging dan production belum.
+- [ ] Terapkan migrasi 0045 ke staging dan production (hentikan writer web dan worker selama migrasi).
+- [ ] TASK 07/09: benchmark dan tarif Studio/Scrape. Tidak ada tarif aktif; jangan isi 0 sebagai placeholder.
+- [x] TASK 10: Trial Studio dan Scrape independen, satu kali per akun Free; reservasi atomik, settlement berdasarkan hasil, dan billing paid tetap legacy.
+- [ ] Terapkan migrasi 0047 sebelum mengaktifkan versi web dan worker yang baru di staging dan production.
+- [x] TASK 11/12: integrasi kredit Studio dan Scrape nonaktif, termasuk tombstone untuk project/job/scrape yang sudah ditagih. Kode dan tes terverifikasi pada p16; aktivasi tarif tetap menunggu TASK 07/09.
+- [x] TASK 13/08: UI billing dan Admin Kredit multi-produk. Terverifikasi p16: 78 tes billing/credit lulus, `/pricing` bebas klaim popularitas tanpa bukti.
 
 ---
 

@@ -49,7 +49,7 @@ export function toDrawerItems(items: WireHistoryItem[]): DrawerHistoryItem[] {
 
 export function formatRelativeTime(value: Date): string {
 	const time = value.getTime();
-	if (!Number.isFinite(time)) return "—";
+	if (!Number.isFinite(time)) return "-";
 	const diff = time - Date.now();
 	if (Math.abs(diff) < HOUR_MS) {
 		return RELATIVE_FORMAT.format(Math.round(diff / MINUTE_MS), "minute");
@@ -69,19 +69,19 @@ export function describeStatus(item: DrawerHistoryItem): string {
 		case "question":
 			return "Tahap Pertanyaan";
 		case "fitur":
-			return "Tahap Fitur · Daftar fitur tersusun";
+			return "Tahap Fitur, Daftar fitur tersusun";
 		case "prd":
 			return item.preview
-				? "Tahap PRD · Ringkasan tersimpan"
-				: "Tahap PRD · Belum ada ringkasan";
+				? "Tahap PRD, Ringkasan tersimpan"
+				: "Tahap PRD, Belum ada ringkasan";
 		case "ac":
 			return item.acStatus === "completed"
-				? "Tahap AC · AC selesai"
-				: "Tahap AC · AC belum selesai";
+				? "Tahap AC, AC selesai"
+				: "Tahap AC, AC belum selesai";
 		case "task":
 			return item.taskStatus === "completed"
-				? "Tahap Task · Task selesai"
-				: "Tahap Task · Task belum selesai";
+				? "Tahap Task, Task selesai"
+				: "Tahap Task, Task belum selesai";
 		default:
 			return "Proyek tersimpan";
 	}

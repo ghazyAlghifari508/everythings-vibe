@@ -49,6 +49,7 @@ test("real PostgreSQL allowance, concurrency, release, isolation, and paid accou
 	]);
 	// The free initial allowance needs no approval: it is priced at zero.
 	assert.equal((await checkPreSyncCredit(otherUser)).response, null);
+	assert.equal((await checkPreSyncCredit(otherUser)).response, null);
 
 	// Session metadata is not account billing authorization.
 	const authorizedUser = crypto.randomUUID();

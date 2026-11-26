@@ -1,16 +1,18 @@
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { useCallback, useRef, useState } from "react";
-import type { StudioFrameRow, StudioProjectRow } from "@/db/schema";
+import type { StudioFrameRow } from "@/db/schema";
+import type { StudioComposerSubmitResult } from "@/features/studio/components/composer/studio-composer";
 import { exportProjectAsZip } from "@/features/studio/services/studio-export";
 import {
 	readStudioApiError,
 	requestStudioFrameRetry,
 } from "@/features/studio/services/studio-frame-retry-client";
+import type { StudioVisibleProject } from "@/features/studio/types/studio-status";
 import { useUIStore } from "@/store";
 import { useStudioComposerRequest } from "./use-studio-composer-request";
 
 export interface UseStudioWorkspaceActionsOptions {
-	project: StudioProjectRow;
+	project: StudioVisibleProject;
 	frames: StudioFrameRow[];
 	selectedFrameIds: string[];
 	syncProjectStatus: () => Promise<void>;
@@ -24,13 +26,14 @@ export function useStudioWorkspaceActions({
 	syncProjectStatus,
 	setError,
 }: UseStudioWorkspaceActionsOptions) {
-	const { composerLoading, handleComposerSubmit } = useStudioComposerRequest({
-		projectId: project.id,
-		userId: project.userId,
-		selectedFrameIds,
-		syncProjectStatus,
-		setError,
-	});
+	const { composerLoading, handleComposerSubmit: submitStudioComposerRequest } =
+		useStudioComposerRequest({
+			projectId: project.id,
+			userId: project.userId,
+			selectedFrameIds,
+			syncProjectStatus,
+			setError,
+		});
 	const [exportingZip, setExportingZip] = useState(false);
 	const [deleting, setDeleting] = useState(false);
 	const [renaming, setRenaming] = useState(false);
@@ -39,8 +42,23 @@ export function useStudioWorkspaceActions({
 	const [frameRetryErrors, setFrameRetryErrors] = useState<
 		Record<string, string>
 	>({});
+	const [creditsExhausted, setCreditsExhausted] = useState<string | null>(null);
 
 	const navigate = useNavigate();
+	// Admission is decided by the operation endpoint's own code, so the submit is
+	// a single request: an exhausted account gets the modal (or the pricing page)
+	// from the same response that would otherwise have created the job.
+	const handleComposerSubmit = useCallback(
+		async (promptText: string): Promise<StudioComposerSubmitResult> => {
+			const result = await submitStudioComposerRequest(promptText);
+			if (result.creditState === "insufficient")
+				setCreditsExhausted("Kredit tidak cukup untuk operasi ini.");
+			if (result.creditState === "plan_gated")
+				void navigate({ to: "/pricing" });
+			return result;
+		},
+		[navigate, submitStudioComposerRequest],
+	);
 	const router = useRouter();
 	const showToast = useUIStore((state) => state.showToast);
 	// The in-flight guard is a ref: two clicks in one tick both read the rendered
@@ -205,6 +223,8 @@ export function useStudioWorkspaceActions({
 		renaming,
 		retryingFrameIds,
 		frameRetryErrors,
+		creditsExhausted,
+		setCreditsExhausted,
 		handleDuplicate,
 		handleDelete,
 		handleRename,

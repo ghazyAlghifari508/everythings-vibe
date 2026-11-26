@@ -77,6 +77,18 @@ export function useStudioComposerRequest({
 					}),
 				});
 				if (!res.ok) {
+					const body: unknown = await res
+						.clone()
+						.json()
+						.catch(() => null);
+					const code =
+						typeof body === "object" && body !== null && "code" in body
+							? String(body.code)
+							: "";
+					if (code === "INSUFFICIENT_CREDITS")
+						return { accepted: false, creditState: "insufficient" };
+					if (code === "TRIAL_EXHAUSTED" || code === "PRODUCT_PLAN_REQUIRED")
+						return { accepted: false, creditState: "plan_gated" };
 					setError(await readStudioApiError(res, "Permintaan desain ditolak."));
 					return { accepted: false };
 				}

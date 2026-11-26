@@ -27,6 +27,7 @@ const project: StudioProjectRow = {
 	prdContent: null,
 	prdFilename: null,
 	prdContentHash: null,
+	deletedAt: null,
 	createdAt: date,
 	updatedAt: date,
 };
@@ -70,6 +71,8 @@ const job: StudioJobRow = {
 	error: null,
 	claimedBy: null,
 	attempts: 1,
+	deletedAt: null,
+	creditOperationId: null,
 	claimedAt: null,
 	leaseExpiresAt: null,
 	startedAt: date,

@@ -233,6 +233,9 @@ export async function listRunnableStudioJobs() {
 			and(
 				eq(studioJobs.status, "queued"),
 				isNull(studioJobs.claimedBy),
+				// Billing tombstones keep the row, so a deleted job must never be
+				// offered to the dispatcher.
+				isNull(studioJobs.deletedAt),
 				// The same predicate `claimStudioJob` applies. A job whose old worker
 				// still holds a live lease is not runnable, so it must not be offered
 				// to the dispatcher until the lease expires: offering it would make the
@@ -254,6 +257,7 @@ export async function listRunnableStudioJobs() {
 					and(
 						eq(studioProjects.id, candidate.projectId),
 						eq(studioProjects.userId, candidate.userId),
+						isNull(studioProjects.deletedAt),
 					),
 				)
 				.for("update");

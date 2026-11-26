@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CreditOperationStage } from "@/db/schema";
 import type { CreditOperationState } from "@/features/billing/services/adaptive-credit";
+import type {
+	CreditOperationKind,
+	CreditOperationProduct,
+} from "@/features/billing/services/credit-operation-registry";
 import { loadCreditUsageHistory } from "@/features/billing/services/credit-usage.functions";
 import type {
 	CreditOperationItem,
@@ -12,16 +16,23 @@ import type {
 
 export type StageFilter = "all" | CreditOperationStage;
 export type StatusFilter = "all" | CreditOperationState;
+export type ProductFilter = "all" | CreditOperationProduct;
+export type KindFilter = "all" | CreditOperationKind;
+export type CreditUsageFetchParams = {
+	page: number;
+	pageSize: number;
+	stage: StageFilter;
+	status: StatusFilter;
+	product: ProductFilter;
+	kind: KindFilter;
+};
 
 export interface UseCreditUsageOptions {
 	operations?: CreditOperationItem[];
 	initialPagination?: CreditUsagePagination;
-	onFetch?: (params: {
-		page: number;
-		pageSize: number;
-		stage: StageFilter;
-		status: StatusFilter;
-	}) => Promise<PaginatedCreditUsageResult>;
+	onFetch?: (
+		params: CreditUsageFetchParams,
+	) => Promise<PaginatedCreditUsageResult>;
 }
 
 export function useCreditUsage({
@@ -31,6 +42,8 @@ export function useCreditUsage({
 }: UseCreditUsageOptions) {
 	const [stageFilter, setStageFilter] = useState<StageFilter>("all");
 	const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+	const [productFilter, setProductFilter] = useState<ProductFilter>("all");
+	const [kindFilter, setKindFilter] = useState<KindFilter>("all");
 	const [page, setPage] = useState<number>(initialPagination?.page ?? 1);
 	const pageSize = initialPagination?.pageSize ?? 10;
 
@@ -54,24 +67,27 @@ export function useCreditUsage({
 	const isInitialMount = useRef(true);
 
 	const executeFetch = useCallback(
-		async (targetPage: number, stage: StageFilter, status: StatusFilter) => {
+		async (
+			targetPage: number,
+			stage: StageFilter,
+			status: StatusFilter,
+			product: ProductFilter,
+			kind: KindFilter,
+		) => {
 			setLoading(true);
 			setError(null);
 			try {
 				const fetcher =
 					onFetch ??
-					(async (params: {
-						page: number;
-						pageSize: number;
-						stage: StageFilter;
-						status: StatusFilter;
-					}) => {
+					(async (params: CreditUsageFetchParams) => {
 						return await loadCreditUsageHistory({
 							data: {
 								page: params.page,
 								pageSize: params.pageSize,
 								stage: params.stage === "all" ? undefined : params.stage,
 								status: params.status === "all" ? undefined : params.status,
+								product: params.product === "all" ? undefined : params.product,
+								kind: params.kind === "all" ? undefined : params.kind,
 							},
 						});
 					});
@@ -81,6 +97,8 @@ export function useCreditUsage({
 					pageSize,
 					stage,
 					status,
+					product,
+					kind,
 				});
 				setServerData(result);
 			} catch {
@@ -100,8 +118,22 @@ export function useCreditUsage({
 			return;
 		}
 
-		void executeFetch(page, stageFilter, statusFilter);
-	}, [isServerMode, page, stageFilter, statusFilter, executeFetch]);
+		void executeFetch(
+			page,
+			stageFilter,
+			statusFilter,
+			productFilter,
+			kindFilter,
+		);
+	}, [
+		isServerMode,
+		page,
+		stageFilter,
+		statusFilter,
+		productFilter,
+		kindFilter,
+		executeFetch,
+	]);
 
 	// In local fallback mode:
 	const localFiltered = useMemo(() => {
@@ -109,9 +141,18 @@ export function useCreditUsage({
 		return initialOperations.filter((op) => {
 			if (stageFilter !== "all" && op.stage !== stageFilter) return false;
 			if (statusFilter !== "all" && op.state !== statusFilter) return false;
+			if (productFilter !== "all" && op.product !== productFilter) return false;
+			if (kindFilter !== "all" && op.kind !== kindFilter) return false;
 			return true;
 		});
-	}, [isServerMode, initialOperations, stageFilter, statusFilter]);
+	}, [
+		isServerMode,
+		initialOperations,
+		stageFilter,
+		statusFilter,
+		productFilter,
+		kindFilter,
+	]);
 
 	const localTotal = localFiltered.length;
 	const localTotalPages = Math.max(1, Math.ceil(localTotal / pageSize));
@@ -138,25 +179,49 @@ export function useCreditUsage({
 		setPage(1);
 	};
 
+	const handleProductChange = (newProduct: ProductFilter) => {
+		setProductFilter(newProduct);
+		setPage(1);
+	};
+
+	const handleKindChange = (newKind: KindFilter) => {
+		setKindFilter(newKind);
+		setPage(1);
+	};
+
 	const handleResetFilter = () => {
 		setStageFilter("all");
 		setStatusFilter("all");
+		setProductFilter("all");
+		setKindFilter("all");
 		setPage(1);
 	};
 
 	const handleRetry = () => {
-		void executeFetch(page, stageFilter, statusFilter);
+		void executeFetch(
+			page,
+			stageFilter,
+			statusFilter,
+			productFilter,
+			kindFilter,
+		);
 	};
 
 	const handlePageChange = (newPage: number) => {
 		setPage(newPage);
 	};
 
-	const hasActiveFilter = stageFilter !== "all" || statusFilter !== "all";
+	const hasActiveFilter =
+		stageFilter !== "all" ||
+		statusFilter !== "all" ||
+		productFilter !== "all" ||
+		kindFilter !== "all";
 
 	return {
 		stageFilter,
 		statusFilter,
+		productFilter,
+		kindFilter,
 		page,
 		pageSize,
 		currentPage,
@@ -169,6 +234,8 @@ export function useCreditUsage({
 		handleStageChange,
 		handleStatusChange,
 		handleResetFilter,
+		handleProductChange,
+		handleKindChange,
 		handleRetry,
 		handlePageChange,
 		setPage,

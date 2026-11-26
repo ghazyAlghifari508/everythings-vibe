@@ -7,9 +7,14 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 
 vi.mock("@tanstack/react-start", () => ({
-	createServerFn: () => ({
-		handler: (fn: unknown) => fn,
-	}),
+	createServerFn: () => {
+		// Server functions chain .validator(...) before .handler(...).
+		const builder = {
+			validator: () => builder,
+			handler: (fn: unknown) => fn,
+		};
+		return builder;
+	},
 	createServerOnlyFn: (fn: unknown) => fn,
 }));
 

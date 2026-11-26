@@ -184,7 +184,7 @@ export function describePlanReadiness(plan: ActivePlanCandidate): string {
 	if (plan.hasPrd) parts.push("PRD");
 	if (plan.hasAc) parts.push("AC");
 	if (plan.hasTasks) parts.push("Task");
-	if (parts.length > 0) return parts.join(" · ");
+	if (parts.length > 0) return parts.join(", ");
 	if (plan.hasArtifacts) return "Sudah ada planning";
-	return "Draft · Belum selesai";
+	return "Draft, Belum selesai";
 }

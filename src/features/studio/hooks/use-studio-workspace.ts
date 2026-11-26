@@ -1,11 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
-import type {
-	StudioFrameRow,
-	StudioJobRow,
-	StudioMessageRow,
-	StudioProjectRow,
-} from "@/db/schema";
+import type { StudioFrameRow, StudioMessageRow } from "@/db/schema";
 import type { StudioComposerSubmitResult } from "@/features/studio/components/composer/studio-composer";
 import { useStudioPlanningRetry } from "@/features/studio/hooks/use-studio-planning-retry";
 import { useStudioStatus } from "@/features/studio/hooks/use-studio-status";
@@ -17,16 +12,20 @@ import {
 import { extractDesignSystemTokens } from "@/features/studio/services/studio-design-tokens";
 import { STUDIO_DESIGN_PRESETS } from "@/features/studio/services/studio-presets";
 import type { StudioDetailLoaderData } from "@/features/studio/types/studio";
-import type { StudioStatus } from "@/features/studio/types/studio-status";
+import type {
+	StudioStatus,
+	StudioVisibleJob,
+	StudioVisibleProject,
+} from "@/features/studio/types/studio-status";
 import { pruneStudioFrameSelection } from "@/features/studio/utils/studio-frame-selection";
 import { deriveStudioLifecycle } from "@/features/studio/utils/studio-lifecycle";
 
 const selectedFrameIdsSchema = z.array(z.string().min(1));
 
 export interface StudioWorkspaceState {
-	project: StudioProjectRow;
+	project: StudioVisibleProject;
 	frames: StudioFrameRow[];
-	activeJob: StudioJobRow | null;
+	activeJob: StudioVisibleJob | null;
 	messages: StudioMessageRow[];
 	selectedFrameId: string | null;
 	selectedFrameIds: string[];
@@ -41,6 +40,8 @@ export interface StudioWorkspaceState {
 	retryingFrameIds: string[];
 	/** Per-frame retry rejections, rendered inside that frame only. */
 	frameRetryErrors: Record<string, string>;
+	creditsExhausted: string | null;
+	setCreditsExhausted: (message: string | null) => void;
 	error: string;
 	isProcessing: boolean;
 	readyFramesCount: number;
@@ -270,6 +271,8 @@ export function useStudioWorkspace(
 		retryingPlanning: planningRetry.retryingPlanning,
 		canRetryPlanning: lifecycle.canRetryPlanning && !syncError,
 		frameRetryErrors: actions.frameRetryErrors,
+		creditsExhausted: actions.creditsExhausted,
+		setCreditsExhausted: actions.setCreditsExhausted,
 		error: error || syncError,
 		isProcessing,
 		readyFramesCount,

@@ -6,28 +6,51 @@ import {
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Icon } from "@/components/ui/icon";
+import { StatusIndicator } from "@/components/ui/status-indicator";
 import { useUserPlan } from "@/features/billing/hooks/use-user-plan";
+import type { CreditOperationProduct } from "@/features/billing/services/credit-operation-registry";
 import { cancelSubscription } from "@/features/billing/services/payment.functions";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import { useUIStore } from "@/store";
 import type {
 	BillingCreditUsage,
 	BillingPaymentItem,
+	BillingProductUsage,
 	BillingSubscription,
+	ProductTrialState,
 } from "../services/billing-settings.functions";
+import type { ProductChargingState } from "../services/charging-state.functions";
 import { ADAPTIVE_CREDIT_PRICING } from "../types/billing-constants";
 import { getPaymentStatusInfo } from "../utils/payment-status";
+import { CreditMeter } from "./credit-meter";
 import { CreditUsageSection } from "./credit-usage";
 import { PaymentHistoryDialog } from "./payment-history-dialog";
 
+const PRODUCT_USAGE_LABELS: Record<CreditOperationProduct, string> = {
+	vibeplan_greenfield: "Greenfield",
+	vibeplan_codebase: "Existing Codebase",
+	studio: "Studio",
+	scrape: "Scrape",
+	legacy_unknown: "Legacy tanpa klasifikasi",
+};
+
+const TRIAL_PRESENTATION = {
+	available: { label: "Tersedia", tone: "success" },
+	reserved: { label: "Sedang diproses", tone: "warning" },
+	consumed: { label: "Sudah digunakan", tone: "neutral" },
+} as const;
 export function BillingPage({
 	subscription,
 	payments: paymentsList,
 	creditUsage,
+	trials,
+	productChargingEnabled,
 }: {
 	subscription: BillingSubscription | undefined;
 	payments: BillingPaymentItem[];
 	creditUsage: BillingCreditUsage;
+	trials: Record<"studio" | "scrape", ProductTrialState>;
+	productChargingEnabled: ProductChargingState;
 }) {
 	const [cancelOpen, setCancelOpen] = useState(false);
 	const [cancelling, setCancelling] = useState(false);
@@ -60,18 +83,33 @@ export function BillingPage({
 		periodEndDate.getTime() < Date.now();
 	const statusText = isPaidPlan
 		? isPaused
-			? "Pause — masa aktif habis"
+			? "Pause, masa aktif habis"
 			: periodEndDate
 				? `Aktif s.d. ${formatDate(periodEndDate.toISOString())}`
 				: "Aktif (paket lama, tanpa masa aktif)"
 		: "Gratis";
 	const showToast = useUIStore((s) => s.showToast);
-	const credits = subscription?.credits ?? 0;
-	const creditsUsed = subscription?.creditsUsed ?? 0;
-	const creditsReserved = subscription?.creditsReserved ?? 0;
-	const remaining = Math.max(0, credits - creditsUsed - creditsReserved);
+	const allocation = userPlan?.credits ?? subscription?.credits ?? 0;
+	const creditsUsed = userPlan?.creditsUsed ?? subscription?.creditsUsed ?? 0;
+	const creditsReserved = creditUsage.reservedCredits ?? 0;
+	// Canonical remaining from getCreditBalance via /api/user/plan. The loader
+	// value is only the first-render fallback, never a view-only subtraction.
+	const canonicalRemaining = userPlan?.remaining;
+	const available =
+		typeof canonicalRemaining === "number"
+			? canonicalRemaining
+			: creditUsage.availableCredits;
+	const exempt =
+		userPlan?.billingExempt === true || canonicalRemaining === "unlimited";
+	const paused = isPaused || userPlan?.subscriptionState === "paused";
 	// ponytail: preview shows latest 4-5 transactions to prevent card height stretching.
 	const previewPayments = paymentsList.slice(0, 5);
+	const productUsage: BillingProductUsage[] =
+		creditUsage.productBreakdown.filter((row) => row.credits > 0);
+	const productUsageTotal = productUsage.reduce(
+		(sum, row) => sum + row.credits,
+		0,
+	);
 
 	return (
 		<div className="w-full flex flex-col gap-6">
@@ -129,32 +167,14 @@ export function BillingPage({
 					</div>
 
 					<div className="mt-6 rounded-lg bg-(--bg-surface) p-4">
-						<div className="mb-2 flex justify-between text-sm">
-							<span className="text-(--text-secondary)">Kredit digunakan</span>
-							<span className="font-medium">
-								{creditsUsed} / {credits}
-								{creditsReserved > 0 && (
-									<span className="ml-1 text-xs text-amber-400 font-normal">
-										({creditsReserved} direservasi)
-									</span>
-								)}
-							</span>
-						</div>
-						<div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-(--bg-card)">
-							<div
-								className="h-full rounded-full bg-indigo transition-all"
-								style={{
-									width: `${credits > 0 ? (creditsUsed / credits) * 100 : 0}%`,
-								}}
-							/>
-						</div>
-						<p className="mt-2 text-xs text-(--text-secondary)">
-							{isPaused
-								? "Masa aktif habis — sisa kredit periode lama hangus. Perpanjang untuk dapat kredit segar."
-								: remaining > 0
-									? `Sisa ${remaining} kredit periode ini.${creditsReserved > 0 ? ` (${creditsReserved} sedang direservasi).` : ""} Kredit reset setiap 30 hari.`
-									: "Kredit periode ini habis. Perpanjang atau tunggu reset berikutnya."}
-						</p>
+						<CreditMeter
+							allocation={allocation}
+							used={creditsUsed}
+							reserved={creditsReserved}
+							available={available}
+							exempt={exempt}
+							paused={paused}
+						/>
 						<p className="mt-2 text-xs text-(--text-secondary)">
 							Analisis awal gratis sekali per akun. Analisis berikutnya memakai
 							hingga{" "}
@@ -165,8 +185,8 @@ export function BillingPage({
 							kredit sesuai ukuran repository. Sesi sync gratis; hanya analisis
 							berhasil yang ditagih.
 						</p>
-						{!isPaused &&
-							remaining === 0 &&
+						{!paused &&
+							available <= 0 &&
 							isPaidPlan &&
 							periodEndDate != null && (
 								<p className="mt-1 text-xs text-(--text-secondary)">
@@ -178,6 +198,75 @@ export function BillingPage({
 									</Link>
 								</p>
 							)}
+					</div>
+					<div className="mt-5 border-t border-(--border-subtle) pt-4">
+						<h3 className="font-inter text-sm font-[510] text-snow">
+							Penggunaan kredit periode ini
+						</h3>
+						{productUsage.length === 0 ? (
+							<p className="mt-2 text-xs text-(--text-secondary)">
+								Belum ada kredit terpakai pada periode ini.
+							</p>
+						) : (
+							<dl className="mt-3 space-y-2 text-xs">
+								{productUsage.map((row) => (
+									<div
+										key={row.product}
+										className="flex items-center justify-between gap-3"
+									>
+										<dt className="text-(--text-secondary)">
+											{PRODUCT_USAGE_LABELS[row.product]}
+										</dt>
+										<dd className="font-mono text-snow">
+											{row.credits} kredit
+										</dd>
+									</div>
+								))}
+								<div className="flex items-center justify-between gap-3 border-t border-(--border-subtle) pt-2 font-medium">
+									<dt>Total terpakai</dt>
+									<dd className="font-mono">{productUsageTotal} kredit</dd>
+								</div>
+							</dl>
+						)}
+						<p className="mt-3 text-xs text-(--text-secondary)">
+							Alokasi direset tiap 30 hari. Top up masuk ke saldo periode
+							berjalan dan hangus di akhir periode. Kredit tersedia lagi saat
+							periode berikutnya dimulai.
+						</p>
+					</div>
+
+					<div className="mt-5 border-t border-(--border-subtle) pt-4">
+						<h3 className="font-inter text-sm font-[510] text-snow">
+							Trial fitur
+						</h3>
+						<div className="mt-3 grid gap-2">
+							{(["studio", "scrape"] as const).map((product) => {
+								const presentation = TRIAL_PRESENTATION[trials[product]];
+								return (
+									<div
+										key={product}
+										className="flex items-center justify-between gap-3 text-xs"
+									>
+										<span className="capitalize text-fog">{product}</span>
+										{isPaidPlan || exempt ? (
+											<StatusIndicator tone="success">
+												Akses penuh
+											</StatusIndicator>
+										) : (
+											<StatusIndicator tone={presentation.tone}>
+												{presentation.label}
+											</StatusIndicator>
+										)}
+									</div>
+								);
+							})}
+						</div>
+						<p className="mt-3 text-xs text-(--text-secondary)">
+							Trial tidak memotong saldo kredit dan tidak diperbarui tiap bulan.
+							{!productChargingEnabled.studio &&
+								!productChargingEnabled.scrape &&
+								" Studio dan Scrape saat ini tidak memotong kredit."}
+						</p>
 					</div>
 				</div>
 
@@ -204,15 +293,16 @@ export function BillingPage({
 													{formatCurrency(p.amount ?? 0)}
 												</div>
 												<div className="mt-0.5 text-xs text-(--text-secondary)">
-													{p.createdAt ? formatDateTime(p.createdAt) : "—"}
+													{p.createdAt ? formatDateTime(p.createdAt) : "-"}
 												</div>
 											</div>
 											<div className="shrink-0">
-												<span
-													className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusInfo.className}`}
+												<StatusIndicator
+													tone={statusInfo.tone}
+													icon={statusInfo.icon}
 												>
 													{statusInfo.label}
-												</span>
+												</StatusIndicator>
 											</div>
 										</div>
 									);
@@ -251,8 +341,8 @@ export function BillingPage({
 							Batalkan Langganan?
 						</h3>
 						<p className="mb-6 text-sm text-(--text-secondary)">
-							Akunmu akan kembali ke paket Free (2 kredit PRD per bulan) dan
-							sisa kredit {planLabel} kamu hangus. Riwayat pembayaran tetap
+							Akunmu akan kembali ke paket Free (2 kredit per 30 hari) dan sisa
+							kredit {planLabel} kamu hangus. Riwayat pembayaran tetap
 							tersimpan. Tindakan ini langsung berlaku.
 						</p>
 						<div className="flex justify-end gap-3">

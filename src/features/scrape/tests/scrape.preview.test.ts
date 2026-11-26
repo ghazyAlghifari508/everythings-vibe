@@ -20,6 +20,7 @@ function completedScrape(overrides: Partial<ScrapeDetail> = {}): ScrapeDetail {
 		jobToken: null,
 		leaseExpiresAt: null,
 		jobAttempts: 0,
+		deletedAt: null,
 		createdAt: new Date("2026-01-01T00:00:00.000Z"),
 		updatedAt: new Date("2026-01-01T00:00:00.000Z"),
 		document: null,

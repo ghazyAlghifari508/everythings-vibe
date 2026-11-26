@@ -8,11 +8,12 @@ import {
 	Tick01Icon,
 } from "@hugeicons/core-free-icons";
 import { memo } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Icon } from "@/components/ui/icon";
 import type { LayoutNode } from "../../types/whiteboard";
 import { MAX_VISIBLE_CONTAINER_ROWS } from "../../utils/whiteboard-layout";
 import { BoardHandle } from "./canvas-connectors";
-import { FeatureIcon, faseBadgeClass } from "./whiteboard-icons";
+import { FeatureIcon } from "./whiteboard-icons";
 
 export const RootNode = memo(function RootNode({ node }: { node: LayoutNode }) {
 	return (
@@ -65,17 +66,13 @@ export const FeatureNode = memo(function FeatureNode({
 						{node.label}
 					</span>
 					<span className="block text-[11px] leading-tight text-fog">
-						Direncanakan ·{" "}
+						Direncanakan:{" "}
 						<span className="tabular-nums">
 							{done}/{total}
 						</span>
 					</span>
 				</span>
-				<span
-					className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-bold uppercase leading-none ${faseBadgeClass(node.phase)}`}
-				>
-					Fase {node.phase ?? "-"}
-				</span>
+				<Badge>{`Fase ${node.phase ?? "-"}`}</Badge>
 			</div>
 			<BoardHandle className="-right-[5px]" />
 		</div>

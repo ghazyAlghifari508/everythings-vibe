@@ -81,13 +81,13 @@ export function CodebaseComposerReferenceChips({
 					data-testid="composer-target-artifact-chip"
 					data-target-kind={targetKind}
 					data-artifact-id={targetArtifact.id}
-					className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-indigo/40 bg-indigo/15 px-2 py-0.5 text-[11px] font-medium text-snow"
+					className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-graphite bg-obsidian px-2 py-0.5 text-[11px] font-medium text-snow"
 				>
 					<Icon
 						icon={File01Icon}
 						size={12}
 						aria-hidden="true"
-						className="shrink-0 text-indigo-300"
+						className="shrink-0 text-fog"
 					/>
 					<span className="truncate" title={targetChipLabel}>
 						{targetChipLabel}
@@ -109,7 +109,7 @@ export function CodebaseComposerReferenceChips({
 			{showMissingTargetNotice ? (
 				<output
 					data-testid="composer-missing-target-notice"
-					className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-200"
+					className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-graphite bg-obsidian px-2 py-0.5 text-[11px] text-fog"
 				>
 					<Icon
 						icon={Alert02Icon}
@@ -134,11 +134,7 @@ export function CodebaseComposerReferenceChips({
 						data-testid={`composer-reference-chip-${idSuffix}`}
 						data-reference-kind={ref.binding.kind}
 						data-stale={!ref.available ? "true" : undefined}
-						className={`inline-flex max-w-full items-center gap-1.5 rounded-md border px-2 py-0.5 text-[11px] ${
-							ref.available
-								? "border-graphite bg-obsidian text-snow"
-								: "border-crimson/50 bg-crimson/10 text-crimson"
-						}`}
+						className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-graphite bg-obsidian px-2 py-0.5 text-[11px] text-snow"
 					>
 						<Icon
 							icon={
@@ -158,9 +154,9 @@ export function CodebaseComposerReferenceChips({
 						{ref.staleReason ? (
 							<span
 								data-testid={`composer-reference-stale-${idSuffix}`}
-								className="shrink-0 text-[10px] font-medium text-crimson"
+								className="shrink-0 text-[10px] font-medium text-warning"
 							>
-								· {ref.staleReason}
+								({ref.staleReason})
 							</span>
 						) : null}
 						<button

@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { scrapes } from "@/db/schema";
 import { SCRAPE_HISTORY_BULK_DELETE_MAX_IDS } from "@/features/scrape/types/scrape-constants";
@@ -28,14 +28,10 @@ export function dedupeScrapeIds(ids: readonly string[]): string[] {
 function ownedScrapeFilter(ids: readonly string[], userId: string) {
 	const idFilter =
 		ids.length === 1 ? eq(scrapes.id, ids[0]) : inArray(scrapes.id, [...ids]);
-	return and(idFilter, eq(scrapes.userId, userId));
+	return and(idFilter, eq(scrapes.userId, userId), isNull(scrapes.deletedAt));
 }
 
-// Deleting a scrape row removes its pages, documents, images and stored image
-// bytes through the existing ON DELETE CASCADE constraints, so the cleanup the
-// one-item delete relied on still happens for a batch. In-flight jobs are not
-// filtered out: every worker write is guarded by the job lease, so removing the
-// row aborts that job cleanly instead of letting it write into a deleted row.
+// Unbilled results retain cascade cleanup. Billed jobs keep their ledger FK.
 export async function deleteOwnedScrapes(
 	ids: readonly string[],
 	userId: string,
@@ -47,10 +43,38 @@ export async function deleteOwnedScrapes(
 			"STORAGE_FAILED",
 			"Terlalu banyak hasil untuk dihapus sekaligus.",
 		);
-	const removed = await db
-		.delete(scrapes)
-		.where(ownedScrapeFilter(unique, userId))
-		.returning({ id: scrapes.id });
+	const removed = await db.transaction(async (tx) => {
+		const scope = ownedScrapeFilter(unique, userId);
+		const rows = await tx
+			.select()
+			.from(scrapes)
+			.where(scope)
+			.orderBy(scrapes.id)
+			.for("update");
+		const { settleScrapeTrial } = await import("./scrape-trial-settlement");
+		const { findScrapeCharge } = await import("./scrape-credit.server");
+		const hardDelete: string[] = [];
+		const tombstones: string[] = [];
+		for (const row of rows) {
+			await settleScrapeTrial(tx, row, "cancelled");
+			if (await findScrapeCharge(tx, row)) tombstones.push(row.id);
+			else hardDelete.push(row.id);
+		}
+		if (tombstones.length)
+			await tx
+				.update(scrapes)
+				.set({ deletedAt: new Date(), jobToken: null, leaseExpiresAt: null })
+				.where(and(scope, inArray(scrapes.id, tombstones)));
+		if (hardDelete.length)
+			return [
+				...rows.filter((row) => tombstones.includes(row.id)),
+				...(await tx
+					.delete(scrapes)
+					.where(ownedScrapeFilter(hardDelete, userId))
+					.returning({ id: scrapes.id })),
+			];
+		return rows;
+	});
 	const deletedIds = removed.map((row) => row.id);
 	return {
 		deleted: deletedIds.length,

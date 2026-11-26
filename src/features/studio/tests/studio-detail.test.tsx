@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
 	cleanup,
 	fireEvent,
@@ -49,6 +51,16 @@ vi.mock("@/lib/session", () => ({
 }));
 
 import { Route } from "@/routes/design/$id";
+
+const queryClient = new QueryClient({
+	defaultOptions: { queries: { retry: false } },
+});
+
+function renderWithQuery(ui: React.ReactNode) {
+	return render(
+		<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+	);
+}
 
 describe("StudioDetailPage Multi-Screen Canvas", () => {
 	beforeEach(() => {
@@ -143,7 +155,7 @@ describe("StudioDetailPage Multi-Screen Canvas", () => {
 
 		const Component = (Route as unknown as { component: React.ComponentType })
 			.component;
-		render(<Component />);
+		renderWithQuery(<Component />);
 
 		expect(
 			screen.getByRole("heading", { level: 1, name: "Aplikasi POS Kasir" }),
@@ -223,7 +235,7 @@ describe("StudioDetailPage Multi-Screen Canvas", () => {
 
 		const Component = (Route as unknown as { component: React.ComponentType })
 			.component;
-		render(<Component />);
+		renderWithQuery(<Component />);
 
 		const frameBtn = screen.getByRole("button", { name: /^Overview$/i });
 		fireEvent.click(frameBtn);
@@ -280,7 +292,7 @@ describe("StudioDetailPage Multi-Screen Canvas", () => {
 
 		const Component = (Route as unknown as { component: React.ComponentType })
 			.component;
-		render(<Component />);
+		renderWithQuery(<Component />);
 
 		// Select frame f-1
 		const frameBtn = screen.getByRole("button", { name: /^Dashboard$/i });
@@ -363,7 +375,7 @@ describe("StudioDetailPage Multi-Screen Canvas", () => {
 
 		const Component = (Route as unknown as { component: React.ComponentType })
 			.component;
-		render(<Component />);
+		renderWithQuery(<Component />);
 
 		fireEvent.click(screen.getByRole("button", { name: /^Ringkasan$/i }));
 		fireEvent.click(screen.getByRole("button", { name: /^Anggaran$/i }), {
@@ -379,8 +391,12 @@ describe("StudioDetailPage Multi-Screen Canvas", () => {
 		});
 		fireEvent.click(screen.getByRole("button", { name: /Kirim prompt/i }));
 
+		// The submit runs an async credit preflight before posting, so wait for the
+		// POST itself rather than the first fetch.
 		await waitFor(() => {
-			expect(fetchMock).toHaveBeenCalled();
+			expect(
+				fetchMock.mock.calls.some((call) => call[1]?.method === "POST"),
+			).toBe(true);
 		});
 		const operationCall = fetchMock.mock.calls.find(
 			(call) => call[1]?.method === "POST",
@@ -401,7 +417,11 @@ describe("StudioDetailPage Multi-Screen Canvas", () => {
 
 		const Component = (Route as unknown as { component: React.ComponentType })
 			.component;
-		const { rerender } = render(<Component />);
+		const { rerender } = renderWithQuery(<Component />);
+		const rerenderWithQuery = (ui: React.ReactNode) =>
+			rerender(
+				<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+			);
 
 		fireEvent.click(screen.getByRole("button", { name: /^Ringkasan$/i }));
 		fireEvent.click(screen.getByRole("button", { name: /^Laporan$/i }), {
@@ -419,7 +439,7 @@ describe("StudioDetailPage Multi-Screen Canvas", () => {
 			updatedAt: new Date(),
 		}));
 		mockUseLoaderData.mockReturnValue(polled);
-		rerender(<Component />);
+		rerenderWithQuery(<Component />);
 
 		expect(screen.getByText(/Merevisi 2 layar terpilih/i)).toBeDefined();
 		expect(screen.getAllByText("Ringkasan").length).toBeGreaterThanOrEqual(1);
@@ -435,7 +455,7 @@ describe("StudioDetailPage Multi-Screen Canvas", () => {
 
 		const Component = (Route as unknown as { component: React.ComponentType })
 			.component;
-		render(<Component />);
+		renderWithQuery(<Component />);
 
 		fireEvent.click(screen.getByRole("button", { name: /^Ringkasan$/i }));
 		fireEvent.click(screen.getByRole("button", { name: /^Anggaran$/i }), {

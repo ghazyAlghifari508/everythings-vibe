@@ -44,6 +44,10 @@ export interface CodebaseResyncModalProps {
 	isAnalyzing?: boolean;
 	onRetryAnalysis?: () => void;
 	activeSessionId?: string | null;
+	/** Highest credit the analysis may consume, shown before the user syncs. */
+	creditMaximum?: number | null;
+	/** True when the free initial allowance covers the analysis. */
+	creditFree?: boolean;
 }
 
 /**
@@ -72,6 +76,8 @@ export function CodebaseResyncModal({
 	isAnalyzing = false,
 	onRetryAnalysis,
 	activeSessionId,
+	creditMaximum = null,
+	creditFree = false,
 }: CodebaseResyncModalProps) {
 	const resolvedRepositoryName =
 		resolveCodebaseDisplayName(projectName) ?? "Repository belum terdeteksi";
@@ -123,6 +129,9 @@ export function CodebaseResyncModal({
 					</DialogTitle>
 					<DialogDescription className="text-xs leading-relaxed text-fog">
 						{resolvedRepositoryName}
+						{creditMaximum !== null && creditMaximum > 0 && !creditFree
+							? `, Analisis: maksimal ${creditMaximum} kredit`
+							: null}
 					</DialogDescription>
 				</DialogHeader>
 

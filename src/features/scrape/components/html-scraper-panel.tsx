@@ -132,7 +132,7 @@ export function HtmlScraperPanel() {
 							id="html-help"
 							className="text-center text-xs text-fog sm:text-left"
 						>
-							Website publik · Preview HTML · index.html
+							Website publik, Preview HTML, index.html
 						</p>
 					)}
 				</div>

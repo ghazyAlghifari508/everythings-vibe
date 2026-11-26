@@ -89,6 +89,10 @@ async function runEnrichmentRetry(
 			"NO_ANALYZABLE_CONTENT",
 			"Evidence visual tersimpan tidak tersedia untuk retry.",
 		);
+	const { requirePaidProductWork } = await import(
+		"@/features/billing/services/product-trials.server"
+	);
+	await requirePaidProductWork(userId, "scrape");
 	// An AI-only retry consumes a real generation slot, so it respects the same
 	// request rate limit as creating a new scrape instead of bypassing it.
 	const { checkRateLimit } = await import("@/lib/rate-limit");

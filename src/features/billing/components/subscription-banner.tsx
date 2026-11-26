@@ -24,7 +24,7 @@ export function SubscriptionBanner() {
 			<Icon icon={Alert01Icon} size={16} className="shrink-0" aria-hidden />
 			<span>
 				Masa aktif langganan <b className="capitalize">{data.plan}</b> sudah
-				habis — sisa kredit hangus dan generate terkunci.
+				habis. Sisa kredit hangus dan generate terkunci.
 			</span>
 			<Link
 				to="/settings/billing"

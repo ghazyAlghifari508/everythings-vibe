@@ -266,7 +266,7 @@ describe("truthful activity", () => {
 			/>,
 		);
 		expect(activityArea(container)?.textContent).toContain(
-			"Memuat tampilan mobile · 2 dari 2",
+			"Memuat tampilan mobile, 2 dari 2",
 		);
 		expect(container.textContent).not.toContain("390x844");
 		expect(container.textContent).not.toContain("light (2/2)");

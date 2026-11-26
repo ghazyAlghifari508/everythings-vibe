@@ -7,13 +7,30 @@ import type {
 	PaginatedCreditUsageInput,
 	PaginatedCreditUsageResult,
 } from "../types/credit-usage";
+import {
+	CREDIT_OPERATION_REGISTRY,
+	type CreditOperationKind,
+	type CreditOperationProduct,
+} from "./credit-operation-registry";
 
 const VALID_STAGES = new Set<CreditOperationStage>([
 	"codebase",
 	"prd",
 	"ac",
 	"task",
+	"studio",
+	"scrape",
 ]);
+
+const VALID_PRODUCTS = new Set<CreditOperationProduct>([
+	"vibeplan_greenfield",
+	"vibeplan_codebase",
+	"studio",
+	"scrape",
+	"legacy_unknown",
+]);
+
+const VALID_KINDS = new Set(Object.keys(CREDIT_OPERATION_REGISTRY));
 
 const VALID_STATES = new Set<CreditOperationState>([
 	"quoted",
@@ -31,6 +48,8 @@ export interface NormalizedCreditUsageInput {
 	page: number;
 	pageSize: number;
 	stage?: CreditOperationStage;
+	product?: CreditOperationProduct;
+	kind?: CreditOperationKind;
 	status?: CreditOperationState;
 	projectId?: string;
 }
@@ -78,7 +97,23 @@ export function normalizeCreditUsageInput(
 			? input.projectId.trim()
 			: undefined;
 
-	return { page, pageSize, stage, status, projectId };
+	const rawProduct =
+		typeof input?.product === "string" ? input.product.trim() : undefined;
+	const product =
+		rawProduct &&
+		rawProduct !== "all" &&
+		VALID_PRODUCTS.has(rawProduct as CreditOperationProduct)
+			? (rawProduct as CreditOperationProduct)
+			: undefined;
+
+	const rawKind =
+		typeof input?.kind === "string" ? input.kind.trim() : undefined;
+	const kind =
+		rawKind && rawKind !== "all" && VALID_KINDS.has(rawKind)
+			? (rawKind as CreditOperationKind)
+			: undefined;
+
+	return { page, pageSize, stage, status, projectId, product, kind };
 }
 
 // ponytail: offset pagination with compound ordering (createdAt DESC, id DESC)
@@ -91,7 +126,9 @@ export async function queryCreditUsageHistory(
 	input: NormalizedCreditUsageInput,
 ): Promise<PaginatedCreditUsageResult> {
 	const { db } = await import("@/db");
-	const { creditOperations, projects } = await import("@/db/schema");
+	const { creditOperations, projects, scrapes, studioProjects } = await import(
+		"@/db/schema"
+	);
 
 	const conditions = [eq(creditOperations.userId, userId)];
 
@@ -101,6 +138,14 @@ export async function queryCreditUsageHistory(
 
 	if (input.stage) {
 		conditions.push(eq(creditOperations.stage, input.stage));
+	}
+
+	if (input.product) {
+		conditions.push(eq(creditOperations.product, input.product));
+	}
+
+	if (input.kind) {
+		conditions.push(eq(creditOperations.kind, input.kind));
 	}
 
 	if (input.status) {
@@ -118,8 +163,13 @@ export async function queryCreditUsageHistory(
 	const baseQuery = db
 		.select({
 			id: creditOperations.id,
+			product: creditOperations.product,
+			fundingSource: creditOperations.fundingSource,
 			projectId: creditOperations.projectId,
 			projectName: projects.name,
+			studioTitle: studioProjects.title,
+			scrapeTitle: scrapes.title,
+			scrapeSourceUrl: scrapes.sourceUrl,
 			kind: creditOperations.kind,
 			stage: creditOperations.stage,
 			state: creditOperations.state,
@@ -129,6 +179,7 @@ export async function queryCreditUsageHistory(
 			finalCharge: creditOperations.finalCharge,
 			pricingVersion: creditOperations.pricingVersion,
 			metrics: creditOperations.metrics,
+			usage: creditOperations.usage,
 			capApplied: creditOperations.capApplied,
 			createdAt: creditOperations.createdAt,
 			settledAt: creditOperations.settledAt,
@@ -139,6 +190,20 @@ export async function queryCreditUsageHistory(
 			and(
 				eq(projects.id, creditOperations.projectId),
 				eq(projects.userId, userId),
+			),
+		)
+		.leftJoin(
+			studioProjects,
+			and(
+				eq(studioProjects.id, creditOperations.studioProjectId),
+				eq(studioProjects.userId, userId),
+			),
+		)
+		.leftJoin(
+			scrapes,
+			and(
+				eq(scrapes.id, creditOperations.scrapeId),
+				eq(scrapes.userId, userId),
 			),
 		)
 		.where(whereClause)
@@ -170,8 +235,16 @@ export async function queryCreditUsageHistory(
 	const safeRows = Array.isArray(rows) ? rows : [];
 	const items: CreditOperationItem[] = safeRows.map((op) => ({
 		id: op.id,
+		product: op.product,
+		fundingSource: op.fundingSource,
 		projectId: op.projectId,
-		projectName: op.projectName ?? null,
+		resourceName:
+			op.product === "studio"
+				? (op.studioTitle ?? null)
+				: op.product === "scrape"
+					? (op.scrapeTitle ?? op.scrapeSourceUrl ?? null)
+					: (op.projectName ?? null),
+		resourceUrl: op.product === "scrape" ? op.scrapeSourceUrl : null,
 		kind: op.kind,
 		stage: op.stage,
 		state: op.state,
@@ -181,6 +254,7 @@ export async function queryCreditUsageHistory(
 		finalCharge: op.finalCharge,
 		pricingVersion: op.pricingVersion,
 		metrics: op.metrics,
+		usage: op.usage ?? null,
 		capApplied: op.capApplied,
 		createdAt:
 			op.createdAt instanceof Date

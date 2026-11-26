@@ -57,6 +57,8 @@ export const studioProjects = pgTable(
 		prdContent: text("prd_content"),
 		prdFilename: text("prd_filename"),
 		prdContentHash: text("prd_content_hash"),
+		/** Set instead of deleting when a credit operation references this row. */
+		deletedAt: timestamp("deleted_at", { withTimezone: true }),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.defaultNow()
 			.notNull(),
@@ -64,7 +66,11 @@ export const studioProjects = pgTable(
 			.defaultNow()
 			.notNull(),
 	},
-	(t) => [index("studio_projects_user_id_idx").on(t.userId)],
+	(t) => [
+		index("studio_projects_user_id_idx").on(t.userId),
+		// FK target for credit_operations (resource ownership); id stays first.
+		unique("studio_projects_user_id_id_unique").on(t.id, t.userId),
+	],
 );
 
 export const studioAssets = pgTable(
@@ -148,6 +154,9 @@ export const studioJobs = pgTable(
 		leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
 		startedAt: timestamp("started_at", { withTimezone: true }),
 		finishedAt: timestamp("finished_at", { withTimezone: true }),
+		/** Credit operation funding this job attempt, pinned at reservation. */
+		creditOperationId: text("credit_operation_id"),
+		deletedAt: timestamp("deleted_at", { withTimezone: true }),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.defaultNow()
 			.notNull(),
@@ -159,6 +168,12 @@ export const studioJobs = pgTable(
 		index("studio_jobs_project_id_idx").on(t.projectId),
 		index("studio_jobs_user_id_idx").on(t.userId),
 		index("studio_jobs_status_idx").on(t.status),
+		// FK target for credit_operations: job, owning project and user agree.
+		unique("studio_jobs_id_project_id_user_id_unique").on(
+			t.id,
+			t.projectId,
+			t.userId,
+		),
 		uniqueIndex("studio_jobs_request_part_idx").on(
 			t.projectId,
 			t.userId,

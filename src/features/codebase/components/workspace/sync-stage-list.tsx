@@ -249,7 +249,7 @@ export function SyncStageList({
 								</span>
 							)}
 							<span className="leading-relaxed text-fog">
-								Snapshot yang sudah diunggah tetap tersimpan — analisis dapat
+								Snapshot yang sudah diunggah tetap tersimpan. Analisis dapat
 								dicoba ulang tanpa mengunggah ulang.
 							</span>
 							<button
@@ -269,7 +269,7 @@ export function SyncStageList({
 			) : null}
 			{summaryParts.length > 0 && (
 				<p className="mt-1 font-mono text-[11px] tabular-nums text-fog">
-					{summaryParts.join(" · ")}
+					{summaryParts.join(", ")}
 				</p>
 			)}
 		</div>

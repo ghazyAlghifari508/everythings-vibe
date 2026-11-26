@@ -50,8 +50,8 @@ describe("formatDate", () => {
 		);
 	});
 
-	it("returns an em dash for invalid input", () => {
-		expect(formatDate("not-a-date")).toBe("—");
+	it("returns a plain hyphen for invalid input", () => {
+		expect(formatDate("not-a-date")).toBe("-");
 	});
 });
 

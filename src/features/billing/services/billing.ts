@@ -107,6 +107,27 @@ export function resolveSubscriptionState(
 	};
 }
 
+export function resolveProductEntitlement(input: {
+	subscription: EffectiveSubscription;
+	trial: "reserved" | "consumed" | null;
+	work: "free" | "trial" | "paid";
+	exempt: boolean;
+	maximumCredits?: number;
+}) {
+	if (input.work === "free") return "free_non_billable";
+	if (input.exempt) return "billing_exempt";
+	if (input.subscription.effectivePlan !== "free") {
+		if (input.maximumCredits === undefined) return "paid_legacy";
+		return input.subscription.remaining >= input.maximumCredits
+			? "paid_credit_available"
+			: "insufficient_paid_credit";
+	}
+	if (input.work === "paid") return "plan_gated";
+	if (input.trial === "reserved") return "trial_reserved";
+	if (input.trial === "consumed") return "trial_exhausted";
+	return "trial_available";
+}
+
 /** True when a free row needs its monthly allocation refreshed (write-on-read). */
 export function isFreeRolloverDue(
 	sub: SubscriptionRowLike | undefined,

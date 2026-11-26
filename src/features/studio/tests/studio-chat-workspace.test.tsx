@@ -1,12 +1,15 @@
 // @vitest-environment jsdom
+
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
 	act,
 	cleanup,
 	fireEvent,
-	render,
+	render as renderBase,
 	screen,
 	waitFor,
 } from "@testing-library/react";
+import type { ReactElement } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { StudioWorkspace } from "../components/workspace/studio-workspace";
 import type { StudioDetailLoaderData } from "../types/studio";
@@ -43,6 +46,27 @@ vi.mock("../components/canvas/studio-canvas", () => ({
 		</section>
 	),
 }));
+const queryClient = new QueryClient({
+	defaultOptions: { queries: { retry: false } },
+});
+
+/**
+ * The workspace mounts credit surfaces that read react-query, so every render
+ * and rerender keeps the provider mounted.
+ */
+function render(ui: ReactElement) {
+	const view = renderBase(
+		<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+	);
+	return {
+		...view,
+		rerender: (next: ReactElement) =>
+			view.rerender(
+				<QueryClientProvider client={queryClient}>{next}</QueryClientProvider>,
+			),
+	};
+}
+
 function fixture(): StudioDetailLoaderData {
 	const date = new Date("2026-01-01");
 	const data = studioStatusSchema.parse({

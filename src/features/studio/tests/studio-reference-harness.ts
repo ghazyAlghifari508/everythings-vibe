@@ -141,9 +141,13 @@ export const studioProviderMock = {
 
 export async function createStudioUser(): Promise<string> {
 	const userId = crypto.randomUUID();
-	await db
-		.insert(users)
-		.values({ id: userId, email: `${userId}@example.test` });
+	await db.insert(users).values({
+		id: userId,
+		email: `${userId}@example.test`,
+		// Design-reference coverage wants the requested frame count, so the
+		// owner is exempt instead of entering the one-frame Free trial.
+		billingExempt: true,
+	});
 	return userId;
 }
 

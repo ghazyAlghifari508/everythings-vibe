@@ -106,13 +106,3 @@ export function FeatureIcon({
 	const icon = FEATURE_ICON_COMPONENTS[featureIconName(label)];
 	return <Icon icon={icon} size={size} aria-hidden />;
 }
-
-const FASE_STYLES: Record<number, string> = {
-	1: "bg-orange-500/15 text-orange-300 border-orange-500/30",
-	2: "bg-sky-500/15 text-sky-300 border-sky-500/30",
-	3: "bg-violet-500/15 text-violet-300 border-violet-500/30",
-};
-
-export function faseBadgeClass(phase: number | undefined): string {
-	return FASE_STYLES[phase ?? 0] ?? FASE_STYLES[3] ?? FASE_STYLES[1] ?? "";
-}

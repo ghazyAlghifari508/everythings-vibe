@@ -22,6 +22,8 @@ const mockOperations: CreditOperationItem[] = [
 		id: "op-1",
 		projectId: "proj-1",
 		projectName: "Aplikasi Kasir Pro",
+		product: "vibeplan_greenfield",
+		fundingSource: "subscription_balance",
 		kind: "prd_generation",
 		stage: "prd",
 		state: "settled",
@@ -48,6 +50,8 @@ const mockOperations: CreditOperationItem[] = [
 		id: "op-2",
 		projectId: "proj-1",
 		projectName: "Aplikasi Kasir Pro",
+		product: "vibeplan_greenfield",
+		fundingSource: "subscription_balance",
 		kind: "ac_generation",
 		stage: "ac",
 		state: "failed",
@@ -68,6 +72,8 @@ const mockOperations: CreditOperationItem[] = [
 		id: "op-3",
 		projectId: "proj-2",
 		projectName: "Marketplace B2B",
+		product: "vibeplan_codebase",
+		fundingSource: "subscription_balance",
 		kind: "codebase_analysis",
 		stage: "codebase",
 		state: "released",
@@ -91,6 +97,8 @@ const mockOperations: CreditOperationItem[] = [
 		id: "op-4",
 		projectId: "proj-2",
 		projectName: "Marketplace B2B",
+		product: "vibeplan_greenfield",
+		fundingSource: "subscription_balance",
 		kind: "task_generation",
 		stage: "task",
 		state: "reserved",
@@ -111,6 +119,8 @@ const mockOperations: CreditOperationItem[] = [
 		id: "op-5",
 		projectId: "proj-2",
 		projectName: "Marketplace B2B",
+		product: "vibeplan_greenfield",
+		fundingSource: "subscription_balance",
 		kind: "prd_generation",
 		stage: "prd",
 		state: "running",
@@ -129,6 +139,8 @@ const mockOperations: CreditOperationItem[] = [
 		id: "op-6",
 		projectId: "proj-1",
 		projectName: "Aplikasi Kasir Pro",
+		product: "vibeplan_greenfield",
+		fundingSource: "subscription_balance",
 		kind: "ac_generation",
 		stage: "ac",
 		state: "quarantined",
@@ -147,6 +159,8 @@ const mockOperations: CreditOperationItem[] = [
 		id: "op-7",
 		projectId: "proj-1",
 		projectName: "Aplikasi Kasir Pro",
+		product: "vibeplan_greenfield",
+		fundingSource: "subscription_balance",
 		kind: "task_generation",
 		stage: "task",
 		state: "refunded",
@@ -160,6 +174,50 @@ const mockOperations: CreditOperationItem[] = [
 		},
 		capApplied: false,
 		createdAt: "2026-09-20T16:00:00.000Z",
+	},
+];
+
+const universalOperations: CreditOperationItem[] = [
+	{
+		id: "studio-1",
+		projectId: null,
+		projectName: null,
+		product: "studio",
+		fundingSource: "subscription_balance",
+		resourceName: "Landing Page Kafe",
+		kind: "studio.generate",
+		stage: "studio",
+		state: "settled",
+		estimatedCredits: 2,
+		reservedCredits: 2,
+		maximumCredits: 4,
+		finalCharge: 2,
+		pricingVersion: "2026-09-20",
+		metrics: { promptChars: 900 },
+		usage: { measuredUnits: 3 },
+		capApplied: false,
+		createdAt: "2026-10-20T10:00:00.000Z",
+		settledAt: "2026-10-20T10:01:00.000Z",
+	},
+	{
+		id: "scrape-1",
+		projectId: null,
+		projectName: null,
+		product: "scrape",
+		fundingSource: "trial",
+		resourceName: "DESIGN.md kafe",
+		resourceUrl: "https://example.test/kafe",
+		kind: "scrape.design_md",
+		stage: "scrape",
+		state: "released",
+		estimatedCredits: 2,
+		reservedCredits: 2,
+		maximumCredits: 3,
+		finalCharge: 0,
+		pricingVersion: "2026-09-20",
+		metrics: { promptChars: 120 },
+		capApplied: false,
+		createdAt: "2026-10-20T11:00:00.000Z",
 	},
 ];
 
@@ -418,6 +476,30 @@ describe("CreditUsageSection", () => {
 		expect(container.textContent).toContain("150.000 bytes");
 		expect(container.textContent).toContain("Dependensi");
 		expect(container.textContent).toContain("12 paket");
+	});
+	it("shows universal product, resource, and ledger columns with detail amounts", () => {
+		act(() => {
+			root?.render(<CreditUsageSection operations={universalOperations} />);
+		});
+
+		expect(container.textContent).toContain("Fitur");
+		expect(container.textContent).toContain("Proyek/Hasil");
+		expect(container.textContent).toContain("Landing Page Kafe");
+		expect(container.textContent).toContain("DESIGN.md kafe");
+		expect(container.textContent).toContain("Buat Studio");
+		expect(container.textContent).toContain("DESIGN.md Scrape");
+
+		const detailBtn = container.querySelector(
+			"button[data-testid='detail-btn-studio-1']",
+		) as HTMLButtonElement | null;
+		expect(detailBtn).not.toBeNull();
+		act(() => {
+			detailBtn?.click();
+		});
+		expect(container.textContent).toContain("Sumber Dana");
+		expect(container.textContent).toContain("Direservasi");
+		expect(container.textContent).toContain("Dilepaskan");
+		expect(container.textContent).toContain("Unit Terukur");
 	});
 });
 

@@ -17,6 +17,10 @@ async function createOwner(): Promise<string> {
 		id: userId,
 		email: `${userId}@example.test`,
 		name: "Slots fixture",
+		// Frame-slot accounting is what this suite covers. A bare Free user now
+		// enters the one-frame Studio trial, so the fixture stays billing-exempt
+		// to exercise the paid slot contract instead.
+		billingExempt: true,
 	});
 	return userId;
 }

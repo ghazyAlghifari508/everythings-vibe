@@ -25,7 +25,7 @@ export function NavbarNavLinks({
 	const scrape = isVibeDesignScrapRoute(pathname);
 	const linkClass = (active: boolean, scoped = false) =>
 		mobile
-			? `flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] ${active ? "bg-white/10 text-snow" : "text-snow hover:bg-white/5"}`
+			? `flex min-h-11 items-center gap-3 rounded-md px-3 py-3 text-sm font-[510] ${active ? "bg-white/10 text-snow" : "text-snow hover:bg-white/5"}`
 			: `rounded-md px-3 py-1.5 text-sm ${scoped ? "font-medium " : ""}transition-colors ${active ? "bg-white/10 text-snow" : "text-fog hover:bg-white/5 hover:text-snow"}`;
 
 	return (

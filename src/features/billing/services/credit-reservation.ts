@@ -15,26 +15,26 @@ import type {
 import { CreditSubscriptionOriginError } from "@/features/billing/types/credit-contracts";
 import { resolveSubscriptionState } from "./billing";
 import {
+	assertSameOperationIdentity,
+	resolveCreditResource,
+	resolveFundingSource,
+} from "./credit-resource";
+import {
 	lockInitialAnalysisAccount,
 	readInitialAnalysisAllowance,
 } from "./initial-analysis-allowance";
 
 export async function reserveCreditOperation(
 	input: ReserveCreditOperationInput,
+	transaction?: Parameters<
+		Parameters<Awaited<ReturnType<typeof getDatabase>>["db"]["transaction"]>[0]
+	>[0],
 ): Promise<CreditOperationResult> {
 	const { db, schema } = await getDatabase();
-	return db.transaction(async (tx) => {
-		const [project] = await tx
-			.select({ id: schema.projects.id })
-			.from(schema.projects)
-			.where(
-				and(
-					eq(schema.projects.id, input.projectId),
-					eq(schema.projects.userId, input.userId),
-				),
-			)
-			.limit(1);
-		if (!project) throw new Error("Credit operation ownership mismatch");
+	const reserve = async (
+		tx: NonNullable<typeof transaction>,
+	): Promise<CreditOperationResult> => {
+		const resource = await resolveCreditResource(tx, input);
 
 		if (input.initialAnalysisAllowance)
 			await lockInitialAnalysisAccount(tx, input.userId);
@@ -62,6 +62,11 @@ export async function reserveCreditOperation(
 				state: schema.creditOperations.state,
 				finalCharge: schema.creditOperations.finalCharge,
 				analysisReference: schema.creditOperations.analysisReference,
+				kind: schema.creditOperations.kind,
+				projectId: schema.creditOperations.projectId,
+				studioProjectId: schema.creditOperations.studioProjectId,
+				studioJobId: schema.creditOperations.studioJobId,
+				scrapeId: schema.creditOperations.scrapeId,
 			})
 			.from(schema.creditOperations)
 			.where(
@@ -71,14 +76,24 @@ export async function reserveCreditOperation(
 				),
 			)
 			.limit(1);
-		if (existing)
+		if (existing) {
+			assertSameOperationIdentity(existing, {
+				operation: input.operation,
+				resource,
+			});
 			return {
 				id: existing.id,
 				state: existing.state,
 				finalCharge: existing.finalCharge,
 				analysisReference: existing.analysisReference,
 			};
-		validateQuote(input.quote, input.operation, input.metrics);
+		}
+		validateQuote(
+			input.quote,
+			input.operation,
+			input.metrics,
+			input.authoritativeQuote,
+		);
 		if (!isExempt && input.initialAnalysisAllowance) {
 			if (input.operation !== "codebase_analysis")
 				throw new Error("Invalid allowance operation");
@@ -107,7 +122,16 @@ export async function reserveCreditOperation(
 			.values({
 				id: crypto.randomUUID(),
 				userId: input.userId,
-				projectId: input.projectId,
+				resourceType: resource.resourceType,
+				projectId: resource.projectId,
+				studioProjectId: resource.studioProjectId,
+				studioJobId: resource.studioJobId,
+				scrapeId: resource.scrapeId,
+				product: resource.product,
+				fundingSource: resolveFundingSource({
+					isExempt,
+					initialAnalysisAllowance: Boolean(input.initialAnalysisAllowance),
+				}),
 				subscriptionId: subscription?.id ?? null,
 				kind: input.operation,
 				stage: input.stage,
@@ -149,6 +173,10 @@ export async function reserveCreditOperation(
 				)
 				.limit(1);
 			if (!retry) throw new Error("Credit operation idempotency conflict");
+			assertSameOperationIdentity(retry, {
+				operation: input.operation,
+				resource,
+			});
 			return {
 				id: retry.id,
 				state: retry.state,
@@ -199,13 +227,17 @@ export async function reserveCreditOperation(
 					orValidPeriod(schema.subscriptions.currentPeriodEnd),
 				),
 			)
-			.returning({ id: schema.subscriptions.id });
+			.returning({
+				id: schema.subscriptions.id,
+				allocationEpoch: schema.subscriptions.allocationEpoch,
+			});
 		if (!updated.length) throw new Error("Insufficient available credit");
 		const operationUpdates = await tx
 			.update(schema.creditOperations)
 			.set({
 				state: "reserved",
 				reservedCredits: maximumCredits,
+				subscriptionEpoch: updated[0].allocationEpoch,
 				reservedAt: new Date(),
 				updatedAt: new Date(),
 			})
@@ -235,7 +267,8 @@ export async function reserveCreditOperation(
 			finalCharge: null,
 			analysisReference: operation.analysisReference,
 		};
-	});
+	};
+	return transaction ? reserve(transaction) : db.transaction(reserve);
 }
 
 export async function markCreditOperationRunning(input: {

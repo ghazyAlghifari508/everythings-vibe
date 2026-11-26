@@ -41,10 +41,18 @@ function setupDefaultDb() {
 				}),
 			}),
 			where: vi.fn().mockReturnValue({
+				// Message queries await orderBy() directly; other queries chain
+				// .limit()/.for(), so the value is both a thenable and a builder.
 				orderBy: vi.fn().mockReturnValue({
 					limit: vi.fn().mockResolvedValue([]),
+					for: vi.fn().mockResolvedValue([]),
+					then: (
+						resolve: (rows: unknown[]) => void,
+						reject?: (reason: unknown) => void,
+					) => Promise.resolve([]).then(resolve, reject),
 				}),
 				limit: vi.fn().mockResolvedValue([]),
+				for: vi.fn().mockResolvedValue([]),
 			}),
 			orderBy: vi.fn().mockReturnValue({
 				limit: vi.fn().mockResolvedValue([]),
@@ -63,6 +71,18 @@ vi.mock("@/db", () => ({
 	},
 }));
 
+// Billing admission and charge reservation have dedicated suites; this spec
+// exercises the Studio service layer against a scripted database.
+vi.mock("@/features/billing/services/product-trials.server", () => ({
+	admitProductWork: async () => ({ kind: "paid" }),
+	requirePaidProductWork: async () => {},
+}));
+vi.mock("../services/studio-credit-adapter.server", () => ({
+	serverStudioQuote: () => null,
+	reserveStudioOperationCharge: async () => ({ operationId: "op-1" }),
+	settleStudioOperationCharge: async () => {},
+	releaseStudioOperationCharge: async () => {},
+}));
 vi.mock("@/lib/services/ai-orchestrator", () => ({
 	selectModels: () => [],
 	tryStreamWithFallback: async () => ({
@@ -328,11 +348,31 @@ describe("Studio Service", () => {
 				createdAt: new Date(),
 			};
 
-			mockDb.insert.mockReturnValueOnce({
-				values: vi.fn().mockReturnValue({
-					returning: vi.fn().mockResolvedValue([mockNextRevision]),
-				}),
-			});
+			// The revision flow persists the queued job before the revision row.
+			mockDb.insert
+				.mockReturnValueOnce({
+					values: vi.fn().mockReturnValue({
+						returning: vi.fn().mockResolvedValue([
+							{
+								id: "job-rev-1",
+								projectId: "proj-1",
+								userId: "user-1",
+								prompt: "Ubah tombol",
+								jobType: "revise",
+								targetFrameId: null,
+								status: "running",
+								error: null,
+								createdAt: new Date(),
+								updatedAt: new Date(),
+							},
+						]),
+					}),
+				})
+				.mockReturnValueOnce({
+					values: vi.fn().mockReturnValue({
+						returning: vi.fn().mockResolvedValue([mockNextRevision]),
+					}),
+				});
 
 			mockDb.update.mockReturnValueOnce({
 				set: vi.fn().mockReturnValue({

@@ -3,93 +3,30 @@
 import {
 	ArrowLeft01Icon,
 	ArrowUpRight01Icon,
-	BubbleChatIcon,
+	CheckmarkCircle02Icon,
+	Coins01Icon,
 	CreditCardIcon,
-	GitBranchIcon,
 	Layers01Icon,
 	UserGroupIcon,
 } from "@hugeicons/core-free-icons";
 import { Link } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
-import { formatCurrency } from "@/lib/utils";
+import {
+	ADMIN_DASHBOARD_CREDIT_WINDOW_DAYS,
+	ADMIN_DASHBOARD_TREND_DAYS,
+} from "@/lib/constants";
 import { getAdminTrendMetrics } from "../services";
 import type { AdminDashboardMetrics, DailyTrendPoint } from "../types";
+import { AdminCreditBreakdownChart } from "./admin-credit-breakdown-chart";
+import { AdminDashboardActivity } from "./admin-dashboard-activity";
 import { AdminMetricCard } from "./admin-metric-card";
 import { TrendLineChart } from "./trend-line-chart";
 
-function getStatusBadge(status: string) {
-	const normalized = status.toLowerCase();
-	if (["success", "settlement", "paid"].includes(normalized)) {
-		return (
-			<span className="inline-flex items-center rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-400">
-				Selesai
-			</span>
-		);
-	}
-	if (["pending", "challenge"].includes(normalized)) {
-		return (
-			<span className="inline-flex items-center rounded border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-amber-300">
-				Pending
-			</span>
-		);
-	}
-	return (
-		<span className="inline-flex items-center rounded border border-rose-500/20 bg-rose-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-rose-300">
-			{status}
-		</span>
-	);
-}
-
-function getPlanBadge(plan: string) {
-	const p = plan.toLowerCase();
-	if (p === "hengker") {
-		return (
-			<span className="inline-flex items-center rounded border border-amber-400/20 bg-amber-400/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-300">
-				Hengker
-			</span>
-		);
-	}
-	if (p === "pro") {
-		return (
-			<span className="inline-flex items-center rounded border border-indigo-400/20 bg-indigo-400/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-indigo-300">
-				Pro
-			</span>
-		);
-	}
-	return (
-		<span className="inline-flex items-center rounded border border-graphite bg-white/5 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-mist">
-			{plan}
-		</span>
-	);
-}
-
-function getStepBadge(step: string | null) {
-	const s = (step || "draft").toLowerCase();
-	const labelMap: Record<string, string> = {
-		idea: "Ide",
-		questions: "Tanya Jawab",
-		prd: "PRD",
-		ac: "AC",
-		kanban: "Kanban",
-	};
-	const label = labelMap[s] || s;
-	return (
-		<span className="rounded border border-graphite bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-mist">
-			{label}
-		</span>
-	);
-}
-
-function formatShortDate(date: Date | string | null | undefined): string {
-	if (!date) return "—";
-	const d = new Date(date);
-	return d.toLocaleDateString("id-ID", {
-		day: "numeric",
-		month: "short",
-		hour: "2-digit",
-		minute: "2-digit",
-	});
+function formatDay(dateKey: string): string {
+	const [year, month, day] = dateKey.split("-");
+	if (!year || !month || !day) return dateKey;
+	return `${Number(day)}/${Number(month)}`;
 }
 
 export function AdminDashboardView({
@@ -100,9 +37,12 @@ export function AdminDashboardView({
 	const [trendData, setTrendData] = useState<DailyTrendPoint[]>(
 		metrics.trendData || [],
 	);
+	const [trendDays, setTrendDays] = useState<number>(
+		ADMIN_DASHBOARD_TREND_DAYS,
+	);
 	const [isLoadingTrend, setIsLoadingTrend] = useState<boolean>(false);
 	const [trendError, setTrendError] = useState<boolean>(false);
-	const [trendDays, setTrendDays] = useState<number>(7);
+
 	const trendRequestRef = useRef(0);
 
 	const handleRangeChange = async (days: number) => {
@@ -131,12 +71,11 @@ export function AdminDashboardView({
 		metrics.planDistribution?.find((p) => p.plan === "hengker")?.count ?? 0;
 	const proCount =
 		metrics.planDistribution?.find((p) => p.plan === "pro")?.count ?? 0;
-	const totalPipelineOutputs =
+	const documentTaskCount =
 		(metrics.prdCount ?? 0) +
 		(metrics.acCount ?? 0) +
 		(metrics.tasksCount ?? 0);
-	const openTicketsCount =
-		(metrics.feedbackCount ?? 0) + (metrics.errorCount ?? 0);
+	const windowLabel = `${formatDay(metrics.creditWindowStart)} sampai ${formatDay(metrics.creditWindowEnd)}`;
 
 	return (
 		<div className="mx-auto max-w-7xl space-y-8 font-inter">
@@ -154,50 +93,95 @@ export function AdminDashboardView({
 			{/* Page Header */}
 			<header className="border-b border-graphite pb-6">
 				<h1 className="font-inter text-2xl font-[510] text-snow">
-					System Overview
+					Ringkasan Platform
 				</h1>
 				<p className="mt-1 text-sm text-fog">
-					Metrik real-time pengguna, aktivitas pipeline AI, dan performa
-					finansial platform.
+					Ringkasan pengguna, pendapatan, kredit, dan operasi berhasil di semua
+					produk.
 				</p>
 			</header>
 
-			{/* 5 Key Metric Cards */}
-			<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+			{/* Primary KPI row */}
+			<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
 				<AdminMetricCard
 					label="Total Pengguna"
 					value={metrics.usersCount}
-					subtext={`${hengkerCount} Hengker · ${proCount} Pro`}
+					subtext={`${hengkerCount} Hengker, ${proCount} Pro`}
 					icon={UserGroupIcon}
-				/>
-				<AdminMetricCard
-					label="Status Pipeline"
-					value={totalPipelineOutputs}
-					subtext={`${metrics.prdCount} PRD · ${metrics.acCount} AC · ${metrics.tasksCount} Task`}
-					icon={Layers01Icon}
-				/>
-				<AdminMetricCard
-					label="Proyek Siap"
-					value={metrics.projectsCount}
-					subtext="Proyek ide produk aktif"
-					icon={GitBranchIcon}
-				/>
-				<AdminMetricCard
-					label="Tiket Terbuka"
-					value={openTicketsCount}
-					subtext={`${metrics.feedbackCount} Saran · ${metrics.errorCount} Error`}
-					icon={BubbleChatIcon}
 				/>
 				<AdminMetricCard
 					label="Pendapatan Bulan Ini"
 					value={metrics.currentMonthRevenue}
-					subtext="Total pembayaran sukses bulan ini"
+					subtext="Pembayaran sukses bulan ini"
 					icon={CreditCardIcon}
 					isCurrency={true}
 				/>
+				<AdminMetricCard
+					label="Kredit Terpakai"
+					value={metrics.settledCreditsUsed}
+					subtext={`Debit buku besar, ${windowLabel}`}
+					icon={Coins01Icon}
+				/>
+				<AdminMetricCard
+					label="Operasi Berhasil"
+					value={metrics.successfulOperations}
+					subtext={`${metrics.partialOperations} sebagian, retry tidak dihitung`}
+					icon={CheckmarkCircle02Icon}
+				/>
 			</div>
 
-			{/* Trend Line Chart Section */}
+			{/* Supporting operational summary, kept out of the primary KPI row */}
+			<section
+				aria-label="Ringkasan operasional"
+				className="grid grid-cols-1 divide-y divide-graphite rounded-xl border border-graphite bg-charcoal/60 sm:grid-cols-3 sm:divide-x sm:divide-y-0 shadow-[var(--shadow-inset)]"
+			>
+				<Link
+					to="/admin/feedback"
+					className="flex min-h-11 items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-white/[0.02] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-fog/40"
+				>
+					<div className="min-w-0">
+						<p className="text-xs font-medium text-mist">Tiket aktif</p>
+						<p className="mt-1 text-lg font-light text-snow">
+							{metrics.activeTicketsCount}
+						</p>
+						<p className="truncate text-[11px] text-fog">
+							{metrics.activeFeedbackCount} saran, {metrics.activeErrorCount}{" "}
+							error
+						</p>
+					</div>
+					<Icon icon={ArrowUpRight01Icon} size={16} className="text-fog" />
+				</Link>
+				<Link
+					to="/admin/projects"
+					className="flex min-h-11 items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-white/[0.02] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-fog/40"
+				>
+					<div className="min-w-0">
+						<p className="text-xs font-medium text-mist">Proyek aktif</p>
+						<p className="mt-1 text-lg font-light text-snow">
+							{metrics.activeProjectsCount}
+						</p>
+						<p className="truncate text-[11px] text-fog">
+							Proyek terhapus tidak dihitung
+						</p>
+					</div>
+					<Icon icon={ArrowUpRight01Icon} size={16} className="text-fog" />
+				</Link>
+				<div className="flex items-center justify-between gap-3 px-4 py-3">
+					<div className="min-w-0">
+						<p className="text-xs font-medium text-mist">Dokumen &amp; Task</p>
+						<p className="mt-1 text-lg font-light text-snow">
+							{documentTaskCount}
+						</p>
+						<p className="truncate text-[11px] text-fog">
+							{metrics.prdCount} PRD, {metrics.acCount} AC, {metrics.tasksCount}{" "}
+							Task
+						</p>
+					</div>
+					<Icon icon={Layers01Icon} size={16} className="text-fog" />
+				</div>
+			</section>
+
+			{/* Trend line chart */}
 			<section className="relative">
 				<TrendLineChart
 					initialData={metrics.trendData}
@@ -211,12 +195,11 @@ export function AdminDashboardView({
 				/>
 				{isLoadingTrend && (
 					<div className="absolute right-6 top-6 flex items-center gap-2 rounded-full border border-graphite bg-obsidian/80 px-3 py-1 text-[11px] text-fog backdrop-blur">
-						<span className="h-1.5 w-1.5 animate-ping rounded-full bg-emerald-400" />
 						Memperbarui grafik...
 					</div>
 				)}
 				{trendError && !isLoadingTrend && (
-					<div className="absolute right-6 top-6 flex items-center gap-2 rounded-full border border-crimson/60 bg-obsidian/80 px-3 py-1 text-[11px] text-snow backdrop-blur">
+					<div className="absolute right-6 top-6 flex items-center gap-2 rounded-full border border-graphite bg-obsidian/80 px-3 py-1 text-[11px] text-snow backdrop-blur">
 						Gagal memuat rentang grafik.
 						<button
 							type="button"
@@ -229,125 +212,37 @@ export function AdminDashboardView({
 				)}
 			</section>
 
-			{/* Bottom Two-Column Activity Cards */}
-			<div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-				{/* Card 1: Transaksi Booster Terbaru */}
-				<section className="flex flex-col justify-between rounded-xl border border-graphite bg-charcoal p-5 sm:p-6 shadow-[var(--shadow-inset)]">
-					<div>
-						<div className="mb-4 flex items-center justify-between">
-							<div>
-								<h2 className="text-base font-[510] text-snow">
-									Transaksi Booster Terbaru
-								</h2>
-								<p className="text-xs text-fog">
-									Riwayat pesanan kredit & paket Mayar / Midtrans
-								</p>
-							</div>
-							<Link
-								to="/admin/transactions"
-								className="text-xs font-medium text-fog hover:text-snow transition-colors"
-							>
-								Lihat Semua
-							</Link>
-						</div>
+			{/* Credit usage per product family, reusing the Kredit page primitive */}
+			<section className="space-y-2">
+				<AdminCreditBreakdownChart
+					items={metrics.creditBreakdown}
+					periodLabel={`${ADMIN_DASHBOARD_CREDIT_WINDOW_DAYS} hari`}
+				/>
+				<div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-fog">
+					<span>Jendela {windowLabel}</span>
+					<Link
+						to="/admin/credit"
+						search={{
+							tab: "usage",
+							page: 1,
+							pageSize: 20,
+							from: metrics.creditWindowStart,
+							to: metrics.creditWindowEnd,
+							product: "all",
+							operation: "all",
+							status: "all",
+							search: "",
+							fundingSource: "all",
+						}}
+						className="inline-flex min-h-11 items-center gap-1.5 font-medium text-fog transition-colors hover:text-snow"
+					>
+						Lihat rincian kredit
+						<Icon icon={ArrowUpRight01Icon} size={14} />
+					</Link>
+				</div>
+			</section>
 
-						{!metrics.recentTransactions ||
-						metrics.recentTransactions.length === 0 ? (
-							<div className="py-12 text-center text-xs text-fog">
-								Belum ada transaksi booster tercatat.
-							</div>
-						) : (
-							<div className="divide-y divide-graphite rounded-lg border border-graphite bg-obsidian">
-								{metrics.recentTransactions.map((tx) => (
-									<div
-										key={tx.id}
-										className="flex flex-col gap-2 p-3.5 sm:flex-row sm:items-center sm:justify-between transition-colors hover:bg-white/[0.02]"
-									>
-										<div className="min-w-0 flex-1 pr-2">
-											<div className="flex items-center gap-2">
-												<span className="font-mono text-xs font-medium text-snow">
-													{tx.orderId}
-												</span>
-												{getPlanBadge(tx.plan)}
-											</div>
-											<p className="mt-1 truncate text-xs text-fog">
-												{tx.userName || tx.userEmail || "Anonymous"} ·{" "}
-												{formatShortDate(tx.createdAt)}
-											</p>
-										</div>
-
-										<div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
-											{getStatusBadge(tx.status)}
-											<span className="font-mono text-xs font-medium text-snow">
-												{formatCurrency(tx.amount)}
-											</span>
-										</div>
-									</div>
-								))}
-							</div>
-						)}
-					</div>
-				</section>
-
-				{/* Card 2: Proyek Terbaru */}
-				<section className="flex flex-col justify-between rounded-xl border border-graphite bg-charcoal p-5 sm:p-6 shadow-[var(--shadow-inset)]">
-					<div>
-						<div className="mb-4 flex items-center justify-between">
-							<div>
-								<h2 className="text-base font-[510] text-snow">
-									Proyek Terbaru
-								</h2>
-								<p className="text-xs text-fog">
-									Aktivitas pembuatan proyek paling akhir
-								</p>
-							</div>
-							<Link
-								to="/admin/projects"
-								className="text-xs font-medium text-fog hover:text-snow transition-colors"
-							>
-								Kelola Proyek
-							</Link>
-						</div>
-
-						{!metrics.recentProjects || metrics.recentProjects.length === 0 ? (
-							<div className="py-12 text-center text-xs text-fog">
-								Belum ada proyek yang dibuat.
-							</div>
-						) : (
-							<div className="divide-y divide-graphite rounded-lg border border-graphite bg-obsidian">
-								{metrics.recentProjects.map((p) => (
-									<div
-										key={p.id}
-										className="flex items-center justify-between p-3.5 transition-colors hover:bg-white/[0.02]"
-									>
-										<div className="min-w-0 flex-1 pr-3">
-											<p className="truncate text-sm font-[510] text-snow">
-												{p.name}
-											</p>
-											<p className="mt-0.5 truncate text-xs text-fog">
-												{p.userName || p.userEmail} ·{" "}
-												{formatShortDate(p.createdAt)}
-											</p>
-										</div>
-
-										<div className="flex items-center gap-2.5 shrink-0">
-											{getStepBadge(p.step)}
-											<Link
-												to="/vibeplan/$id/prd"
-												params={{ id: p.id }}
-												className="rounded p-1 text-fog hover:bg-white/5 hover:text-snow transition-colors"
-												title="Buka proyek"
-											>
-												<Icon icon={ArrowUpRight01Icon} size={16} />
-											</Link>
-										</div>
-									</div>
-								))}
-							</div>
-						)}
-					</div>
-				</section>
-			</div>
+			<AdminDashboardActivity metrics={metrics} />
 		</div>
 	);
 }

@@ -25,7 +25,7 @@ afterEach(cleanup);
 
 const featureArtifact = {
 	id: "feature-proj-1",
-	title: "Spesifikasi Fitur · Pencarian Artikel",
+	title: "Spesifikasi Fitur: Pencarian Artikel",
 	fileName: "feature-pencarian-artikel.json",
 	fileSizeBytes: 1024,
 	badge: "FITUR",
@@ -34,7 +34,7 @@ const featureArtifact = {
 
 const prdArtifact = {
 	id: "prd-proj-1",
-	title: "PRD · Pencarian Artikel",
+	title: "PRD: Pencarian Artikel",
 	fileName: "PRD-pencarian-artikel.md",
 	fileSizeBytes: 2048,
 	badge: "MARKDOWN",
@@ -43,7 +43,7 @@ const prdArtifact = {
 
 const acArtifact = {
 	id: "ac-proj-1",
-	title: "Acceptance Criteria · Pencarian Artikel",
+	title: "Acceptance Criteria: Pencarian Artikel",
 	fileName: "AC-pencarian-artikel.md",
 	fileSizeBytes: 1536,
 	badge: "MARKDOWN",
@@ -52,7 +52,7 @@ const acArtifact = {
 
 const tasksArtifact = {
 	id: "tasks-proj-1",
-	title: "Task · Pencarian Artikel",
+	title: "Task: Pencarian Artikel",
 	fileName: "tasks-pencarian-artikel.json",
 	fileSizeBytes: 512,
 	badge: "TASK",
@@ -135,8 +135,8 @@ describe("FIX 06 — @ references only real planning documents", () => {
 				questions={[]}
 				answers={{}}
 				artifacts={[
-					{ ...prdArtifact, id: "prd-proj-2", title: "PRD · Fitur Lain" },
-					{ ...acArtifact, id: "ac-proj-2", title: "AC · Fitur Lain" },
+					{ ...prdArtifact, id: "prd-proj-2", title: "PRD: Fitur Lain" },
+					{ ...acArtifact, id: "ac-proj-2", title: "AC: Fitur Lain" },
 				]}
 			/>,
 		);
@@ -205,7 +205,7 @@ describe("FIX 06 — @ references only real planning documents", () => {
 				id: "prd-proj-1",
 				projectId: "proj-1",
 				targetKind: "prd",
-				label: "@PRD · Pencarian Artikel",
+				label: "@PRD: Pencarian Artikel",
 				fileName: "PRD-pencarian-artikel.md",
 			} satisfies ComposerReferenceBinding,
 		]);
@@ -214,7 +214,7 @@ describe("FIX 06 — @ references only real planning documents", () => {
 		expect(composer.value).toBe("Tambahkan indeks pencarian penuh");
 		expect(
 			screen.getByTestId("composer-reference-chip-prd").textContent,
-		).toContain("@PRD · Pencarian Artikel");
+		).toContain("@PRD: Pencarian Artikel");
 	});
 
 	it("does not duplicate a reference when the same document is picked twice", () => {

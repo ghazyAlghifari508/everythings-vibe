@@ -4,6 +4,7 @@ import {
 	orValidPeriod,
 } from "@/features/billing/services/credit-db";
 import {
+	isCurrentAllocationEpoch,
 	requireBoundSubscriptionId,
 	resolveSettlementParameters,
 } from "@/features/billing/services/credit-guards";
@@ -91,7 +92,10 @@ export async function settleCreditOperation(
 			throw new Error("Final credit charge exceeds operation maximum");
 		const subscriptionId = requireBoundSubscriptionId(operation.subscriptionId);
 		const [subscription] = await tx
-			.select({ id: schema.subscriptions.id })
+			.select({
+				id: schema.subscriptions.id,
+				allocationEpoch: schema.subscriptions.allocationEpoch,
+			})
 			.from(schema.subscriptions)
 			.where(
 				and(
@@ -104,6 +108,15 @@ export async function settleCreditOperation(
 			.limit(1)
 			.for("update");
 		if (!subscription) throw new CreditSubscriptionOriginError("missing");
+		// A period reset already zeroed this hold; charging the new period for
+		// it would spend credits nobody reserved there.
+		if (
+			!isCurrentAllocationEpoch(
+				operation.subscriptionEpoch,
+				subscription.allocationEpoch,
+			)
+		)
+			throw new CreditSubscriptionOriginError("invalid_period");
 		const release = operation.reservedCredits - finalCharge;
 		if (release < 0)
 			throw new Error("Final credit charge exceeds reserved credit");

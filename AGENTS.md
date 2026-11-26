@@ -60,6 +60,18 @@ The following non-negotiable rules apply unconditionally from turn 1 of every se
 - **Honest Indicators:** Indicators must be wired to real signals (SSE events, measurable transitions). Never fabricate progress bars, fake timer step sequences, or simulated typing. If no stream exists, display one honest static label.
 - **Language:** Explain to user in **Bahasa Indonesia**; keep code, identifiers, commits, and technical terms in **English**.
 
+### 7. Product Copy Punctuation
+- **Natural Indonesian product copy:** short sentences, layout, commas, or separate lines instead of decorative separators.
+- **Forbidden in developer-authored UI copy:** em dash (`—`, U+2014), bullet separator (`•`, U+2022), and middle dot (`·`, U+00B7), including Unicode or HTML escapes.
+- **Missing values:** use "Tidak ada data" or "Belum tersedia". A plain hyphen is fine in compact tables.
+- **Preserve semantics:** avoid needless jargon, keep business meaning accurate, and never rewrite user-authored, generated, or scraped content to satisfy this rule.
+
+### 8. Badge & Status Presentation
+- **Use the shared system.** Category/identity labels → `Badge`; operational state → `StatusIndicator`; genuine attention states (banned, critical payment issue, deleted) → `StatusBadge`; counts → `NumericBadge`. All live in `src/components/ui/` and are exported from its `index.ts`.
+- **No repeated tinted boxes.** Never hand-write a status pill with a colored border, soft colored background, uppercase tracker text, or random hex color. Semantic color belongs on the status icon; meaning must survive without color.
+- **Keep domain mappings independent.** Payment, credit operation, ticket lifecycle, project lifecycle, and account status each own their label/tone mapping. Never merge payment pending with failed, or released credit with a paid charge. `Pro` and `Hengker` are identities, not success states.
+- **Do not badge controls or content.** Inline banners, selected-state controls, diff markup, user-generated Studio output, and third-party embedded UI keep their own contracts.
+
 ---
 
 ## 🛠️ Verification & Development Commands

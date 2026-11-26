@@ -85,7 +85,7 @@ export function Faq() {
 						>
 							Pusat Bantuan
 						</Link>
-						{" · "}
+						", "
 						<Link
 							to="/settings/feedback"
 							className="font-[510] text-snow underline underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2 focus-visible:ring-offset-onyx"

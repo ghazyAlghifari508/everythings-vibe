@@ -58,8 +58,8 @@ describe("scrape retry contract", () => {
 			source.indexOf("export async function retryScrape"),
 			source.indexOf("export async function deleteScrape"),
 		);
-		expect(retrySection).toContain(
-			"where(and(eq(scrapes.id, scrapeId), eq(scrapes.userId, userId)))",
+		expect(retrySection).toMatch(
+			/where\(\s*and\(\s*eq\(scrapes\.id, scrapeId\),\s*eq\(scrapes\.userId, userId\),\s*isNull\(scrapes\.deletedAt\)/,
 		);
 		expect(retrySection).toContain('eq(scrapes.status, "failed")');
 	});

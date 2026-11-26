@@ -38,6 +38,15 @@ export interface CanonicalDesignSystem {
 // Anything outside those tables (hand-written or legacy documents) still parses
 // through the keyword fallbacks below, so a custom DESIGN.md is not narrowed to
 // the VibeScrape shape.
+/** Markdown section body: from its heading to the next heading line. */
+function sectionAfter(source: string, heading: RegExp): string | null {
+	const found = heading.exec(source);
+	if (!found) return null;
+	const rest = source.slice(found.index + found[0].length);
+	const nextHeading = rest.search(/\n#{2,3}\s/);
+	return nextHeading === -1 ? rest : rest.slice(0, nextHeading);
+}
+
 export function extractDesignSystemTokens(
 	designMd?: string | null,
 ): CanonicalDesignSystem | null {
@@ -273,6 +282,26 @@ export function extractDesignSystemTokens(
 		}
 	}
 
+	// The current model renderer names the typeface inside a "Fonts & Type
+	// Faces" section and states it per role in the typography scale table, so
+	// neither the "Fonts & Type Scale" heading nor a "Font:" line matches.
+	if (!typography.fontFamily) {
+		const fontsSection = sectionAfter(text, /^#{2,3}[^\n]*Fonts?[^\n]*/im);
+		if (fontsSection) {
+			const stack = fontsSection.match(/- CSS stack:\s*`?([^`,\n]+)/);
+			const bold = fontsSection.match(/\*\*([A-Za-z][A-Za-z0-9 .-]*?)\*\*/);
+			const family = (stack?.[1] ?? bold?.[1] ?? "").trim();
+			if (family) setFontFamily(family);
+		}
+		if (!typography.fontFamily) {
+			const scale = sectionAfter(text, /^#{2,3}[^\n]*Typography Scale[^\n]*/im);
+			const cell = scale?.match(
+				/^\|\s*[^|\n]+\|\s*([A-Za-z][A-Za-z0-9 ._-]*?)\s*\|/m,
+			);
+			if (cell?.[1]) setFontFamily(cell[1]);
+		}
+	}
+
 	// 3. Extract Border Radius
 	// Match | Element | Value | e.g. | nav | 50px |
 	const radiusSection = text.match(
@@ -328,6 +357,35 @@ export function extractDesignSystemTokens(
 		// slot for a radius the document itself never classified.
 		if (!shapes.borderRadius.cards && unclassifiedRadii.length)
 			shapes.borderRadius.cards = `${Math.max(...unclassifiedRadii)}px`;
+	}
+
+	// The current model renderer states radii as machine-readable custom
+	// properties (`--radius-buttons: 8px`) plus per-component "Corner radius"
+	// bullets, and no Border Radius table. Without this the whole design-system
+	// hand-off loses every shape token.
+	if (
+		!shapes.borderRadius.cards ||
+		!shapes.borderRadius.buttons ||
+		!shapes.borderRadius.nav
+	) {
+		for (const m of text.matchAll(
+			/--radius-([a-z-]+)\s*:\s*`?([0-9.]+(?:px|rem|%))`?/gi,
+		)) {
+			const role = (m[1] ?? "").toLowerCase();
+			const value = m[2] ?? "";
+			if (!value) continue;
+			if (!shapes.borderRadius.buttons && /button|cta|action/.test(role))
+				shapes.borderRadius.buttons = value;
+			else if (!shapes.borderRadius.nav && /nav|tab/.test(role))
+				shapes.borderRadius.nav = value;
+			else if (!shapes.borderRadius.cards && /card|section|surface/.test(role))
+				shapes.borderRadius.cards = value;
+			else if (
+				!shapes.borderRadius.small &&
+				/small|chip|badge|input|field/.test(role)
+			)
+				shapes.borderRadius.small = value;
+		}
 	}
 
 	// 4. Extract Do's and Don'ts

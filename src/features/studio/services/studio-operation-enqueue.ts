@@ -7,6 +7,7 @@ import {
 	studioJobs,
 	studioProjects,
 } from "@/db/schema";
+import { admitProductWork } from "@/features/billing/services/product-trials.server";
 import { ScrapeError } from "@/lib/design-errors";
 import { STUDIO_ADD_SCREEN_LIMIT } from "../types/studio-constants";
 import {
@@ -15,6 +16,10 @@ import {
 } from "./studio-composer-intent";
 import { resolveStudioOperationIntent } from "./studio-composer-intent.server";
 import { appendStudioConversation } from "./studio-conversation";
+import {
+	reserveStudioOperationCharge,
+	serverStudioQuote,
+} from "./studio-credit-adapter.server";
 import { StudioFrameError } from "./studio-frame-errors";
 import {
 	ensureStudioInitialOwnership,
@@ -121,6 +126,34 @@ export async function enqueueStudioOperation(
 			.from(studioFrames)
 			.where(eq(studioFrames.projectId, projectId))
 			.orderBy(asc(studioFrames.order));
+		const targetIds =
+			intent === "revise_project"
+				? current.map((frame) => frame.id)
+				: (input.frameIds ?? []);
+		const plannedFrames =
+			intent === "add_screen"
+				? Math.max(1, decision.screens.length)
+				: Math.max(1, targetIds.length);
+		const scope = {
+			operation:
+				intent === "add_screen"
+					? ("studio.add_frame" as const)
+					: ("studio.revise" as const),
+			frames: plannedFrames,
+			promptChars: checked.prompt.length,
+			designMdChars: locked.designMd?.length ?? 0,
+		};
+		const quote = serverStudioQuote(scope);
+		await admitProductWork(tx, userId, "studio", "paid", {
+			key: input.requestId,
+			payload: {
+				projectId,
+				intent,
+				prompt: checked.prompt,
+				frameIds: targetIds,
+			},
+			maximumCredits: quote?.maximumCredits,
+		});
 		const common = {
 			projectId,
 			userId,
@@ -181,6 +214,15 @@ export async function enqueueStudioOperation(
 						eq(studioProjects.userId, userId),
 					),
 				);
+			if (quote)
+				for (const job of jobs)
+					await reserveStudioOperationCharge(tx, {
+						userId,
+						projectId,
+						jobId: job.id,
+						scope: { ...scope, frames: 1 },
+						idempotencyKey: `studio:${job.id}`,
+					});
 			return { intent, jobs, frames: created };
 		}
 		const ids = [
@@ -234,6 +276,15 @@ export async function enqueueStudioOperation(
 				.filter((frame) => ids.includes(frame.id))
 				.map((frame) => ({ frameId: frame.id, name: frame.name })),
 		});
+		if (quote)
+			for (const job of jobs)
+				await reserveStudioOperationCharge(tx, {
+					userId,
+					projectId,
+					jobId: job.id,
+					scope: { ...scope, frames: 1 },
+					idempotencyKey: `studio:${job.id}`,
+				});
 		return { intent, jobs };
 	});
 }

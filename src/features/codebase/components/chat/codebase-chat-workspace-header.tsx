@@ -53,12 +53,12 @@ export function CodebaseChatWorkspaceHeader({
 							onClick={onOpenTaskProgress}
 							data-testid="codebase-kanban-badge"
 							data-action="open-task-progress"
-							aria-label={`Progress task · ${kanbanProgress.done}/${kanbanProgress.total} selesai`}
+							aria-label={`Progress task, ${kanbanProgress.done}/${kanbanProgress.total} selesai`}
 							title="Buka task progress di panel samping"
 							className="group inline-flex shrink-0 items-center gap-1.5 rounded-md border border-graphite bg-obsidian px-2.5 py-1 text-[11px] font-medium text-snow transition-all duration-150 hover:border-graphite/80 hover:bg-graphite/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo/50 active:scale-[0.98]"
 						>
 							<span className="font-mono text-fog group-hover:text-snow">
-								{`Progress task · ${kanbanProgress.done}/${kanbanProgress.total} selesai`}
+								{`Progress task, ${kanbanProgress.done}/${kanbanProgress.total} selesai`}
 							</span>
 							<Icon
 								icon={ArrowRight01Icon}

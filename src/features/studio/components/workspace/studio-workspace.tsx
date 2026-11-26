@@ -3,13 +3,16 @@ import { AlertCircleIcon } from "@hugeicons/core-free-icons";
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
 import { Icon } from "@/components/ui/icon";
+import { CreditExhaustedModal } from "@/features/billing/components/credit-exhausted-modal";
 import { StudioCanvas } from "@/features/studio/components/canvas/studio-canvas";
 import { StudioChatPanel } from "@/features/studio/components/workspace/studio-chat-panel";
 import { StudioHeader } from "@/features/studio/components/workspace/studio-header";
 import { useStudioChatDraft } from "@/features/studio/hooks/use-studio-chat-draft";
 import { useStudioChatPanel } from "@/features/studio/hooks/use-studio-chat-panel";
+import { useStudioCreditQuote } from "@/features/studio/hooks/use-studio-credit-quote";
 import { useStudioFrameDevices } from "@/features/studio/hooks/use-studio-frame-devices";
 import { useStudioWorkspace } from "@/features/studio/hooks/use-studio-workspace";
+import type { StudioQuoteScope } from "@/features/studio/services/studio-credit-policy";
 import type { StudioDetailLoaderData } from "@/features/studio/types/studio";
 import type {
 	StudioElementAction,
@@ -24,6 +27,17 @@ export function StudioWorkspace({
 	initialData: StudioDetailLoaderData;
 }) {
 	const workspace = useStudioWorkspace(initialData);
+	const quoteScope = useMemo<StudioQuoteScope>(
+		() => ({
+			operation: "studio.revise",
+			frames: Math.max(1, workspace.selectedFrames.length),
+			promptChars: 0,
+			designMdChars: workspace.project.designMd?.length ?? 0,
+		}),
+		[workspace.selectedFrames.length, workspace.project.designMd],
+	);
+	const quoteView = useStudioCreditQuote(quoteScope);
+
 	const chat = useStudioChatPanel();
 	const elementEditing = useStudioElementEditing({
 		projectId: workspace.project.id,
@@ -230,8 +244,18 @@ export function StudioWorkspace({
 					elementEditing={elementEditing}
 					onOpenFrame={handleOpenResultFrame}
 					draft={draft}
+					creditLabel={quoteView?.label ?? null}
 				/>
 			</div>
+			<CreditExhaustedModal
+				isOpen={workspace.creditsExhausted !== null}
+				onClose={() => workspace.setCreditsExhausted(null)}
+				errorMessage={workspace.creditsExhausted ?? ""}
+				projectId={workspace.project.id}
+				stage="prd"
+				requiredCredits={quoteView?.requiredCredits ?? undefined}
+				availableCredits={quoteView?.availableCredits}
+			/>
 		</main>
 	);
 }

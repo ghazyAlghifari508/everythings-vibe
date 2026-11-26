@@ -18,6 +18,8 @@ const state = vi.hoisted(() => ({
 		userId: string;
 		projectId: string;
 		projectName: string | null;
+		product: string;
+		fundingSource: string;
 		kind: string;
 		stage: string;
 		state: string;
@@ -126,6 +128,8 @@ describe("loadCreditUsageHistory server-side pagination & filter contracts", () 
 				userId: "user-tenant-xyz",
 				projectId: "proj-1",
 				projectName: "Tenant Project",
+				product: "vibeplan_greenfield",
+				fundingSource: "subscription_balance",
 				kind: "prd_generation",
 				stage: "prd",
 				state: "settled",
@@ -149,7 +153,7 @@ describe("loadCreditUsageHistory server-side pagination & filter contracts", () 
 		expect(result.totalPages).toBe(3);
 		expect(result.items.length).toBe(1);
 		expect(result.items[0].id).toBe("op-101");
-		expect(result.items[0].projectName).toBe("Tenant Project");
+		expect(result.items[0].resourceName).toBe("Tenant Project");
 
 		// Verify count query and data query were made
 		expect(state.queries.length).toBe(2);
@@ -269,6 +273,45 @@ describe("loadCreditUsageHistory server-side pagination & filter contracts", () 
 			expect(sqlQuery.params).toContain("user-tenant-xyz");
 			expect(sqlQuery.params).toContain("ac");
 			expect(sqlQuery.params).toContain("failed");
+		}
+	});
+
+	it("normalizes product and kind filters to known registry values", () => {
+		expect(
+			normalizeCreditUsageInput({
+				product: "studio",
+				kind: "studio.revise",
+			}),
+		).toMatchObject({ product: "studio", kind: "studio.revise" });
+		expect(
+			normalizeCreditUsageInput({
+				product: "foreign_product",
+				kind: "studio.unknown",
+			}),
+		).toMatchObject({ product: undefined, kind: undefined });
+	});
+
+	it("applies product and kind filters before pagination", async () => {
+		state.queries = [];
+		await loadCreditUsageHistory({
+			data: {
+				page: 2,
+				pageSize: 10,
+				stage: "studio",
+				product: "studio",
+				kind: "studio.revise",
+				status: "settled",
+			},
+		});
+
+		const dataQuery = state.queries.find((q) => q.limit !== undefined);
+		expect(dataQuery?.offset).toBe(10);
+		if (dataQuery?.filter instanceof SQL) {
+			const params = new PgDialect().sqlToQuery(dataQuery.filter).params;
+			expect(params).toContain("user-tenant-xyz");
+			expect(params).toContain("studio");
+			expect(params).toContain("studio.revise");
+			expect(params).toContain("settled");
 		}
 	});
 });

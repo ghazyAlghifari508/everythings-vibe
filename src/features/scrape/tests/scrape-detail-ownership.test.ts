@@ -58,6 +58,7 @@ function row(overrides: Partial<ScrapeRow> = {}): ScrapeRow {
 		jobToken: null,
 		leaseExpiresAt: null,
 		jobAttempts: 0,
+		deletedAt: null,
 		createdAt,
 		updatedAt: createdAt,
 		...overrides,

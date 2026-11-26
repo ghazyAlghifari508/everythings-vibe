@@ -1,4 +1,5 @@
 import { Tick01Icon } from "@hugeicons/core-free-icons";
+import { Badge } from "@/components/ui/badge";
 import { Icon } from "@/components/ui/icon";
 import { StudioThemeDashboardPreview } from "@/features/studio/components/design-system/studio-theme-dashboard-preview";
 import { STUDIO_DESIGN_PRESETS } from "@/features/studio/services/studio-presets";
@@ -69,7 +70,7 @@ export function StudioDesignThemePanel({
 								) : null}
 							</span>
 							<span className="text-xs text-fog">
-								{preset.description} · {preset.font}
+								{preset.description}, {preset.font}
 							</span>
 						</button>
 					);
@@ -127,9 +128,7 @@ export function StudioDesignTemplatePanel() {
 							<span className="text-sm font-semibold text-snow">
 								{template.name}
 							</span>
-							<span className="rounded-full border border-graphite px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-fog">
-								Segera hadir
-							</span>
+							<Badge>Segera hadir</Badge>
 						</span>
 						<span className="text-xs text-fog">{template.description}</span>
 						<button

@@ -38,6 +38,7 @@ const projectSchema = z.object({
 	prdContent: nullableText,
 	prdFilename: nullableText,
 	prdContentHash: nullableText,
+	deletedAt: date.nullable().default(null),
 	...timestamps,
 }) satisfies z.ZodType<StudioProjectRow>;
 
@@ -79,6 +80,8 @@ const jobSchema = z.object({
 	error: nullableText,
 	claimedBy: nullableText,
 	attempts: z.int().nonnegative(),
+	creditOperationId: nullableText.default(null),
+	deletedAt: date.nullable().default(null),
 	claimedAt: date.nullable(),
 	leaseExpiresAt: date.nullable(),
 	startedAt: date.nullable(),
@@ -121,11 +124,24 @@ export const studioStatusSchema = z
 			new Set(frames.map((frame) => frame.id)).size === frames.length,
 	);
 
+/** UI-facing rows: billing/tombstone internals are optional for display. */
+export type StudioVisibleProject = Omit<StudioProjectRow, "deletedAt"> & {
+	deletedAt?: Date | null;
+};
+export type StudioVisibleJob = Omit<
+	StudioJobRow,
+	"deletedAt" | "creditOperationId"
+> & {
+	deletedAt?: Date | null;
+	creditOperationId?: string | null;
+};
+
 export interface StudioStatus {
-	project: StudioProjectRow;
+	project: StudioVisibleProject;
 	frames: StudioFrameRow[];
+	/** UI-facing rows keep billing/tombstone columns optional. */
 	jobs?: StudioJobRow[];
-	activeJob: StudioJobRow | null;
+	activeJob: StudioVisibleJob | null;
 	messages?: StudioMessageRow[];
 }
 
@@ -134,7 +150,7 @@ export function isStudioProcessing(status: StudioStatus) {
 }
 
 export function resolveStudioQueueHealth(
-	activeJob: StudioJobRow | null,
+	activeJob: StudioVisibleJob | null,
 	now = Date.now(),
 ): string | null {
 	if (

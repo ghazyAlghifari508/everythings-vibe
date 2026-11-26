@@ -417,7 +417,7 @@ describe("HistoryDrawer query failure", () => {
 		await screen.findByRole("button", { name: /Coba lagi/i });
 
 		expect(screen.queryByText(/0 ditampilkan/i)).toBeNull();
-		expect(screen.getByText("—")).toBeDefined();
+		expect(screen.getByText("-")).toBeDefined();
 	});
 });
 
@@ -510,7 +510,7 @@ describe("HistoryDrawer status line", () => {
 			},
 		});
 
-		expect(screen.getByText("Tahap PRD · Ringkasan tersimpan")).toBeDefined();
+		expect(screen.getByText("Tahap PRD, Ringkasan tersimpan")).toBeDefined();
 		expect(screen.queryByText("Menunggu PRD")).toBeNull();
 	});
 
@@ -519,7 +519,7 @@ describe("HistoryDrawer status line", () => {
 			override: { items: [{ ...mockItems[0], step: "prd", preview: null }] },
 		});
 
-		expect(screen.getByText("Tahap PRD · Belum ada ringkasan")).toBeDefined();
+		expect(screen.getByText("Tahap PRD, Belum ada ringkasan")).toBeDefined();
 	});
 
 	it("only claims completion when the real status says completed", () => {
@@ -536,8 +536,8 @@ describe("HistoryDrawer status line", () => {
 			},
 		});
 
-		expect(screen.getByText("Tahap AC · AC selesai")).toBeDefined();
-		expect(screen.getByText("Tahap AC · AC belum selesai")).toBeDefined();
+		expect(screen.getByText("Tahap AC, AC selesai")).toBeDefined();
+		expect(screen.getByText("Tahap AC, AC belum selesai")).toBeDefined();
 	});
 });
 

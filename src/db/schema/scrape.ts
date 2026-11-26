@@ -8,6 +8,7 @@ import {
 	pgTable,
 	text,
 	timestamp,
+	unique,
 	uniqueIndex,
 } from "drizzle-orm/pg-core";
 import type {
@@ -199,6 +200,7 @@ export const scrapes = pgTable(
 		jobToken: text("job_token"),
 		leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
 		jobAttempts: integer("job_attempts").notNull().default(0),
+		deletedAt: timestamp("deleted_at", { withTimezone: true }),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.defaultNow()
 			.notNull(),
@@ -209,6 +211,8 @@ export const scrapes = pgTable(
 	(t) => [
 		index("scrapes_user_id_idx").on(t.userId),
 		index("scrapes_job_queue_idx").on(t.status, t.leaseExpiresAt, t.createdAt),
+		// FK target for credit_operations (resource ownership); id stays first.
+		unique("scrapes_user_id_id_unique").on(t.id, t.userId),
 	],
 );
 

@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import {
 	type InsertScrapeDocumentRow,
@@ -36,7 +36,11 @@ export async function saveScrapeDocument(
 			.where(
 				claim
 					? scrapeClaimPredicate(claim)
-					: and(eq(scrapes.id, scrapeId), eq(scrapes.userId, userId)),
+					: and(
+							eq(scrapes.id, scrapeId),
+							eq(scrapes.userId, userId),
+							isNull(scrapes.deletedAt),
+						),
 			)
 			.for("update")
 			.limit(1);
@@ -69,6 +73,10 @@ export async function generateAndSaveDesignMd(
 			"HTML scrape belum tersedia.",
 		);
 	if (scrape.document) return scrape.document;
+	const { requirePaidProductWork } = await import(
+		"@/features/billing/services/product-trials.server"
+	);
+	await requirePaidProductWork(userId, "scrape");
 	const request = scrapeRequestSchema.parse(
 		scrape.request ?? { url: scrape.sourceUrl, mode: "design" },
 	);

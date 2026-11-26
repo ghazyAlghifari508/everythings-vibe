@@ -3,6 +3,7 @@ import type {
 	StudioMessageRow,
 	StudioProjectRow,
 } from "@/db/schema";
+import type { StudioVisibleProject } from "../types/studio-status";
 import {
 	getStudioScreenSuggestions,
 	type StudioScreenSuggestion,
@@ -14,7 +15,7 @@ import {
  * rebuilds the same associations without a model call or a new credit charge.
  */
 export interface StudioConversationSuggestionsInput {
-	project: StudioProjectRow;
+	project: StudioVisibleProject;
 	frames: readonly StudioFrameRow[];
 	messages: readonly StudioMessageRow[];
 	/** A running job owns the next result; the previous list is not shown. */

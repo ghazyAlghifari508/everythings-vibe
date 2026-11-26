@@ -363,6 +363,8 @@ describe("frame results scoped to one operation", () => {
 		leaseExpiresAt: null,
 		startedAt: null,
 		finishedAt: null,
+		deletedAt: null,
+		creditOperationId: null,
 		createdAt: now,
 		updatedAt: now,
 		...over,

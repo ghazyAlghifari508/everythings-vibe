@@ -1,12 +1,12 @@
 export {
+	getAdminCreditUsageSummary,
+	getAdminOperationalCostStats,
+	listAdminCreditUsage,
+} from "./admin-credit-service";
+export {
 	getAdminDashboardMetrics,
 	getAdminTrendMetrics,
 } from "./admin-dashboard-service";
-export {
-	getAdminFeedbackStats,
-	listErrorReports,
-	listFeedback,
-} from "./admin-feedback-service";
 export {
 	setErrorReportArchived,
 	setFeedbackArchived,
@@ -14,9 +14,16 @@ export {
 	updateFeedbackStatus,
 } from "./admin-feedback-mutations";
 export {
+	getAdminFeedbackStats,
+	listErrorReports,
+	listFeedback,
+} from "./admin-feedback-service";
+export {
 	getAdminProjectStats,
 	listAdminProjects,
 } from "./admin-projects-service";
+export type { ShadowUsageBenchmarkResponse } from "./admin-shadow-usage-service";
+export { getShadowUsageBenchmark } from "./admin-shadow-usage-service";
 export {
 	FAILED_PAYMENT_STATUSES,
 	getAdminTransactionStats,

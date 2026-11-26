@@ -6,11 +6,13 @@ import {
 	studioJobs,
 	studioProjects,
 } from "@/db/schema";
+import { settleProductTrial } from "@/features/billing/services/product-trial-settlement.server";
 import {
 	STUDIO_JOB_CLAIM_TTL_MS,
 	STUDIO_JOB_MAX_ATTEMPTS,
 } from "../types/studio-constants";
 import { synchronizeStudioConversation } from "./studio-conversation";
+import { settleStudioOperationCharge } from "./studio-credit-adapter.server";
 import {
 	ensureStudioInitialOwnership,
 	failStudioDependency,
@@ -106,8 +108,8 @@ function studioClaimPredicate(claim: StudioJobClaim) {
 		eq(studioJobs.projectId, claim.projectId),
 		eq(studioJobs.userId, claim.userId),
 		eq(studioJobs.claimedBy, claim.workerId),
+		isNull(studioJobs.deletedAt),
 		inArray(studioJobs.status, activeStatuses),
-		sql`${studioJobs.leaseExpiresAt} > clock_timestamp()`,
 	);
 }
 
@@ -150,7 +152,13 @@ export async function claimStudioJob(
 		const [candidate] = await tx
 			.select()
 			.from(studioJobs)
-			.where(and(eq(studioJobs.id, jobId), eq(studioJobs.userId, userId)))
+			.where(
+				and(
+					eq(studioJobs.id, jobId),
+					eq(studioJobs.userId, userId),
+					isNull(studioJobs.deletedAt),
+				),
+			)
 			.limit(1);
 		if (!candidate) return null;
 		const [project] = await tx
@@ -171,6 +179,7 @@ export async function claimStudioJob(
 				and(
 					eq(studioJobs.id, jobId),
 					eq(studioJobs.userId, userId),
+					isNull(studioJobs.deletedAt),
 					inArray(studioJobs.status, activeStatuses),
 					lt(studioJobs.attempts, STUDIO_JOB_MAX_ATTEMPTS),
 					or(
@@ -198,7 +207,13 @@ export async function claimStudioJob(
 				finishedAt: null,
 				updatedAt: sql`clock_timestamp()`,
 			})
-			.where(and(eq(studioJobs.id, jobId), eq(studioJobs.userId, userId)))
+			.where(
+				and(
+					eq(studioJobs.id, jobId),
+					eq(studioJobs.userId, userId),
+					isNull(studioJobs.deletedAt),
+				),
+			)
 			.returning();
 		return claimed ?? null;
 	});
@@ -284,6 +299,7 @@ export async function recoverStalledStudioJobs(
 	userId?: string,
 ): Promise<number> {
 	const eligible = and(
+		isNull(studioJobs.deletedAt),
 		inArray(studioJobs.status, activeStatuses),
 		or(
 			isNull(studioJobs.leaseExpiresAt),
@@ -360,6 +376,17 @@ export async function recoverStalledStudioJobs(
 									),
 						),
 					);
+			if (exhausted) {
+				await settleProductTrial(tx, "studio", job.userId, job.id, 0);
+				await settleStudioOperationCharge(tx, {
+					userId: job.userId,
+					jobId: job.id,
+					operationId: job.creditOperationId,
+					outcome: "failed",
+					completedFrames: 0,
+					artifactReference: job.id,
+				});
+			}
 			await synchronizeStudioConversation(tx, job.projectId, job.userId);
 			recovered++;
 		});

@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { prdFyPlans } from "@/features/billing/data/pricing-data";
 import {
@@ -46,28 +45,43 @@ describe("FEATURES", () => {
 	});
 });
 
-describe("pricing copy and contract", () => {
-	it("all plan tiers include 30-day reset feature", () => {
+describe("pricing entitlements and contract", () => {
+	const includedKeys = (plan: (typeof prdFyPlans)[number]) =>
+		new Set(
+			plan.features.filter((feature) => feature.isIncluded).map((f) => f.key),
+		);
+
+	it("all tiers publish the 30-day reset entitlement", () => {
 		for (const plan of prdFyPlans) {
 			const resetFeature = plan.features.find((f) => f.key === "monthly-reset");
 			expect(resetFeature?.isIncluded).toBe(true);
-			expect(resetFeature?.name).toBe("Kredit reset setiap 30 hari");
+			expect(resetFeature?.name).toBe("Kredit direset tiap 30 hari");
 		}
 	});
 
-	it("pricing card copy contains accurate adaptive billing explanation and no false promises", async () => {
-		const pricingCardSource = await readFile(
-			new URL("../components/pricing-card.tsx", import.meta.url),
-			"utf8",
-		);
+	it("free publishes VibePlan trials without paid product access", () => {
+		const included = includedKeys(prdFyPlans[0]);
+		expect(included.has("vibeplan")).toBe(true);
+		expect(included.has("studio-trial")).toBe(true);
+		expect(included.has("scrape-trial")).toBe(true);
+		expect(included.has("studio")).toBe(false);
+		expect(included.has("scrape")).toBe(false);
+	});
 
-		expect(pricingCardSource).not.toContain("1 kredit = 1 tahap");
-		expect(pricingCardSource).not.toContain("tidak pernah hangus");
-		expect(pricingCardSource).toContain(
-			"Setiap operasi menggunakan kredit sesuai jenis dan kebutuhan proses.",
-		);
-		expect(pricingCardSource).toContain(
-			"Estimasi ditampilkan sebelum penggunaan.",
-		);
+	it("paid tiers publish full multi-product access", () => {
+		for (const plan of prdFyPlans.slice(1)) {
+			const included = includedKeys(plan);
+			expect(included.has("vibeplan")).toBe(true);
+			expect(included.has("studio")).toBe(true);
+			expect(included.has("scrape")).toBe(true);
+			expect(included.has("template")).toBe(true);
+		}
+	});
+
+	it("published allocations match the plan credit contract", () => {
+		for (const plan of prdFyPlans) {
+			expect(plan.credits).toBe(PLAN_CREDITS[plan.id]);
+			expect(plan.price).toBe(PLAN_PRICES[plan.id]);
+		}
 	});
 });

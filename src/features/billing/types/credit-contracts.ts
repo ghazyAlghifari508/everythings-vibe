@@ -96,20 +96,43 @@ export interface CreditQuoteInput {
 	metrics: CreditQuote["metrics"];
 }
 
-export interface ReserveCreditOperationInput {
+/**
+ * The resource a credit operation bills. Plan operations keep the
+ * historical `projectId`; Studio and Scrape name their own resource.
+ * Ownership of every variant is validated server-side during reservation.
+ */
+export type CreditResourceInput =
+	| { resourceType?: "plan_project"; projectId: string }
+	| {
+			resourceType: "studio_project";
+			studioProjectId: string;
+			studioJobId: string;
+	  }
+	| { resourceType: "scrape"; scrapeId: string };
+
+export type ReserveCreditOperationBase = {
 	userId: string;
-	projectId: string;
 	stage: CreditOperationStage;
 	operation: CreditOperationKind;
 	metrics: CreditQuote["metrics"];
 	idempotencyKey: string;
 	quote: CreditQuote;
+	/** Server-derived quote from the versioned tariff registry, when applicable. */
+	authoritativeQuote?: CreditQuote;
 	expiresAt?: Date;
 	initialAnalysisAllowance?: boolean;
 	analysisReference?: string;
 	isExempt?: boolean;
 	exemptionReason?: string | null;
-}
+};
+
+export type PlanReserveCreditOperationInput = ReserveCreditOperationBase & {
+	resourceType?: "plan_project";
+	projectId: string;
+};
+
+export type ReserveCreditOperationInput = ReserveCreditOperationBase &
+	CreditResourceInput;
 
 export interface SettleCreditOperationInput {
 	userId: string;

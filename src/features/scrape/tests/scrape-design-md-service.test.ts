@@ -28,6 +28,7 @@ vi.mock("drizzle-orm", () => ({
 		return { op: "eq", col, value };
 	},
 	ilike: (col: unknown, value: unknown) => ({ op: "ilike", col, value }),
+	isNull: (col: unknown) => ({ op: "isNull", col }),
 	or: (...args: unknown[]) => ({ op: "or", args }),
 	inArray: (col: unknown, values: unknown) => ({
 		op: "inArray",

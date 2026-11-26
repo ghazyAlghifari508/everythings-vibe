@@ -11,6 +11,11 @@ export async function adminDb() {
 		feedback,
 		errorReports,
 		payments,
+		creditOperations,
+		creditLedgerEntries,
+		studioProjects,
+		scrapes,
+		shadowUsageRecords,
 	} = await import("@/db/schema");
 	return {
 		db,
@@ -24,5 +29,10 @@ export async function adminDb() {
 		feedback,
 		errorReports,
 		payments,
+		creditOperations,
+		creditLedgerEntries,
+		studioProjects,
+		scrapes,
+		shadowUsageRecords,
 	};
 }

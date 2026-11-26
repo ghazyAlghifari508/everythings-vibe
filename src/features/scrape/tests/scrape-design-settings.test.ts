@@ -66,6 +66,11 @@ vi.mock("@/features/scrape/utils/url-validator", () => ({
 vi.mock("@/lib/rate-limit", () => ({
 	checkRateLimit: async () => ({ allowed: true }),
 }));
+vi.mock("@/features/billing/services/product-trials.server", () => ({
+	admitProductWork: async () => ({ kind: "legacy" }),
+	SCRAPE_TRIAL_PAGES: 3,
+	SCRAPE_TRIAL_VIEWS: 2,
+}));
 vi.mock("@/lib/services/ai-orchestrator", () => ({
 	selectModels: () => [],
 	tryStreamWithFallback: async () => {
@@ -97,6 +102,7 @@ function saved(): ScrapeRow {
 		html: null,
 		previewHtml: null,
 		jobAttempts: 1,
+		deletedAt: null,
 		jobToken: null,
 		leaseExpiresAt: null,
 		createdAt: new Date(),
@@ -150,7 +156,7 @@ it("retries the persisted design request and passes its settings into capture af
 	await retryScrape("sample", "owner");
 	expect(storage.patches[0]?.status).toBe("queued");
 	expect(storage.patches[0]).not.toHaveProperty("request");
-	storage.rows.push([saved()], [{ id: "sample" }]);
+	storage.rows.push([], [], [saved()], [{ id: "sample" }]);
 	vi.mocked(scrapeHtml).mockResolvedValue({
 		sourceUrl: FIXTURE.sourceUrl,
 		domain: "acme.example",

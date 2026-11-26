@@ -27,7 +27,7 @@ export async function tryStreamWithFallback(
 }> {
 	if (!Array.isArray(models) || models.length === 0) {
 		throw new Error(
-			"Konfigurasi model AI kosong — tidak ada model untuk dicoba.",
+			"Konfigurasi model AI kosong. Tidak ada model untuk dicoba.",
 		);
 	}
 	let lastError = "";

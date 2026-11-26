@@ -159,7 +159,8 @@ export function CreditExhaustedModal({
 									Mau kuota lebih banyak & fitur lengkap?
 								</span>
 								<p className="text-[11px] text-fog mt-0.5">
-									Mulai Rp 49.000/bulan untuk 30 kredit, full AC, Task & Kanban.
+									Mulai Rp 49.000/30 hari untuk 30 kredit. VibePlan penuh,
+									Studio, Scrape, dan VibeTemplate.
 								</p>
 							</div>
 							<span className="flex items-center gap-1 font-mono text-xs text-snow font-medium shrink-0 ml-2">
@@ -174,7 +175,7 @@ export function CreditExhaustedModal({
 							onClick={() =>
 								selectedPackage && handlePlanSelect(selectedPackage.id)
 							}
-							aria-label={`Beli ${selectedPackage?.credits ?? 0} Kredit — Rp ${selectedPackage ? selectedPackage.priceIdr.toLocaleString("id-ID") : 0}`}
+							aria-label={`Beli ${selectedPackage?.credits ?? 0} Kredit, Rp ${selectedPackage ? selectedPackage.priceIdr.toLocaleString("id-ID") : 0}`}
 							className="btn-primary flex h-10 w-full items-center justify-center gap-2 rounded-lg font-inter text-sm font-[510] transition-all hover:brightness-105 active:scale-[0.99] disabled:opacity-50 cursor-pointer"
 						>
 							{loading ? (
@@ -189,7 +190,7 @@ export function CreditExhaustedModal({
 								</>
 							) : (
 								<span>
-									Beli {selectedPackage?.credits} Kredit — Rp{" "}
+									Beli {selectedPackage?.credits} Kredit, Rp{" "}
 									{selectedPackage?.priceIdr.toLocaleString("id-ID")}
 								</span>
 							)}

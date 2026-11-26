@@ -52,11 +52,11 @@ export function CrawlSitemapSelection({
 						{relations.foundFrom
 							? `Ditemukan dari ${relations.foundFrom.label}`
 							: "Halaman awal crawl"}
-						{" · "}
+						", "
 						<span className="tabular-nums">
 							{relations.outgoingCount} tautan keluar
 						</span>
-						{" · "}
+						", "
 						<span className="tabular-nums">
 							{relations.incomingCount} tautan masuk
 						</span>

@@ -6,11 +6,11 @@ import { isSafeFontFamily } from "./design-system-inspector-css-values";
 
 export function TypefaceCard({ typeface }: { typeface: InspectorTypeface }) {
 	const rows: [string, string][] = [
-		["Peran", typeface.roles.join(", ") || "—"],
-		["Weight terukur", typeface.weights.join(", ") || "—"],
-		["Variasi ukuran", typeface.sizes.join(", ") || "—"],
-		["Line height", [...new Set(typeface.lineHeights)].join(", ") || "—"],
-		["Letter spacing", [...new Set(typeface.letterSpacings)].join(", ") || "—"],
+		["Peran", typeface.roles.join(", ") || "-"],
+		["Weight terukur", typeface.weights.join(", ") || "-"],
+		["Variasi ukuran", typeface.sizes.join(", ") || "-"],
+		["Line height", [...new Set(typeface.lineHeights)].join(", ") || "-"],
+		["Letter spacing", [...new Set(typeface.letterSpacings)].join(", ") || "-"],
 	];
 	// Neutral copy for the family's first role, so the card never shows page copy.
 	const specimen = specimenTextForRole(typeface.roles[0] ?? "Body");

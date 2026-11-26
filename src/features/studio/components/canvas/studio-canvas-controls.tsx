@@ -6,10 +6,12 @@ import {
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/ui/icon";
 import { ZoomControls } from "@/components/ui/zoom-controls";
-import type { StudioJobRow } from "@/db/schema";
 import { StudioFrameRetryButton } from "@/features/studio/components/canvas/studio-frame-error";
 import { STUDIO_CANVAS_OVERLAY_EDGE_PX } from "@/features/studio/types/studio-constants";
-import { resolveStudioQueueHealth } from "@/features/studio/types/studio-status";
+import {
+	resolveStudioQueueHealth,
+	type StudioVisibleJob,
+} from "@/features/studio/types/studio-status";
 import { canvasZoomRowBottomCss } from "@/features/studio/utils/studio-canvas-layout";
 
 export type StudioCanvasTool = "select" | "hand" | "element";
@@ -142,7 +144,7 @@ export function StudioCanvasStatusOverlays({
 	leftInsetPx,
 	onRefreshStatus,
 }: {
-	activeJob: StudioJobRow | null;
+	activeJob: StudioVisibleJob | null;
 	inconsistent: boolean;
 	leftInsetPx: number;
 	onRefreshStatus?: () => void;

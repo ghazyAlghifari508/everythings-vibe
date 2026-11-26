@@ -17,21 +17,10 @@ const config = defineConfig(({ command, mode, isPreview }) => ({
 			"@tanstack/react-router > @tanstack/react-store > use-sync-external-store/shim/with-selector",
 		],
 	},
-	// Pre-transform the SSR module graph while the server boots: measured first
-	// request after restart spends ~7-13s in a serialized 471-module transform
-	// waterfall; the route tree is the top of that graph on every page.
-	server: {
-		warmup: {
-			ssrFiles: [
-				"src/routeTree.gen.ts",
-				"src/routes/__root.tsx",
-				"src/router.tsx",
-				"src/routes/**/*.tsx",
-				"src/routes/**/*.ts",
-				"src/app/providers.tsx",
-			],
-		},
-	},
+	// SSR warmup was removed after measurement: the broad ssrFiles globs warmed
+	// the entire route graph (including route test files) on every restart. Vite
+	// docs recommend warming only frequently used files; here that cost 127s of
+	// transform work versus 7s without warmup and delayed the first HTML response.
 	plugins: [
 		devtools(
 			resolveStudioDevtoolsConfig(

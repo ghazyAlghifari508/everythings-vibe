@@ -8,12 +8,19 @@ import {
 } from "@hugeicons/core-free-icons";
 import { useState } from "react";
 import { Icon } from "@/components/ui/icon";
+import { StatusIndicator } from "@/components/ui/status-indicator";
 import type { CreditOperationStage } from "@/db/schema";
 import {
+	type KindFilter,
+	type ProductFilter,
 	type StageFilter,
 	type StatusFilter,
 	useCreditUsage,
 } from "@/features/billing/hooks/use-credit-usage";
+import {
+	CREDIT_OPERATION_REGISTRY,
+	type CreditOperationKind,
+} from "@/features/billing/services/credit-operation-registry";
 import type {
 	CreditOperationItem,
 	CreditUsagePagination,
@@ -21,15 +28,32 @@ import type {
 } from "@/features/billing/types/credit-usage";
 import {
 	getActivityLabel,
+	getProductLabel,
+	getResourceLabel,
 	getStatusBadge,
 	getStatusLabel,
 } from "@/features/billing/utils/credit-usage-status";
-import { cn, formatDate } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 import { CreditUsageDetail } from "./credit-usage-detail";
 
-export type { CreditOperationItem, StageFilter, StatusFilter };
-export { getActivityLabel, getStatusBadge, getStatusLabel };
+export type {
+	CreditOperationItem,
+	KindFilter,
+	ProductFilter,
+	StageFilter,
+	StatusFilter,
+};
+export { getActivityLabel, getProductLabel, getStatusBadge, getStatusLabel };
 
+const PRODUCT_OPTIONS = [
+	{ value: "vibeplan_greenfield", label: "Greenfield" },
+	{ value: "vibeplan_codebase", label: "Existing Codebase" },
+	{ value: "studio", label: "Studio" },
+	{ value: "scrape", label: "Scrape" },
+	{ value: "legacy_unknown", label: "Legacy" },
+] as const;
+
+const KIND_OPTIONS = Object.keys(CREDIT_OPERATION_REGISTRY);
 export interface CreditUsageProps {
 	availableCredits?: number;
 	reservedCredits?: number;
@@ -42,6 +66,8 @@ export interface CreditUsageProps {
 		pageSize: number;
 		stage: StageFilter;
 		status: StatusFilter;
+		product: ProductFilter;
+		kind: KindFilter;
 	}) => Promise<PaginatedCreditUsageResult>;
 }
 
@@ -49,6 +75,8 @@ export function CreditUsageSection(props: CreditUsageProps) {
 	const {
 		stageFilter,
 		statusFilter,
+		productFilter,
+		kindFilter,
 		pageSize,
 		currentPage,
 		totalPages,
@@ -59,6 +87,8 @@ export function CreditUsageSection(props: CreditUsageProps) {
 		hasActiveFilter,
 		handleStageChange,
 		handleStatusChange,
+		handleProductChange,
+		handleKindChange,
 		handleResetFilter,
 		handleRetry,
 		handlePageChange,
@@ -105,6 +135,8 @@ export function CreditUsageSection(props: CreditUsageProps) {
 								<option value="prd">PRD</option>
 								<option value="ac">AC</option>
 								<option value="task">Task</option>
+								<option value="studio">Studio</option>
+								<option value="scrape">Scrape</option>
 							</select>
 						</div>
 
@@ -132,6 +164,54 @@ export function CreditUsageSection(props: CreditUsageProps) {
 								<option value="running">Diproses</option>
 								<option value="quarantined">Dikarantina</option>
 								<option value="refunded">Dikembalikan</option>
+							</select>
+						</div>
+
+						<div className="flex items-center gap-2">
+							<label
+								htmlFor="filter-product-select"
+								className="text-xs font-medium text-(--text-secondary)"
+							>
+								Fitur:
+							</label>
+							<select
+								id="filter-product-select"
+								data-testid="filter-product"
+								value={productFilter}
+								onChange={(e) =>
+									handleProductChange(e.target.value as ProductFilter)
+								}
+								className="rounded-lg border border-(--border-subtle) bg-(--bg-surface) px-3 py-1.5 text-xs font-medium text-snow focus:border-indigo focus:outline-none"
+							>
+								<option value="all">Semua Fitur</option>
+								{PRODUCT_OPTIONS.map((option) => (
+									<option key={option.value} value={option.value}>
+										{option.label}
+									</option>
+								))}
+							</select>
+						</div>
+
+						<div className="flex items-center gap-2">
+							<label
+								htmlFor="filter-kind-select"
+								className="text-xs font-medium text-(--text-secondary)"
+							>
+								Aktivitas:
+							</label>
+							<select
+								id="filter-kind-select"
+								data-testid="filter-kind"
+								value={kindFilter}
+								onChange={(e) => handleKindChange(e.target.value as KindFilter)}
+								className="rounded-lg border border-(--border-subtle) bg-(--bg-surface) px-3 py-1.5 text-xs font-medium text-snow focus:border-indigo focus:outline-none"
+							>
+								<option value="all">Semua Aktivitas</option>
+								{KIND_OPTIONS.map((kind) => (
+									<option key={kind} value={kind}>
+										{getActivityLabel(kind as CreditOperationKind)}
+									</option>
+								))}
 							</select>
 						</div>
 
@@ -201,7 +281,8 @@ export function CreditUsageSection(props: CreditUsageProps) {
 								<tr>
 									<th className="px-5 py-3 font-medium">Waktu</th>
 									<th className="px-5 py-3 font-medium">Aktivitas</th>
-									<th className="px-5 py-3 font-medium">Project</th>
+									<th className="px-5 py-3 font-medium">Fitur</th>
+									<th className="px-5 py-3 font-medium">Proyek/Hasil</th>
 									<th className="px-5 py-3 font-medium">Estimasi</th>
 									<th className="px-5 py-3 font-medium">Terpakai</th>
 									<th className="px-5 py-3 font-medium">Status</th>
@@ -218,13 +299,19 @@ export function CreditUsageSection(props: CreditUsageProps) {
 											className="hover:bg-(--bg-surface)/50 transition-colors"
 										>
 											<td className="whitespace-nowrap px-5 py-3.5 text-xs text-(--text-secondary)">
-												{op.createdAt ? formatDate(op.createdAt) : "—"}
+												{op.createdAt ? formatDate(op.createdAt) : "-"}
 											</td>
 											<td className="whitespace-nowrap px-5 py-3.5 font-medium text-snow">
 												{getActivityLabel(op.kind)}
 											</td>
-											<td className="whitespace-nowrap px-5 py-3.5 text-xs text-fog max-w-[180px] truncate">
-												{op.projectName || "Proyek Tanpa Nama"}
+											<td className="whitespace-nowrap px-5 py-3.5 text-xs text-fog">
+												{getProductLabel(op.product)}
+											</td>
+											<td
+												className="max-w-[180px] truncate whitespace-nowrap px-5 py-3.5 text-xs text-fog"
+												title={getResourceLabel(op)}
+											>
+												{getResourceLabel(op)}
 											</td>
 											<td className="whitespace-nowrap px-5 py-3.5 text-xs font-mono text-(--text-secondary)">
 												{op.estimatedCredits} kr
@@ -232,18 +319,16 @@ export function CreditUsageSection(props: CreditUsageProps) {
 											<td className="whitespace-nowrap px-5 py-3.5 text-xs font-mono font-medium text-snow">
 												{op.finalCharge !== null && op.finalCharge !== undefined
 													? `${op.finalCharge} kr`
-													: "—"}
+													: "-"}
 											</td>
 											<td className="whitespace-nowrap px-5 py-3.5">
-												<span
-													className={cn(
-														"inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium",
-														badge.className,
-													)}
+												<StatusIndicator
+													tone={badge.tone}
+													icon={badge.icon}
+													emphasize={badge.tone === "danger"}
 												>
-													{badge.icon}
 													{badge.label}
-												</span>
+												</StatusIndicator>
 											</td>
 											<td className="whitespace-nowrap px-5 py-3.5 text-right">
 												<button
@@ -268,7 +353,6 @@ export function CreditUsageSection(props: CreditUsageProps) {
 					<div className="p-4 border-t border-(--border-subtle) flex flex-wrap items-center justify-between gap-3 bg-(--bg-surface)/30">
 						<div className="flex items-center gap-2 text-xs text-(--text-secondary)">
 							<span>{pageSize} baris per halaman</span>
-							<span className="hidden sm:inline text-fog/40">•</span>
 							<span className="tabular-nums">
 								Halaman {currentPage} dari {totalPages}
 							</span>

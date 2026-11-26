@@ -11,6 +11,10 @@ export function generateSplinePath(points: { x: number; y: number }[]): string {
 		return `M ${fmt(validPoints[0].x)} ${fmt(validPoints[0].y)}`;
 
 	let d = `M ${fmt(validPoints[0].x)} ${fmt(validPoints[0].y)}`;
+	const yValues = validPoints.map((p) => p.y);
+	const minY = Math.min(...yValues);
+	const maxY = Math.max(...yValues);
+	const clampY = (value: number) => Math.min(maxY, Math.max(minY, value));
 
 	for (let i = 0; i < validPoints.length - 1; i++) {
 		const p0 = validPoints[i === 0 ? 0 : i - 1];
@@ -20,9 +24,9 @@ export function generateSplinePath(points: { x: number; y: number }[]): string {
 			validPoints[i + 2 >= validPoints.length ? validPoints.length - 1 : i + 2];
 
 		const cp1x = p1.x + (p2.x - p0.x) / 6;
-		const cp1y = p1.y + (p2.y - p0.y) / 6;
+		const cp1y = clampY(p1.y + (p2.y - p0.y) / 6);
 		const cp2x = p2.x - (p3.x - p1.x) / 6;
-		const cp2y = p2.y - (p3.y - p1.y) / 6;
+		const cp2y = clampY(p2.y - (p3.y - p1.y) / 6);
 
 		d += ` C ${fmt(cp1x)} ${fmt(cp1y)}, ${fmt(cp2x)} ${fmt(cp2y)}, ${fmt(p2.x)} ${fmt(p2.y)}`;
 	}

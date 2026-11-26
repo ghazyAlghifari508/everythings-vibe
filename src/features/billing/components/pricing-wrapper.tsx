@@ -3,12 +3,16 @@
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useUserPlan } from "@/features/billing/hooks/use-user-plan";
+import type { ProductChargingState } from "@/features/billing/services/charging-state.functions";
 import { useUIStore } from "@/store";
 import { prdFyPlans } from "../data/pricing-data";
 import { syncPaymentStatus } from "../services/payment.functions";
 import { PricingComponent } from "./pricing-card";
-
-export default function PricingWrapper() {
+export default function PricingWrapper({
+	productChargingEnabled = { studio: false, scrape: false },
+}: {
+	productChargingEnabled?: ProductChargingState;
+}) {
 	const navigate = useNavigate();
 	const searchStr = useLocation({ select: (l) => l.searchStr });
 	const searchParams = new URLSearchParams(searchStr);
@@ -87,6 +91,7 @@ export default function PricingWrapper() {
 				plans={prdFyPlans}
 				onPlanSelect={handlePlanSelect}
 				currentPlan={currentPlan}
+				productChargingEnabled={productChargingEnabled}
 			/>
 		</div>
 	);

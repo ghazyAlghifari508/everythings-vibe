@@ -7,9 +7,14 @@ import {
 	studioJobs,
 	studioProjects,
 } from "@/db/schema";
+import { admitProductWork } from "@/features/billing/services/product-trials.server";
 import type { StudioFrameRetryOutcome } from "../types/studio";
 import { isTemporarySlot } from "../utils/studio-lifecycle";
 import { synchronizeStudioConversation } from "./studio-conversation";
+import {
+	reserveStudioOperationCharge,
+	serverStudioQuote,
+} from "./studio-credit-adapter.server";
 import { StudioFrameError } from "./studio-frame-errors";
 import { findStudioInitialJob } from "./studio-job-dependencies";
 
@@ -114,11 +119,27 @@ export async function retryStudioFrame(
 			)
 		)
 			throw new StudioFrameError("STUDIO_DEPENDENCY_FAILED");
+		const retryPrompt = initial?.prompt ?? frame.description ?? frame.name;
+		const scope = {
+			operation: "studio.regenerate" as const,
+			frames: 1,
+			promptChars: retryPrompt.length,
+			designMdChars: project.designMd?.length ?? 0,
+		};
+		const quote = serverStudioQuote(scope);
+		await admitProductWork(tx, userId, "studio", "paid", {
+			key: `retry:${frameId}:${operation?.attempts ?? 0}`,
+			payload: { projectId, frameId, prompt: retryPrompt },
+			maximumCredits: quote?.maximumCredits,
+		});
+		let retryJobId: string;
 		if (operation) {
+			retryJobId = operation.id;
 			await tx
 				.update(studioJobs)
 				.set({
 					...resetClaim,
+					creditOperationId: null,
 					baseRevision: operation.baseRevision ?? frame.revision,
 					updatedAt: new Date(),
 				})
@@ -126,16 +147,29 @@ export async function retryStudioFrame(
 					and(eq(studioJobs.id, operation.id), eq(studioJobs.userId, userId)),
 				);
 		} else {
-			await tx.insert(studioJobs).values({
-				projectId,
-				userId,
-				jobType: "retry",
-				targetFrameId: frameId,
-				prompt: initial?.prompt ?? frame.description ?? frame.name,
-				baseRevision: frame.revision,
-				blueprintJobId: initial?.id ?? null,
-			});
+			const [created] = await tx
+				.insert(studioJobs)
+				.values({
+					projectId,
+					userId,
+					jobType: "retry",
+					targetFrameId: frameId,
+					prompt: retryPrompt,
+					baseRevision: frame.revision,
+					blueprintJobId: initial?.id ?? null,
+				})
+				.returning();
+			if (!created) throw new StudioFrameError("STUDIO_STORAGE_FAILED");
+			retryJobId = created.id;
 		}
+		if (quote)
+			await reserveStudioOperationCharge(tx, {
+				userId,
+				projectId,
+				jobId: retryJobId,
+				scope,
+				idempotencyKey: `studio-regenerate:${retryJobId}:${operation?.attempts ?? 0}`,
+			});
 		// Only the failed state is reset; the frame keeps its last HTML so a
 		// failed revision still has content to correct.
 		const [updated] = await tx
@@ -216,9 +250,21 @@ export async function retryStudioPlanning(
 			throw new StudioFrameError("STUDIO_INVALID_INPUT");
 		if (project.designBlueprint || job.planningCompletedAt)
 			throw new StudioFrameError("STUDIO_INVALID_INPUT");
+		const scope = {
+			operation: "studio.regenerate" as const,
+			frames: Math.max(1, project.initialPageCount ?? 1),
+			promptChars: job.prompt.length,
+			designMdChars: project.designMd?.length ?? 0,
+		};
+		const quote = serverStudioQuote(scope);
+		await admitProductWork(tx, userId, "studio", "paid", {
+			key: `retry-planning:${job.id}:${job.attempts}`,
+			payload: { projectId, prompt: job.prompt },
+			maximumCredits: quote?.maximumCredits,
+		});
 		const [updated] = await tx
 			.update(studioJobs)
-			.set({ ...resetClaim, updatedAt: new Date() })
+			.set({ ...resetClaim, creditOperationId: null, updatedAt: new Date() })
 			.where(
 				and(
 					eq(studioJobs.id, job.id),
@@ -228,6 +274,14 @@ export async function retryStudioPlanning(
 			)
 			.returning();
 		if (!updated) throw new StudioFrameError("STUDIO_STORAGE_FAILED");
+		if (quote)
+			await reserveStudioOperationCharge(tx, {
+				userId,
+				projectId,
+				jobId: job.id,
+				scope,
+				idempotencyKey: `studio-regenerate:${job.id}:${job.attempts}`,
+			});
 		await synchronizeStudioConversation(tx, projectId, userId);
 		return updated;
 	});

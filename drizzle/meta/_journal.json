@@ -351,6 +351,41 @@
       "when": 1795708413016,
       "tag": "0049_studio_after_main",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1795388265095,
+      "tag": "0050_universal_credit_ledger",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1795391567718,
+      "tag": "0051_damp_archangel",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1795399135899,
+      "tag": "0052_product_trials",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1795404241316,
+      "tag": "0053_lame_korg",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1795417709576,
+      "tag": "0054_scrape_billing_tombstone",
+      "breakpoints": true
     }
   ]
 }

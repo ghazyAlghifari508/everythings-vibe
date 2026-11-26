@@ -54,6 +54,7 @@ export function StudioLaunchComposer({
 	onError,
 	onSubmit,
 	textareaRef,
+	creditLabel,
 }: {
 	prompt: string;
 	onPromptChange: (value: string) => void;
@@ -68,6 +69,7 @@ export function StudioLaunchComposer({
 	onError?: (error: string) => void;
 	onSubmit: () => void;
 	textareaRef: RefObject<HTMLTextAreaElement | null>;
+	creditLabel?: string | null;
 }) {
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const [isFocused, setIsFocused] = useState(false);
@@ -176,7 +178,7 @@ export function StudioLaunchComposer({
 									{prd.filename}
 								</span>
 								<span className="text-[11px] text-fog">
-									Product requirements · Ready
+									Product requirements, Ready
 								</span>
 							</div>
 							<span className="flex items-center gap-1">
@@ -228,7 +230,7 @@ export function StudioLaunchComposer({
 										className="max-w-36 truncate text-[11px] text-fog"
 										title={reference.logoFilename}
 									>
-										· Logo ({reference.logoFilename})
+										Logo ({reference.logoFilename})
 									</span>
 								) : null}
 							</div>
@@ -246,6 +248,11 @@ export function StudioLaunchComposer({
 				</div>
 			) : null}
 
+			{creditLabel ? (
+				<p className="text-xs text-fog" data-testid="studio-credit-estimate">
+					{creditLabel}
+				</p>
+			) : null}
 			<div className="flex flex-wrap items-center gap-2 border-t border-graphite/60 pt-3">
 				<fieldset
 					aria-label="Pilih mode desain antarmuka"
