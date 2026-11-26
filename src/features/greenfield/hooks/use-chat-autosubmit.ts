@@ -1,6 +1,7 @@
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 import { usePaymentResume } from "@/features/greenfield/hooks/use-payment-resume";
+import { buildAutoPrdMessage } from "@/features/greenfield/utils/prd-auto-message";
 import {
 	clearSetupPrompt,
 	consumePendingPrdPrompt,
@@ -69,7 +70,7 @@ export function useChatAutoSubmit({
 
 		if (pending.mode === "auto") {
 			setGeneratingPRD(true);
-			const autoMessage = `Generate PRD lengkap berdasarkan informasi berikut:\n\n${pending.prompt}\n\nGunakan section markers sesuai standar.`;
+			const autoMessage = buildAutoPrdMessage(pending.prompt);
 			const bubbleMessage = pending.displayMessage || pending.prompt;
 			void onSubmitPrompt(autoMessage, "generate", bubbleMessage);
 		} else {

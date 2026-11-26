@@ -4,7 +4,7 @@ import { Alert02Icon, ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { useRouter } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
-import { ThoughtLine } from "@/components/ui/thought-line";
+import { Spinner } from "@/components/ui/spinner";
 import type { ProjectFeatureTree } from "@/db/schema";
 import { useGenerationNavigationGuard } from "@/features/greenfield/hooks/use-generation-navigation-guard";
 import { featureTreeSchema } from "@/features/greenfield/types/feature-tree";
@@ -41,8 +41,6 @@ function releaseFiturGuard(projectId: string, owner: AbortController) {
 		inFlightFiturProjects.delete(projectId);
 	}
 }
-
-const IDLE_FITUR_TITLE = "AI sedang menyusun daftar fitur";
 
 export function FiturDetail({
 	projectId,
@@ -244,25 +242,18 @@ export function FiturDetail({
 	return (
 		<div className="flex h-full flex-col bg-onyx text-snow">
 			<div className="flex items-center justify-between border-b border-graphite bg-obsidian px-4 py-3">
-				<h1 className="truncate font-inter text-lg font-[510]">
-					{isGenerating ? "AI sedang menyusun daftar fitur..." : "Feature Tree"}
-				</h1>
+				<h1 className="truncate font-inter text-lg font-[510]">Feature Tree</h1>
+				{isGenerating && !hasContent ? (
+					<output className="flex items-center gap-2 text-xs text-fog">
+						<Spinner size={14} />
+						<span>Menyusun daftar fitur...</span>
+					</output>
+				) : null}
 			</div>
 
 			<div className="relative flex-1 overflow-hidden">
 				{isGenerating && !hasContent ? (
-					<div className="flex h-full flex-col">
-						<div className="px-4 pt-3">
-							<ThoughtLine
-								working
-								label={IDLE_FITUR_TITLE}
-								doneLabel="Daftar fitur selesai"
-							/>
-						</div>
-						<div className="relative min-h-0 flex-1">
-							<FeatureMapCanvas productName={projectName} featureTree={null} />
-						</div>
-					</div>
+					<FeatureMapCanvas productName={projectName} featureTree={null} />
 				) : hasError && !hasContent ? (
 					<div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
 						<Icon icon={Alert02Icon} size={40} className="text-crimson" />
@@ -271,7 +262,7 @@ export function FiturDetail({
 						</h2>
 						<p className="max-w-md text-sm text-fog">
 							Terjadi kesalahan saat menghubungi AI. Daftar fitur belum
-							tersimpan — tidak ada data yang hilang.
+							tersimpan.
 						</p>
 						<button
 							type="button"
@@ -282,7 +273,7 @@ export function FiturDetail({
 						</button>
 					</div>
 				) : !hasContent ? (
-					<div className="flex h-full flex-col items-center justify-center gap-5 p-8 text-center">
+					<div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
 						<div className="max-w-md">
 							<h2 className="font-inter text-lg font-[510] text-snow">
 								Belum ada daftar fitur
@@ -291,47 +282,12 @@ export function FiturDetail({
 								Susun daftar fitur dari jawaban Anda sebelum lanjut ke PRD.
 							</p>
 						</div>
-						<ol className="grid w-full max-w-2xl gap-3 text-left sm:grid-cols-3">
-							{[
-								{
-									n: "1",
-									t: "Jawab pertanyaan",
-									d: "Lengkapi preferensi produk di tahap Ask.",
-								},
-								{
-									n: "2",
-									t: "Lihat Fitur",
-									d: "AI menyusun fitur & subfitur di halaman ini.",
-								},
-								{
-									n: "3",
-									t: "Generate PRD",
-									d: "Lanjut ke PRD 8 seksi dari daftar fitur.",
-								},
-							].map((s) => (
-								<li
-									key={s.n}
-									className="rounded-xl border border-graphite bg-charcoal p-4"
-								>
-									<span
-										aria-hidden
-										className="flex h-6 w-6 items-center justify-center rounded-full border border-graphite bg-obsidian font-mono text-[11px] text-snow"
-									>
-										{s.n}
-									</span>
-									<p className="mt-2 text-sm font-[510] text-snow">{s.t}</p>
-									<p className="mt-0.5 text-xs leading-relaxed text-fog">
-										{s.d}
-									</p>
-								</li>
-							))}
-						</ol>
 						<button
 							type="button"
 							onClick={() => handleGenerate()}
 							className="btn-primary inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-sm"
 						>
-							Susun Daftar Fitur
+							Susun daftar fitur
 							<Icon icon={ArrowRight01Icon} size={14} />
 						</button>
 					</div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useEffect, useRef } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { CreditExhaustedModal } from "@/features/billing/components/credit-exhausted-modal";
 import { useChatAutoSubmit } from "@/features/greenfield/hooks/use-chat-autosubmit";
 import { useChatDraft } from "@/features/greenfield/hooks/use-chat-draft";
@@ -10,6 +10,7 @@ import { useChatStore } from "@/store";
 import type { Plan } from "@/types/database";
 import { ChatInputArea } from "./chat-input-area";
 import { ChatMessageList } from "./chat-message-list";
+import { PrdRetryBar } from "./prd-retry-bar";
 import { ResumeErrorModal } from "./resume-error-modal";
 
 export interface ChatPanelProps {
@@ -81,7 +82,6 @@ export const ChatPanel = memo(function ChatPanel({
 		stream.messages,
 		stream.streamingContent,
 		stream.currentSection,
-		stream.thinkingText,
 		scrollToBottom,
 	]);
 
@@ -98,6 +98,16 @@ export const ChatPanel = memo(function ChatPanel({
 	}, [clearDraft, input, stream]);
 
 	const isEffectivelyDisabled = !projectId && inputDisabled;
+	// Wait one effect pass so the auto-submit above can claim a pending prompt
+	// first; otherwise the bar would flash before the generation starts.
+	const [settled, setSettled] = useState(false);
+	useEffect(() => setSettled(true), []);
+	const showRetry =
+		settled &&
+		!currentPrdContent &&
+		!isReadOnly &&
+		!stream.isStreaming &&
+		!stream.isGeneratingPRD;
 
 	return (
 		<div
@@ -108,13 +118,21 @@ export const ChatPanel = memo(function ChatPanel({
 				messages={stream.messages}
 				isStreaming={stream.isStreaming}
 				streamingContent={stream.streamingContent}
-				thinkingText={stream.thinkingText}
 				currentSection={stream.currentSection}
 				completedSections={stream.completedSections}
 				isGeneratingPRD={stream.isGeneratingPRD}
 				isRevising={stream.isRevising}
 				scrollRef={scrollRef}
 			/>
+
+			{showRetry && projectId && (
+				<PrdRetryBar
+					projectId={projectId}
+					onGenerate={(message, display) =>
+						stream.handleSendWithMessage(message, "generate", display)
+					}
+				/>
+			)}
 
 			<ChatInputArea
 				input={input}

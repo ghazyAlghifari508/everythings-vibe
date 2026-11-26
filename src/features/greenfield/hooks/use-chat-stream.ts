@@ -7,6 +7,7 @@ import {
 	useState,
 } from "react";
 import { extractSections } from "@/features/greenfield/components/chat/chat-revision";
+import { createStreamBuffer } from "@/features/greenfield/components/chat/chat-stream-buffer";
 import {
 	handleStreamCatch,
 	handleStreamDoneEvent,
@@ -16,11 +17,11 @@ import {
 } from "@/features/greenfield/components/chat/chat-stream-handlers";
 import { executeChatStreamRequest } from "@/features/greenfield/components/chat/chat-stream-runner";
 import { useGenerationNavigationGuard } from "@/features/greenfield/hooks/use-generation-navigation-guard";
+import type { PrdChatMode } from "@/features/greenfield/services/prd-chat-request";
 import { useChatStore, useUIStore } from "@/store";
 import { useChatResumeModal } from "./use-chat-resume-modal";
 import { useChatSectionProgress } from "./use-chat-section-progress";
 import { useChatSend } from "./use-chat-send";
-import { useChatStreamBuffer } from "./use-chat-stream-buffer";
 
 export interface UseChatStreamOptions {
 	projectId?: string;
@@ -45,10 +46,11 @@ export function useChatStream({
 	const [streamingContent, setStreamingContent] = useState("");
 	const [thinkingText, setThinkingText] = useState("");
 	const [isRevising, setIsRevising] = useState(false);
-	const [activeChatMode, setActiveChatMode] = useState<string>("chat");
 
 	const isSubmittingRef = useRef(false);
 	const abortControllerRef = useRef<AbortController | null>(null);
+	const activeRequestRef = useRef<number | null>(null);
+	const requestSeqRef = useRef(0);
 	const streamingContentRef = useRef("");
 	const thinkingTextRef = useRef(thinkingText);
 	thinkingTextRef.current = thinkingText;
@@ -76,33 +78,31 @@ export function useChatStream({
 
 	useGenerationNavigationGuard(isStreaming);
 
-	const buffer = useChatStreamBuffer({
-		chatMode: activeChatMode,
-		currentPrdContent,
-		updateProgressFromContent,
-		setStreamingPRDContent,
-		setStreamingContent,
-		streamingContentRef,
-	});
-
 	useEffect(() => {
 		if (!isStreaming) isSubmittingRef.current = false;
 	}, [isStreaming]);
 
 	const previousProjectIdRef = useRef(projectId);
 	useEffect(() => {
-		if (
-			previousProjectIdRef.current &&
-			projectId &&
-			previousProjectIdRef.current !== projectId
-		) {
-			if (abortControllerRef.current) {
-				abortControllerRef.current.abort();
-				abortControllerRef.current = null;
-			}
-		}
+		const previousProjectId = previousProjectIdRef.current;
 		previousProjectIdRef.current = projectId;
-	}, [projectId]);
+		if (!previousProjectId || !projectId || previousProjectId === projectId) {
+			return;
+		}
+		if (activeRequestRef.current === null) return;
+		// The in-flight request belongs to the previous project: revoke its
+		// ownership first so late events cannot write into this project.
+		activeRequestRef.current = null;
+		abortControllerRef.current?.abort();
+		abortControllerRef.current = null;
+		isSubmittingRef.current = false;
+		setStreaming(false);
+		setGeneratingPRD(false);
+		setStreamingPRDContent("");
+		setStreamingContent("");
+		setThinkingText("");
+		setIsRevising(false);
+	}, [projectId, setGeneratingPRD, setStreaming, setStreamingPRDContent]);
 
 	const handleCancel = useCallback(() => {
 		// Retain ownership until the aborted request has finished its cleanup.
@@ -112,22 +112,41 @@ export function useChatStream({
 	const streamApiCall = useCallback(
 		async (
 			body: Record<string, unknown>,
-			chatMode: string,
+			chatMode: PrdChatMode,
 			originalMessage: string,
 			existingPartialContent = "",
 		) => {
-			setActiveChatMode(chatMode);
+			const requestId = ++requestSeqRef.current;
+			activeRequestRef.current = requestId;
+			const isCurrent = () => activeRequestRef.current === requestId;
 			const abortController = new AbortController();
 			abortControllerRef.current = abortController;
 
+			const buffer = createStreamBuffer({
+				mode: chatMode,
+				basePrdContent: currentPrdContent,
+				initialContent: existingPartialContent,
+				isCurrent,
+				updateProgressFromContent,
+				setStreamingPRDContent,
+				setStreamingContent: (text) => {
+					streamingContentRef.current = text;
+					setStreamingContent(text);
+				},
+			});
+			const invalidateRouter = () =>
+				startTransition(() => {
+					router.invalidate();
+				});
+
 			try {
 				let errorHandled = false;
-				let streamResultFullContent = "";
 
 				const streamResult = await executeChatStreamRequest({
 					body,
 					signal: abortController.signal,
 					onHttpError: (status, err) => {
+						if (!isCurrent()) return;
 						handleStreamHttpError({
 							status,
 							err,
@@ -138,27 +157,23 @@ export function useChatStream({
 							setCreditsExhausted,
 							showToast,
 						});
-						isSubmittingRef.current = false;
 					},
-					onThinking: (chunk) => setThinkingText((prev) => prev + chunk),
-					onThinkingReset: () => setThinkingText(""),
+					onThinking: (chunk) => {
+						if (isCurrent()) setThinkingText((prev) => prev + chunk);
+					},
+					onThinkingReset: () => {
+						if (isCurrent()) setThinkingText("");
+					},
 					onDelta: (chunk) => {
+						if (!isCurrent()) return;
 						if (thinkingTextRef.current) setThinkingText("");
-						streamResultFullContent += chunk;
-						buffer.pendingContentRef.current =
-							(buffer.pendingContentRef.current || existingPartialContent) +
-							chunk;
-						buffer.scheduleFlush();
+						buffer.append(chunk);
 					},
 					onDone: (parsed) => {
-						buffer.cancelFlush();
-						buffer.flushContent();
-						buffer.pendingContentRef.current = "";
+						if (!isCurrent()) return;
+						buffer.flush();
 						if (parsed.conversationId) setConversationId(parsed.conversationId);
-						const finalContentHere = existingPartialContent
-							? existingPartialContent + streamResultFullContent
-							: streamResultFullContent;
-						markAllSectionsCompleted(finalContentHere);
+						if (chatMode !== "chat") markAllSectionsCompleted(buffer.content());
 
 						if (chatMode === "revise") {
 							const freshContent =
@@ -174,32 +189,24 @@ export function useChatStream({
 							parsed,
 							chatMode,
 							projectId,
-							streamingNaturalLanguage:
-								streamingContentRef.current || streamingContent,
+							streamingNaturalLanguage: buffer.replyText(),
 							onProjectCreated,
 							onPrdRevised,
 							addMessage,
 							setGeneratingPRD,
 							setStreamingPRDContent,
 							setIsRevising,
-							invalidateRouter: () =>
-								startTransition(() => {
-									router.invalidate();
-								}),
+							invalidateRouter,
 						});
 					},
 					onError: (parsed) => {
+						if (!isCurrent()) return;
 						errorHandled = true;
-						buffer.cancelFlush();
-						buffer.pendingContentRef.current = "";
-						const currentDisplayContent = existingPartialContent
-							? existingPartialContent + streamResultFullContent
-							: streamResultFullContent;
-
+						buffer.flush();
 						handleStreamErrorEvent({
 							parsed,
 							chatMode,
-							currentDisplayContent,
+							currentDisplayContent: buffer.content(),
 							originalMessage,
 							triggerResumeModal: resumeModal.triggerResumeModal,
 							showToast,
@@ -210,12 +217,9 @@ export function useChatStream({
 					},
 				});
 
-				if (!streamResult || errorHandled) return;
+				if (!streamResult || errorHandled || !isCurrent()) return;
 
-				buffer.cancelFlush();
-				buffer.flushContent();
-				buffer.pendingContentRef.current = "";
-
+				buffer.flush();
 				handleStreamPostCompletion({
 					gotDoneEvent: streamResult.gotDoneEvent,
 					gotErrorEvent: streamResult.gotErrorEvent,
@@ -226,18 +230,15 @@ export function useChatStream({
 					setGeneratingPRD,
 					setStreamingPRDContent,
 					showToast,
-					invalidateRouter: () =>
-						startTransition(() => {
-							router.invalidate();
-						}),
+					invalidateRouter,
 				});
 			} catch (err: unknown) {
+				if (!isCurrent()) return;
+				buffer.cancel();
 				handleStreamCatch({
 					err,
 					chatMode,
-					currentDisplayContent: existingPartialContent
-						? existingPartialContent + buffer.pendingContentRef.current
-						: buffer.pendingContentRef.current,
+					currentDisplayContent: buffer.content(),
 					originalMessage,
 					showToast,
 					triggerResumeModal: resumeModal.triggerResumeModal,
@@ -245,20 +246,25 @@ export function useChatStream({
 					setStreamingPRDContent,
 				});
 			} finally {
-				buffer.resetBuffer();
-				setStreaming(false);
-				setStreamingContent("");
-				if (chatMode !== "generate" && chatMode !== "resume") {
-					setGeneratingPRD(false);
-					setStreamingPRDContent("");
+				buffer.cancel();
+				// A superseded request (project switch) was already reset by its
+				// replacement; touching the shared flags here would clobber it.
+				if (isCurrent()) {
+					activeRequestRef.current = null;
+					abortControllerRef.current = null;
+					setStreaming(false);
+					setStreamingContent("");
+					setIsRevising(false);
+					if (chatMode !== "generate" && chatMode !== "resume") {
+						setGeneratingPRD(false);
+						setStreamingPRDContent("");
+					}
+					isSubmittingRef.current = false;
 				}
-				isSubmittingRef.current = false;
-				abortControllerRef.current = null;
 			}
 		},
 		[
 			addMessage,
-			buffer,
 			currentPrdContent,
 			markAllSectionsCompleted,
 			onProjectCreated,
@@ -273,7 +279,7 @@ export function useChatStream({
 			setStreaming,
 			setStreamingPRDContent,
 			showToast,
-			streamingContent,
+			updateProgressFromContent,
 		],
 	);
 

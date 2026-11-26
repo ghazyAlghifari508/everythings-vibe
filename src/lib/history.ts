@@ -21,10 +21,14 @@ export interface HistoryItem {
 
 // Workspace scope for the history list. "greenfield" hides existing-codebase
 // projects so each workspace gets its own history; undefined/"all" keeps the
-// global list the history drawer still reads.
-export const historyFilterSchema = z.object({
-	workspace: z.enum(["greenfield", "all"]).optional(),
-});
+// global list the history drawer still reads. The drawer calls the server
+// function with no payload at all, so an omitted filter must parse to "all"
+// instead of failing validation.
+export const historyFilterSchema = z
+	.object({
+		workspace: z.enum(["greenfield", "all"]).optional(),
+	})
+	.default({});
 
 export const loadHistory = createServerFn({ method: "GET" })
 	.validator((data: unknown) => historyFilterSchema.parse(data))

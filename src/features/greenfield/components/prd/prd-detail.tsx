@@ -6,9 +6,9 @@ import { type CSSProperties, useState, useTransition } from "react";
 import { Icon } from "@/components/ui/icon";
 import { CreditExhaustedModal } from "@/features/billing/components/credit-exhausted-modal";
 import { ChatPanel } from "@/features/greenfield/components/chat/chat-panel";
-import { GenerationProgress } from "@/features/greenfield/components/generation-progress";
 import { usePanelResize } from "@/features/greenfield/hooks/use-panel-resize";
 import { usePrdDetail } from "@/features/greenfield/hooks/use-prd-detail";
+import { PRD_CHAT_PANEL_ID } from "@/features/greenfield/types/greenfield-constants";
 import { isPrdLocked } from "@/lib/flow-progress";
 import { cn } from "@/lib/utils";
 import { useChatStore, useUIStore } from "@/store";
@@ -72,12 +72,8 @@ export function PrdDetail({
 	const navigate = useNavigate();
 	const search = useLocation({ select: (l) => l.search });
 	const [, startTransition] = useTransition();
-	const {
-		isGeneratingPRD,
-		streamingPRDContent,
-		creditsExhausted,
-		setCreditsExhausted,
-	} = useChatStore();
+	const { isGeneratingPRD, creditsExhausted, setCreditsExhausted } =
+		useChatStore();
 
 	const {
 		currentContent,
@@ -141,25 +137,17 @@ export function PrdDetail({
 					)}
 					style={{ background: "var(--bg-page)" }}
 				>
-					{/* Default: PRD content (streaming or saved) */}
+					{/* Default: PRD content (streaming or saved). The canvas owns the
+					    pre-token state itself: it shows a text skeleton, so no second
+					    loading copy or spinner is rendered over the document here. */}
 					<div className="flex flex-1 flex-col overflow-hidden relative">
-						{/* Mobile-only spinner — keeps the full-page blocker for small screens
-                where the chat progress card isn't visible. Desktop users see the
-                empty PrdViewer + the section progress card in the chat panel. */}
-						{/* Pre-stream / waiting-for-first-token: plain load first
-						    (desktop+mobile), then rotating thinking steps once the model
-						    has been silent a few seconds. Real content replaces it. */}
-						{isGeneratingPRD && !streamingPRDContent && !latestVersion && (
-							<div className="absolute inset-0 z-10 overflow-y-auto bg-onyx">
-								<GenerationProgress label="PRD" isStreaming={isGeneratingPRD} />
-							</div>
-						)}
 						<PrdViewer
 							content={streamingForView ? streamingForView : currentContent}
 							plan={plan}
 							versions={mappedVersions}
 							currentVersion={selectedVersionNum}
 							onSelectVersion={handleVersionSelect}
+							isGenerating={isGeneratingPRD}
 							className="flex-1 overflow-hidden"
 						/>
 						{plan === "free" && latestVersion && (
@@ -183,49 +171,66 @@ export function PrdDetail({
 					</div>
 				</div>
 
-				<div
-					id="print-hide-chat"
+				{/* Mobile (<md) follows the Dokumen/Chat tab; md+ follows the store.
+				    The panel stays laid out while closed so the toggle animates
+				    instead of snapping: the tablet sheet slides up from the bottom,
+				    and the desktop panel keeps its right edge pinned to the wall
+				    while its width animates, so its left edge slides in from the
+				    right and sinks back into it. `invisible` (not display:none)
+				    keeps the closed panel out of the tab order and hit testing. */}
+				<aside
+					id={PRD_CHAT_PANEL_ID}
+					aria-label="Chat PRD"
+					data-state={isChatOpen ? "open" : "closed"}
 					style={chatStyle}
 					className={cn(
-						"flex min-h-0 flex-1 flex-col border-l border-graphite print:hidden md:fixed md:inset-x-0 md:bottom-0 md:z-40 md:h-[60vh] md:rounded-t-xl xl:relative xl:inset-auto xl:z-auto xl:h-auto xl:rounded-none xl:flex-none xl:w-[var(--chat-width)]",
-						activeTab !== "chat" && "hidden md:flex",
-						!isChatOpen &&
-							"md:hidden xl:flex xl:w-0 xl:overflow-hidden xl:border-none",
-						!isDraggingRight && "xl:transition-[width]",
+						"min-h-0 flex-1 flex-col overflow-hidden border-l border-graphite print:hidden",
+						"md:fixed md:inset-x-0 md:bottom-0 md:z-40 md:flex md:h-[60vh] md:rounded-t-xl",
+						"xl:relative xl:inset-auto xl:z-auto xl:h-auto xl:rounded-none xl:flex-none xl:translate-y-0",
+						// Toggle animates; a manual drag must track the pointer with no
+						// transition, or the panel lags one animation behind the cursor.
+						!isDraggingRight &&
+							"md:transition-[transform,visibility] md:duration-300 md:ease-out xl:transition-[width,visibility] xl:duration-300 xl:ease-out motion-reduce:transition-none",
+						activeTab === "chat" ? "flex" : "hidden",
+						isChatOpen
+							? "md:visible md:translate-y-0 xl:w-[var(--chat-width)]"
+							: "md:invisible md:translate-y-full xl:w-0",
 					)}
 				>
+					<div className="flex min-h-0 flex-1 flex-col overflow-hidden xl:w-[var(--chat-width)]">
+						<div className="hidden shrink-0 items-center justify-between border-b border-graphite px-4 py-2 md:flex xl:hidden">
+							<span className="text-sm font-[510]">Chat</span>
+							<button
+								type="button"
+								onClick={toggleChat}
+								aria-label="Tutup chat"
+								className="text-fog hover:text-snow"
+							>
+								<Icon icon={Cancel01Icon} size={16} />
+							</button>
+						</div>
+						<ChatPanel
+							projectId={projectId}
+							conversationId={conversationId}
+							onProjectCreated={handleProjectCreated}
+							onPrdRevised={handlePrdRevised}
+							className="min-h-0 flex-1 w-full border-none"
+							enableAutoSubmit={true}
+							inputDisabled={!projectId && !isGeneratingPRD}
+							isReadOnly={isReadOnly}
+							currentPrdContent={currentContent}
+							userPlan={plan}
+							selectedVersionNum={selectedVersionNum}
+						/>
+					</div>
 					{isChatOpen && (
 						<div
 							aria-hidden="true"
-							className="absolute inset-y-0 -left-1 z-10 hidden w-2 cursor-col-resize xl:block"
+							className="absolute inset-y-0 left-0 z-10 hidden w-2 cursor-col-resize xl:block"
 							onMouseDown={onStartDragRight}
 						/>
 					)}
-					<div className="hidden shrink-0 items-center justify-between border-b border-graphite px-4 py-2 md:flex xl:hidden">
-						<span className="text-sm font-[510]">Chat</span>
-						<button
-							type="button"
-							onClick={toggleChat}
-							aria-label="Tutup chat"
-							className="text-fog hover:text-snow"
-						>
-							<Icon icon={Cancel01Icon} size={16} />
-						</button>
-					</div>
-					<ChatPanel
-						projectId={projectId}
-						conversationId={conversationId}
-						onProjectCreated={handleProjectCreated}
-						onPrdRevised={handlePrdRevised}
-						className="min-h-0 flex-1 w-full border-none"
-						enableAutoSubmit={true}
-						inputDisabled={!projectId && !isGeneratingPRD}
-						isReadOnly={isReadOnly}
-						currentPrdContent={currentContent}
-						userPlan={plan}
-						selectedVersionNum={selectedVersionNum}
-					/>
-				</div>
+				</aside>
 			</div>
 
 			<CreditExhaustedModal

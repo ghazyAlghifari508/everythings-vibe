@@ -40,9 +40,8 @@ export interface FlowStepCta {
 }
 
 /**
- * Derives state-aware CTA for the workspace navbar.
- * Prevents misleading "Generate AC" or "Generate Task" actions when the project
- * has already progressed past that stage (e.g. user opening /prd via browser history).
+ * Ask-stage CTA only. Later stages derive theirs from verified artifacts in
+ * flow-cta.ts; a step rank alone must never produce a forward or back action.
  */
 export function getFlowStepCta(
 	currentRouteStep: FlowStep,
@@ -84,78 +83,6 @@ export function getFlowStepCta(
 			kind: "generate",
 			label: "Lihat Fitur",
 			targetStep: "fitur",
-		};
-	}
-
-	if (currentRouteStep === "prd") {
-		if (dbRank >= stepRank("task")) {
-			return {
-				kind: "navigate",
-				label: "Kembali ke Task",
-				targetStep: "task",
-			};
-		}
-		if (dbRank >= stepRank("ac")) {
-			return {
-				kind: "navigate",
-				label: "Lanjut ke AC",
-				targetStep: "ac",
-			};
-		}
-		if (dbRank < stepRank("prd")) {
-			return {
-				kind: "navigate",
-				label: "Kembali ke Fitur",
-				targetStep: "fitur",
-			};
-		}
-		return {
-			kind: "generate",
-			label: "Generate AC",
-			targetStep: "ac",
-		};
-	}
-
-	if (currentRouteStep === "fitur") {
-		if (dbRank >= stepRank("task")) {
-			return {
-				kind: "navigate",
-				label: "Kembali ke Task",
-				targetStep: "task",
-			};
-		}
-		if (dbRank >= stepRank("ac")) {
-			return {
-				kind: "navigate",
-				label: "Lanjut ke AC",
-				targetStep: "ac",
-			};
-		}
-		if (dbRank >= stepRank("prd")) {
-			return {
-				kind: "navigate",
-				label: "Lanjut ke PRD",
-				targetStep: "prd",
-			};
-		}
-		return {
-			kind: "generate",
-			label: "Generate PRD",
-			targetStep: "prd",
-		};
-	}
-	if (currentRouteStep === "ac") {
-		if (dbRank >= stepRank("task")) {
-			return {
-				kind: "navigate",
-				label: "Kembali ke Task",
-				targetStep: "task",
-			};
-		}
-		return {
-			kind: "generate",
-			label: "Generate Task",
-			targetStep: "task",
 		};
 	}
 

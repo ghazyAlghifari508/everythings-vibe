@@ -4,6 +4,7 @@ import { useRouter } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useGenerationNavigationGuard } from "@/features/greenfield/hooks/use-generation-navigation-guard";
 import { usePaymentResume } from "@/features/greenfield/hooks/use-payment-resume";
+import { useWorkspaceSync } from "@/features/greenfield/hooks/use-workspace-sync";
 import { saveAcContent } from "@/features/greenfield/services/ac-save";
 import { consumeAcStream } from "@/features/greenfield/services/ac-stream";
 import {
@@ -57,6 +58,7 @@ export function useAcGeneration({
 	navigate,
 }: UseAcGenerationParams) {
 	const router = useRouter();
+	useWorkspaceSync(projectId, "hasAc", Boolean(latestAcContent));
 	const showToast = useUIStore((s) => s.showToast);
 	const setGeneratingAC = useChatStore((s) => s.setGeneratingAC);
 	const setCreditsExhausted = useChatStore((s) => s.setCreditsExhausted);
